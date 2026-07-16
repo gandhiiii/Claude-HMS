@@ -88,6 +88,7 @@ function renderAdmissions(container) {
             <button class="tab-btn ${admFilter === 'admitted' ? 'active' : ''}" onclick="switchAdmFilter('admitted',this)">Admitted</button>
             <button class="tab-btn ${admFilter === 'discharged' ? 'active' : ''}" onclick="switchAdmFilter('discharged',this)">Discharged</button>
             <button class="tab-btn ${admFilter === 'rooms' ? 'active' : ''}" onclick="switchAdmFilter('rooms',this)">🏥 Rooms</button>
+            <button class="tab-btn ${admFilter === 'report' ? 'active' : ''}" onclick="switchAdmFilter('report',this)">📊 Report</button>
         </div>
 
         <div id="admContent"></div>
@@ -107,6 +108,11 @@ function renderAdmContent() {
         if (stats) stats.style.display = 'none';
         content.innerHTML = '<div id="roomViewContainer"></div><div style="margin-top:12px;text-align:right;"><button class="btn btn-sm btn-secondary" onclick="showRoomManagement()">⚙️ Manage Rooms</button></div>';
         renderRoomView();
+    } else if (admFilter === 'report') {
+        if (topBar) topBar.style.justifyContent = 'flex-end';
+        if (searchBox) searchBox.style.display = 'none';
+        if (stats) stats.style.display = 'none';
+        renderAdmReport(content);
     } else {
         if (topBar) topBar.style.justifyContent = '';
         if (searchBox) searchBox.style.display = '';
@@ -700,4 +706,250 @@ function deleteAdm(id) {
         DB.delete('admissions', id);
         renderAdmContent();
     });
+}
+
+/* ═══════════════════════════════════════
+   ADMISSION REPORT
+   ═══════════════════════════════════════ */
+
+function renderAdmReport(container) {
+    var today = new Date();
+    var firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    var todayStr = today.toISOString().split('T')[0];
+
+    container.innerHTML =
+        '<div class="card">' +
+        '<div class="card-header"><h2>📊 Admission Report</h2></div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;align-items:flex-end;">' +
+        '<div class="form-group" style="margin:0;min-width:140px;"><label style="font-size:12px;">From Date</label>' +
+        '<input type="date" id="rptFrom" class="form-control" value="' + firstOfMonth + '" onchange="refreshAdmReport()"></div>' +
+        '<div class="form-group" style="margin:0;min-width:140px;"><label style="font-size:12px;">To Date</label>' +
+        '<input type="date" id="rptTo" class="form-control" value="' + todayStr + '" onchange="refreshAdmReport()"></div>' +
+        '<div class="form-group" style="margin:0;min-width:120px;"><label style="font-size:12px;">Type</label>' +
+        '<select id="rptType" class="form-control" onchange="refreshAdmReport()">' +
+        '<option value="">All Types</option><option value="regular">Regular</option>' +
+        '<option value="emergency">Emergency</option><option value="icu">ICU</option></select></div>' +
+        '<div class="form-group" style="margin:0;min-width:120px;"><label style="font-size:12px;">Status</label>' +
+        '<select id="rptStatus" class="form-control" onchange="refreshAdmReport()">' +
+        '<option value="">All Status</option><option value="admitted">Admitted</option>' +
+        '<option value="discharged">Discharged</option></select></div>' +
+        '<div style="display:flex;gap:8px;">' +
+        '<button class="btn btn-danger" onclick="exportAdmPDF()">🖨️ Export PDF</button>' +
+        '<button class="btn btn-success" onclick="exportAdmExcel()">📥 Export Excel</button>' +
+        '</div></div>' +
+        '<div id="rptSummary" class="grid-4" style="margin-bottom:16px;"></div>' +
+        '<div id="rptTable"></div>' +
+        '</div>';
+
+    refreshAdmReport();
+}
+
+function getAdmReportData() {
+    var from = document.getElementById('rptFrom') ? document.getElementById('rptFrom').value : '';
+    var to = document.getElementById('rptTo') ? document.getElementById('rptTo').value : '';
+    var typeF = document.getElementById('rptType') ? document.getElementById('rptType').value : '';
+    var statusF = document.getElementById('rptStatus') ? document.getElementById('rptStatus').value : '';
+
+    var fromTs = from ? new Date(from).getTime() : 0;
+    var toTs = to ? new Date(to + 'T23:59:59').getTime() : Infinity;
+
+    var all = DB.get('admissions') || [];
+    return all.filter(function(a) {
+        var admTs = a.admissionDate ? new Date(a.admissionDate).getTime() : 0;
+        if (admTs < fromTs || admTs > toTs) return false;
+        if (typeF && a.type !== typeF) return false;
+        if (statusF && a.status !== statusF) return false;
+        return true;
+    });
+}
+
+function refreshAdmReport() {
+    var rows = getAdmReportData();
+
+    // Summary cards
+    var admitted = rows.filter(function(r) { return r.status === 'admitted'; }).length;
+    var discharged = rows.filter(function(r) { return r.status === 'discharged'; }).length;
+    var emergency = rows.filter(function(r) { return r.type === 'emergency'; }).length;
+    var totalBill = rows.reduce(function(s, r) { return s + (parseFloat(r.billAmount) || 0); }, 0);
+    var staySum = 0; var stayCount = 0;
+    rows.forEach(function(r) {
+        if (r.status === 'discharged' && r.dischargeDate) {
+            staySum += APP.daysBetween(r.admissionDate, r.dischargeDate);
+            stayCount++;
+        }
+    });
+    var avgStay = stayCount > 0 ? (staySum / stayCount).toFixed(1) : '—';
+
+    var sumEl = document.getElementById('rptSummary');
+    if (sumEl) {
+        sumEl.innerHTML =
+            '<div class="stat-card" style="border-left-color:var(--primary)"><div class="stat-value">' + rows.length + '</div><div class="stat-label">Total Records</div></div>' +
+            '<div class="stat-card" style="border-left-color:var(--info)"><div class="stat-value">' + admitted + '</div><div class="stat-label">Currently Admitted</div></div>' +
+            '<div class="stat-card" style="border-left-color:var(--secondary)"><div class="stat-value">' + discharged + '</div><div class="stat-label">Discharged</div></div>' +
+            '<div class="stat-card" style="border-left-color:var(--danger)"><div class="stat-value">' + emergency + '</div><div class="stat-label">Emergency</div></div>' +
+            '<div class="stat-card" style="border-left-color:var(--warning)"><div class="stat-value">₹' + totalBill.toLocaleString('en-IN') + '</div><div class="stat-label">Total Revenue</div></div>' +
+            '<div class="stat-card" style="border-left-color:var(--gray)"><div class="stat-value">' + avgStay + '</div><div class="stat-label">Avg Stay (days)</div></div>';
+    }
+
+    // Table
+    var tblEl = document.getElementById('rptTable');
+    if (!tblEl) return;
+    if (rows.length === 0) {
+        tblEl.innerHTML = '<div class="empty-state" style="padding:40px;">No records found for the selected filters.</div>';
+        return;
+    }
+    var html = '<div class="table-responsive"><table><thead><tr>' +
+        '<th>#</th><th>Patient Name</th><th>ID</th><th>Age/Gender</th><th>Room/Bed</th>' +
+        '<th>Doctor</th><th>Type</th><th>Admitted</th><th>Discharged</th>' +
+        '<th>Stay (days)</th><th>Bill (₹)</th><th>Payment</th><th>Status</th></tr></thead><tbody>';
+
+    var sorted = rows.slice().sort(function(a, b) {
+        return new Date(b.admissionDate) - new Date(a.admissionDate);
+    });
+
+    sorted.forEach(function(a, i) {
+        var stay = a.status === 'discharged' && a.dischargeDate
+            ? APP.daysBetween(a.admissionDate, a.dischargeDate)
+            : (a.status === 'admitted' ? APP.daysBetween(a.admissionDate, new Date().toISOString()) : '—');
+        var bedLabel = a.bedId ? ' (' + a.bedId + ')' : '';
+        html += '<tr>' +
+            '<td>' + (i + 1) + '</td>' +
+            '<td><strong>' + esc(a.patientName) + '</strong></td>' +
+            '<td>' + esc(a.patientId || '#' + a.id.slice(-6)) + '</td>' +
+            '<td>' + esc(a.age || '—') + ' / ' + esc(a.gender || '—') + '</td>' +
+            '<td>' + esc(a.roomNo) + esc(bedLabel) + '</td>' +
+            '<td>' + esc(a.doctorName || '—') + '</td>' +
+            '<td><span class="badge ' + (a.type === 'emergency' ? 'badge-danger' : a.type === 'icu' ? 'badge-warning' : 'badge-info') + '">' + esc(a.type) + '</span></td>' +
+            '<td>' + APP.formatDate(a.admissionDate) + '</td>' +
+            '<td>' + (a.dischargeDate ? APP.formatDate(a.dischargeDate) : '—') + '</td>' +
+            '<td>' + stay + '</td>' +
+            '<td>' + (a.billAmount ? '₹' + parseFloat(a.billAmount).toLocaleString('en-IN') : '—') + '</td>' +
+            '<td><span class="badge ' + (a.paymentStatus === 'paid' ? 'badge-success' : a.paymentStatus === 'partial' ? 'badge-warning' : 'badge-danger') + '">' + esc(a.paymentStatus || '—') + '</span></td>' +
+            '<td><span class="badge ' + APP.getStatusBadge(a.status) + '">' + esc(a.status) + '</span></td>' +
+            '</tr>';
+    });
+    html += '</tbody></table></div>';
+    tblEl.innerHTML = html;
+}
+
+function esc(v) {
+    return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ─── PDF Export ─── */
+function exportAdmPDF() {
+    var rows = getAdmReportData();
+    var from = document.getElementById('rptFrom') ? document.getElementById('rptFrom').value : '';
+    var to = document.getElementById('rptTo') ? document.getElementById('rptTo').value : '';
+
+    var admitted = rows.filter(function(r){ return r.status==='admitted'; }).length;
+    var discharged = rows.filter(function(r){ return r.status==='discharged'; }).length;
+    var emergency = rows.filter(function(r){ return r.type==='emergency'; }).length;
+    var totalBill = rows.reduce(function(s,r){ return s+(parseFloat(r.billAmount)||0); },0);
+
+    var tableRows = rows.slice().sort(function(a,b){ return new Date(b.admissionDate)-new Date(a.admissionDate); }).map(function(a,i){
+        var stay = a.status==='discharged'&&a.dischargeDate ? APP.daysBetween(a.admissionDate,a.dischargeDate) : (a.status==='admitted' ? APP.daysBetween(a.admissionDate,new Date().toISOString()) : '—');
+        var bedLabel = a.bedId ? ' ('+a.bedId+')' : '';
+        return '<tr><td>'+(i+1)+'</td><td>'+esc(a.patientName)+'</td><td>'+esc(a.patientId||'#'+a.id.slice(-6))+'</td><td>'+esc(a.age||'')+'/'+(a.gender||'')+'</td><td>'+esc(a.roomNo)+esc(bedLabel)+'</td><td>'+esc(a.doctorName||'')+'</td><td>'+esc(a.type)+'</td><td>'+APP.formatDate(a.admissionDate)+'</td><td>'+(a.dischargeDate?APP.formatDate(a.dischargeDate):'—')+'</td><td>'+stay+'</td><td>'+(a.billAmount?'₹'+parseFloat(a.billAmount).toLocaleString('en-IN'):'—')+'</td><td>'+esc(a.paymentStatus||'')+'</td><td>'+esc(a.status)+'</td></tr>';
+    }).join('');
+
+    var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Admission Report</title><style>' +
+        'body{font-family:Arial,sans-serif;font-size:12px;color:#222;margin:0;padding:20px;}' +
+        'h1{font-size:20px;color:#1a73e8;margin:0 0 4px;}' +
+        '.meta{font-size:11px;color:#666;margin-bottom:16px;}' +
+        '.summary{display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap;}' +
+        '.sum-card{border:1px solid #dadce0;border-radius:8px;padding:10px 18px;min-width:110px;text-align:center;}' +
+        '.sum-val{font-size:22px;font-weight:700;color:#1a73e8;}' +
+        '.sum-lbl{font-size:10px;color:#666;text-transform:uppercase;}' +
+        'table{width:100%;border-collapse:collapse;font-size:10px;}' +
+        'th{background:#1a73e8;color:#fff;padding:6px 5px;text-align:left;white-space:nowrap;}' +
+        'td{padding:5px;border-bottom:1px solid #e0e0e0;vertical-align:top;}' +
+        'tr:nth-child(even) td{background:#f8f9fa;}' +
+        '.footer{margin-top:20px;font-size:10px;color:#999;border-top:1px solid #dadce0;padding-top:8px;}' +
+        '@media print{body{padding:10px;}button{display:none;}}' +
+        '</style></head><body>' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+        '<div><h1>🏥 Hospital Management System</h1><div class="meta">Admission Report &nbsp;|&nbsp; Period: ' + (from||'All')+' to '+(to||'All') + ' &nbsp;|&nbsp; Generated: '+new Date().toLocaleString('en-IN')+'</div></div>' +
+        '<button onclick="window.print()" style="padding:8px 20px;background:#1a73e8;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;margin-top:4px;">🖨️ Print / Save PDF</button>' +
+        '</div>' +
+        '<div class="summary">' +
+        '<div class="sum-card"><div class="sum-val">'+rows.length+'</div><div class="sum-lbl">Total Records</div></div>' +
+        '<div class="sum-card"><div class="sum-val">'+admitted+'</div><div class="sum-lbl">Admitted</div></div>' +
+        '<div class="sum-card"><div class="sum-val">'+discharged+'</div><div class="sum-lbl">Discharged</div></div>' +
+        '<div class="sum-card"><div class="sum-val">'+emergency+'</div><div class="sum-lbl">Emergency</div></div>' +
+        '<div class="sum-card"><div class="sum-val">₹'+totalBill.toLocaleString('en-IN')+'</div><div class="sum-lbl">Total Revenue</div></div>' +
+        '</div>' +
+        '<table><thead><tr><th>#</th><th>Patient</th><th>ID</th><th>Age/Gen</th><th>Room</th><th>Doctor</th><th>Type</th><th>Admitted</th><th>Discharged</th><th>Stay</th><th>Bill</th><th>Payment</th><th>Status</th></tr></thead><tbody>' + tableRows + '</tbody></table>' +
+        '<div class="footer">Hospital Management System &nbsp;|&nbsp; Total: '+rows.length+' records &nbsp;|&nbsp; Printed: '+new Date().toLocaleString('en-IN')+'</div>' +
+        '</body></html>';
+
+    var win = window.open('', '_blank');
+    if (!win) { APP.notify('Allow pop-ups to export PDF', 'error'); return; }
+    win.document.write(html);
+    win.document.close();
+    setTimeout(function(){ win.print(); }, 400);
+}
+
+/* ─── Excel (CSV) Export ─── */
+function exportAdmExcel() {
+    var rows = getAdmReportData();
+    if (rows.length === 0) { APP.notify('No records to export', 'error'); return; }
+
+    var from = document.getElementById('rptFrom') ? document.getElementById('rptFrom').value : '';
+    var to = document.getElementById('rptTo') ? document.getElementById('rptTo').value : '';
+
+    var headers = ['#','Patient Name','Patient ID','Age','Gender','Phone','Emergency Contact',
+        'Room No','Bed','Doctor','Department','Type','Admission Date','Discharge Date',
+        'Stay (days)','Diagnosis','Bill Amount (INR)','Payment Status','Status','Notes'];
+
+    var csvRows = [headers];
+
+    var sorted = rows.slice().sort(function(a,b){ return new Date(b.admissionDate)-new Date(a.admissionDate); });
+    sorted.forEach(function(a, i) {
+        var stay = a.status==='discharged'&&a.dischargeDate
+            ? APP.daysBetween(a.admissionDate,a.dischargeDate)
+            : (a.status==='admitted' ? APP.daysBetween(a.admissionDate,new Date().toISOString()) : '');
+        csvRows.push([
+            i+1,
+            csvCell(a.patientName),
+            csvCell(a.patientId||'#'+a.id.slice(-6)),
+            csvCell(a.age||''),
+            csvCell(a.gender||''),
+            csvCell(a.phone||''),
+            csvCell(a.emergencyContact||''),
+            csvCell(a.roomNo),
+            csvCell(a.bedId||''),
+            csvCell(a.doctorName||''),
+            csvCell(a.department||''),
+            csvCell(a.type||''),
+            csvCell(a.admissionDate ? new Date(a.admissionDate).toLocaleDateString('en-IN') : ''),
+            csvCell(a.dischargeDate ? new Date(a.dischargeDate).toLocaleDateString('en-IN') : ''),
+            stay,
+            csvCell(a.diagnosis||''),
+            a.billAmount||'',
+            csvCell(a.paymentStatus||''),
+            csvCell(a.status||''),
+            csvCell(a.notes||'')
+        ]);
+    });
+
+    var csv = csvRows.map(function(r){ return r.join(','); }).join('\r\n');
+    var bom = '﻿'; // UTF-8 BOM so Excel opens with correct encoding
+    var blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'Admission_Report_' + (from||'all') + '_to_' + (to||'all') + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+    APP.notify('Excel file downloaded (' + rows.length + ' records)', 'success');
+}
+
+function csvCell(v) {
+    var s = String(v == null ? '' : v);
+    if (s.indexOf(',') > -1 || s.indexOf('"') > -1 || s.indexOf('\n') > -1) {
+        return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
 }
