@@ -19,11 +19,15 @@ function renderEmployeeDashboard(container) {
     var u = user.fullName || user.username;
     _empData = {
         user: user, dept: dept,
-        myTasks: tasks.filter(function(t) { return t.assignedTo === u || t.assignedTo === user.fullName || t.assignedTo === user.username || t.department === dept; }),
+        myTasks: tasks.filter(function(t) {
+            // Show if explicitly assigned to this user, OR if unassigned but tagged to their dept
+            return t.assignedTo === u || t.assignedTo === user.fullName || t.assignedTo === user.username ||
+                   (!t.assignedTo && t.department === dept);
+        }),
         myProblems: problems.filter(function(p) { return p.createdBy === user.username || p.createdBy === user.fullName; }),
         myRequests: requests.filter(function(r) { return r.createdBy === user.username || r.createdBy === user.fullName; }),
-        myChecklists: checklists,
-        myProjects: projects,
+        myChecklists: checklists.filter(function(c) { return c.assignedTo === user.fullName || c.assignedTo === 'common'; }),
+        myProjects: projects.filter(function(p) { return p.assignedTo === u || p.assignedTo === user.fullName || p.assignedTo === user.username; }),
         deptInventory: inventory,
         myReports: reports.filter(function(r) { return r.createdBy === user.username || r.createdBy === user.fullName; }),
         pendingCleaning: cleaningTasks.filter(function(t){ return t.status !== 'done'; }),
