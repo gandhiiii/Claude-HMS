@@ -88,6 +88,7 @@ function renderAdmissions(container) {
             <button class="tab-btn ${admFilter === 'admitted' ? 'active' : ''}" onclick="switchAdmFilter('admitted',this)">Admitted</button>
             <button class="tab-btn ${admFilter === 'discharged' ? 'active' : ''}" onclick="switchAdmFilter('discharged',this)">Discharged</button>
             <button class="tab-btn ${admFilter === 'rooms' ? 'active' : ''}" onclick="switchAdmFilter('rooms',this)">🏥 Rooms</button>
+            <button class="tab-btn ${admFilter === 'cleaning' ? 'active' : ''}" onclick="switchAdmFilter('cleaning',this)">🧹 Cleaning <span id="cleaningBadge" style="display:inline-block;background:var(--danger);color:#fff;border-radius:10px;padding:0 6px;font-size:10px;font-weight:700;margin-left:4px;vertical-align:middle;"></span></button>
             <button class="tab-btn ${admFilter === 'report' ? 'active' : ''}" onclick="switchAdmFilter('report',this)">📊 Report</button>
         </div>
 
@@ -108,6 +109,11 @@ function renderAdmContent() {
         if (stats) stats.style.display = 'none';
         content.innerHTML = '<div id="roomViewContainer"></div><div style="margin-top:12px;text-align:right;"><button class="btn btn-sm btn-secondary" onclick="showRoomManagement()">⚙️ Manage Rooms</button></div>';
         renderRoomView();
+    } else if (admFilter === 'cleaning') {
+        if (topBar) topBar.style.justifyContent = 'flex-end';
+        if (searchBox) searchBox.style.display = 'none';
+        if (stats) stats.style.display = 'none';
+        renderCleaningAdmin(content);
     } else if (admFilter === 'report') {
         if (topBar) topBar.style.justifyContent = 'flex-end';
         if (searchBox) searchBox.style.display = 'none';
@@ -674,6 +680,7 @@ function saveDischarge() {
     var adm = DB.getById('admissions', data.id);
     DB.update('admissions', data.id, { status: 'discharged', dischargeDate: data.dischargeDate, dischargeSummary: data.dischargeSummary, billAmount: data.billAmount, paymentStatus: data.paymentStatus });
     if (adm) {
+        // Mark room as cleaning
         var overrides = DB.get('roomStatus') || [];
         var roomData = { roomNo: adm.roomNo, status: 'cleaning', updatedAt: new Date().toISOString() };
         var idx = -1;
@@ -683,8 +690,30 @@ function saveDischarge() {
         if (idx > -1) overrides[idx] = roomData;
         else overrides.push(roomData);
         DB.set('roomStatus', overrides);
+
+        // Create cleaning task for Housekeeping department
+        var rooms = getRooms();
+        var roomInfo = null;
+        for (var r = 0; r < rooms.length; r++) {
+            if (rooms[r].roomNo === adm.roomNo) { roomInfo = rooms[r]; break; }
+        }
+        var user = AUTH.currentUser();
+        DB.add('roomCleaningTasks', {
+            roomNo: adm.roomNo,
+            bedId: adm.bedId || '',
+            floor: roomInfo ? roomInfo.floor : '',
+            category: roomInfo ? roomInfo.category : '',
+            patientName: adm.patientName,
+            dischargedAt: data.dischargeDate,
+            dischargedBy: user ? user.fullName : 'Admin',
+            status: 'pending',
+            assignedTo: null,
+            startedAt: null,
+            completedAt: null,
+            completedBy: null
+        });
     }
-    APP.notify('Patient discharged. Bed freed.', 'success');
+    APP.notify('Patient discharged — Room queued for housekeeping cleaning.', 'success');
     renderAdmContent();
     closeModal();
 }
@@ -952,4 +981,126 @@ function csvCell(v) {
         return '"' + s.replace(/"/g, '""') + '"';
     }
     return s;
+}
+
+/* ═══════════════════════════════════════
+   ROOM CLEANING WORKFLOW
+   ═══════════════════════════════════════ */
+
+/* Called from admin Admissions → Cleaning tab */
+function renderCleaningAdmin(container) {
+    var tasks = DB.get('roomCleaningTasks') || [];
+    var pending = tasks.filter(function(t){ return t.status === 'pending' || t.status === 'in-progress'; });
+    var done    = tasks.filter(function(t){ return t.status === 'done'; });
+
+    // Update badge
+    var badge = document.getElementById('cleaningBadge');
+    if (badge) badge.textContent = pending.length > 0 ? pending.length : '';
+
+    var html = '<div class="card">'
+        + '<div class="card-header"><h2>🧹 Room Cleaning Queue</h2>'
+        + '<span style="font-size:13px;color:var(--gray);">Rooms awaiting housekeeping after patient discharge</span></div>';
+
+    if (pending.length === 0) {
+        html += '<div class="empty-state" style="padding:40px;">✅ No rooms pending cleaning right now.</div>';
+    } else {
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:16px;">';
+        pending.forEach(function(t) {
+            var since = t.dischargedAt ? APP.daysBetween(t.dischargedAt, new Date().toISOString()) : 0;
+            var urgencyColor = since >= 1 ? 'var(--danger)' : 'var(--warning)';
+            html += '<div style="background:#fff8e1;border:2px solid ' + urgencyColor + ';border-radius:10px;padding:14px;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+                + '<span style="font-size:22px;font-weight:700;">Room ' + esc(t.roomNo) + '</span>'
+                + '<span class="badge ' + (t.status === 'in-progress' ? 'badge-info' : 'badge-warning') + '">' + esc(t.status) + '</span>'
+                + '</div>'
+                + '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">'
+                + (t.floor ? 'Floor ' + t.floor + ' &nbsp;|&nbsp; ' : '')
+                + esc(t.category || '')
+                + (t.bedId ? ' &nbsp;|&nbsp; Bed ' + esc(t.bedId) : '')
+                + '</div>'
+                + '<div style="font-size:13px;margin-bottom:4px;">👤 <strong>' + esc(t.patientName) + '</strong> discharged</div>'
+                + '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">'
+                + 'Discharged: ' + (t.dischargedAt ? new Date(t.dischargedAt).toLocaleDateString('en-IN') : '—')
+                + ' &nbsp;|&nbsp; By: ' + esc(t.dischargedBy || '—')
+                + (since > 0 ? ' &nbsp;|&nbsp; <span style="color:' + urgencyColor + ';font-weight:600;">' + since + 'd pending</span>' : '')
+                + '</div>'
+                + (t.assignedTo ? '<div style="font-size:12px;margin-bottom:8px;">👷 Assigned: <strong>' + esc(t.assignedTo) + '</strong></div>' : '')
+                + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+                + (t.status === 'pending' ? '<button class="btn btn-sm btn-warning" style="color:#fff;" onclick="startCleaning(\'' + t.id + '\')">▶ Start Cleaning</button>' : '')
+                + '<button class="btn btn-sm btn-success" onclick="completeCleaning(\'' + t.id + '\')">✅ Mark Clean</button>'
+                + '</div></div>';
+        });
+        html += '</div>';
+    }
+
+    if (done.length > 0) {
+        html += '<div style="margin-top:16px;"><h4 style="margin-bottom:8px;font-size:14px;color:var(--gray);">✅ Recently Completed</h4>'
+            + '<div class="table-responsive"><table><thead><tr><th>Room</th><th>Floor</th><th>Patient</th><th>Discharged</th><th>Completed</th><th>Completed By</th></tr></thead><tbody>';
+        done.slice().reverse().slice(0, 15).forEach(function(t) {
+            html += '<tr><td><strong>' + esc(t.roomNo) + '</strong></td>'
+                + '<td>' + esc(t.floor || '—') + '</td>'
+                + '<td>' + esc(t.patientName) + '</td>'
+                + '<td>' + (t.dischargedAt ? new Date(t.dischargedAt).toLocaleDateString('en-IN') : '—') + '</td>'
+                + '<td>' + (t.completedAt ? APP.formatDateTime(t.completedAt) : '—') + '</td>'
+                + '<td>' + esc(t.completedBy || '—') + '</td></tr>';
+        });
+        html += '</tbody></table></div></div>';
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+/* Start cleaning — marks in-progress and records who started */
+function startCleaning(taskId) {
+    var user = AUTH.currentUser();
+    DB.update('roomCleaningTasks', taskId, {
+        status: 'in-progress',
+        assignedTo: user ? user.fullName : 'Unknown',
+        startedAt: new Date().toISOString()
+    });
+    APP.notify('Cleaning started', 'info');
+    if (admFilter === 'cleaning') {
+        var content = document.getElementById('admContent');
+        if (content) renderCleaningAdmin(content);
+    }
+}
+
+/* Complete cleaning — room back to available */
+function completeCleaning(taskId) {
+    var user = AUTH.currentUser();
+    var task = DB.getById('roomCleaningTasks', taskId);
+    DB.update('roomCleaningTasks', taskId, {
+        status: 'done',
+        completedAt: new Date().toISOString(),
+        completedBy: user ? user.fullName : 'Unknown'
+    });
+    if (task) {
+        // Remove cleaning override → room becomes available
+        var overrides = DB.get('roomStatus') || [];
+        var updated = overrides.filter(function(r){ return r.roomNo !== task.roomNo; });
+        DB.set('roomStatus', updated);
+    }
+    APP.notify('Room marked clean — now available for new admissions!', 'success');
+    // Refresh whichever view is active
+    if (admFilter === 'cleaning') {
+        var content = document.getElementById('admContent');
+        if (content) renderCleaningAdmin(content);
+    } else if (admFilter === 'rooms') {
+        renderRoomView();
+    }
+    // Also refresh employee dashboard if open
+    try {
+        var empCl = document.getElementById('empSectionCleaning');
+        if (empCl && empCl.style.display !== 'none') renderEmpCleaningSection();
+    } catch(e) {}
+}
+
+/* Update cleaning badge on tab bar */
+function updateCleaningBadge() {
+    var badge = document.getElementById('cleaningBadge');
+    if (!badge) return;
+    var tasks = DB.get('roomCleaningTasks') || [];
+    var pending = tasks.filter(function(t){ return t.status !== 'done'; }).length;
+    badge.textContent = pending > 0 ? pending : '';
 }

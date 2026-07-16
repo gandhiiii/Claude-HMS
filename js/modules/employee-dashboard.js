@@ -14,6 +14,7 @@ function renderEmployeeDashboard(container) {
     var inventory = DB.get('inventory') || [];
     var projects = DB.get('projects') || [];
     var reports = DB.get('reports') || [];
+    var cleaningTasks = DB.get('roomCleaningTasks') || [];
 
     var u = user.fullName || user.username;
     _empData = {
@@ -24,7 +25,9 @@ function renderEmployeeDashboard(container) {
         myChecklists: checklists,
         myProjects: projects,
         deptInventory: inventory,
-        myReports: reports.filter(function(r) { return r.createdBy === user.username || r.createdBy === user.fullName; })
+        myReports: reports.filter(function(r) { return r.createdBy === user.username || r.createdBy === user.fullName; }),
+        pendingCleaning: cleaningTasks.filter(function(t){ return t.status !== 'done'; }),
+        doneCleaning: cleaningTasks.filter(function(t){ return t.status === 'done'; })
     };
 
     container.innerHTML = ''
@@ -42,6 +45,9 @@ function renderEmployeeDashboard(container) {
         + '<div class="emp-nav-item" onclick="empNav(\'lifecycle\',this)" data-sec="lifecycle" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);font-size:14px;display:flex;align-items:center;gap:8px;transition:0.2s;">🔋 Lifecycle <span class="badge badge-info" style="margin-left:auto;font-size:10px;">' + _empData.deptInventory.length + '</span></div>'
         + '<div class="emp-nav-item" onclick="empNav(\'projects\',this)" data-sec="projects" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);font-size:14px;display:flex;align-items:center;gap:8px;transition:0.2s;">📋 Projects <span class="badge badge-primary" style="margin-left:auto;font-size:10px;">' + _empData.myProjects.length + '</span></div>'
         + '<div class="emp-nav-item" onclick="empNav(\'reports\',this)" data-sec="reports" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);font-size:14px;display:flex;align-items:center;gap:8px;transition:0.2s;">📋 Reports</div>'
+        + '<div class="emp-nav-item" onclick="empNav(\'cleaning\',this)" data-sec="cleaning" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);font-size:14px;display:flex;align-items:center;gap:8px;transition:0.2s;">🧹 Cleaning'
+        + (_empData.pendingCleaning.length > 0 ? ' <span class="badge badge-danger" style="margin-left:auto;font-size:10px;">' + _empData.pendingCleaning.length + '</span>' : '')
+        + '</div>'
         + '<div class="emp-nav-item" onclick="empNav(\'performance\',this)" data-sec="performance" style="padding:12px 16px;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:8px;transition:0.2s;">📊 Performance</div>'
         + '</div>'
 
@@ -54,6 +60,7 @@ function renderEmployeeDashboard(container) {
         + '<div id="empSectionLifecycle" style="display:none;"></div>'
         + '<div id="empSectionProjects" style="display:none;"></div>'
         + '<div id="empSectionReports" style="display:none;"></div>'
+        + '<div id="empSectionCleaning" style="display:none;"></div>'
         + '<div id="empSectionPerformance" style="display:none;"></div>'
         + '</div></div>';
 
@@ -66,6 +73,7 @@ function renderEmployeeDashboard(container) {
     renderEmpLifecycleSec();
     renderEmpProjectsSec();
     renderEmpReportsSec();
+    renderEmpCleaningSection();
     renderEmpPerformanceSec();
 }
 
@@ -116,6 +124,13 @@ function renderEmpOverview() {
         + '<div class="stat-card"><div style="font-size:24px;font-weight:700;color:var(--primary);">' + d.myProjects.length + '</div><div style="font-size:11px;color:var(--gray);">My Projects</div></div>'
         + '</div>'
 
+        + (_empData.pendingCleaning.length > 0
+            ? '<div style="background:#fff3e0;border:2px solid var(--warning);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="empNav(\'cleaning\',document.querySelector(\'.emp-nav-item[data-sec=cleaning]\'))">'
+              + '<span style="font-size:24px;">🧹</span>'
+              + '<div style="flex:1;"><div style="font-weight:700;color:#e65100;">' + _empData.pendingCleaning.length + ' room(s) need cleaning</div>'
+              + '<div style="font-size:12px;color:var(--gray);">Tap to view and complete cleaning tasks</div></div>'
+              + '<span style="font-size:18px;color:#e65100;">›</span></div>'
+            : '')
         + '<div class="card" style="padding:12px 16px;background:#f8f9ff;">'
         + '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">'
         + '<span style="font-weight:600;font-size:14px;">⚡ Quick Actions</span>'
@@ -448,4 +463,118 @@ function saveReport() {
     DB.add('reports', data);
     APP.notify('Report submitted successfully', 'success');
     Router.navigate('employee-dashboard');
+}
+
+/* ═══════════════════════════════════════
+   CLEANING SECTION (Housekeeping employees)
+   ═══════════════════════════════════════ */
+
+function renderEmpCleaningSection() {
+    var el = document.getElementById('empSectionCleaning');
+    if (!el) return;
+    var user = AUTH.currentUser();
+    var tasks = DB.get('roomCleaningTasks') || [];
+    var pending = tasks.filter(function(t){ return t.status !== 'done'; });
+    var done    = tasks.filter(function(t){ return t.status === 'done'; });
+    var myDone  = done.filter(function(t){ return t.completedBy === (user ? user.fullName : ''); });
+
+    var html = '';
+
+    // Alert banner when rooms need cleaning
+    if (pending.length > 0) {
+        html += '<div style="background:#fff3e0;border:2px solid var(--warning);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">'
+            + '<span style="font-size:28px;">🧹</span>'
+            + '<div><div style="font-weight:700;font-size:15px;color:#e65100;">' + pending.length + ' Room' + (pending.length>1?'s':'') + ' Need Cleaning</div>'
+            + '<div style="font-size:13px;color:var(--gray);">Discharged patients\' rooms are waiting to be cleaned before new admissions.</div></div>'
+            + '</div>';
+    } else {
+        html += '<div style="background:#e8f5e9;border:2px solid var(--secondary);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">'
+            + '<span style="font-size:28px;">✅</span>'
+            + '<div><div style="font-weight:700;font-size:15px;color:var(--secondary);">All Rooms Clean</div>'
+            + '<div style="font-size:13px;color:var(--gray);">No pending cleaning tasks right now.</div></div>'
+            + '</div>';
+    }
+
+    // Pending cards
+    if (pending.length > 0) {
+        html += '<h4 style="margin-bottom:10px;font-size:15px;">⏳ Pending Cleaning Tasks</h4>'
+            + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:20px;">';
+        pending.forEach(function(t) {
+            var since = t.dischargedAt ? Math.max(0, APP.daysBetween(t.dischargedAt, new Date().toISOString())) : 0;
+            var urgency = since >= 1 ? '#ffebee' : '#fff8e1';
+            var border  = since >= 1 ? 'var(--danger)' : 'var(--warning)';
+            var isMyTask = t.assignedTo === (user ? user.fullName : '');
+            html += '<div style="background:' + urgency + ';border:2px solid ' + border + ';border-radius:10px;padding:14px;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+                + '<span style="font-size:22px;font-weight:700;">Room ' + t.roomNo + '</span>'
+                + '<span class="badge ' + (t.status==='in-progress'?'badge-info':'badge-warning') + '">' + t.status + '</span></div>'
+                + '<div style="font-size:12px;color:var(--gray);margin-bottom:6px;">'
+                + (t.floor ? 'Floor ' + t.floor + ' | ' : '') + (t.category || '') + (t.bedId ? ' | Bed ' + t.bedId : '')
+                + '</div>'
+                + '<div style="font-size:13px;margin-bottom:4px;">👤 <strong>' + t.patientName + '</strong></div>'
+                + '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">'
+                + 'Discharged: ' + (t.dischargedAt ? new Date(t.dischargedAt).toLocaleDateString('en-IN') : '—')
+                + (since > 0 ? ' &nbsp;·&nbsp; <span style="color:var(--danger);font-weight:600;">' + since + 'd ago</span>' : ' &nbsp;·&nbsp; Today')
+                + '</div>'
+                + (t.assignedTo ? '<div style="font-size:12px;margin-bottom:6px;">👷 ' + (isMyTask ? '<strong>Assigned to you</strong>' : t.assignedTo) + '</div>' : '')
+                + '<div style="display:flex;gap:6px;">'
+                + (t.status==='pending' ? '<button class="btn btn-sm btn-warning" style="color:#fff;" onclick="empStartCleaning(\'' + t.id + '\')">▶ Start</button>' : '')
+                + '<button class="btn btn-sm btn-success" onclick="empCompleteCleaning(\'' + t.id + '\')">✅ Mark Clean</button>'
+                + '</div></div>';
+        });
+        html += '</div>';
+    }
+
+    // My completed tasks today
+    if (myDone.length > 0) {
+        html += '<h4 style="margin-bottom:8px;font-size:14px;color:var(--gray);">✅ Cleaned by You</h4>'
+            + '<div class="table-responsive"><table><thead><tr><th>Room</th><th>Patient</th><th>Completed At</th></tr></thead><tbody>';
+        myDone.slice().reverse().slice(0, 10).forEach(function(t) {
+            html += '<tr><td><strong>' + t.roomNo + '</strong></td><td>' + t.patientName + '</td>'
+                + '<td>' + (t.completedAt ? APP.formatDateTime(t.completedAt) : '—') + '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+    }
+
+    el.innerHTML = html || '<div class="empty-state">No cleaning tasks</div>';
+}
+
+function empStartCleaning(taskId) {
+    var user = AUTH.currentUser();
+    DB.update('roomCleaningTasks', taskId, {
+        status: 'in-progress',
+        assignedTo: user ? user.fullName : 'Unknown',
+        startedAt: new Date().toISOString()
+    });
+    APP.notify('Cleaning started — room marked in-progress', 'info');
+    renderEmpCleaningSection();
+    // Keep sidebar badge in sync
+    try { updateCleaningBadge(); } catch(e) {}
+}
+
+function empCompleteCleaning(taskId) {
+    if (typeof completeCleaning === 'function') {
+        completeCleaning(taskId);
+    } else {
+        var user = AUTH.currentUser();
+        var task = DB.getById('roomCleaningTasks', taskId);
+        DB.update('roomCleaningTasks', taskId, {
+            status: 'done',
+            completedAt: new Date().toISOString(),
+            completedBy: user ? user.fullName : 'Unknown'
+        });
+        if (task) {
+            var overrides = DB.get('roomStatus') || [];
+            DB.set('roomStatus', overrides.filter(function(r){ return r.roomNo !== task.roomNo; }));
+        }
+        APP.notify('Room marked clean — now available!', 'success');
+    }
+    renderEmpCleaningSection();
+    // Update badge
+    var nav = document.querySelector('.emp-nav-item[data-sec="cleaning"] .badge');
+    if (nav) {
+        var pending = (DB.get('roomCleaningTasks')||[]).filter(function(t){ return t.status!=='done'; }).length;
+        nav.textContent = pending > 0 ? pending : '';
+        if (pending === 0) nav.style.display = 'none';
+    }
 }
