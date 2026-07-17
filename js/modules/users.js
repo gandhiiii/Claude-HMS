@@ -7,9 +7,9 @@ function renderUsers(container) {
 
     container.innerHTML = `
         <div class="flex-between mb-4" style="flex-wrap:wrap;gap:8px;">
-            <div style="display:flex;gap:4px;background:var(--light-gray);border-radius:8px;padding:3px;">
-                <button id="viewListBtn" class="btn btn-sm ${_usersView==='list'?'btn-primary':'btn-outline'}" style="border-radius:6px;" onclick="usersSetView('list')">👤 All Users</button>
-                <button id="viewTeamsBtn" class="btn btn-sm ${_usersView==='teams'?'btn-primary':'btn-outline'}" style="border-radius:6px;" onclick="usersSetView('teams')">👥 By Team</button>
+            <div style="display:flex;gap:4px;background:var(--light-gray);border-radius:10px;padding:4px;">
+                <button id="viewListBtn" class="btn btn-sm ${_usersView==='list'?'btn-primary':'btn-outline'}" style="border-radius:7px;font-weight:600;" onclick="usersSetView('list')">👤 All Users</button>
+                <button id="viewTeamsBtn" class="btn btn-sm ${_usersView==='teams'?'btn-primary':'btn-outline'}" style="border-radius:7px;font-weight:600;" onclick="usersSetView('teams')">👥 Manage Teams</button>
             </div>
             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
                 <div class="search-box" id="userSearchBox" style="${_usersView==='teams'?'display:none':''}">

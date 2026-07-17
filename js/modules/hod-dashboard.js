@@ -247,7 +247,12 @@ function _hodOverview(el) {
         // Right: team snapshot
         + '<div><div style="font-weight:700;font-size:14px;margin-bottom:10px;">👥 Team Status</div>';
     if (d.team.length === 0) {
-        html += '<div style="background:var(--light-gray);border-radius:8px;padding:16px;font-size:13px;color:var(--gray);">No team members yet. Go to <strong>My Team</strong> tab to add members.</div>';
+        html += '<div style="background:linear-gradient(135deg,#f3e5f5,#e8eaf6);border:2px dashed #9c27b0;border-radius:10px;padding:20px;text-align:center;">'
+            + '<div style="font-size:28px;margin-bottom:6px;">👥</div>'
+            + '<div style="font-weight:700;font-size:14px;color:#6a1b9a;margin-bottom:4px;">No team members yet</div>'
+            + '<div style="font-size:12px;color:var(--gray);margin-bottom:12px;">Add staff to your department to assign tasks & track work</div>'
+            + '<button class="btn btn-primary" style="background:#6a1b9a;border:none;" onclick="hodTabSwitch(\'team\')">👥 Set Up My Team</button>'
+            + '</div>';
     } else {
         d.team.forEach(function (m) {
             var mt   = d.myTasks.filter(function (t) { return t.assignedTo === m.fullName; });
