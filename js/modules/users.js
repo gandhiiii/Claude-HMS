@@ -107,6 +107,14 @@ function showUserForm(user) {
     const deptFeatures = getDepartmentFeatures(userDept);
     const userPerms = user?.permissions || [];
 
+    // Department field: dropdown if depts exist, text input otherwise
+    const deptField = depts.length > 0
+        ? `<select name="department" class="form-control" onchange="onDeptChange(this)">
+               <option value="">-- Select Department --</option>
+               ${depts.map(d => `<option value="${d.name}" ${userDept === d.name ? 'selected' : ''} data-features='${JSON.stringify(d.features || [])}'>${d.name}</option>`).join('')}
+           </select>`
+        : `<input type="text" name="department" class="form-control" value="${userDept}" placeholder="e.g. Housekeeping">`;
+
     const form = `
         <form id="userForm">
             <input type="hidden" name="id" value="${user?.id || ''}">
@@ -124,12 +132,12 @@ function showUserForm(user) {
                     <input type="text" name="fullName" class="form-control" value="${user?.fullName || ''}" required>
                 </div>
                 <div class="form-group">
-                    <label>Email *</label>
-                    <input type="email" name="email" class="form-control" value="${user?.email || ''}" required>
+                    <label>Email <span style="color:var(--gray);font-size:11px;">(optional)</span></label>
+                    <input type="email" name="email" class="form-control" value="${user?.email || ''}" placeholder="staff@hospital.com">
                 </div>
                 <div class="form-group">
-                    <label>Phone *</label>
-                    <input type="text" name="phone" class="form-control" value="${user?.phone || ''}" required>
+                    <label>Phone <span style="color:var(--gray);font-size:11px;">(optional)</span></label>
+                    <input type="text" name="phone" class="form-control" value="${user?.phone || ''}" placeholder="Mobile number">
                 </div>
                 <div class="form-group">
                     <label>Role *</label>
@@ -138,11 +146,8 @@ function showUserForm(user) {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Department *</label>
-                    <select name="department" class="form-control" required onchange="onDeptChange(this)">
-                        <option value="">Select Department</option>
-                        ${depts.map(d => `<option value="${d.name}" ${userDept === d.name ? 'selected' : ''} data-features='${JSON.stringify(d.features || [])}'>${d.name}</option>`).join('')}
-                    </select>
+                    <label>Department</label>
+                    ${deptField}
                 </div>
             </div>
             <div class="form-group">
@@ -227,8 +232,8 @@ function saveUser() {
     });
     data.permissions = Array.from(form.querySelectorAll('[name="permissions"]:checked')).map(cb => cb.value);
 
-    if (!data.fullName || !data.username || !data.email || !data.phone) {
-        APP.notify('Please fill all required fields', 'error'); return false;
+    if (!data.fullName || !data.username) {
+        APP.notify('Username and Full Name are required', 'error'); return false;
     }
 
     const existing = DB.get('users');
