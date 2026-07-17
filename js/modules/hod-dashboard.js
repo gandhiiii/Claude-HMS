@@ -131,13 +131,13 @@ function renderHodDashboard(container) {
     var pendingReq = myReqs.filter(function (r) { return r.status === 'pending'; }).length;
 
     var tabs = [
-        { id: 'overview',    label: '📊 Overview' },
-        { id: 'admissions',  label: '🏥 Admissions' },
-        { id: 'tasks',       label: '📝 Team Tasks', badge: _hodData.overdueTasks.length, bc: 'badge-danger' },
-        { id: 'team',        label: '👥 My Team (' + team.length + ')' },
-        { id: 'checklists',  label: '✅ Checklists', badge: pendingCl, bc: 'badge-info' },
-        { id: 'requests',    label: '📦 Requests', badge: pendingReq, bc: 'badge-warning' },
-        { id: 'performance', label: '📊 Performance' }
+        { id: 'overview',    label: 'Overview' },
+        { id: 'admissions',  label: 'Admissions' },
+        { id: 'tasks',       label: 'Tasks', badge: _hodData.overdueTasks.length, bc: 'badge-danger' },
+        { id: 'team',        label: '👥 My Team', badge: team.length, bc: 'badge-success' },
+        { id: 'checklists',  label: 'Checklists', badge: pendingCl, bc: 'badge-info' },
+        { id: 'requests',    label: 'Requests', badge: pendingReq, bc: 'badge-warning' },
+        { id: 'performance', label: 'Performance' }
     ];
 
     var html = ''
@@ -172,10 +172,10 @@ function renderHodDashboard(container) {
               + '<button class="btn btn-sm btn-warning" style="color:#fff;">Manage</button></div>'
             : '')
 
-        // Tab bar
-        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:0 4px;display:flex;overflow-x:auto;border-bottom:none;">'
+        // Tab bar — flex-wrap so all tabs are always visible on any screen width
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:4px 4px 0;display:flex;flex-wrap:wrap;gap:2px;border-bottom:none;">'
         + tabs.map(function (t) {
-            var lbl = t.label + (t.badge ? ' <span class="badge ' + (t.bc || 'badge-primary') + '" style="font-size:10px;margin-left:2px;">' + t.badge + '</span>' : '');
+            var lbl = t.label + (t.badge > 0 ? ' <span class="badge ' + (t.bc || 'badge-primary') + '" style="font-size:10px;margin-left:2px;">' + t.badge + '</span>' : '');
             return '<button class="hod-tab-btn' + (t.id === 'overview' ? ' active' : '') + '" data-tab="' + t.id + '" onclick="hodTabSwitch(\'' + t.id + '\')">' + lbl + '</button>';
         }).join('')
         + '</div>'

@@ -1,32 +1,153 @@
+var _usersView = 'list'; // 'list' | 'teams'
+
 function renderUsers(container) {
     var users = DB.get('users');
+    var cu = AUTH.currentUser();
+    var isAdmin = cu && (cu.isSuperAdmin || cu.role === 'admin');
 
     container.innerHTML = `
-        <div class="flex-between mb-4">
-            <div class="search-box">
-                <input type="text" class="form-control" id="userSearch" placeholder="Search users..." oninput="renderUsersList()">
+        <div class="flex-between mb-4" style="flex-wrap:wrap;gap:8px;">
+            <div style="display:flex;gap:4px;background:var(--light-gray);border-radius:8px;padding:3px;">
+                <button id="viewListBtn" class="btn btn-sm ${_usersView==='list'?'btn-primary':'btn-outline'}" style="border-radius:6px;" onclick="usersSetView('list')">👤 All Users</button>
+                <button id="viewTeamsBtn" class="btn btn-sm ${_usersView==='teams'?'btn-primary':'btn-outline'}" style="border-radius:6px;" onclick="usersSetView('teams')">👥 By Team</button>
             </div>
-            <div style="display:flex;gap:6px;align-items:center;">
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <div class="search-box" id="userSearchBox" style="${_usersView==='teams'?'display:none':''}">
+                    <input type="text" class="form-control" id="userSearch" placeholder="Search users..." oninput="renderUsersList()">
+                </div>
                 <span id="userCount" style="font-size:13px;color:var(--gray);">${users.length} users</span>
                 <button class="btn btn-primary" onclick="showUserForm()">+ Add User</button>
-                ${AUTH.currentUser()?.isSuperAdmin || AUTH.currentUser()?.role === 'admin' ? '<button class="btn btn-danger" onclick="removeAllEmployees()">🗑️ Remove All</button>' : ''}
+                ${isAdmin ? '<button class="btn btn-danger" onclick="removeAllEmployees()">🗑️ Remove All</button>' : ''}
             </div>
         </div>
-        <div class="card">
-            <div class="table-responsive">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Username</th><th>Full Name</th><th>Email</th><th>Phone</th>
-                            <th>Role</th><th>Department</th><th>Permissions</th><th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="usersTableBody"></tbody>
-                </table>
-            </div>
-        </div>
+        <div id="usersMainContent"></div>
     `;
-    renderUsersList();
+    _renderUsersContent();
+}
+
+function usersSetView(view) {
+    _usersView = view;
+    var listBtn  = document.getElementById('viewListBtn');
+    var teamsBtn = document.getElementById('viewTeamsBtn');
+    var searchBox = document.getElementById('userSearchBox');
+    if (listBtn)  { listBtn.className  = 'btn btn-sm ' + (view==='list'  ? 'btn-primary' : 'btn-outline'); listBtn.style.borderRadius='6px'; }
+    if (teamsBtn) { teamsBtn.className = 'btn btn-sm ' + (view==='teams' ? 'btn-primary' : 'btn-outline'); teamsBtn.style.borderRadius='6px'; }
+    if (searchBox) searchBox.style.display = view==='teams' ? 'none' : '';
+    _renderUsersContent();
+}
+
+function _renderUsersContent() {
+    var el = document.getElementById('usersMainContent');
+    if (!el) return;
+    if (_usersView === 'teams') {
+        _renderTeamsView(el);
+    } else {
+        el.innerHTML = `<div class="card"><div class="table-responsive"><table>
+            <thead><tr><th>Username</th><th>Full Name</th><th>Email</th><th>Phone</th>
+            <th>Role</th><th>Department</th><th>Permissions</th><th>Actions</th></tr></thead>
+            <tbody id="usersTableBody"></tbody></table></div></div>`;
+        renderUsersList();
+    }
+}
+
+function _renderTeamsView(el) {
+    var users = DB.get('users') || [];
+    var depts = DB.get('departments') || [];
+
+    // Group all users by department
+    var groups = {};
+    users.forEach(function(u) {
+        var d = u.department || '(No Department)';
+        if (!groups[d]) groups[d] = [];
+        groups[d].push(u);
+    });
+
+    // Also include empty departments from dept list
+    depts.forEach(function(d) {
+        if (!groups[d.name]) groups[d.name] = [];
+    });
+
+    var deptKeys = Object.keys(groups).sort();
+    if (deptKeys.length === 0) {
+        el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--gray);">No departments or users yet.</div>';
+        return;
+    }
+
+    var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;">';
+    deptKeys.forEach(function(dept) {
+        var members = groups[dept];
+        var hodList   = members.filter(function(u){ return u.role==='hod'; });
+        var empList   = members.filter(function(u){ return u.role==='employee'||u.role==='storekeeper'||u.role==='ambulance_employee'; });
+        var adminList = members.filter(function(u){ return u.role==='admin'||u.role==='super_admin'; });
+
+        html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;">'
+            // Dept header
+            + '<div style="background:linear-gradient(135deg,#3949ab,#1a237e);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">'
+            + '<div><div style="font-size:15px;font-weight:700;">🏢 ' + dept + '</div>'
+            + '<div style="font-size:11px;opacity:.8;">' + members.length + ' member' + (members.length!==1?'s':'') + '</div></div>'
+            + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3);font-size:12px;" onclick="adminAddToTeam(\'' + dept.replace(/'/g,"\\'") + '\')">+ Add</button></div>'
+            + '<div style="padding:12px;">';
+
+        if (members.length === 0) {
+            html += '<div style="font-size:12px;color:var(--gray);text-align:center;padding:10px 0;">No members yet</div>';
+        } else {
+            // HOD(s)
+            hodList.forEach(function(u) {
+                html += _teamMemberRow(u, '👔', '#f3e5f5', '#6a1b9a');
+            });
+            adminList.forEach(function(u) {
+                html += _teamMemberRow(u, '🔑', '#e3f2fd', '#1565c0');
+            });
+            empList.forEach(function(u) {
+                html += _teamMemberRow(u, '👤', 'var(--light-gray)', 'var(--text)');
+            });
+        }
+
+        html += '</div></div>';
+    });
+
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function _teamMemberRow(u, icon, bg, color) {
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:' + bg + ';margin-bottom:5px;">'
+        + '<span style="font-size:16px;">' + icon + '</span>'
+        + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:13px;font-weight:600;color:' + color + ';">' + (u.fullName||u.username) + '</div>'
+        + '<div style="font-size:10px;color:var(--gray);">@' + u.username + ' · ' + (u.role||'employee').replace(/_/g,' ').toUpperCase() + '</div>'
+        + '</div>'
+        + '<div style="display:flex;gap:4px;">'
+        + '<button class="btn btn-sm btn-outline" style="font-size:10px;padding:2px 7px;" onclick="editUser(\'' + u.id + '\')">Edit</button>'
+        + (!u.isSuperAdmin ? '<button class="btn btn-sm btn-danger" style="font-size:10px;padding:2px 7px;" onclick="deleteUser(\'' + u.id + '\')">Del</button>' : '')
+        + '</div></div>';
+}
+
+function adminAddToTeam(dept) {
+    // Pre-fill showUserForm with the dept locked
+    var depts = DB.get('departments') || [];
+    var roles = ['employee', 'hod', 'storekeeper', 'ambulance_employee'];
+    var deptField = '<input type="hidden" name="department" value="' + dept + '">'
+        + '<div style="background:#e3f2fd;border-radius:6px;padding:8px 12px;font-size:12px;color:#1565c0;margin-top:4px;">'
+        + '🏢 Adding to: <strong>' + dept + '</strong></div>';
+
+    var form = '<form id="userForm">'
+        + '<input type="hidden" name="id" value="">'
+        + '<div class="grid-2">'
+        + '<div class="form-group"><label>Username *</label><input type="text" name="username" class="form-control" required></div>'
+        + '<div class="form-group"><label>Password *</label><input type="text" name="password" class="form-control" required></div>'
+        + '<div class="form-group"><label>Full Name *</label><input type="text" name="fullName" class="form-control" required></div>'
+        + '<div class="form-group"><label>Email <span style="font-size:11px;color:var(--gray);">(optional)</span></label><input type="email" name="email" class="form-control" placeholder="staff@hospital.com"></div>'
+        + '<div class="form-group"><label>Phone <span style="font-size:11px;color:var(--gray);">(optional)</span></label><input type="text" name="phone" class="form-control" placeholder="Mobile number"></div>'
+        + '<div class="form-group"><label>Role *</label><select name="role" class="form-control" onchange="onRoleChange(this)">'
+        + roles.map(function(r){ return '<option value="'+r+'">'+ r.replace(/_/g,' ').toUpperCase() +'</option>'; }).join('')
+        + '</select></div>'
+        + '</div>'
+        + deptField
+        + '<div class="form-group" style="margin-top:10px;"><label>Permissions</label>'
+        + '<div class="permission-grid" id="permissionsGrid">' + renderPermissionCheckboxes([], []) + '</div></div>'
+        + '</form>';
+    openFormModal('Add Member to ' + dept, form, 'saveUser()', true);
 }
 
 function renderUsersList() {
