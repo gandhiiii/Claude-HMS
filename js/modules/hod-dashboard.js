@@ -569,7 +569,25 @@ function _hodTeam(el) {
 }
 
 function hodAddMember() {
-    var user = AUTH.currentUser();
+    var user  = AUTH.currentUser();
+    var isAdmin = user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin');
+    var depts  = DB.get('departments') || [];
+
+    // Department field: admin gets a dropdown; HOD gets a locked display
+    var deptField;
+    if (isAdmin) {
+        var opts = depts.filter(function(d){ return d.active !== false; })
+                        .map(function(d){ return '<option value="' + d.name + '">' + d.name + '</option>'; }).join('');
+        deptField = '<div class="form-group"><label>Department *</label>'
+            + '<select name="department" class="form-control" required>'
+            + '<option value="">-- Select Department --</option>' + opts
+            + '</select></div>';
+    } else {
+        deptField = '<input type="hidden" name="department" value="' + (user ? user.department : '') + '">'
+            + '<div style="background:#f3e5f5;border-radius:6px;padding:8px 12px;font-size:12px;color:#6a1b9a;margin-top:4px;">'
+            + '👔 Department: <strong>' + (user ? user.department : '') + '</strong> · Role: <strong>Employee</strong></div>';
+    }
+
     var form = '<form id="hodMemberForm">'
         + '<div class="form-group"><label>Full Name *</label><input type="text" name="fullName" class="form-control" required></div>'
         + '<div class="form-group"><label>Username *</label><input type="text" name="username" class="form-control" required placeholder="login username"></div>'
@@ -578,8 +596,7 @@ function hodAddMember() {
         + '<div class="form-group"><label>Phone</label><input type="text" name="phone" class="form-control"></div>'
         + '<div class="form-group"><label>Email</label><input type="email" name="email" class="form-control"></div>'
         + '</div>'
-        + '<div style="background:#f3e5f5;border-radius:6px;padding:8px 12px;font-size:12px;color:#6a1b9a;margin-top:4px;">'
-        + '👔 Department: <strong>' + (user ? user.department : '') + '</strong> · Role: <strong>Employee</strong></div>'
+        + deptField
         + '</form>';
     openFormModal('Add Team Member', form, 'hodSaveMember()', false);
 }
@@ -591,6 +608,10 @@ function hodSaveMember() {
     if (!data.fullName || !data.username || !data.password) {
         APP.notify('Name, username and password required', 'error'); return false;
     }
+    // Admin picks dept from form; HOD always uses their own dept
+    var targetDept = data.department || user.department;
+    if (!targetDept) { APP.notify('Department is required', 'error'); return false; }
+
     var users = DB.get('users') || [];
     if (users.find(function (u) { return u.username === data.username; })) {
         APP.notify('Username already exists', 'error'); return false;
@@ -607,13 +628,13 @@ function hodSaveMember() {
         phone:       data.phone || '',
         email:       data.email || '',
         role:        'employee',
-        department:  user.department,
+        department:  targetDept,
         permissions: empPerms,
         createdBy:   user.username,
         createdAt:   new Date().toISOString()
     });
     DB.set('users', users);
-    APP.notify(data.fullName + ' added to ' + user.department, 'success');
+    APP.notify(data.fullName + ' added to ' + targetDept, 'success');
     _hodData.team = _getHodTeam(user);
     _hodData.teamNames = _hodData.team.map(function (m) { return m.fullName; });
     _renderHodTab('team');
