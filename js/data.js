@@ -209,6 +209,8 @@ const AUTH = {
         // Role-based auto-grants (no manual permission config needed)
         if (permission === 'hod-dashboard' && user.role === 'hod') return true;
         if (permission === 'employee-dashboard' && (user.role === 'employee' || user.role === 'hod')) return true;
+        // HOD auto-gets admissions, checklists, material-requests so they can manage their dept
+        if (user.role === 'hod' && ['admissions','checklists','material-requests','problems','tasks'].indexOf(permission) !== -1) return true;
         return user.permissions && user.permissions.includes(permission);
     },
     canAccess(permission) {

@@ -13,7 +13,8 @@ var SYNC = (function () {
         'roomchecklists', 'admissions', 'rooms', 'roomStatus',
         'lostfound', 'adminChecklist', 'checklists',
         'material_requests', 'suggestions', 'reports',
-        'roomCleaningTasks', 'floorItems', 'resetTokens'
+        'roomCleaningTasks', 'floorItems', 'resetTokens',
+        'hodTasks', 'hodRequests'
     ];
 
     var _pushing = false;   // prevents write→listen→write loops

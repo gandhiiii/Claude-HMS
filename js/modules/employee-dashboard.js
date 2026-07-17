@@ -64,7 +64,8 @@ function renderEmployeeDashboard(container) {
     var u    = user.fullName || user.username;
     var q    = _getQuarter();
 
-    var tasks         = DB.get('tasks') || [];
+    // Merge admin tasks + HOD-assigned tasks so employee sees work from both sources
+    var tasks         = (DB.get('tasks') || []).concat(DB.get('hodTasks') || []);
     var problems      = DB.get('problems') || [];
     var requests      = DB.get('material_requests') || [];
     var checklists    = DB.get('checklists') || [];
