@@ -8,7 +8,9 @@ const Router = {
 
         // Restore last visited module or use role default
         const defaultModule = user.role === 'ambulance_employee' ? 'ambulance'
-            : user.role === 'employee' ? 'employee-dashboard' : 'dashboard';
+            : user.role === 'employee' ? 'employee-dashboard'
+            : user.role === 'hod' ? 'hod-dashboard'
+            : 'dashboard';
         const saved = localStorage.getItem('hms_lastModule');
         const startModule = saved || defaultModule;
         this.navigate(startModule);
@@ -76,6 +78,7 @@ const Router = {
             { id: 'admin-checklists', label: 'Admin Checklists', icon: '🔖', permission: 'admin-checklists' },
             { id: 'material-requests', label: 'Material Requests', icon: '📦', permission: 'material-requests' },
             { id: 'suggestions', label: 'Suggestions', icon: '💡', permission: 'suggestions' },
+            { id: 'hod-dashboard', label: 'In-Charge Dashboard', icon: '👔', permission: 'hod-dashboard' },
             { id: 'employee-dashboard', label: 'My Dashboard', icon: '📊', permission: 'employee-dashboard' },
             { id: 'checklists', label: 'Checklists', icon: '✅', permission: 'checklists' }
         ];
@@ -93,6 +96,7 @@ const Router = {
         var u = AUTH.currentUser();
         if (!u) { window.location.href = 'index.html'; return; }
         if (module === 'dashboard' && u && u.role === 'employee') module = 'employee-dashboard';
+        if (module === 'dashboard' && u && u.role === 'hod') module = 'hod-dashboard';
 
         // Cleanup ambulance tracking when leaving that module
         if (APP.currentModule === 'ambulance' && module !== 'ambulance') {
@@ -131,7 +135,8 @@ const Router = {
             admissions: 'Admissions & Discharges', 'lost-found': 'Lost & Found',
             'admin-checklists': 'Admin Checklists', checklists: 'Checklists',
             'material-requests': 'Material Requests', suggestions: 'Suggestions',
-            'employee-dashboard': 'My Dashboard'
+            'employee-dashboard': 'My Dashboard',
+            'hod-dashboard': 'In-Charge Dashboard'
         };
         const titleEl = document.getElementById('pageTitle');
         if (titleEl) titleEl.textContent = titles[module] || module;
@@ -159,7 +164,8 @@ const Router = {
             checklists: renderChecklists,
             'material-requests': renderMaterialRequests,
             suggestions: renderSuggestions,
-            'employee-dashboard': renderEmployeeDashboard
+            'employee-dashboard': renderEmployeeDashboard,
+            'hod-dashboard': renderHodDashboard
         };
         if (renderers[module]) {
             content.innerHTML = '<div style="text-align:center;padding:40px;"><div class="spinner"></div><p style="color:var(--gray);margin-top:8px;">Loading...</p></div>';

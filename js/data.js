@@ -205,8 +205,11 @@ const AUTH = {
     },
     hasPermission(user, permission) {
         if (!user) return false;
-        if (user.isSuperAdmin || user.permissions.includes('all')) return true;
-        return user.permissions.includes(permission);
+        if (user.isSuperAdmin || (user.permissions && user.permissions.includes('all'))) return true;
+        // Role-based auto-grants (no manual permission config needed)
+        if (permission === 'hod-dashboard' && user.role === 'hod') return true;
+        if (permission === 'employee-dashboard' && (user.role === 'employee' || user.role === 'hod')) return true;
+        return user.permissions && user.permissions.includes(permission);
     },
     canAccess(permission) {
         const user = this.currentUser();
