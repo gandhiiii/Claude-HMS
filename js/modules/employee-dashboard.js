@@ -1,449 +1,692 @@
-var _empSection = 'overview';
+// Employee Dashboard — personal work view, distinct from admin
+// All sections are data-driven; no department hard-coding.
+
+var _empTab = 'overview';
 var _empClFilter = 'daily';
 var _empData = {};
 
+/* ── Quarter helpers ── */
+function _getQuarter() {
+    var now = new Date();
+    var q = Math.floor(now.getMonth() / 3);
+    var qStart = new Date(now.getFullYear(), q * 3, 1);
+    var qEnd   = new Date(now.getFullYear(), q * 3 + 3, 0, 23, 59, 59);
+    return { name: 'Q' + (q + 1) + ' ' + now.getFullYear(), start: qStart, end: qEnd, idx: q };
+}
+function _inRange(dateStr, start, end) {
+    if (!dateStr) return false;
+    var d = new Date(dateStr);
+    return d >= start && d <= end;
+}
+function _isToday(dateStr) {
+    if (!dateStr) return false;
+    var d = new Date(dateStr), n = new Date();
+    return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+}
+function _isThisWeek(dateStr) {
+    if (!dateStr) return false;
+    var d = new Date(dateStr), n = new Date();
+    var weekStart = new Date(n); weekStart.setDate(n.getDate() - n.getDay());
+    var weekEnd   = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
+    return d >= weekStart && d <= weekEnd;
+}
+
+/* ── Style injection (once) ── */
+(function() {
+    var s = document.createElement('style');
+    s.textContent = [
+        '.emp-tab-btn{padding:9px 16px;border:none;background:none;cursor:pointer;font-size:13px;font-weight:500;color:var(--gray);border-bottom:3px solid transparent;transition:0.2s;white-space:nowrap;}',
+        '.emp-tab-btn.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:700;}',
+        '.emp-tab-btn:hover:not(.active){color:var(--text);background:var(--light-gray);}',
+        '.emp-kpi{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:0.15s;}',
+        '.emp-kpi:hover{box-shadow:0 2px 8px rgba(0,0,0,.1);}',
+        '.emp-kpi-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}',
+        '.emp-kpi-val{font-size:22px;font-weight:700;line-height:1;}',
+        '.emp-kpi-lbl{font-size:11px;color:var(--gray);margin-top:2px;}',
+        '.q-progress-track{background:var(--light-gray);border-radius:8px;height:10px;overflow:hidden;}',
+        '.q-progress-fill{height:100%;border-radius:8px;transition:width .5s;}',
+        '.work-item{padding:10px 14px;border-radius:8px;background:var(--card);border:1px solid var(--border);margin-bottom:8px;display:flex;align-items:center;gap:12px;}',
+        '.work-item.overdue{border-left:4px solid var(--danger);}',
+        '.work-item.urgent{border-left:4px solid var(--warning);}',
+        '.work-item.done{opacity:0.6;}',
+        '.hod-tag{background:#e3f2fd;color:#1565c0;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600;}',
+    ].join('');
+    document.head.appendChild(s);
+})();
+
+/* ══════════════════════════════════════════
+   MAIN RENDER
+══════════════════════════════════════════ */
 function renderEmployeeDashboard(container) {
     var user = AUTH.currentUser();
     if (!user) { container.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
-    var dept = user.department || 'Maintenance';
+    var dept = user.department || '';
+    var u    = user.fullName || user.username;
+    var q    = _getQuarter();
 
-    var tasks = DB.get('tasks') || [];
-    var problems = DB.get('problems') || [];
-    var requests = DB.get('material_requests') || [];
-    var checklists = DB.get('checklists') || [];
-    var inventory = DB.get('inventory') || [];
-    var projects = DB.get('projects') || [];
-    var reports = DB.get('reports') || [];
+    var tasks         = DB.get('tasks') || [];
+    var problems      = DB.get('problems') || [];
+    var requests      = DB.get('material_requests') || [];
+    var checklists    = DB.get('checklists') || [];
+    var inventory     = DB.get('inventory') || [];
+    var projects      = DB.get('projects') || [];
+    var reports       = DB.get('reports') || [];
     var cleaningTasks = DB.get('roomCleaningTasks') || [];
+    var users         = DB.get('users') || [];
 
-    var u = user.fullName || user.username;
+    // Identify admin/HOD usernames for tagging
+    var adminNames = {};
+    users.forEach(function(us) {
+        if (us.role === 'admin' || us.role === 'super_admin' || us.role === 'hod') {
+            adminNames[us.fullName] = us.role;
+            adminNames[us.username] = us.role;
+        }
+    });
+
     _empData = {
-        user: user, dept: dept,
+        user: user, dept: dept, u: u, q: q, adminNames: adminNames,
         myTasks: tasks.filter(function(t) {
-            // Show if explicitly assigned to this user, OR if unassigned but tagged to their dept
             return t.assignedTo === u || t.assignedTo === user.fullName || t.assignedTo === user.username ||
                    (!t.assignedTo && t.department === dept);
         }),
-        myProblems: problems.filter(function(p) { return p.createdBy === user.username || p.createdBy === user.fullName; }),
-        myRequests: requests.filter(function(r) { return r.createdBy === user.username || r.createdBy === user.fullName; }),
-        myChecklists: checklists.filter(function(c) { return c.assignedTo === user.fullName || c.assignedTo === 'common'; }),
-        myProjects: projects.filter(function(p) { return p.assignedTo === u || p.assignedTo === user.fullName || p.assignedTo === user.username; }),
-        deptInventory: inventory,
-        myReports: reports.filter(function(r) { return r.createdBy === user.username || r.createdBy === user.fullName; }),
-        pendingCleaning: cleaningTasks.filter(function(t){ return t.status !== 'done'; }),
-        doneCleaning: cleaningTasks.filter(function(t){ return t.status === 'done'; })
+        myProblems: problems.filter(function(p) {
+            return p.createdBy === user.username || p.createdBy === user.fullName;
+        }),
+        myRequests: requests.filter(function(r) {
+            return r.createdBy === user.username || r.createdBy === user.fullName;
+        }),
+        myChecklists: checklists.filter(function(c) {
+            return c.assignedTo === user.fullName || c.assignedTo === 'common';
+        }),
+        myProjects: projects.filter(function(p) {
+            return p.assignedTo === u || p.assignedTo === user.fullName || p.assignedTo === user.username;
+        }),
+        myReports: reports.filter(function(r) {
+            return r.createdBy === user.username || r.createdBy === user.fullName;
+        }),
+        pendingCleaning: cleaningTasks.filter(function(t) { return t.status !== 'done'; }),
+        doneCleaning:    cleaningTasks.filter(function(t) { return t.status === 'done'; })
     };
 
-    container.innerHTML = ''
-        + '<div class="flex-between mb-3" style="align-items:center;">'
-        + '<h3 style="font-size:20px;font-weight:600;">My Dashboard</h3>'
-        + '<div style="display:flex;align-items:center;gap:8px;"><span class="badge badge-info">' + dept + '</span><span style="font-size:14px;font-weight:600;">' + user.fullName + '</span></div></div>'
+    // Quarter-scoped tasks
+    var qTasks = _empData.myTasks.filter(function(t) { return _inRange(t.deadline, q.start, q.end); });
+    var qDone  = qTasks.filter(function(t) { return t.status === 'completed'; });
+    var qPct   = qTasks.length > 0 ? Math.round((qDone.length / qTasks.length) * 100) : 0;
+    // Quarter progress (how far into the quarter are we)
+    var qElapsed = Math.max(0, Math.min(100, Math.round(((new Date() - q.start) / (q.end - q.start)) * 100)));
 
-        + '<div class="emp-layout" style="display:flex;gap:16px;align-items:flex-start;">'
-        + '<div class="emp-sidebar" style="width:200px;min-width:200px;background:var(--card);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;">'
-        + '<div class="emp-nav-item active" onclick="empNav(\'overview\',this)" data-sec="overview" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);font-size:14px;display:flex;align-items:center;gap:8px;transition:0.2s;">📊 Overview</div>'
-        + '<div class="emp-nav-item" onclick="empNav(\'tasks\',this)" data-sec="tasks" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);font-size:14px;display:flex;align-items:center;gap:8px;transition:0.2s;">📝 Tasks <span class="badge badge-primary" style="margin-left:auto;font-size:10px;">' + _empData.myTasks.length + '</span></div>'
-        + '<div class="emp-nav-item" onclick="empNav(\'problems\',this)" data-sec="problems" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);font-size:14px;display:flex;align-items:center;gap:8px;transition:0.2s;">🔧 Problems <span class="badge badge-danger" style="margin-left:auto;font-size:10px;">' + _empData.myProblems.filter(function(p){return p.status!=='resolved';}).length + '</span></div>'
-        + '<div class="emp-nav-item" onclick="empNav(\'checklists\',this)" data-sec="checklists" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);font-size:14px;display:flex;align-items:center;gap:8px;transition:0.2s;">✅ Checklists</div>'
-        + '<div class="emp-nav-item" onclick="empNav(\'requests\',this)" data-sec="requests" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);font-size:14px;display:flex;align-items:center;gap:8px;transition:0.2s;">📦 Materials <span class="badge badge-warning" style="margin-left:auto;font-size:10px;">' + _empData.myRequests.filter(function(r){return r.status==='pending';}).length + '</span></div>'
-        + '<div class="emp-nav-item" onclick="empNav(\'lifecycle\',this)" data-sec="lifecycle" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);font-size:14px;display:flex;align-items:center;gap:8px;transition:0.2s;">🔋 Lifecycle <span class="badge badge-info" style="margin-left:auto;font-size:10px;">' + _empData.deptInventory.length + '</span></div>'
-        + '<div class="emp-nav-item" onclick="empNav(\'projects\',this)" data-sec="projects" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);font-size:14px;display:flex;align-items:center;gap:8px;transition:0.2s;">📋 Projects <span class="badge badge-primary" style="margin-left:auto;font-size:10px;">' + _empData.myProjects.length + '</span></div>'
-        + '<div class="emp-nav-item" onclick="empNav(\'reports\',this)" data-sec="reports" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);font-size:14px;display:flex;align-items:center;gap:8px;transition:0.2s;">📋 Reports</div>'
-        + '<div class="emp-nav-item" onclick="empNav(\'cleaning\',this)" data-sec="cleaning" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);font-size:14px;display:flex;align-items:center;gap:8px;transition:0.2s;">🧹 Cleaning'
-        + (_empData.pendingCleaning.length > 0 ? ' <span class="badge badge-danger" style="margin-left:auto;font-size:10px;">' + _empData.pendingCleaning.length + '</span>' : '')
-        + '</div>'
-        + '<div class="emp-nav-item" onclick="empNav(\'performance\',this)" data-sec="performance" style="padding:12px 16px;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:8px;transition:0.2s;">📊 Performance</div>'
-        + '</div>'
+    _empData.qTasks = qTasks; _empData.qDone = qDone; _empData.qPct = qPct;
 
-        + '<div class="emp-content" style="flex:1;min-width:0;" id="empContent">'
-        + '<div id="empSectionOverview"></div>'
-        + '<div id="empSectionTasks" style="display:none;"></div>'
-        + '<div id="empSectionProblems" style="display:none;"></div>'
-        + '<div id="empSectionChecklists" style="display:none;"></div>'
-        + '<div id="empSectionRequests" style="display:none;"></div>'
-        + '<div id="empSectionLifecycle" style="display:none;"></div>'
-        + '<div id="empSectionProjects" style="display:none;"></div>'
-        + '<div id="empSectionReports" style="display:none;"></div>'
-        + '<div id="empSectionCleaning" style="display:none;"></div>'
-        + '<div id="empSectionPerformance" style="display:none;"></div>'
-        + '</div></div>';
+    // Quick KPI counts
+    var todayTasks = _empData.myTasks.filter(function(t) { return _isToday(t.deadline) && t.status !== 'completed'; });
+    var weekTasks  = _empData.myTasks.filter(function(t) { return _isThisWeek(t.deadline) && t.status !== 'completed'; });
+    var openProbs  = _empData.myProblems.filter(function(p) { return p.status !== 'resolved'; });
+    var clTotal    = _empData.myChecklists.length;
+    var clDone     = _empData.myChecklists.filter(function(c) { return c.status === 'completed'; }).length;
+    var clPct      = clTotal > 0 ? Math.round((clDone / clTotal) * 100) : 100;
 
-    _empSection = 'overview';
-    renderEmpOverview();
-    renderEmpTasksSec();
-    renderEmpProblemsSec();
-    renderEmpChecklistsSec();
-    renderEmpRequestsSec();
-    renderEmpLifecycleSec();
-    renderEmpProjectsSec();
-    renderEmpReportsSec();
-    renderEmpCleaningSection();
-    renderEmpPerformanceSec();
-}
+    var tabs = [
+        { id: 'overview',    label: '📊 Overview' },
+        { id: 'work',        label: '📝 My Work', badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
+        { id: 'checklists',  label: '✅ Checklists' },
+        { id: 'reports',     label: '📋 Reports' },
+        { id: 'cleaning',    label: '🧹 Cleaning', badge: _empData.pendingCleaning.length, badgeClass: 'badge-danger' },
+        { id: 'performance', label: '📊 Performance' }
+    ];
 
-function empNav(section, btn) {
-    _empSection = section;
-    document.querySelectorAll('.emp-nav-item').forEach(function(el) { el.classList.remove('active'); });
-    if (btn) btn.classList.add('active');
-    document.querySelectorAll('[id^="empSection"]').forEach(function(el) { el.style.display = 'none'; });
-    var target = document.getElementById('empSection' + section.charAt(0).toUpperCase() + section.slice(1));
-    if (target) target.style.display = 'block';
-}
-
-function empNavStyle() {
-    var style = document.createElement('style');
-    style.textContent = '.emp-nav-item:hover{background:var(--light-gray);}.emp-nav-item.active{background:var(--primary);color:#fff;font-weight:600;}.emp-nav-item.active .badge{background:rgba(255,255,255,0.3);color:#fff;}';
-    document.head.appendChild(style);
-}
-empNavStyle();
-
-function renderEmpOverview() {
-    var el = document.getElementById('empSectionOverview');
-    if (!el) return;
-    var d = _empData;
-    var tasksPending = d.myTasks.filter(function(t) { return t.status !== 'completed'; }).length;
-    var tasksDone = d.myTasks.filter(function(t) { return t.status === 'completed'; }).length;
-    var problemsOpen = d.myProblems.filter(function(p) { return p.status !== 'resolved'; }).length;
-    var problemsSolved = d.myProblems.filter(function(p) { return p.status === 'resolved'; }).length;
-    var requestsPending = d.myRequests.filter(function(r) { return r.status === 'pending'; }).length;
-    var requestsApproved = d.myRequests.filter(function(r) { return r.status === 'approved'; }).length;
-    var checklistsPending = d.myChecklists.filter(function(cl) { return cl.status !== 'completed'; }).length;
-    var checklistsDone = d.myChecklists.filter(function(cl) { return cl.status === 'completed'; }).length;
-    var taskRate = d.myTasks.length > 0 ? Math.round((tasksDone / d.myTasks.length) * 100) : 0;
-    var probRate = d.myProblems.length > 0 ? Math.round((problemsSolved / d.myProblems.length) * 100) : 0;
-
-    el.innerHTML = ''
-        + '<div class="grid-5 mb-4" style="gap:10px;">'
-        + '<div class="stat-card" style="cursor:pointer;" onclick="empNav(\'tasks\',document.querySelector(\'.emp-nav-item[data-sec=tasks]\'))"><div style="font-size:24px;font-weight:700;color:var(--warning);">' + tasksPending + '</div><div style="font-size:11px;color:var(--gray);">Pending Tasks</div></div>'
-        + '<div class="stat-card"><div style="font-size:24px;font-weight:700;color:var(--success);">' + tasksDone + '</div><div style="font-size:11px;color:var(--gray);">Tasks Done</div></div>'
-        + '<div class="stat-card" style="cursor:pointer;" onclick="empNav(\'problems\',document.querySelector(\'.emp-nav-item[data-sec=problems]\'))"><div style="font-size:24px;font-weight:700;color:var(--danger);">' + problemsOpen + '</div><div style="font-size:11px;color:var(--gray);">Open Problems</div></div>'
-        + '<div class="stat-card"><div style="font-size:24px;font-weight:700;color:var(--success);">' + problemsSolved + '</div><div style="font-size:11px;color:var(--gray);">Problems Solved</div></div>'
-        + '<div class="stat-card"><div style="font-size:24px;font-weight:700;color:var(--warning);">' + requestsPending + '</div><div style="font-size:11px;color:var(--gray);">Pending Requests</div></div>'
-        + '</div>'
-
-        + '<div class="grid-4 mb-4" style="gap:10px;">'
-        + '<div class="stat-card"><div style="font-size:24px;font-weight:700;color:var(--info);">' + checklistsPending + '</div><div style="font-size:11px;color:var(--gray);">Checklists Due</div></div>'
-        + '<div class="stat-card"><div style="font-size:24px;font-weight:700;color:var(--success);">' + checklistsDone + '</div><div style="font-size:11px;color:var(--gray);">Checklists Done</div></div>'
-        + '<div class="stat-card"><div style="font-size:24px;font-weight:700;color:var(--success);">' + requestsApproved + '</div><div style="font-size:11px;color:var(--gray);">Approved Requests</div></div>'
-        + '<div class="stat-card"><div style="font-size:24px;font-weight:700;color:var(--primary);">' + d.myProjects.length + '</div><div style="font-size:11px;color:var(--gray);">My Projects</div></div>'
-        + '</div>'
-
-        + (_empData.pendingCleaning.length > 0
-            ? '<div style="background:#fff3e0;border:2px solid var(--warning);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="empNav(\'cleaning\',document.querySelector(\'.emp-nav-item[data-sec=cleaning]\'))">'
-              + '<span style="font-size:24px;">🧹</span>'
-              + '<div style="flex:1;"><div style="font-weight:700;color:#e65100;">' + _empData.pendingCleaning.length + ' room(s) need cleaning</div>'
-              + '<div style="font-size:12px;color:var(--gray);">Tap to view and complete cleaning tasks</div></div>'
-              + '<span style="font-size:18px;color:#e65100;">›</span></div>'
-            : '')
-        + '<div class="card" style="padding:12px 16px;background:#f8f9ff;">'
-        + '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">'
-        + '<span style="font-weight:600;font-size:14px;">⚡ Quick Actions</span>'
-        + '<button class="btn btn-sm btn-primary" onclick="Router.navigate(\'problems\')">🔧 Report Problem</button>'
-        + '<button class="btn btn-sm btn-info" style="background:var(--info);color:#fff;" onclick="Router.navigate(\'material-requests\')">📦 New Request</button>'
-        + '<button class="btn btn-sm btn-secondary" onclick="showReportForm()">📋 Submit Report</button>'
-        + '<button class="btn btn-sm btn-success" onclick="Router.navigate(\'checklists\')">✅ Checklists</button>'
-        + '<button class="btn btn-sm btn-warning" style="color:#fff;" onclick="Router.navigate(\'tasks\')">📝 My Tasks</button>'
-        + '<button class="btn btn-sm btn-primary" onclick="Router.navigate(\'projects\')">📋 Projects</button>'
+    var html = ''
+        // ── Profile header ──
+        + '<div style="background:linear-gradient(135deg,var(--primary) 0%,#1a6bcc 100%);border-radius:14px;padding:20px 24px;color:#fff;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
+        + '<div style="display:flex;align-items:center;gap:16px;">'
+        + '<div style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;font-size:24px;">👤</div>'
+        + '<div><div style="font-size:20px;font-weight:700;">' + u + '</div>'
+        + '<div style="font-size:13px;opacity:0.85;">' + (dept || 'No Department') + ' &nbsp;·&nbsp; ' + (user.role || 'employee').replace(/_/g,' ') + '</div></div></div>'
+        + '<div style="text-align:right;opacity:0.85;font-size:13px;">'
+        + new Date().toLocaleDateString('en-IN', {weekday:'long',day:'numeric',month:'long',year:'numeric'})
         + '</div></div>'
 
-        + '<div class="grid-2 mt-4" style="gap:16px;">'
-        + '<div class="card"><div class="card-header"><h3>📝 Recent Tasks</h3><button class="btn btn-sm btn-outline" onclick="empNav(\'tasks\',document.querySelector(\'.emp-nav-item[data-sec=tasks]\'))">View All</button></div><div id="empOvTasks" style="padding:12px;"></div></div>'
-        + '<div class="card"><div class="card-header"><h3>🔧 Recent Problems</h3><button class="btn btn-sm btn-outline" onclick="empNav(\'problems\',document.querySelector(\'.emp-nav-item[data-sec=problems]\'))">View All</button></div><div id="empOvProblems" style="padding:12px;"></div></div>'
+        // ── KPI strip ──
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px;">'
+        + _kpiCard('📅', 'Due Today',    todayTasks.length, '#fff3e0', '#e65100', 'work')
+        + _kpiCard('📆', 'Due This Week', weekTasks.length,  '#e3f2fd', 'var(--primary)', 'work')
+        + _kpiCard('✅', 'Checklist Rate', clPct + '%',       '#e8f5e9', 'var(--secondary)', 'checklists')
+        + _kpiCard('🔧', 'Open Issues',   openProbs.length,   '#fce4ec', 'var(--danger)', 'reports')
+        + _kpiCard('📋', 'My Projects',   _empData.myProjects.length, '#f3e5f5', '#7b1fa2', 'work')
         + '</div>'
 
-        + '<div class="grid-2 mt-4" style="gap:16px;">'
-        + '<div class="card"><div class="card-header"><h3>📦 Recent Requests</h3><button class="btn btn-sm btn-outline" onclick="empNav(\'requests\',document.querySelector(\'.emp-nav-item[data-sec=requests]\'))">View All</button></div><div id="empOvRequests" style="padding:12px;"></div></div>'
-        + '<div class="card"><div class="card-header"><h3>✅ Recent Checklists</h3><button class="btn btn-sm btn-outline" onclick="empNav(\'checklists\',document.querySelector(\'.emp-nav-item[data-sec=checklists]\'))">View All</button></div><div id="empOvChecklists" style="padding:12px;"></div></div>'
+        // ── Quarterly strip ──
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:18px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:15px;">📅 ' + q.name + ' Work Progress</div>'
+        + '<div style="font-size:13px;color:var(--gray);">' + qDone.length + ' / ' + qTasks.length + ' tasks completed this quarter</div>'
+        + '</div>'
+        + '<div style="margin-bottom:6px;">'
+        // Task completion bar
+        + '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray);margin-bottom:3px;"><span>Task completion</span><span style="font-weight:600;color:' + (qPct >= 80 ? 'var(--success)' : qPct >= 50 ? 'var(--warning)' : 'var(--danger)') + ';">' + qPct + '%</span></div>'
+        + '<div class="q-progress-track"><div class="q-progress-fill" style="width:' + qPct + '%;background:' + (qPct >= 80 ? 'var(--success)' : qPct >= 50 ? 'var(--warning)' : 'var(--danger)') + ';"></div></div>'
+        + '</div>'
+        + '<div>'
+        // Quarter timeline (how far into quarter)
+        + '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray);margin-bottom:3px;"><span>Quarter elapsed</span><span>' + qElapsed + '%</span></div>'
+        + '<div class="q-progress-track"><div class="q-progress-fill" style="width:' + qElapsed + '%;background:var(--info);"></div></div>'
+        + '</div>'
+        + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gray);margin-top:6px;">'
+        + '<span>' + q.start.toLocaleDateString('en-IN',{month:'short',day:'numeric'}) + '</span>'
+        + '<span>' + q.end.toLocaleDateString('en-IN',{month:'short',day:'numeric'}) + '</span></div>'
+        + '</div>'
+
+        // ── Cleaning alert ──
+        + (_empData.pendingCleaning.length > 0
+            ? '<div style="background:#fff3e0;border:2px solid var(--warning);border-radius:10px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="empTabSwitch(\'cleaning\',this)">'
+              + '<span style="font-size:24px;">🧹</span><div style="flex:1;"><div style="font-weight:700;color:#e65100;">' + _empData.pendingCleaning.length + ' room(s) need cleaning</div>'
+              + '<div style="font-size:12px;color:var(--gray);">Tap to view tasks</div></div><span style="color:#e65100;">›</span></div>'
+            : '')
+
+        // ── Tab bar ──
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:0 4px;display:flex;overflow-x:auto;gap:2px;border-bottom:none;">'
+        + tabs.map(function(t) {
+            var label = t.label + (t.badge > 0 ? ' <span class="badge ' + (t.badgeClass || 'badge-primary') + '" style="font-size:10px;margin-left:2px;">' + t.badge + '</span>' : '');
+            return '<button class="emp-tab-btn' + (t.id === 'overview' ? ' active' : '') + '" data-tab="' + t.id + '" onclick="empTabSwitch(\'' + t.id + '\',this)">' + label + '</button>';
+        }).join('')
+        + '</div>'
+
+        // ── Tab content ──
+        + '<div style="background:var(--card);border:1px solid var(--border);border-top:3px solid var(--primary);border-radius:0 0 12px 12px;padding:18px;" id="empTabContent">'
         + '</div>';
 
-    renderSmallList('empOvTasks', d.myTasks, 'task');
-    renderSmallList('empOvProblems', d.myProblems, 'problem');
-    renderSmallList('empOvRequests', d.myRequests, 'request');
-    renderSmallList('empOvChecklists', d.myChecklists, 'checklist');
+    container.innerHTML = html;
+
+    _empTab = 'overview';
+    _renderEmpTab('overview');
 }
 
-function renderSmallList(id, items, type) {
-    var el = document.getElementById(id);
+function _kpiCard(icon, label, val, bg, color, tab) {
+    return '<div class="emp-kpi" onclick="empTabSwitch(\'' + tab + '\')">'
+        + '<div class="emp-kpi-icon" style="background:' + bg + ';">' + icon + '</div>'
+        + '<div><div class="emp-kpi-val" style="color:' + color + ';">' + val + '</div><div class="emp-kpi-lbl">' + label + '</div></div>'
+        + '</div>';
+}
+
+function empTabSwitch(tab, btn) {
+    _empTab = tab;
+    document.querySelectorAll('.emp-tab-btn').forEach(function(el) {
+        el.classList.toggle('active', el.dataset.tab === tab);
+    });
+    _renderEmpTab(tab);
+}
+
+function _renderEmpTab(tab) {
+    var el = document.getElementById('empTabContent');
     if (!el) return;
-    if (items.length === 0) { el.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:8px;">None</div>'; return; }
+    if (tab === 'overview')    { renderEmpOverview(el); return; }
+    if (tab === 'work')        { renderEmpWorkTab(el); return; }
+    if (tab === 'checklists')  { renderEmpChecklistsTab(el); return; }
+    if (tab === 'reports')     { renderEmpReportsTab(el); return; }
+    if (tab === 'cleaning')    { renderEmpCleaningSection(el); return; }
+    if (tab === 'performance') { renderEmpPerformanceTab(el); return; }
+}
+
+/* ══════════════════════════════════════════
+   OVERVIEW TAB
+══════════════════════════════════════════ */
+function renderEmpOverview(el) {
+    var d = _empData;
+    var q = d.q;
+    if (!el) el = document.getElementById('empTabContent');
+    if (!el) return;
+
+    var tasksPending = d.myTasks.filter(function(t) { return t.status !== 'completed'; });
+    var todayTasks   = tasksPending.filter(function(t) { return _isToday(t.deadline); });
+    var overdueTasks = tasksPending.filter(function(t) { return t.deadline && new Date(t.deadline) < new Date(); });
+
+    // Recent items
+    var recentTasks    = d.myTasks.slice().sort(function(a,b){ return (b.createdAt||'').localeCompare(a.createdAt||''); }).slice(0, 4);
+    var recentCl       = d.myChecklists.filter(function(c){ return c.status !== 'completed'; }).slice(0, 4);
+    var pendingReqs    = d.myRequests.filter(function(r){ return r.status === 'pending'; }).slice(0, 4);
+
     var html = '';
-    for (var i = 0; i < Math.min(items.length, 5); i++) {
-        var item = items[i];
-        if (type === 'task') {
-            var badge = APP.getStatusBadge(item.status);
-            html += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--light-gray);font-size:13px;"><span>' + (item.title || '') + '</span><span class="badge ' + badge + '" style="font-size:10px;">' + (item.status || '') + '</span></div>';
-        } else if (type === 'problem') {
-            var badge = APP.getStatusBadge(item.status);
-            html += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--light-gray);font-size:13px;"><span>' + (item.title || '') + '</span><span class="badge ' + badge + '" style="font-size:10px;">' + (item.status || '') + '</span></div>';
-        } else if (type === 'request') {
-            var badge = item.status === 'approved' ? 'badge-success' : item.status === 'rejected' ? 'badge-danger' : 'badge-warning';
-            html += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--light-gray);font-size:13px;"><span>' + (item.title || '') + '</span><span class="badge ' + badge + '" style="font-size:10px;">' + (item.status || '') + '</span></div>';
-        } else if (type === 'checklist') {
-            var total = item.items ? item.items.length : 0;
-            var done = item.items ? item.items.filter(function(it) { return it.status === 'ok'; }).length : 0;
-            var pct = total > 0 ? Math.round((done / total) * 100) : 0;
-            html += '<div style="padding:6px 0;border-bottom:1px solid var(--light-gray);font-size:13px;"><div style="display:flex;justify-content:space-between;"><span>' + (item.title || '') + '</span><span class="badge ' + (item.status === 'completed' ? 'badge-success' : 'badge-info') + '" style="font-size:10px;">' + (item.status || 'active') + '</span></div><div style="display:flex;align-items:center;gap:4px;margin-top:2px;"><div style="flex:1;height:4px;background:var(--light-gray);border-radius:2px;"><div style="height:100%;width:' + pct + '%;background:var(--success);border-radius:2px;"></div></div><span style="font-size:10px;color:var(--gray);">' + done + '/' + total + '</span></div></div>';
+
+    // Overdue alert
+    if (overdueTasks.length > 0) {
+        html += '<div style="background:#ffebee;border:1px solid var(--danger);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;">'
+            + '<strong style="color:var(--danger);">⚠️ ' + overdueTasks.length + ' overdue task(s)</strong> &nbsp;'
+            + overdueTasks.slice(0,2).map(function(t){ return '<span style="color:var(--danger);">' + t.title + '</span>'; }).join(', ')
+            + (overdueTasks.length > 2 ? ' +' + (overdueTasks.length - 2) + ' more' : '')
+            + ' &nbsp;<button class="btn btn-sm btn-danger" onclick="empTabSwitch(\'work\')">View All</button></div>';
+    }
+
+    // Today's focus
+    html += '<div style="margin-bottom:18px;">'
+        + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">🎯 Today\'s Focus</div>';
+    if (todayTasks.length === 0 && recentCl.length === 0) {
+        html += '<div style="color:var(--gray);font-size:13px;padding:16px;text-align:center;background:var(--light-gray);border-radius:8px;">Nothing due today — you\'re all caught up! 🎉</div>';
+    } else {
+        if (todayTasks.length > 0) {
+            html += '<div style="font-size:12px;font-weight:600;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Tasks Due Today</div>';
+            todayTasks.slice(0, 5).forEach(function(t) {
+                html += _workItem(t, d.adminNames, true);
+            });
+        }
+        if (recentCl.length > 0) {
+            html += '<div style="font-size:12px;font-weight:600;color:var(--gray);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.5px;">Open Checklists</div>';
+            recentCl.slice(0, 3).forEach(function(cl) {
+                var total = cl.items ? cl.items.length : 0;
+                var done  = cl.items ? cl.items.filter(function(i){ return i.status === 'ok'; }).length : 0;
+                var pct   = total > 0 ? Math.round((done/total)*100) : 0;
+                html += '<div class="work-item"><div style="flex:1;">'
+                    + '<div style="font-size:13px;font-weight:600;">' + cl.title + '</div>'
+                    + '<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">'
+                    + '<div style="flex:1;max-width:180px;height:5px;background:var(--light-gray);border-radius:3px;"><div style="height:100%;width:' + pct + '%;background:var(--success);border-radius:3px;"></div></div>'
+                    + '<span style="font-size:11px;color:var(--gray);">' + done + '/' + total + '</span></div></div>'
+                    + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'checklists\')">Open</button></div>';
+            });
         }
     }
+    html += '</div>';
+
+    // Two-column: recent tasks + quick actions
+    html += '<div class="grid-2" style="gap:16px;">'
+        + '<div>'
+        + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">📝 Recent Tasks</div>';
+    if (recentTasks.length === 0) {
+        html += '<div style="color:var(--gray);font-size:13px;">No tasks yet</div>';
+    } else {
+        recentTasks.forEach(function(t) { html += _workItem(t, d.adminNames, false); });
+    }
+    html += '</div>'
+        + '<div>'
+        + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">⚡ Quick Actions</div>'
+        + '<div style="display:flex;flex-direction:column;gap:8px;">'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'work\')">📝 View All My Tasks</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'checklists\')">✅ Open Checklists</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="Router.navigate(\'problems\')">🔧 Report a Problem</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="Router.navigate(\'material-requests\')">📦 New Material Request</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="showReportForm()">📋 Submit Report</button>'
+        + '</div>'
+        + (pendingReqs.length > 0
+            ? '<div style="margin-top:14px;"><div style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--gray);">Pending Requests</div>'
+              + pendingReqs.map(function(r){ return '<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--light-gray);">' + (r.title||'Request') + ' <span class="badge badge-warning" style="font-size:10px;">pending</span></div>'; }).join('')
+              + '</div>'
+            : '')
+        + '</div></div>';
+
     el.innerHTML = html;
 }
 
-function renderEmpTasksSec() {
-    var el = document.getElementById('empSectionTasks');
-    if (!el) return;
+function _workItem(t, adminNames, showDate) {
+    var isOverdue = t.deadline && new Date(t.deadline) < new Date() && t.status !== 'completed';
+    var cls = t.status === 'completed' ? 'done' : isOverdue ? 'overdue' : t.priority === 'high' ? 'urgent' : '';
+    var fromAdmin = t.createdBy && adminNames[t.createdBy];
+    var roleLabel = fromAdmin === 'hod' ? 'HOD' : (fromAdmin === 'admin' || fromAdmin === 'super_admin') ? 'Admin' : null;
+    return '<div class="work-item ' + cls + '">'
+        + '<div style="flex:1;min-width:0;">'
+        + '<div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+        + '<span>' + (t.title || '') + '</span>'
+        + (roleLabel ? '<span class="hod-tag">' + roleLabel + '</span>' : '')
+        + (t.priority === 'high' ? '<span style="color:var(--danger);font-size:11px;">● High</span>' : '')
+        + '</div>'
+        + (showDate && t.deadline ? '<div style="font-size:11px;color:' + (isOverdue ? 'var(--danger)' : 'var(--gray)') + ';margin-top:2px;">' + (isOverdue ? '⚠️ Overdue: ' : '📅 ') + APP.formatDate(t.deadline) + '</div>' : '')
+        + '</div>'
+        + '<span class="badge ' + APP.getStatusBadge(t.status) + '" style="font-size:10px;flex-shrink:0;">' + (t.status || 'pending') + '</span>'
+        + '</div>';
+}
+
+/* ══════════════════════════════════════════
+   MY WORK TAB (tasks + projects)
+══════════════════════════════════════════ */
+function renderEmpWorkTab(el) {
     var d = _empData;
-    var tasksPending = d.myTasks.filter(function(t) { return t.status !== 'completed'; }).length;
-    var html = '<div class="card"><div class="card-header"><h3>📝 My Tasks (' + d.myTasks.length + ')</h3></div>'
-        + '<div style="padding:16px;">';
-    if (d.myTasks.length === 0) { html += '<div style="color:var(--gray);font-size:13px;">No tasks assigned</div>'; }
-    else {
-        html += '<div class="table-responsive"><table class="table"><thead><tr><th>Title</th><th>Priority</th><th>Deadline</th><th>Status</th><th>Action</th></tr></thead><tbody>';
-        for (var i = 0; i < d.myTasks.length; i++) {
-            var t = d.myTasks[i];
-            var overdue = t.deadline && new Date(t.deadline) < new Date() && t.status !== 'completed' ? ' <span style="color:var(--danger);font-size:11px;">⚠️</span>' : '';
-            html += '<tr><td>' + (t.title || '') + overdue + '</td>'
-                + '<td>' + (t.priority ? '<span class="badge ' + (t.priority === 'high' ? 'badge-danger' : t.priority === 'medium' ? 'badge-warning' : 'badge-info') + '" style="font-size:10px;">' + t.priority + '</span>' : '-') + '</td>'
-                + '<td style="font-size:12px;">' + (t.deadline ? APP.formatDate(t.deadline) : '-') + '</td>'
-                + '<td><span class="badge ' + APP.getStatusBadge(t.status) + '" style="font-size:11px;">' + (t.status || 'pending') + '</span></td>'
-                + '<td><button class="btn btn-sm btn-primary" onclick="Router.navigate(\'tasks\')">Open</button></td></tr>';
-        }
-        html += '</tbody></table></div>';
+    var pending   = d.myTasks.filter(function(t){ return t.status !== 'completed'; });
+    var completed = d.myTasks.filter(function(t){ return t.status === 'completed'; });
+
+    var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:16px;">📝 My Tasks (' + d.myTasks.length + ')</div>'
+        + '<div style="display:flex;gap:8px;">'
+        + '<span class="badge badge-warning" style="padding:5px 10px;">' + pending.length + ' pending</span>'
+        + '<span class="badge badge-success" style="padding:5px 10px;">' + completed.length + ' done</span>'
+        + '</div></div>';
+
+    if (d.myTasks.length === 0) {
+        html += '<div style="text-align:center;padding:32px;color:var(--gray);font-size:13px;">No tasks assigned to you</div>';
+    } else {
+        // Group: due today, this week, later, completed
+        var groups = [
+            { label: '🔴 Overdue',      items: pending.filter(function(t){ return t.deadline && new Date(t.deadline) < new Date(); }) },
+            { label: '📅 Due Today',    items: pending.filter(function(t){ return _isToday(t.deadline) && !(t.deadline && new Date(t.deadline) < new Date()); }) },
+            { label: '📆 Due This Week',items: pending.filter(function(t){ return _isThisWeek(t.deadline) && !_isToday(t.deadline) && !(t.deadline && new Date(t.deadline) < new Date()); }) },
+            { label: '📋 Later',        items: pending.filter(function(t){ return !t.deadline || (!_isThisWeek(t.deadline) && !(t.deadline && new Date(t.deadline) < new Date())); }) },
+            { label: '✅ Completed',    items: completed }
+        ];
+
+        groups.forEach(function(g) {
+            if (g.items.length === 0) return;
+            html += '<div style="margin-bottom:16px;">'
+                + '<div style="font-size:12px;font-weight:700;color:var(--gray);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;">' + g.label + ' (' + g.items.length + ')</div>';
+            g.items.forEach(function(t) {
+                var fromAdmin = t.createdBy && d.adminNames[t.createdBy];
+                var roleLabel = fromAdmin === 'hod' ? 'HOD' : (fromAdmin === 'admin' || fromAdmin === 'super_admin') ? 'Admin' : null;
+                var isOverdue = t.deadline && new Date(t.deadline) < new Date() && t.status !== 'completed';
+                html += '<div class="work-item ' + (t.status==='completed'?'done':isOverdue?'overdue':t.priority==='high'?'urgent':'') + '" style="flex-wrap:wrap;gap:6px;">'
+                    + '<div style="flex:1;min-width:200px;">'
+                    + '<div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+                    + '<span>' + (t.title||'') + '</span>'
+                    + (roleLabel ? '<span class="hod-tag">' + roleLabel + '</span>' : '')
+                    + (t.priority === 'high' ? '<span class="badge badge-danger" style="font-size:10px;">High</span>' : t.priority === 'medium' ? '<span class="badge badge-warning" style="font-size:10px;">Med</span>' : '')
+                    + '</div>'
+                    + (t.description ? '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + t.description.substring(0,80) + (t.description.length>80?'…':'') + '</div>' : '')
+                    + '<div style="font-size:11px;color:var(--gray);margin-top:3px;">'
+                    + (t.deadline ? (isOverdue ? '<span style="color:var(--danger);">⚠️ Due: ' : '📅 Due: ') + APP.formatDate(t.deadline) + (isOverdue?'</span>':'') : '')
+                    + (t.createdBy ? ' &nbsp;·&nbsp; From: ' + t.createdBy : '')
+                    + '</div></div>'
+                    + '<span class="badge ' + APP.getStatusBadge(t.status) + '" style="font-size:11px;">' + (t.status||'pending') + '</span>'
+                    + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'tasks\')">Open</button>'
+                    + '</div>';
+            });
+            html += '</div>';
+        });
     }
-    html += '</div></div>';
+
+    // Projects
+    if (d.myProjects.length > 0) {
+        html += '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">'
+            + '<div style="font-weight:700;font-size:15px;margin-bottom:12px;">📋 My Projects (' + d.myProjects.length + ')</div>';
+        d.myProjects.forEach(function(p) {
+            var pct = p.budget > 0 ? Math.round((p.spent / p.budget) * 100) : 0;
+            html += '<div class="work-item" style="flex-wrap:wrap;gap:10px;">'
+                + '<div style="flex:1;min-width:200px;">'
+                + '<div style="font-size:13px;font-weight:600;">' + (p.name||'') + '</div>'
+                + (p.description ? '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + p.description.substring(0,80) + '</div>' : '')
+                + '</div>'
+                + '<span class="badge ' + APP.getStatusBadge(p.status) + '" style="font-size:11px;">' + (p.status||'planning') + '</span>'
+                + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'projects\')">Open</button>'
+                + '</div>';
+        });
+        html += '</div>';
+    }
+
+    // Material requests
+    var pendingReqs = d.myRequests.filter(function(r){ return r.status === 'pending'; });
+    if (d.myRequests.length > 0) {
+        html += '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+            + '<div style="font-weight:700;font-size:15px;">📦 Material Requests (' + d.myRequests.length + ')</div>'
+            + '<button class="btn btn-sm btn-primary" onclick="Router.navigate(\'material-requests\')">+ New Request</button></div>';
+        d.myRequests.slice().reverse().slice(0,6).forEach(function(r) {
+            var badge = r.status === 'approved' ? 'badge-success' : r.status === 'rejected' ? 'badge-danger' : 'badge-warning';
+            html += '<div class="work-item"><div style="flex:1;font-size:13px;font-weight:600;">' + (r.title||'Request')
+                + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + APP.formatDate(r.createdAt) + (r.approvedBy ? ' · Reviewed by: ' + r.approvedBy : '') + '</div></div>'
+                + '<span class="badge ' + badge + '" style="font-size:11px;">' + (r.status||'pending') + '</span></div>';
+        });
+        html += '</div>';
+    }
+
     el.innerHTML = html;
 }
 
-function renderEmpProblemsSec() {
-    var el = document.getElementById('empSectionProblems');
-    if (!el) return;
+/* ══════════════════════════════════════════
+   CHECKLISTS TAB
+══════════════════════════════════════════ */
+function renderEmpChecklistsTab(el) {
     var d = _empData;
-    var html = '<div class="card"><div class="card-header"><h3>🔧 My Problems (' + d.myProblems.length + ')</h3><button class="btn btn-sm btn-primary" onclick="Router.navigate(\'problems\')">+ New Problem</button></div>'
-        + '<div style="padding:16px;">';
-    if (d.myProblems.length === 0) { html += '<div style="color:var(--gray);font-size:13px;">No problems reported</div>'; }
-    else {
-        html += '<div class="table-responsive"><table class="table"><thead><tr><th>Title</th><th>Category</th><th>Priority</th><th>Status</th><th>Action</th></tr></thead><tbody>';
-        for (var i = 0; i < d.myProblems.length; i++) {
-            var p = d.myProblems[i];
-            html += '<tr><td>' + (p.title || '') + '</td>'
-                + '<td style="font-size:12px;">' + (p.category || '-') + '</td>'
-                + '<td>' + (p.priority ? '<span class="badge ' + (p.priority === 'high' ? 'badge-danger' : p.priority === 'medium' ? 'badge-warning' : 'badge-info') + '" style="font-size:10px;">' + p.priority + '</span>' : '-') + '</td>'
-                + '<td><span class="badge ' + APP.getStatusBadge(p.status) + '" style="font-size:11px;">' + (p.status || 'open') + '</span></td>'
-                + '<td><button class="btn btn-sm btn-primary" onclick="Router.navigate(\'problems\')">Open</button></td></tr>';
-        }
-        html += '</tbody></table></div>';
-    }
-    html += '</div></div>';
-    el.innerHTML = html;
-}
+    var clPending   = d.myChecklists.filter(function(c){ return c.status !== 'completed'; });
+    var clCompleted = d.myChecklists.filter(function(c){ return c.status === 'completed'; });
 
-function renderEmpChecklistsSec() {
-    var el = document.getElementById('empSectionChecklists');
-    if (!el) return;
-    var d = _empData;
-    var html = '<div class="card"><div class="card-header" style="flex-wrap:wrap;"><h3>✅ Checklists (' + d.myChecklists.length + ')</h3>'
-        + '<div style="display:flex;gap:4px;font-size:12px;">'
+    var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:16px;">✅ My Checklists</div>'
+        + '<div style="display:flex;gap:4px;">'
         + '<button class="tab-btn active" onclick="filterEmpCl(\'daily\',this)">Daily</button>'
         + '<button class="tab-btn" onclick="filterEmpCl(\'weekly\',this)">Weekly</button>'
         + '<button class="tab-btn" onclick="filterEmpCl(\'monthly\',this)">Monthly</button>'
         + '<button class="tab-btn" onclick="filterEmpCl(\'all\',this)">All</button>'
-        + '</div></div><div id="empClList" style="padding:16px;"></div></div>';
+        + '</div></div>';
+
+    html += '<div id="empClListNew"></div>';
     el.innerHTML = html;
     _empClFilter = 'daily';
     window._empChecklists = d.myChecklists;
-    renderEmpFullChecklists(d.myChecklists);
+    _renderEmpChecklists(d.myChecklists);
 }
 
 function filterEmpCl(filter, btn) {
     _empClFilter = filter;
-    var parent = btn.parentNode;
-    if (parent) {
-        var btns = parent.querySelectorAll('.tab-btn');
-        for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
-    }
+    btn.parentNode.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
     btn.classList.add('active');
-    renderEmpFullChecklists(window._empChecklists || []);
+    _renderEmpChecklists(window._empChecklists || []);
 }
 
-function renderEmpFullChecklists(checklists) {
-    var el = document.getElementById('empClList');
+function _renderEmpChecklists(checklists) {
+    var el = document.getElementById('empClListNew');
     if (!el) return;
-    var filtered = [];
-    for (var i = 0; i < checklists.length; i++) {
-        var cl = checklists[i];
-        var title = (cl.title || '').toLowerCase();
-        if (_empClFilter === 'daily' && title.indexOf('daily') === -1) continue;
-        if (_empClFilter === 'weekly' && title.indexOf('weekly') === -1) continue;
-        if (_empClFilter === 'monthly' && title.indexOf('monthly') === -1) continue;
-        filtered.push(cl);
+    var filtered = checklists.filter(function(cl) {
+        if (_empClFilter === 'all') return true;
+        return (cl.title || '').toLowerCase().indexOf(_empClFilter) !== -1;
+    });
+    if (filtered.length === 0) {
+        el.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:20px;text-align:center;">No ' + _empClFilter + ' checklists assigned</div>';
+        return;
     }
-    if (filtered.length === 0) { el.innerHTML = '<div style="color:var(--gray);font-size:13px;">No ' + _empClFilter + ' checklists</div>'; return; }
     var html = '';
-    for (var i = 0; i < filtered.length; i++) {
-        var cl = filtered[i];
+    filtered.forEach(function(cl) {
         var total = cl.items ? cl.items.length : 0;
-        var done = cl.items ? cl.items.filter(function(it) { return it.status === 'ok'; }).length : 0;
-        var pct = total > 0 ? Math.round((done / total) * 100) : 0;
-        html += '<div style="padding:10px 0;border-bottom:1px solid var(--light-gray);">'
+        var done  = cl.items ? cl.items.filter(function(i){ return i.status === 'ok'; }).length : 0;
+        var pct   = total > 0 ? Math.round((done/total)*100) : 0;
+        var isDue = cl.deadline && _isToday(cl.deadline);
+        html += '<div class="work-item' + (isDue?' urgent':'') + '" style="flex-direction:column;align-items:stretch;gap:8px;">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;">'
-            + '<div><strong>' + (cl.title || '') + '</strong><span style="font-size:12px;color:var(--gray);margin-left:8px;">' + (cl.floor || '') + '</span></div>'
-            + '<div style="display:flex;align-items:center;gap:8px;"><span class="badge ' + (cl.status === 'completed' ? 'badge-success' : 'badge-info') + '" style="font-size:11px;">' + (cl.status || 'active') + '</span><button class="btn btn-sm btn-outline" onclick="Router.navigate(\'checklists\')">Open</button></div>'
+            + '<div style="font-size:14px;font-weight:600;">' + (cl.title||'') + (cl.floor ? ' <span style="font-size:11px;color:var(--gray);">· ' + cl.floor + '</span>' : '') + '</div>'
+            + '<div style="display:flex;align-items:center;gap:8px;">'
+            + '<span class="badge ' + (cl.status==='completed'?'badge-success':'badge-info') + '" style="font-size:11px;">' + (cl.status||'active') + '</span>'
+            + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'checklists\')">Open</button>'
+            + '</div></div>'
+            + '<div style="display:flex;align-items:center;gap:8px;">'
+            + '<div style="flex:1;height:8px;background:var(--light-gray);border-radius:4px;"><div style="height:100%;width:' + pct + '%;background:' + (pct===100?'var(--success)':pct>=50?'var(--warning)':'var(--danger)') + ';border-radius:4px;"></div></div>'
+            + '<span style="font-size:12px;color:var(--gray);min-width:50px;">' + done + '/' + total + ' items</span>'
             + '</div>'
-            + '<div style="display:flex;align-items:center;gap:8px;margin-top:4px;">'
-            + '<div style="flex:1;max-width:300px;height:6px;background:var(--light-gray);border-radius:3px;"><div style="height:100%;width:' + pct + '%;background:var(--success);border-radius:3px;"></div></div>'
-            + '<span style="font-size:11px;color:var(--gray);">' + done + '/' + total + ' items</span>'
-            + '</div></div>';
-    }
+            + (cl.deadline ? '<div style="font-size:11px;color:' + (isDue?'var(--warning)':'var(--gray)') + ';">📅 Due: ' + APP.formatDate(cl.deadline) + '</div>' : '')
+            + '</div>';
+    });
     el.innerHTML = html;
 }
 
-function renderEmpRequestsSec() {
-    var el = document.getElementById('empSectionRequests');
-    if (!el) return;
+/* ══════════════════════════════════════════
+   REPORTS TAB (reports + problems)
+══════════════════════════════════════════ */
+function renderEmpReportsTab(el) {
     var d = _empData;
-    var html = '<div class="card"><div class="card-header"><h3>📦 Material Requests (' + d.myRequests.length + ')</h3><button class="btn btn-sm btn-primary" onclick="Router.navigate(\'material-requests\')">+ New Request</button></div>'
-        + '<div style="padding:16px;">';
-    if (d.myRequests.length === 0) { html += '<div style="color:var(--gray);font-size:13px;">No material requests</div>'; }
-    else {
-        html += '<div class="table-responsive"><table class="table"><thead><tr><th>Title</th><th>Items</th><th>Date</th><th>Status</th><th>Approved By</th><th>Action</th></tr></thead><tbody>';
-        for (var i = 0; i < d.myRequests.length; i++) {
-            var r = d.myRequests[i];
-            var badge = r.status === 'approved' ? 'badge-success' : r.status === 'rejected' ? 'badge-danger' : 'badge-warning';
-            var itemsStr = '';
-            if (r.items) {
-                for (var j = 0; j < r.items.length; j++) {
-                    itemsStr += r.items[j].name + ' x' + r.items[j].qty + (j < r.items.length - 1 ? ', ' : '');
-                }
-            }
-            html += '<tr><td>' + (r.title || 'Request') + '</td>'
-                + '<td style="font-size:12px;">' + (itemsStr || '-') + '</td>'
-                + '<td style="font-size:12px;">' + APP.formatDate(r.createdAt) + '</td>'
-                + '<td><span class="badge ' + badge + '" style="font-size:11px;">' + (r.status || 'pending') + '</span></td>'
-                + '<td style="font-size:12px;">' + (r.approvedBy || '-') + '</td>'
-                + '<td><button class="btn btn-sm btn-primary" onclick="Router.navigate(\'material-requests\')">Open</button></td></tr>';
-        }
+
+    var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
+        + '<div style="font-weight:700;font-size:16px;">🔧 My Problems (' + d.myProblems.length + ')</div>'
+        + '<button class="btn btn-sm btn-primary" onclick="Router.navigate(\'problems\')">+ Report Problem</button></div>';
+
+    if (d.myProblems.length === 0) {
+        html += '<div style="color:var(--gray);font-size:13px;margin-bottom:20px;">No problems reported</div>';
+    } else {
+        d.myProblems.slice().reverse().forEach(function(p) {
+            html += '<div class="work-item">'
+                + '<div style="flex:1;"><div style="font-size:13px;font-weight:600;">' + (p.title||'') + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + (p.category||'') + (p.createdAt?' · '+APP.formatDate(p.createdAt):'') + '</div></div>'
+                + '<span class="badge ' + APP.getStatusBadge(p.status) + '" style="font-size:11px;">' + (p.status||'open') + '</span>'
+                + '</div>';
+        });
+    }
+
+    html += '<div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
+        + '<div style="font-weight:700;font-size:16px;">📋 My Reports (' + d.myReports.length + ')</div>'
+        + '<button class="btn btn-sm btn-primary" onclick="showReportForm()">+ New Report</button></div>';
+
+    if (d.myReports.length === 0) {
+        html += '<div style="color:var(--gray);font-size:13px;">No reports submitted yet</div>';
+    } else {
+        d.myReports.slice().reverse().forEach(function(r) {
+            html += '<div class="work-item">'
+                + '<div style="flex:1;"><div style="font-size:13px;font-weight:600;">' + (r.title||'') + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + (r.category||'') + ' · To: ' + (r.sentTo||'-') + ' · ' + APP.formatDate(r.createdAt) + '</div></div>'
+                + '<span class="badge ' + (r.status==='sent'?'badge-success':'badge-warning') + '" style="font-size:11px;">' + (r.status||'draft') + '</span>'
+                + '</div>';
+        });
+    }
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+/* ══════════════════════════════════════════
+   PERFORMANCE TAB
+══════════════════════════════════════════ */
+function renderEmpPerformanceTab(el) {
+    var d  = _empData;
+    var q  = d.q;
+
+    var tasksDone    = d.myTasks.filter(function(t){ return t.status==='completed'; }).length;
+    var probsSolved  = d.myProblems.filter(function(p){ return p.status==='resolved'; }).length;
+    var reqApproved  = d.myRequests.filter(function(r){ return r.status==='approved'; }).length;
+    var clDone       = d.myChecklists.filter(function(c){ return c.status==='completed'; }).length;
+
+    var taskRate  = d.myTasks.length > 0 ? Math.round(tasksDone/d.myTasks.length*100) : 0;
+    var probRate  = d.myProblems.length > 0 ? Math.round(probsSolved/d.myProblems.length*100) : 0;
+    var reqRate   = d.myRequests.length > 0 ? Math.round(reqApproved/d.myRequests.length*100) : 0;
+    var clRate    = d.myChecklists.length > 0 ? Math.round(clDone/d.myChecklists.length*100) : 0;
+
+    function pBar(pct, color) {
+        return '<div class="q-progress-track" style="height:20px;"><div class="q-progress-fill" style="width:' + pct + '%;background:' + color + ';display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;">' + (pct > 10 ? pct + '%' : '') + '</div></div>';
+    }
+
+    var html = '<div style="font-weight:700;font-size:16px;margin-bottom:16px;">📊 My Performance — ' + q.name + '</div>'
+
+        + '<div class="grid-2" style="gap:20px;margin-bottom:24px;">'
+        + _perfCard('Task Completion', tasksDone, d.myTasks.length, taskRate, 'var(--success)')
+        + _perfCard('Problem Resolution', probsSolved, d.myProblems.length, probRate, 'var(--info)')
+        + _perfCard('Request Approval Rate', reqApproved, d.myRequests.length, reqRate, 'var(--warning)')
+        + _perfCard('Checklist Compliance', clDone, d.myChecklists.length, clRate, 'var(--primary)')
+        + '</div>'
+
+        + '<div style="background:var(--light-gray);border-radius:10px;padding:16px;">'
+        + '<div style="font-weight:600;font-size:14px;margin-bottom:10px;">Q Summary Metrics</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">'
+        + _summaryNum(d.myTasks.length, 'Total Tasks')
+        + _summaryNum(tasksDone, 'Completed')
+        + _summaryNum(d.myTasks.filter(function(t){return t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='completed';}).length, 'Overdue', 'var(--danger)')
+        + _summaryNum(d.myChecklists.length, 'Checklists')
+        + _summaryNum(d.myProblems.length, 'Issues Raised')
+        + _summaryNum(d.myRequests.length, 'Requests Sent')
+        + '</div></div>';
+
+    el.innerHTML = html;
+}
+
+function _perfCard(label, done, total, pct, color) {
+    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px;">'
+        + '<div style="font-size:13px;font-weight:600;margin-bottom:10px;">' + label + '</div>'
+        + '<div class="q-progress-track" style="height:20px;margin-bottom:6px;"><div class="q-progress-fill" style="width:' + pct + '%;background:' + color + ';display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;">' + (pct > 10 ? pct + '%' : '') + '</div></div>'
+        + '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray);">'
+        + '<span>' + done + ' done</span><span>' + total + ' total</span></div></div>';
+}
+
+function _summaryNum(val, label, color) {
+    return '<div style="background:var(--card);border-radius:8px;padding:12px;text-align:center;">'
+        + '<div style="font-size:22px;font-weight:700;color:' + (color||'var(--text)') + ';">' + val + '</div>'
+        + '<div style="font-size:11px;color:var(--gray);">' + label + '</div></div>';
+}
+
+/* ══════════════════════════════════════════
+   CLEANING SECTION
+══════════════════════════════════════════ */
+function renderEmpCleaningSection(el) {
+    if (!el) el = document.getElementById('empTabContent');
+    if (!el) return;
+    var user  = AUTH.currentUser();
+    var tasks = DB.get('roomCleaningTasks') || [];
+    var pending = tasks.filter(function(t){ return t.status !== 'done'; });
+    var done    = tasks.filter(function(t){ return t.status === 'done'; });
+    var myDone  = done.filter(function(t){ return t.completedBy === (user ? user.fullName : ''); });
+
+    var html = '';
+    if (pending.length > 0) {
+        html += '<div style="background:#fff3e0;border:2px solid var(--warning);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">'
+            + '<span style="font-size:28px;">🧹</span>'
+            + '<div><div style="font-weight:700;font-size:15px;color:#e65100;">' + pending.length + ' Room' + (pending.length>1?'s':'') + ' Need Cleaning</div>'
+            + '<div style="font-size:13px;color:var(--gray);">Discharged patients\' rooms waiting to be cleaned.</div></div></div>';
+    } else {
+        html += '<div style="background:#e8f5e9;border:2px solid var(--secondary);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">'
+            + '<span style="font-size:28px;">✅</span>'
+            + '<div><div style="font-weight:700;font-size:15px;color:var(--secondary);">All Rooms Clean</div>'
+            + '<div style="font-size:13px;color:var(--gray);">No pending cleaning tasks right now.</div></div></div>';
+    }
+
+    if (pending.length > 0) {
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:20px;">';
+        pending.forEach(function(t) {
+            var since  = t.dischargedAt ? Math.max(0, APP.daysBetween(t.dischargedAt, new Date().toISOString())) : 0;
+            var urgency = since >= 1 ? '#ffebee' : '#fff8e1';
+            var border  = since >= 1 ? 'var(--danger)' : 'var(--warning)';
+            html += '<div style="background:' + urgency + ';border:2px solid ' + border + ';border-radius:10px;padding:14px;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+                + '<span style="font-size:22px;font-weight:700;">Room ' + t.roomNo + '</span>'
+                + '<span class="badge ' + (t.status==='in-progress'?'badge-info':'badge-warning') + '">' + t.status + '</span></div>'
+                + '<div style="font-size:12px;color:var(--gray);margin-bottom:6px;">'
+                + (t.floor?'Floor '+t.floor+' | ':'') + (t.category||'') + (t.bedId?' | Bed '+t.bedId:'')
+                + '</div>'
+                + '<div style="font-size:13px;margin-bottom:4px;">👤 <strong>' + t.patientName + '</strong></div>'
+                + '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">'
+                + 'Discharged: ' + (t.dischargedAt ? new Date(t.dischargedAt).toLocaleDateString('en-IN') : '—')
+                + (since > 0 ? ' &nbsp;·&nbsp; <span style="color:var(--danger);font-weight:600;">' + since + 'd ago</span>' : ' &nbsp;·&nbsp; Today')
+                + '</div>'
+                + (t.assignedTo ? '<div style="font-size:12px;margin-bottom:6px;">👷 ' + t.assignedTo + '</div>' : '')
+                + '<div style="display:flex;gap:6px;">'
+                + (t.status==='pending' ? '<button class="btn btn-sm btn-warning" style="color:#fff;" onclick="empStartCleaning(\'' + t.id + '\')">▶ Start</button>' : '')
+                + '<button class="btn btn-sm btn-success" onclick="empCompleteCleaning(\'' + t.id + '\')">✅ Mark Clean</button>'
+                + '</div></div>';
+        });
+        html += '</div>';
+    }
+
+    if (myDone.length > 0) {
+        html += '<div style="font-weight:600;font-size:14px;color:var(--gray);margin-bottom:8px;">✅ Cleaned by You</div>'
+            + '<div class="table-responsive"><table><thead><tr><th>Room</th><th>Patient</th><th>Completed At</th></tr></thead><tbody>';
+        myDone.slice().reverse().slice(0,10).forEach(function(t) {
+            html += '<tr><td><strong>' + t.roomNo + '</strong></td><td>' + t.patientName + '</td>'
+                + '<td>' + (t.completedAt ? APP.formatDateTime(t.completedAt) : '—') + '</td></tr>';
+        });
         html += '</tbody></table></div>';
     }
-    html += '</div></div>';
-    el.innerHTML = html;
+
+    el.innerHTML = html || '<div class="empty-state">No cleaning tasks</div>';
 }
 
-function renderEmpLifecycleSec() {
-    var el = document.getElementById('empSectionLifecycle');
-    if (!el) return;
-    var d = _empData;
-    var html = '<div class="card"><div class="card-header"><h3>🔋 Product Lifecycle</h3></div><div style="padding:16px;">';
-    if (d.deptInventory.length === 0) { html += '<div style="color:var(--gray);font-size:13px;">No inventory items found</div>'; }
-    else {
-        var now = new Date();
-        html += '<div class="table-responsive"><table class="table"><thead><tr><th>Item</th><th>Category</th><th>Qty</th><th>Expiry</th><th>Warranty</th><th>Lifecycle</th></tr></thead><tbody>';
-        for (var i = 0; i < d.deptInventory.length; i++) {
-            var it = d.deptInventory[i];
-            var expPct = null, warPct = null, expColor = '', warColor = '';
-            if (it.expiryDate) {
-                var exp = new Date(it.expiryDate);
-                var daysLeft = Math.ceil((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                if (daysLeft > 365) { expPct = 100; expColor = 'var(--success)'; }
-                else if (daysLeft > 90) { expPct = Math.round((daysLeft / 365) * 100); expColor = 'var(--success)'; }
-                else if (daysLeft > 30) { expPct = Math.round((daysLeft / 365) * 100); expColor = 'var(--warning)'; }
-                else if (daysLeft > 0) { expPct = Math.round((daysLeft / 365) * 100); expColor = 'var(--danger)'; }
-                else { expPct = 0; expColor = 'var(--danger)'; }
-                expPct = Math.max(0, Math.min(100, expPct));
-            }
-            if (it.warrantyDate) {
-                var war = new Date(it.warrantyDate);
-                var wDays = Math.ceil((war.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-                if (wDays > 365) { warPct = 100; warColor = 'var(--success)'; }
-                else if (wDays > 90) { warPct = Math.round((wDays / 365) * 100); warColor = 'var(--success)'; }
-                else if (wDays > 30) { warPct = Math.round((wDays / 365) * 100); warColor = 'var(--warning)'; }
-                else if (wDays > 0) { warPct = Math.round((wDays / 365) * 100); warColor = 'var(--danger)'; }
-                else { warPct = 0; warColor = 'var(--danger)'; }
-                warPct = Math.max(0, Math.min(100, warPct));
-            }
-            html += '<tr><td><strong>' + (it.name || '') + '</strong></td>'
-                + '<td style="font-size:12px;">' + (it.category || '-') + '</td>'
-                + '<td style="font-size:12px;">' + (it.quantity || 0) + '</td>'
-                + '<td style="font-size:12px;">' + (it.expiryDate ? '<span style="color:' + expColor + ';">' + APP.formatDate(it.expiryDate) + '</span>' : '-') + '</td>'
-                + '<td style="font-size:12px;">' + (it.warrantyDate ? '<span style="color:' + warColor + ';">' + APP.formatDate(it.warrantyDate) + '</span>' : '-') + '</td>'
-                + '<td style="min-width:120px;">'
-                + (it.expiryDate ? '<div style="display:flex;align-items:center;gap:4px;font-size:10px;margin-bottom:2px;"><span style="width:28px;">Exp</span><div style="flex:1;height:5px;background:var(--light-gray);border-radius:2px;"><div style="height:100%;width:' + expPct + '%;background:' + expColor + ';border-radius:2px;"></div></div></div>' : '')
-                + (it.warrantyDate ? '<div style="display:flex;align-items:center;gap:4px;font-size:10px;"><span style="width:28px;">War</span><div style="flex:1;height:5px;background:var(--light-gray);border-radius:2px;"><div style="height:100%;width:' + warPct + '%;background:' + warColor + ';border-radius:2px;"></div></div></div>' : '')
-                + '</td></tr>';
+function empStartCleaning(taskId) {
+    var user = AUTH.currentUser();
+    DB.update('roomCleaningTasks', taskId, {
+        status: 'in-progress',
+        assignedTo: user ? user.fullName : 'Unknown',
+        startedAt: new Date().toISOString()
+    });
+    APP.notify('Cleaning started', 'info');
+    renderEmpCleaningSection();
+    try { updateCleaningBadge(); } catch(e) {}
+}
+
+function empCompleteCleaning(taskId) {
+    if (typeof completeCleaning === 'function') {
+        completeCleaning(taskId);
+    } else {
+        var user = AUTH.currentUser();
+        var task = DB.getById('roomCleaningTasks', taskId);
+        DB.update('roomCleaningTasks', taskId, {
+            status: 'done', completedAt: new Date().toISOString(),
+            completedBy: user ? user.fullName : 'Unknown'
+        });
+        if (task) {
+            var overrides = DB.get('roomStatus') || [];
+            DB.set('roomStatus', overrides.filter(function(r){ return r.roomNo !== task.roomNo; }));
         }
-        html += '</tbody></table></div>';
+        APP.notify('Room marked clean — now available!', 'success');
     }
-    html += '</div></div>';
-    el.innerHTML = html;
+    renderEmpCleaningSection();
 }
 
-function renderEmpProjectsSec() {
-    var el = document.getElementById('empSectionProjects');
-    if (!el) return;
-    var d = _empData;
-    var html = '<div class="card"><div class="card-header"><h3>📋 My Projects (' + d.myProjects.length + ')</h3></div><div style="padding:16px;">';
-    if (d.myProjects.length === 0) { html += '<div style="color:var(--gray);font-size:13px;">No projects assigned</div>'; }
-    else {
-        html += '<div class="table-responsive"><table class="table"><thead><tr><th>Project</th><th>Status</th><th>Budget</th><th>Spent</th><th>Progress</th></tr></thead><tbody>';
-        for (var i = 0; i < d.myProjects.length; i++) {
-            var p = d.myProjects[i];
-            var pct = p.budget > 0 ? Math.round((p.spent / p.budget) * 100) : 0;
-            html += '<tr><td><strong>' + (p.name || '') + '</strong></td>'
-                + '<td><span class="badge ' + APP.getStatusBadge(p.status) + '" style="font-size:11px;">' + (p.status || 'planning') + '</span></td>'
-                + '<td style="font-size:12px;">₹' + (p.budget || 0).toLocaleString() + '</td>'
-                + '<td style="font-size:12px;">₹' + (p.spent || 0).toLocaleString() + '</td>'
-                + '<td style="min-width:100px;"><div style="display:flex;align-items:center;gap:4px;"><div style="flex:1;height:6px;background:var(--light-gray);border-radius:3px;"><div style="height:100%;width:' + pct + '%;background:' + (pct > 80 ? 'var(--danger)' : pct > 50 ? 'var(--warning)' : 'var(--success)') + ';border-radius:3px;"></div></div><span style="font-size:11px;color:var(--gray);">' + pct + '%</span></div></td>'
-                + '</tr>';
-        }
-        html += '</tbody></table></div>';
-    }
-    html += '</div></div>';
-    el.innerHTML = html;
-}
-
-function renderEmpReportsSec() {
-    var el = document.getElementById('empSectionReports');
-    if (!el) return;
-    var d = _empData;
-    var html = '<div class="card"><div class="card-header"><h3>📋 My Reports (' + d.myReports.length + ')</h3><button class="btn btn-sm btn-primary" onclick="showReportForm()">+ New Report</button></div><div style="padding:16px;">';
-    if (d.myReports.length === 0) { html += '<div style="color:var(--gray);font-size:13px;">No reports submitted yet</div>'; }
-    else {
-        html += '<div class="table-responsive"><table class="table"><thead><tr><th>Title</th><th>Category</th><th>Sent To</th><th>Date</th><th>Status</th></tr></thead><tbody>';
-        for (var i = d.myReports.length - 1; i >= 0; i--) {
-            var r = d.myReports[i];
-            html += '<tr><td>' + (r.title || '') + '</td>'
-                + '<td style="font-size:12px;">' + (r.category || '-') + '</td>'
-                + '<td style="font-size:12px;">' + (r.sentTo || '-') + '</td>'
-                + '<td style="font-size:12px;">' + APP.formatDate(r.createdAt) + '</td>'
-                + '<td><span class="badge ' + (r.status === 'sent' ? 'badge-success' : 'badge-warning') + '" style="font-size:11px;">' + (r.status || 'draft') + '</span></td></tr>';
-        }
-        html += '</tbody></table></div>';
-    }
-    html += '</div></div>';
-    el.innerHTML = html;
-}
-
-function renderEmpPerformanceSec() {
-    var el = document.getElementById('empSectionPerformance');
-    if (!el) return;
-    var d = _empData;
-    var tasksDone = d.myTasks.filter(function(t) { return t.status === 'completed'; }).length;
-    var problemsSolved = d.myProblems.filter(function(p) { return p.status === 'resolved'; }).length;
-    var requestsApproved = d.myRequests.filter(function(r) { return r.status === 'approved'; }).length;
-    var checklistsDone = d.myChecklists.filter(function(cl) { return cl.status === 'completed'; }).length;
-    var taskRate = d.myTasks.length > 0 ? Math.round((tasksDone / d.myTasks.length) * 100) : 0;
-    var probRate = d.myProblems.length > 0 ? Math.round((problemsSolved / d.myProblems.length) * 100) : 0;
-    var reqRate = d.myRequests.length > 0 ? Math.round((requestsApproved / d.myRequests.length) * 100) : 0;
-    var clRate = d.myChecklists.length > 0 ? Math.round((checklistsDone / d.myChecklists.length) * 100) : 0;
-
-    var html = '<div class="card"><div class="card-header"><h3>📊 My Performance</h3></div><div style="padding:24px;">'
-        + '<div class="grid-2" style="gap:24px;">'
-        + '<div><h4 style="font-size:14px;margin-bottom:12px;">Task Completion</h4><div class="progress-bar" style="height:24px;border-radius:12px;"><div class="progress-fill" style="width:' + taskRate + '%;background:var(--success);height:100%;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;">' + taskRate + '%</div></div><div style="display:flex;justify-content:space-between;margin-top:4px;font-size:12px;color:var(--gray);"><span>' + tasksDone + ' completed</span><span>' + d.myTasks.length + ' total</span></div></div>'
-        + '<div><h4 style="font-size:14px;margin-bottom:12px;">Problem Resolution</h4><div class="progress-bar" style="height:24px;border-radius:12px;"><div class="progress-fill" style="width:' + probRate + '%;background:var(--info);height:100%;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;">' + probRate + '%</div></div><div style="display:flex;justify-content:space-between;margin-top:4px;font-size:12px;color:var(--gray);"><span>' + problemsSolved + ' solved</span><span>' + d.myProblems.length + ' total</span></div></div>'
-        + '<div><h4 style="font-size:14px;margin-bottom:12px;">Request Approval Rate</h4><div class="progress-bar" style="height:24px;border-radius:12px;"><div class="progress-fill" style="width:' + reqRate + '%;background:var(--warning);height:100%;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;">' + reqRate + '%</div></div><div style="display:flex;justify-content:space-between;margin-top:4px;font-size:12px;color:var(--gray);"><span>' + requestsApproved + ' approved</span><span>' + d.myRequests.length + ' total</span></div></div>'
-        + '<div><h4 style="font-size:14px;margin-bottom:12px;">Checklist Completion</h4><div class="progress-bar" style="height:24px;border-radius:12px;"><div class="progress-fill" style="width:' + clRate + '%;background:var(--primary);height:100%;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;">' + clRate + '%</div></div><div style="display:flex;justify-content:space-between;margin-top:4px;font-size:12px;color:var(--gray);"><span>' + checklistsDone + ' completed</span><span>' + d.myChecklists.length + ' total</span></div></div>'
-        + '</div></div></div>';
-    el.innerHTML = html;
-}
-
+/* ══════════════════════════════════════════
+   REPORT FORM
+══════════════════════════════════════════ */
 function showReportForm() {
     var user = AUTH.currentUser();
     if (!user) return;
@@ -465,120 +708,6 @@ function saveReport() {
     data.createdByName = user.fullName;
     data.status = 'sent';
     DB.add('reports', data);
-    APP.notify('Report submitted successfully', 'success');
+    APP.notify('Report submitted', 'success');
     Router.navigate('employee-dashboard');
-}
-
-/* ═══════════════════════════════════════
-   CLEANING SECTION (Housekeeping employees)
-   ═══════════════════════════════════════ */
-
-function renderEmpCleaningSection() {
-    var el = document.getElementById('empSectionCleaning');
-    if (!el) return;
-    var user = AUTH.currentUser();
-    var tasks = DB.get('roomCleaningTasks') || [];
-    var pending = tasks.filter(function(t){ return t.status !== 'done'; });
-    var done    = tasks.filter(function(t){ return t.status === 'done'; });
-    var myDone  = done.filter(function(t){ return t.completedBy === (user ? user.fullName : ''); });
-
-    var html = '';
-
-    // Alert banner when rooms need cleaning
-    if (pending.length > 0) {
-        html += '<div style="background:#fff3e0;border:2px solid var(--warning);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">'
-            + '<span style="font-size:28px;">🧹</span>'
-            + '<div><div style="font-weight:700;font-size:15px;color:#e65100;">' + pending.length + ' Room' + (pending.length>1?'s':'') + ' Need Cleaning</div>'
-            + '<div style="font-size:13px;color:var(--gray);">Discharged patients\' rooms are waiting to be cleaned before new admissions.</div></div>'
-            + '</div>';
-    } else {
-        html += '<div style="background:#e8f5e9;border:2px solid var(--secondary);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">'
-            + '<span style="font-size:28px;">✅</span>'
-            + '<div><div style="font-weight:700;font-size:15px;color:var(--secondary);">All Rooms Clean</div>'
-            + '<div style="font-size:13px;color:var(--gray);">No pending cleaning tasks right now.</div></div>'
-            + '</div>';
-    }
-
-    // Pending cards
-    if (pending.length > 0) {
-        html += '<h4 style="margin-bottom:10px;font-size:15px;">⏳ Pending Cleaning Tasks</h4>'
-            + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:20px;">';
-        pending.forEach(function(t) {
-            var since = t.dischargedAt ? Math.max(0, APP.daysBetween(t.dischargedAt, new Date().toISOString())) : 0;
-            var urgency = since >= 1 ? '#ffebee' : '#fff8e1';
-            var border  = since >= 1 ? 'var(--danger)' : 'var(--warning)';
-            var isMyTask = t.assignedTo === (user ? user.fullName : '');
-            html += '<div style="background:' + urgency + ';border:2px solid ' + border + ';border-radius:10px;padding:14px;">'
-                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
-                + '<span style="font-size:22px;font-weight:700;">Room ' + t.roomNo + '</span>'
-                + '<span class="badge ' + (t.status==='in-progress'?'badge-info':'badge-warning') + '">' + t.status + '</span></div>'
-                + '<div style="font-size:12px;color:var(--gray);margin-bottom:6px;">'
-                + (t.floor ? 'Floor ' + t.floor + ' | ' : '') + (t.category || '') + (t.bedId ? ' | Bed ' + t.bedId : '')
-                + '</div>'
-                + '<div style="font-size:13px;margin-bottom:4px;">👤 <strong>' + t.patientName + '</strong></div>'
-                + '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">'
-                + 'Discharged: ' + (t.dischargedAt ? new Date(t.dischargedAt).toLocaleDateString('en-IN') : '—')
-                + (since > 0 ? ' &nbsp;·&nbsp; <span style="color:var(--danger);font-weight:600;">' + since + 'd ago</span>' : ' &nbsp;·&nbsp; Today')
-                + '</div>'
-                + (t.assignedTo ? '<div style="font-size:12px;margin-bottom:6px;">👷 ' + (isMyTask ? '<strong>Assigned to you</strong>' : t.assignedTo) + '</div>' : '')
-                + '<div style="display:flex;gap:6px;">'
-                + (t.status==='pending' ? '<button class="btn btn-sm btn-warning" style="color:#fff;" onclick="empStartCleaning(\'' + t.id + '\')">▶ Start</button>' : '')
-                + '<button class="btn btn-sm btn-success" onclick="empCompleteCleaning(\'' + t.id + '\')">✅ Mark Clean</button>'
-                + '</div></div>';
-        });
-        html += '</div>';
-    }
-
-    // My completed tasks today
-    if (myDone.length > 0) {
-        html += '<h4 style="margin-bottom:8px;font-size:14px;color:var(--gray);">✅ Cleaned by You</h4>'
-            + '<div class="table-responsive"><table><thead><tr><th>Room</th><th>Patient</th><th>Completed At</th></tr></thead><tbody>';
-        myDone.slice().reverse().slice(0, 10).forEach(function(t) {
-            html += '<tr><td><strong>' + t.roomNo + '</strong></td><td>' + t.patientName + '</td>'
-                + '<td>' + (t.completedAt ? APP.formatDateTime(t.completedAt) : '—') + '</td></tr>';
-        });
-        html += '</tbody></table></div>';
-    }
-
-    el.innerHTML = html || '<div class="empty-state">No cleaning tasks</div>';
-}
-
-function empStartCleaning(taskId) {
-    var user = AUTH.currentUser();
-    DB.update('roomCleaningTasks', taskId, {
-        status: 'in-progress',
-        assignedTo: user ? user.fullName : 'Unknown',
-        startedAt: new Date().toISOString()
-    });
-    APP.notify('Cleaning started — room marked in-progress', 'info');
-    renderEmpCleaningSection();
-    // Keep sidebar badge in sync
-    try { updateCleaningBadge(); } catch(e) {}
-}
-
-function empCompleteCleaning(taskId) {
-    if (typeof completeCleaning === 'function') {
-        completeCleaning(taskId);
-    } else {
-        var user = AUTH.currentUser();
-        var task = DB.getById('roomCleaningTasks', taskId);
-        DB.update('roomCleaningTasks', taskId, {
-            status: 'done',
-            completedAt: new Date().toISOString(),
-            completedBy: user ? user.fullName : 'Unknown'
-        });
-        if (task) {
-            var overrides = DB.get('roomStatus') || [];
-            DB.set('roomStatus', overrides.filter(function(r){ return r.roomNo !== task.roomNo; }));
-        }
-        APP.notify('Room marked clean — now available!', 'success');
-    }
-    renderEmpCleaningSection();
-    // Update badge
-    var nav = document.querySelector('.emp-nav-item[data-sec="cleaning"] .badge');
-    if (nav) {
-        var pending = (DB.get('roomCleaningTasks')||[]).filter(function(t){ return t.status!=='done'; }).length;
-        nav.textContent = pending > 0 ? pending : '';
-        if (pending === 0) nav.style.display = 'none';
-    }
 }
