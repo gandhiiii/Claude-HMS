@@ -387,7 +387,10 @@ function renderEmpWorkTab(el) {
                     + (t.createdBy ? ' &nbsp;·&nbsp; From: ' + t.createdBy : '')
                     + '</div></div>'
                     + '<span class="badge ' + APP.getStatusBadge(t.status) + '" style="font-size:11px;">' + (t.status||'pending') + '</span>'
-                    + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'tasks\')">Open</button>'
+                    + (t.status !== 'completed'
+                        ? '<button class="btn btn-sm btn-success" onclick="empUpdateTaskStatus(\'' + t.id + '\',\'' + (t._store||'tasks') + '\')" style="white-space:nowrap;">'
+                          + (t.status === 'in-progress' ? 'Mark Done' : 'Start') + '</button>'
+                        : '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'tasks\')">View</button>')
                     + '</div>';
             });
             html += '</div>';
@@ -786,4 +789,25 @@ function empMarkProbInProgress(id) {
     DB.update('problems', id, { status: 'in_progress' });
     APP.notify('Problem marked in progress', 'info');
     Router.navigate('employee-dashboard');
+}
+
+function empUpdateTaskStatus(id, store) {
+    var s = store || (DB.getById('tasks', id) ? 'tasks' : (DB.getById('hodTasks', id) ? 'hodTasks' : null));
+    if (!s) { APP.notify('Task not found', 'error'); return; }
+    var task = DB.getById(s, id);
+    if (!task) { APP.notify('Task not found', 'error'); return; }
+    var statusFlow = { 'pending': 'in-progress', 'in-progress': 'completed', 'completed': 'pending' };
+    var newStatus = statusFlow[task.status] || 'in-progress';
+    var user = AUTH.currentUser();
+    DB.update(s, id, {
+        status: newStatus,
+        updatedBy: user ? user.username : '',
+        updatedAt: new Date().toISOString()
+    });
+    APP.notify('Task ' + (newStatus === 'completed' ? 'marked done!' : 'started!'), newStatus === 'completed' ? 'success' : 'info');
+    // Refresh employee dashboard data and re-render work tab
+    if (typeof renderEmployeeDashboard === 'function') {
+        renderEmployeeDashboard(document.getElementById('pageContent'));
+        setTimeout(function(){ _renderEmpTab('work'); }, 50);
+    }
 }

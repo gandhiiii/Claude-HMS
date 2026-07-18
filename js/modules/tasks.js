@@ -40,35 +40,41 @@ function switchTaskTab(filter, btn) {
 
 function renderTaskList() {
     const user = AUTH.currentUser();
-    const tasks = DB.get('tasks');
+    // Merge admin tasks + HOD tasks so all roles see complete picture
+    const adminTasks = (DB.get('tasks') || []).map(t => Object.assign({}, t, {_store: 'tasks'}));
+    const hodTaskItems = (DB.get('hodTasks') || []).map(t => Object.assign({}, t, {_store: 'hodTasks'}));
+    const allTasks = adminTasks.concat(hodTaskItems);
     const search = (document.getElementById('taskSearch')?.value || '').toLowerCase();
-    let filtered = tasks.filter(t => {
+    let filtered = allTasks.filter(t => {
         if (!user || user.isSuperAdmin || user.role === 'admin') return true;
         if (user.role === 'hod') return t.department === user.department;
-        return t.assignedTo === user.fullName || t.createdBy === user.username;
+        // Employee: match by fullName, username, or if no assignee, by department
+        return t.assignedTo === user.fullName || t.assignedTo === user.username ||
+               t.createdBy === user.username;
     });
     filtered = filtered.filter(t =>
-        t.title.toLowerCase().includes(search) ||
+        (t.title || '').toLowerCase().includes(search) ||
         (t.assignedTo || '').toLowerCase().includes(search)
     );
     if (taskFilter !== 'all') filtered = filtered.filter(t => t.status === taskFilter);
 
     const tbody = document.getElementById('taskTableBody');
     if (!tbody) return;
+    const isAdmin = !user || user.isSuperAdmin || user.role === 'admin';
     tbody.innerHTML = filtered.slice().reverse().map(t => `
         <tr>
-            <td><strong>${t.title}</strong></td>
-            <td>${t.assignedTo}</td>
+            <td><strong>${t.title}</strong>${t._store === 'hodTasks' ? ' <span class="badge badge-info" style="font-size:10px;">HOD</span>' : ''}</td>
+            <td>${t.assignedTo || '-'}</td>
             <td>${t.department || '-'}</td>
             <td>${t.deadline ? APP.formatDate(t.deadline) : '-'}
                 ${t.deadline && t.status !== 'completed' && APP.daysBetween(new Date().toISOString(), t.deadline) < 0 ? ' ⚠️ Overdue' : ''}
             </td>
-            <td><span class="badge ${t.priority === 'high' ? 'badge-danger' : t.priority === 'medium' ? 'badge-warning' : 'badge-info'}">${t.priority}</span></td>
-            <td><span class="badge ${APP.getStatusBadge(t.status)}">${t.status}</span></td>
+            <td><span class="badge ${t.priority === 'high' ? 'badge-danger' : t.priority === 'medium' ? 'badge-warning' : 'badge-info'}">${t.priority || 'low'}</span></td>
+            <td><span class="badge ${APP.getStatusBadge(t.status)}">${t.status || 'pending'}</span></td>
             <td>
-                <button class="btn btn-sm btn-primary" onclick="editTask('${t.id}')">Edit</button>
-                <button class="btn btn-sm btn-success" onclick="updateTaskStatus('${t.id}')">Next</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteTask('${t.id}')">Del</button>
+                ${isAdmin || user.role === 'hod' ? `<button class="btn btn-sm btn-primary" onclick="editTask('${t.id}','${t._store}')">Edit</button>` : ''}
+                <button class="btn btn-sm btn-success" onclick="updateTaskStatus('${t.id}','${t._store}')">Next</button>
+                ${isAdmin ? `<button class="btn btn-sm btn-danger" onclick="deleteTask('${t.id}','${t._store}')">Del</button>` : ''}
             </td>
         </tr>
     `).join('') || '<tr><td colspan="7" class="empty-state">No tasks assigned</td></tr>';
@@ -76,13 +82,17 @@ function renderTaskList() {
 
 function showTaskForm(task) {
     const user = AUTH.currentUser();
-    const users = DB.get('users');
-    const depts = DB.get('departments');
+    const users = DB.get('users') || [];
+    const depts = DB.get('departments') || [];
     const isAdmin = !user || user.isSuperAdmin || user.role === 'admin';
-    let assignableUsers = users.filter(u => u.role !== 'admin');
+    // Only include users with a valid fullName and exclude admin/super_admin roles
+    let assignableUsers = users.filter(u => u && u.fullName && u.role !== 'admin' && u.role !== 'super_admin');
     if (user.role === 'hod') {
-        assignableUsers = assignableUsers.filter(u => u.department === user.department && u.role !== 'admin');
-        if (task) assignableUsers = assignableUsers.concat(users.filter(u => u.fullName === task.assignedTo));
+        assignableUsers = assignableUsers.filter(u => u.department === user.department);
+        if (task) {
+            const already = assignableUsers.some(u => u.fullName === task.assignedTo);
+            if (!already) assignableUsers = assignableUsers.concat(users.filter(u => u.fullName === task.assignedTo));
+        }
     } else if (!isAdmin) {
         // employees can only assign to themselves
         assignableUsers = [user];
@@ -97,6 +107,7 @@ function showTaskForm(task) {
     const form = `
         <form id="taskForm">
             <input type="hidden" name="id" value="${task?.id || ''}">
+            <input type="hidden" name="_store" value="${task?._store || 'tasks'}">
             <div class="grid-2">
                 <div class="form-group">
                     <label>Task Title *</label>
@@ -157,7 +168,8 @@ function saveTask() {
         if (!data.department) data.department = user.department || '';
     }
     if (data.id) {
-        DB.update('tasks', data.id, data);
+        var store = data._store || 'tasks';
+        DB.update(store, data.id, data);
         APP.notify('Task updated', 'success');
     } else {
         DB.add('tasks', data);
@@ -166,25 +178,29 @@ function saveTask() {
     renderTaskList();
 }
 
-function editTask(id) {
-    const task = DB.getById('tasks', id);
-    if (task) showTaskForm(task);
+function editTask(id, store) {
+    var s = store || 'tasks';
+    var task = DB.getById(s, id) || DB.getById('tasks', id) || DB.getById('hodTasks', id);
+    if (task) showTaskForm(Object.assign({}, task, {_store: s}));
 }
 
-function deleteTask(id) {
+function deleteTask(id, store) {
     confirmAction('Delete this task?', () => {
-        DB.delete('tasks', id);
+        var s = store || (DB.getById('tasks', id) ? 'tasks' : 'hodTasks');
+        DB.delete(s, id);
         APP.notify('Task deleted', 'success');
         renderTaskList();
     });
 }
 
-function updateTaskStatus(id) {
-    const task = DB.getById('tasks', id);
-    if (!task) return;
+function updateTaskStatus(id, store) {
+    var s = store || (DB.getById('tasks', id) ? 'tasks' : (DB.getById('hodTasks', id) ? 'hodTasks' : null));
+    if (!s) { APP.notify('Task not found', 'error'); return; }
+    const task = DB.getById(s, id);
+    if (!task) { APP.notify('Task not found', 'error'); return; }
     const statusFlow = { 'pending': 'in-progress', 'in-progress': 'completed', 'completed': 'pending' };
     const newStatus = statusFlow[task.status] || 'pending';
-    DB.update('tasks', id, { status: newStatus });
-    APP.notify(`Task status: ${newStatus}`, 'info');
+    DB.update(s, id, { status: newStatus });
+    APP.notify('Task status: ' + newStatus, 'info');
     renderTaskList();
 }
