@@ -44,6 +44,8 @@ function _rChartCard(title, id, h) {
 }
 
 function renderReports(container) {
+    var user = AUTH.currentUser();
+    var isAdmin = user && (user.isSuperAdmin || user.role === 'admin');
     var TABS = [
         { id: 'overview',    label: '📊 Overview',    color: '#1a73e8' },
         { id: 'tasks',       label: '✅ Tasks',        color: '#34a853' },
@@ -54,6 +56,7 @@ function renderReports(container) {
         { id: 'checklists',  label: '📋 Checklists',   color: '#fbbc04' },
         { id: 'download',    label: '⬇️ Download',     color: '#455a64' }
     ];
+    if (isAdmin) TABS.splice(TABS.length - 1, 0, { id: 'budget', label: '💰 Budget', color: '#2e7d32' });
 
     var btnHtml = TABS.map(function(t) {
         var active = t.id === _reportTab;
@@ -102,6 +105,7 @@ function _renderReportTab(tab) {
         materials:   _rMaterials,
         departments: _rDepartments,
         checklists:  _rChecklists,
+        budget:      _rBudgetReport,
         download:    _rDownload
     };
     if (map[tab]) map[tab](el);
@@ -702,6 +706,126 @@ function _rChecklists(el) {
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } },
                 scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } } } }
         });
+    }, 50);
+}
+
+// ══════════════════════════════════════════════════════════════
+// BUDGET REPORT (admin-only)
+// ══════════════════════════════════════════════════════════════
+function _rBudgetReport(el) {
+    var user = AUTH.currentUser();
+    if (!user || (user.role !== 'admin' && !user.isSuperAdmin)) {
+        el.innerHTML = '<div class="card"><div class="empty-state">🔒 Budget report is restricted to administrators.</div></div>';
+        return;
+    }
+
+    var budgets  = DB.get('budgets')  || [];
+    var expenses = DB.get('budget_expenses') || [];
+
+    // Latest budget per dept
+    var latestBudget = {};
+    budgets.forEach(function(b) {
+        if (!latestBudget[b.department] || b.createdAt > latestBudget[b.department].createdAt)
+            latestBudget[b.department] = b;
+    });
+    var deptSpent = {};
+    expenses.forEach(function(e) {
+        deptSpent[e.department] = (deptSpent[e.department] || 0) + (parseFloat(e.amount) || 0);
+    });
+    var allDepts = Object.keys(Object.assign({}, latestBudget, deptSpent));
+
+    var totalBudget = Object.values(latestBudget).reduce(function(s,b){ return s+(parseFloat(b.amount)||0); }, 0);
+    var totalSpent  = expenses.reduce(function(s,e){ return s+(parseFloat(e.amount)||0); }, 0);
+    var remaining   = totalBudget - totalSpent;
+    var utilPct     = totalBudget > 0 ? Math.round(totalSpent / totalBudget * 100) : 0;
+
+    // Category totals
+    var catMap = {};
+    expenses.forEach(function(e){ catMap[e.category||'Other'] = (catMap[e.category||'Other']||0)+(parseFloat(e.amount)||0); });
+    var catK = Object.keys(catMap);
+
+    // Monthly trend (last 12)
+    var monthMap = {};
+    expenses.forEach(function(e) {
+        var m = (e.expenseDate||e.createdAt||'').substring(0,7);
+        if (m) monthMap[m] = (monthMap[m]||0)+(parseFloat(e.amount)||0);
+    });
+    var mKeys = Object.keys(monthMap).sort().slice(-12);
+
+    function bFmt(n){ return '₹' + Number(n||0).toLocaleString('en-IN'); }
+
+    // Dept rows
+    var deptRows = allDepts.map(function(nm) {
+        var bAmt  = latestBudget[nm] ? (parseFloat(latestBudget[nm].amount)||0) : 0;
+        var spent = deptSpent[nm] || 0;
+        var pct   = bAmt > 0 ? Math.round(spent/bAmt*100) : (spent>0?100:0);
+        var rem   = bAmt - spent;
+        var col   = pct>=90?'#ea4335':pct>=70?'#fbbc04':'#34a853';
+        return '<tr>'
+            + '<td><strong>' + nm + '</strong></td>'
+            + '<td>' + bFmt(bAmt) + '</td>'
+            + '<td style="color:#ea4335;font-weight:600;">' + bFmt(spent) + '</td>'
+            + '<td style="color:' + (rem<0?'#ea4335':'#34a853') + ';font-weight:700;">' + bFmt(rem) + (rem<0?' ⚠️':'') + '</td>'
+            + '<td style="min-width:140px;">'
+            + '<div style="display:flex;align-items:center;gap:6px;">'
+            + '<div style="flex:1;height:8px;background:var(--light-gray);border-radius:4px;overflow:hidden;">'
+            + '<div style="height:100%;width:' + Math.min(pct,100) + '%;background:' + col + ';border-radius:4px;"></div></div>'
+            + '<span style="font-size:12px;font-weight:700;color:' + col + ';">' + pct + '%</span></div></td>'
+            + '</tr>';
+    }).join('');
+
+    el.innerHTML =
+        '<div class="grid-4 mb-4">'
+        + _rKpi(bFmt(totalBudget), 'Total Budget',  '#2e7d32', '💰', allDepts.length + ' departments')
+        + _rKpi(bFmt(totalSpent),  'Total Spent',   '#ea4335', '💸', utilPct + '% utilized')
+        + _rKpi(bFmt(remaining),   'Remaining',     remaining >= 0 ? '#34a853' : '#ea4335', '🏦', remaining < 0 ? '⚠️ Over budget' : 'available')
+        + _rKpi(utilPct + '%',     'Utilization',   utilPct>=90?'#ea4335':utilPct>=70?'#fbbc04':'#34a853', '📊', 'of total budget')
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">'
+        + _rChartCard('Budget vs Expenses by Department', 'rbg_dept', 260)
+        + _rChartCard('Expense Category Breakdown', 'rbg_cat', 260)
+        + '</div>'
+        + '<div style="margin-bottom:16px;">'
+        + _rChartCard('Monthly Expense Trend', 'rbg_monthly', 230)
+        + '</div>'
+        + '<div class="card">'
+        + '<div style="font-size:14px;font-weight:700;padding:12px 16px;border-bottom:1px solid var(--light-gray);">Department Budget Utilization</div>'
+        + '<div class="table-responsive"><table><thead><tr>'
+        + '<th>Department</th><th>Allocated</th><th>Spent</th><th>Remaining</th><th>Utilization</th>'
+        + '</tr></thead><tbody>'
+        + (deptRows || '<tr><td colspan="5" class="empty-state">No budget data. Use the Budget module to set department budgets and log expenses.</td></tr>')
+        + '</tbody></table></div></div>';
+
+    setTimeout(function() {
+        if (allDepts.length) {
+            _rMakeChart('rbg_dept', {
+                type: 'bar',
+                data: {
+                    labels: allDepts,
+                    datasets: [
+                        { label: 'Budget', data: allDepts.map(function(n){ return latestBudget[n]?(parseFloat(latestBudget[n].amount)||0):0; }), backgroundColor: '#2e7d32', borderRadius: 4 },
+                        { label: 'Spent',  data: allDepts.map(function(n){ return deptSpent[n]||0; }), backgroundColor: '#ea4335', borderRadius: 4 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } },
+                    scales: { y: { beginAtZero: true, ticks: { callback: function(v){ return '₹'+v.toLocaleString('en-IN'); } } } } }
+            });
+        }
+        if (catK.length) {
+            _rMakeChart('rbg_cat', {
+                type: 'doughnut',
+                data: { labels: catK, datasets: [{ data: Object.values(catMap), backgroundColor: R_COLORS, borderWidth: 2 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+            });
+        }
+        if (mKeys.length) {
+            _rMakeChart('rbg_monthly', {
+                type: 'bar',
+                data: { labels: mKeys, datasets: [{ label: 'Expenses', data: mKeys.map(function(m){ return monthMap[m]; }), backgroundColor: '#ff9800', borderRadius: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { callback: function(v){ return '₹'+v.toLocaleString('en-IN'); } } } } }
+            });
+        }
     }, 50);
 }
 
