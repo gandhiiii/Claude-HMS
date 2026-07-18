@@ -17,20 +17,77 @@ var SYNC = (function () {
         'hodTasks', 'hodRequests'
     ];
 
-    var _pushing = false;   // prevents write→listen→write loops
-    var _inited  = false;
+    var _pushing     = {};  // key -> true while a Firebase write is in-flight
+    var _pending     = {};  // key -> latest data queued while a write is in-flight
+    var _lastWriteTs = 0;   // ms timestamp of most recent local write (loop prevention)
+    var _inited      = false;
 
-    /* ── Push one key to Firebase ── */
+    /* ── Queue-based push — never drops a write even when multiple saves fire quickly ── */
     function fbPush(key, data) {
-        if (!window.FB_DB || _pushing) return;
+        if (!window.FB_DB) return;
         if (SHARED_KEYS.indexOf(key) === -1) return;
-        try {
-            _pushing = true;
-            window.FB_DB.ref('hms/' + key).set(data, function () { _pushing = false; });
-        } catch (e) { _pushing = false; }
+        _lastWriteTs = Date.now();
+        _pending[key] = data;               // always store the latest value
+        if (!_pushing[key]) _flush(key);
     }
 
-    /* ── Pull ALL shared keys from Firebase into localStorage ── */
+    function _flush(key) {
+        if (!(key in _pending)) return;
+        var data = _pending[key];
+        delete _pending[key];
+        _pushing[key] = true;
+        try {
+            window.FB_DB.ref('hms/' + key).set(data, function () {
+                _pushing[key] = false;
+                if (key in _pending) _flush(key); // send next queued value
+            });
+        } catch (e) {
+            _pushing[key] = false;
+        }
+    }
+
+    /* ── Merge remote data into local storage, preserving locally-created items ──
+       For object arrays (items have an .id): remote wins for shared ids,
+       but local-only items are kept and scheduled to be pushed back to Firebase.
+       For anything else: remote wins outright.                                  */
+    function _mergeIntoLocal(key, remoteData) {
+        try {
+            var localRaw = localStorage.getItem('hms_' + key);
+            var merged       = remoteData;
+            var hasLocalOnly = false;
+
+            if (localRaw) {
+                var localData;
+                try { localData = JSON.parse(localRaw); } catch (e) { localData = null; }
+
+                if (Array.isArray(remoteData) && Array.isArray(localData)) {
+                    // Only do id-based merge for arrays of objects that have an .id field
+                    var isObjArr = remoteData.some(function (i) { return i && typeof i === 'object' && i.id; }) ||
+                                   localData.some(function (i)  { return i && typeof i === 'object' && i.id; });
+                    if (isObjArr) {
+                        var remoteIds = {};
+                        remoteData.forEach(function (i) { if (i && i.id) remoteIds[i.id] = true; });
+                        merged = remoteData.slice();
+                        localData.forEach(function (item) {
+                            if (item && item.id && !remoteIds[item.id]) {
+                                merged.push(item);
+                                hasLocalOnly = true;
+                            }
+                        });
+                    }
+                }
+            }
+
+            var json = JSON.stringify(merged);
+            localStorage.setItem('hms_' + key, json);
+            sessionStorage.setItem('hms_' + key, json);
+            return hasLocalOnly;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /* ── Pull ALL shared keys from Firebase; merge to protect locally-created data ── */
     function fbPullAll(cb) {
         if (!window.FB_DB) { if (cb) cb(); return; }
         window.FB_DB.ref('hms').once('value').then(function (snap) {
@@ -38,10 +95,25 @@ var SYNC = (function () {
             if (remote) {
                 Object.keys(remote).forEach(function (key) {
                     if (SHARED_KEYS.indexOf(key) === -1) return;
+                    var hadLocalOnly = _mergeIntoLocal(key, remote[key]);
+                    if (hadLocalOnly) {
+                        // Push merged data back so Firebase gains the locally-created items too
+                        try {
+                            var merged = JSON.parse(localStorage.getItem('hms_' + key));
+                            fbPush(key, merged);
+                        } catch (e) {}
+                    }
+                });
+            } else {
+                // Firebase is empty — push everything local so it gets stored
+                SHARED_KEYS.forEach(function (key) {
                     try {
-                        var json = JSON.stringify(remote[key]);
-                        localStorage.setItem('hms_' + key, json);
-                        sessionStorage.setItem('hms_' + key, json);
+                        var raw = localStorage.getItem('hms_' + key);
+                        if (raw) {
+                            var d = JSON.parse(raw);
+                            var hasData = Array.isArray(d) ? d.length > 0 : !!d;
+                            if (hasData) fbPush(key, d);
+                        }
                     } catch (e) {}
                 });
             }
@@ -56,7 +128,8 @@ var SYNC = (function () {
     function fbListen() {
         if (!window.FB_DB) return;
         window.FB_DB.ref('hms').on('value', function (snap) {
-            if (_pushing) return;            // this device just wrote — skip
+            // Ignore events that fire within 2 s of a local write — those are echoes of our own push
+            if (Date.now() - _lastWriteTs < 2000) return;
             var remote = snap.val();
             if (!remote) return;
             var changed = false;
@@ -74,7 +147,6 @@ var SYNC = (function () {
             });
             if (changed) {
                 try { if (typeof APP_SYNC !== 'undefined') APP_SYNC._flash(); } catch (e) {}
-                // Debounce refresh so rapid updates don't flicker
                 clearTimeout(SYNC._refreshTimer);
                 SYNC._refreshTimer = setTimeout(function () {
                     try { if (typeof APP !== 'undefined') APP.refreshCurrent(); } catch (e) {}
@@ -103,7 +175,7 @@ var SYNC = (function () {
             hookDBSet();
 
             if (window.FB_DB) {
-                // Pull latest data first, THEN start listening for live changes
+                // Pull latest data first (with merge), THEN start listening for live changes
                 fbPullAll(function () {
                     fbListen();
                     try { if (typeof APP !== 'undefined') APP.refreshCurrent(); } catch (e) {}
