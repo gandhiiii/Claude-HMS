@@ -166,11 +166,6 @@ function renderEmployeeDashboard(container) {
         + '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray);margin-bottom:3px;"><span>Task completion</span><span style="font-weight:600;color:' + (qPct >= 80 ? 'var(--success)' : qPct >= 50 ? 'var(--warning)' : 'var(--danger)') + ';">' + qPct + '%</span></div>'
         + '<div class="q-progress-track"><div class="q-progress-fill" style="width:' + qPct + '%;background:' + (qPct >= 80 ? 'var(--success)' : qPct >= 50 ? 'var(--warning)' : 'var(--danger)') + ';"></div></div>'
         + '</div>'
-        + '<div>'
-        // Quarter timeline (how far into quarter)
-        + '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray);margin-bottom:3px;"><span>Quarter elapsed</span><span>' + qElapsed + '%</span></div>'
-        + '<div class="q-progress-track"><div class="q-progress-fill" style="width:' + qElapsed + '%;background:var(--info);"></div></div>'
-        + '</div>'
         + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gray);margin-top:6px;">'
         + '<span>' + q.start.toLocaleDateString('en-IN',{month:'short',day:'numeric'}) + '</span>'
         + '<span>' + q.end.toLocaleDateString('en-IN',{month:'short',day:'numeric'}) + '</span></div>'
