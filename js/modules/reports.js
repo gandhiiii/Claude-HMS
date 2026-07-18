@@ -55,6 +55,7 @@ function renderReports(container) {
         { id: 'materials',   label: '📦 Materials',    color: '#ff9800' },
         { id: 'departments', label: '🏢 Departments',  color: '#9c27b0' },
         { id: 'checklists',  label: '📋 Checklists',   color: '#fbbc04' },
+        { id: 'submitted',   label: '📬 Submitted',    color: '#6a1b9a' },
         { id: 'download',    label: '⬇️ Download',     color: '#455a64' }
     ];
     if (isAdmin) TABS.splice(TABS.length - 1, 0, { id: 'budget', label: '💰 Budget', color: '#2e7d32' });
@@ -107,6 +108,7 @@ function _renderReportTab(tab) {
         materials:   _rMaterials,
         departments: _rDepartments,
         checklists:  _rChecklists,
+        submitted:   _rSubmittedReports,
         budget:      _rBudgetReport,
         download:    _rDownload
     };
@@ -1298,4 +1300,76 @@ function _rExportPDF(title, headers, rows) {
     var fname = title.replace(/\s+/g, '_') + '_' + new Date().toISOString().substring(0, 10) + '.pdf';
     doc.save(fname);
     APP.notify('Downloaded: ' + fname, 'success');
+}
+
+/* ══════════════════════════════════════════════════
+   SUBMITTED REPORTS INBOX — all employee/HOD reports
+══════════════════════════════════════════════════ */
+function _rSubmittedReports(el) {
+    var user = AUTH.currentUser();
+    var all  = DB.get('reports') || [];
+
+    // Role-filter: admin sees all; HOD sees own dept + own; employee sees own
+    var visible = all.filter(function(r) {
+        if (!user || user.isSuperAdmin || user.role === 'admin') return true;
+        if (user.role === 'hod') return r.department === user.department || r.createdBy === user.username;
+        return r.createdBy === user.username;
+    }).slice().reverse();
+
+    var depts  = Array.from(new Set(visible.map(function(r){ return r.department||'—'; }))).sort();
+    var filter = document.getElementById('rSubmitFilter') ? document.getElementById('rSubmitFilter').value : 'all';
+
+    var filtered = filter === 'all' ? visible : visible.filter(function(r){ return (r.department||'—') === filter; });
+
+    var filterHtml = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">'
+        + '<label style="font-size:13px;font-weight:600;">Department:</label>'
+        + '<select id="rSubmitFilter" class="form-control" style="width:auto;min-width:140px;" onchange="_renderReportTab(\'submitted\')">'
+        + '<option value="all">All Departments</option>'
+        + depts.map(function(d){ return '<option value="' + d + '"' + (filter===d?' selected':'') + '>' + d + '</option>'; }).join('')
+        + '</select>'
+        + '<span style="font-size:12px;color:var(--gray);">' + filtered.length + ' report' + (filtered.length!==1?'s':'') + '</span>'
+        + '</div>';
+
+    var rows = filtered.map(function(r) {
+        return '<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">'
+            + '<div style="flex:1;min-width:200px;">'
+            + '<div style="font-size:14px;font-weight:600;">' + (r.title||'Untitled') + '</div>'
+            + '<div style="font-size:11px;color:var(--gray);margin-top:3px;">'
+            + (r.createdByName||r.createdBy||'Unknown')
+            + (r.department ? ' &nbsp;·&nbsp; <span style="color:var(--primary);">' + r.department + '</span>' : '')
+            + ' &nbsp;·&nbsp; ' + (r.category||'-')
+            + (r.sentTo ? ' &nbsp;·&nbsp; To: ' + r.sentTo : '')
+            + ' &nbsp;·&nbsp; ' + APP.formatDate(r.createdAt)
+            + '</div>'
+            + (r.description ? '<div style="font-size:12px;margin-top:5px;color:var(--text);line-height:1.5;">' + r.description.substring(0,200) + (r.description.length>200?'…':'') + '</div>' : '')
+            + '</div>'
+            + '<div style="display:flex;gap:6px;flex-shrink:0;margin-top:2px;">'
+            + '<span class="badge badge-success" style="font-size:10px;align-self:flex-start;">sent</span>'
+            + '<button class="btn btn-sm" style="background:#25D366;color:#fff;padding:4px 9px;white-space:nowrap;" onclick="rShareReport(\'' + r.id + '\',\'whatsapp\')">💬 WhatsApp</button>'
+            + '<button class="btn btn-sm" style="background:#1a73e8;color:#fff;padding:4px 9px;white-space:nowrap;" onclick="rShareReport(\'' + r.id + '\',\'email\')">✉️ Email</button>'
+            + '</div></div>';
+    }).join('') || '<div style="padding:24px;text-align:center;color:var(--gray);">No reports submitted yet</div>';
+
+    el.innerHTML =
+        '<div style="font-weight:700;font-size:17px;margin-bottom:4px;">📬 Submitted Reports</div>'
+        + '<div style="font-size:12px;color:var(--gray);margin-bottom:16px;">All reports submitted by employees and HODs</div>'
+        + filterHtml
+        + '<div class="card" style="padding:0 18px;">' + rows + '</div>';
+}
+
+function rShareReport(id, via) {
+    var r = (DB.get('reports')||[]).find(function(x){ return x.id === id; });
+    if (!r) { APP.notify('Report not found','error'); return; }
+    var text = '*' + (r.title||'Report') + '*'
+        + '\nFrom: ' + (r.createdByName||r.createdBy||'')
+        + (r.department ? ' — ' + r.department : '')
+        + '\nDate: ' + (r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : '-')
+        + '\nPeriod: ' + (r.category||'-')
+        + (r.sentTo ? '\nSent To: ' + r.sentTo : '')
+        + '\n\n' + (r.description||'');
+    if (via === 'whatsapp') {
+        window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
+    } else {
+        window.location.href = 'mailto:?subject=' + encodeURIComponent(r.title||'Report') + '&body=' + encodeURIComponent(text);
+    }
 }

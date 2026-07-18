@@ -578,10 +578,12 @@ function renderEmpReportsTab(el) {
         html += '<div style="color:var(--gray);font-size:13px;">No reports submitted yet</div>';
     } else {
         d.myReports.slice().reverse().forEach(function(r) {
-            html += '<div class="work-item">'
-                + '<div style="flex:1;"><div style="font-size:13px;font-weight:600;">' + (r.title||'') + '</div>'
+            html += '<div class="work-item" style="flex-wrap:wrap;gap:6px;">'
+                + '<div style="flex:1;min-width:180px;"><div style="font-size:13px;font-weight:600;">' + (r.title||'') + '</div>'
                 + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + (r.category||'') + ' · To: ' + (r.sentTo||'-') + ' · ' + APP.formatDate(r.createdAt) + '</div></div>'
                 + '<span class="badge ' + (r.status==='sent'?'badge-success':'badge-warning') + '" style="font-size:11px;">' + (r.status||'draft') + '</span>'
+                + '<button class="btn btn-sm" style="background:#25D366;color:#fff;padding:4px 8px;" title="Share via WhatsApp" onclick="empShareReport(\'' + r.id + '\',\'whatsapp\')">💬</button>'
+                + '<button class="btn btn-sm" style="background:#1a73e8;color:#fff;padding:4px 8px;" title="Share via Email" onclick="empShareReport(\'' + r.id + '\',\'email\')">✉️</button>'
                 + '</div>';
         });
     }
@@ -766,9 +768,29 @@ function saveReport() {
     data.createdBy = user.username;
     data.createdByName = user.fullName;
     data.status = 'sent';
-    DB.add('reports', data);
-    APP.notify('Report submitted', 'success');
+    var saved = DB.add('reports', data);
+    APP.notify('Report submitted! Share it using 💬 ✉️ buttons in My Reports.', 'success');
+    // Navigate to employee dashboard and open Reports tab
     Router.navigate('employee-dashboard');
+    setTimeout(function(){ empTabSwitch('reports'); }, 80);
+}
+
+function empShareReport(id, via) {
+    var r = (DB.get('reports') || []).find(function(x){ return x.id === id; });
+    if (!r) { APP.notify('Report not found', 'error'); return; }
+    var user = AUTH.currentUser();
+    var text = '*' + (r.title || 'Report') + '*'
+        + '\nFrom: ' + (r.createdByName || (user && user.fullName) || '')
+        + (r.department ? ' (' + r.department + ')' : '')
+        + '\nDate: ' + (r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : '-')
+        + '\nCategory: ' + (r.category || '-')
+        + (r.sentTo ? '\nSent To: ' + r.sentTo : '')
+        + '\n\n' + (r.description || '');
+    if (via === 'whatsapp') {
+        window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
+    } else {
+        window.location.href = 'mailto:?subject=' + encodeURIComponent(r.title || 'Report') + '&body=' + encodeURIComponent(text);
+    }
 }
 
 function empConfirmMatReq(id, partial) {

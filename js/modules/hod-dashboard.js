@@ -1077,7 +1077,27 @@ function _hodReports(el) {
         +'</form>'
         +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">'
         +'<button class="btn btn-primary" onclick="hodSaveReport2()">📤 Send to Admin</button>'
-        +'</div></div>';
+        +'<button class="btn btn-sm" style="background:#25D366;color:#fff;" onclick="hodShareFormReport(\'whatsapp\')">💬 WhatsApp</button>'
+        +'<button class="btn btn-sm" style="background:#1a73e8;color:#fff;" onclick="hodShareFormReport(\'email\')">✉️ Email</button>'
+        +'</div></div>'
+
+        // submitted reports history
+        +(function(){
+            var deptReports = (DB.get('reports')||[]).filter(function(r){ return r.department === d.dept; }).slice().reverse().slice(0,10);
+            if (!deptReports.length) return '';
+            var rows = deptReports.map(function(r){
+                return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">'
+                    +'<div style="flex:1;min-width:160px;"><div style="font-size:13px;font-weight:600;">' + (r.title||'') + '</div>'
+                    +'<div style="font-size:11px;color:var(--gray);">' + (r.category||'') + ' · ' + (r.createdByName||r.createdBy||'') + ' · ' + APP.formatDate(r.createdAt) + '</div></div>'
+                    +'<span class="badge badge-success" style="font-size:10px;">sent</span>'
+                    +'<button class="btn btn-sm" style="background:#25D366;color:#fff;padding:3px 7px;" onclick="hodShareReport(\'' + r.id + '\',\'whatsapp\')">💬</button>'
+                    +'<button class="btn btn-sm" style="background:#1a73e8;color:#fff;padding:3px 7px;" onclick="hodShareReport(\'' + r.id + '\',\'email\')">✉️</button>'
+                    +'</div>';
+            }).join('');
+            return '<div class="card" style="margin-top:16px;padding:18px;">'
+                +'<div style="font-size:14px;font-weight:700;margin-bottom:10px;">📋 Recent Submitted Reports</div>'
+                + rows +'</div>';
+        })();
 }
 
 /* ── Export helpers ── */
@@ -1215,6 +1235,37 @@ function _hodShare(via, subject, text) {
     } else {
         window.location.href = 'mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(text);
     }
+}
+
+// Share a previously saved report from the history list
+function hodShareReport(id, via) {
+    var r = (DB.get('reports')||[]).find(function(x){ return x.id === id; });
+    if (!r) { APP.notify('Report not found','error'); return; }
+    var text = '*' + (r.title||'Report') + '*'
+        + '\nFrom: ' + (r.createdByName||r.createdBy||'')
+        + (r.department ? ' — ' + r.department : '')
+        + '\nDate: ' + (r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : '-')
+        + '\nPeriod: ' + (r.category||'-')
+        + '\n\n' + (r.description||'');
+    _hodShare(via, r.title||'Report', text);
+}
+
+// Share the content currently in the Send-to-Admin form without saving
+function hodShareFormReport(via) {
+    var form = document.getElementById('hodReportForm2');
+    if (!form) { APP.notify('Fill the form first','error'); return; }
+    var title = form.querySelector('[name="title"]') ? form.querySelector('[name="title"]').value : '';
+    var desc  = form.querySelector('[name="description"]') ? form.querySelector('[name="description"]').value : '';
+    var cat   = form.querySelector('[name="category"]') ? form.querySelector('[name="category"]').value : '';
+    if (!title && !desc) { APP.notify('Fill the report form first','error'); return; }
+    var user = AUTH.currentUser();
+    var text = '*' + (title||'Report') + '*'
+        + '\nFrom: ' + (user ? user.fullName : '')
+        + (user && user.department ? ' — ' + user.department : '')
+        + '\nDate: ' + new Date().toLocaleDateString('en-IN')
+        + '\nPeriod: ' + (cat||'-')
+        + '\n\n' + (desc||'');
+    _hodShare(via, title||'Report', text);
 }
 
 function hodSaveReport2() {
