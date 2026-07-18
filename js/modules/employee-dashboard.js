@@ -132,7 +132,8 @@ function renderEmployeeDashboard(container) {
         { id: 'checklists',  label: '✅ Checklists' },
         { id: 'reports',     label: '📋 Reports' },
         { id: 'cleaning',    label: '🧹 Cleaning', badge: _empData.pendingCleaning.length, badgeClass: 'badge-danger' },
-        { id: 'performance', label: '📊 Performance' }
+        { id: 'performance', label: '📊 Performance' },
+        { id: 'qgoals',      label: '🎯 Q Goals' }
     ];
 
     var html = ''
@@ -220,6 +221,17 @@ function _renderEmpTab(tab) {
     if (tab === 'reports')     { renderEmpReportsTab(el); return; }
     if (tab === 'cleaning')    { renderEmpCleaningSection(el); return; }
     if (tab === 'performance') { renderEmpPerformanceTab(el); return; }
+    if (tab === 'qgoals')     { renderEmpQGoalsTab(el); return; }
+}
+
+function renderEmpQGoalsTab(el) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    if (typeof renderEmpQP === 'function') {
+        renderEmpQP(el, user.username, user.fullName);
+    } else {
+        el.innerHTML = '<div class="empty-state">Q Goals module not loaded.</div>';
+    }
 }
 
 /* ══════════════════════════════════════════

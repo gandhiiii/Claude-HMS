@@ -79,6 +79,7 @@ const Router = {
             { id: 'material-requests', label: 'Material Requests', icon: '📦', permission: 'material-requests' },
             { id: 'suggestions', label: 'Suggestions', icon: '💡', permission: 'suggestions' },
             { id: 'budget', label: 'Budget', icon: '💰', permission: 'budget', adminOnly: true },
+            { id: 'quarterly-priorities', label: 'Quarterly Priorities', icon: '🎯', permission: 'quarterly-priorities', adminOnly: true },
             { id: 'reports', label: 'Reports & Analytics', icon: '📈', permission: 'reports' },
             { id: 'hod-dashboard', label: 'In-Charge Dashboard', icon: '👔', permission: 'hod-dashboard' },
             { id: 'employee-dashboard', label: 'My Dashboard', icon: '📊', permission: 'employee-dashboard' },
@@ -139,6 +140,7 @@ const Router = {
             'admin-checklists': 'Admin Checklists', checklists: 'Checklists',
             'material-requests': 'Material Requests', suggestions: 'Suggestions',
             budget: 'Budget Management',
+            'quarterly-priorities': 'Quarterly Priorities',
             reports: 'Reports & Analytics',
             'employee-dashboard': 'My Dashboard',
             'hod-dashboard': 'In-Charge Dashboard'
@@ -170,6 +172,7 @@ const Router = {
             'material-requests': renderMaterialRequests,
             suggestions: renderSuggestions,
             budget: renderBudget,
+            'quarterly-priorities': renderQPriorities,
             reports: renderReports,
             'employee-dashboard': renderEmployeeDashboard,
             'hod-dashboard': renderHodDashboard

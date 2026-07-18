@@ -145,7 +145,8 @@ function renderHodDashboard(container) {
         { id: 'checklists',  label: 'Checklists', badge: pendingCl, bc: 'badge-info' },
         { id: 'requests',    label: 'Requests', badge: pendingReq, bc: 'badge-warning' },
         { id: 'performance', label: 'Performance' },
-        { id: 'hodreports',  label: '📤 Reports' }
+        { id: 'hodreports',  label: '📤 Reports' },
+        { id: 'hodqp',       label: '🎯 Q Priorities' }
     ];
 
     var html = ''
@@ -213,7 +214,7 @@ function _renderHodTab(tab) {
     if (!el) return;
     var map = { overview: _hodOverview, admissions: _hodAdmissions, tasks: _hodTasks,
                 team: _hodTeam, checklists: _hodChecklists, requests: _hodRequests,
-                performance: _hodPerformance, hodreports: _hodReports };
+                performance: _hodPerformance, hodreports: _hodReports, hodqp: _hodQP };
     if (map[tab]) map[tab](el);
 }
 
@@ -1180,4 +1181,16 @@ function hodSaveReport() {
     });
     APP.notify('Report sent to admin', 'success');
     return true;
+}
+
+/* ═══════════════════════════════════════════════
+   QUARTERLY PRIORITIES TAB
+═══════════════════════════════════════════════ */
+function _hodQP(el) {
+    el.innerHTML = '<div id="hodQPContent"></div>';
+    if (typeof renderHodQP === 'function') {
+        renderHodQP(document.getElementById('hodQPContent'), _hodData.dept);
+    } else {
+        el.innerHTML = '<div class="empty-state">Quarterly Priorities module not loaded.</div>';
+    }
 }
