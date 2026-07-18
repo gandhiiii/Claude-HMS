@@ -51,7 +51,8 @@ function renderReports(container) {
         { id: 'problems',    label: '🔧 Problems',     color: '#ea4335' },
         { id: 'materials',   label: '📦 Materials',    color: '#ff9800' },
         { id: 'departments', label: '🏢 Departments',  color: '#9c27b0' },
-        { id: 'checklists',  label: '📋 Checklists',   color: '#fbbc04' }
+        { id: 'checklists',  label: '📋 Checklists',   color: '#fbbc04' },
+        { id: 'download',    label: '⬇️ Download',     color: '#455a64' }
     ];
 
     var btnHtml = TABS.map(function(t) {
@@ -100,7 +101,8 @@ function _renderReportTab(tab) {
         problems:    _rProblems,
         materials:   _rMaterials,
         departments: _rDepartments,
-        checklists:  _rChecklists
+        checklists:  _rChecklists,
+        download:    _rDownload
     };
     if (map[tab]) map[tab](el);
 }
@@ -701,4 +703,191 @@ function _rChecklists(el) {
                 scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } } } }
         });
     }, 50);
+}
+
+// ══════════════════════════════════════════════════════════════
+// DOWNLOAD TAB
+// ══════════════════════════════════════════════════════════════
+
+var _rSections = [
+    {
+        id: 'tasks', label: 'Tasks', icon: '✅', color: '#34a853', dbKey: 'tasks',
+        headers: ['Title','Status','Priority','Department','Assigned To','Deadline','Created By','Date'],
+        getRow: function(t){ return [t.title||'', t.status||'', t.priority||'', t.department||'', t.assignedTo||'', t.deadline||'', t.createdByName||t.createdBy||'', APP.formatDate(t.createdAt)]; }
+    },
+    {
+        id: 'problems', label: 'Problems', icon: '🔧', color: '#ea4335', dbKey: 'problems',
+        headers: ['Title','Category','Status','Priority','Department','Reported By','Date'],
+        getRow: function(p){ return [p.title||'', p.category||'', p.status||'', p.priority||'', p.department||'', p.reportedBy||p.createdByName||'', APP.formatDate(p.createdAt)]; }
+    },
+    {
+        id: 'admissions', label: 'Admissions', icon: '🏥', color: '#00bcd4', dbKey: 'admissions',
+        headers: ['Patient Name','Age','Gender','Type','Status','Ward','Admission Date','Discharge Date','Bill Amount','Payment Status'],
+        getRow: function(a){ return [a.patientName||'', a.age||'', a.gender||'', a.type||'', a.status||'', a.ward||'', a.admissionDate||'', a.dischargeDate||'', a.billAmount||'', a.paymentStatus||'']; }
+    },
+    {
+        id: 'complaints', label: 'Complaints', icon: '📝', color: '#fbbc04', dbKey: 'complaints',
+        headers: ['Patient Name','Room','Category','Priority','Status','Department','Date','Resolved By'],
+        getRow: function(c){ return [c.patientName||'', c.roomNo||'', c.category||'', c.priority||'', c.status||'', c.department||'', APP.formatDate(c.createdAt), c.resolvedBy||'']; }
+    },
+    {
+        id: 'materials', label: 'Material Requests', icon: '📦', color: '#ff9800', dbKey: 'material_requests',
+        headers: ['Title','Department','Status','Requested By','Date','Approved By'],
+        getRow: function(r){ return [r.title||'', r.department||'', r.status||'', r.createdByName||r.createdBy||'', APP.formatDate(r.createdAt), r.approvedBy||'']; }
+    },
+    {
+        id: 'inventory', label: 'Inventory', icon: '🗂️', color: '#9c27b0', dbKey: 'inventory',
+        headers: ['Item Name','Category','Quantity','Unit','Department','Last Updated'],
+        getRow: function(i){ return [i.name||'', i.category||'', i.quantity||0, i.unit||'pcs', i.department||'', APP.formatDate(i.updatedAt||i.createdAt)]; }
+    },
+    {
+        id: 'suggestions', label: 'Suggestions', icon: '💡', color: '#1a73e8', dbKey: 'suggestions',
+        headers: ['Title','Description','Department','Submitted By','Date'],
+        getRow: function(s){ return [s.title||'', (s.description||'').substring(0,120), s.department||'', s.createdByName||s.createdBy||'', APP.formatDate(s.createdAt)]; }
+    },
+    {
+        id: 'lostfound', label: 'Lost & Found', icon: '🔍', color: '#78909c', dbKey: 'lostfound',
+        headers: ['Item Name','Type','Category','Location','Reported By','Status','Date'],
+        getRow: function(i){ return [i.itemName||'', i.type||'', i.category||'', i.location||'', i.reportedBy||'', i.status||'', APP.formatDate(i.createdAt)]; }
+    },
+    {
+        id: 'staff', label: 'Staff Directory', icon: '👥', color: '#3f51b5', dbKey: 'users',
+        headers: ['Full Name','Username','Role','Department','Email','Phone'],
+        getRow: function(u){ return [u.fullName||'', u.username||'', u.role||'', u.department||'', u.email||'', u.phone||'']; }
+    },
+    {
+        id: 'departments', label: 'Departments', icon: '🏢', color: '#e91e63', dbKey: 'departments',
+        headers: ['Name','Status','HOD','Created At'],
+        getRow: function(d){ return [d.name||'', d.active===false?'Inactive':'Active', d.hod||'', APP.formatDate(d.createdAt)]; }
+    }
+];
+
+function _rDownload(el) {
+    var user = AUTH.currentUser();
+
+    var cardsHtml = _rSections.map(function(s) {
+        var raw   = DB.get(s.dbKey) || [];
+        var items = (s.id === 'staff' || s.id === 'departments' || s.id === 'inventory')
+            ? raw : _rRoleFilter(raw, user);
+        var count = items.length;
+        return '<div class="card" style="padding:16px;border-top:3px solid ' + s.color + ';">'
+            + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
+            + '<span style="font-size:24px;">' + s.icon + '</span>'
+            + '<div><div style="font-size:14px;font-weight:700;">' + s.label + '</div>'
+            + '<div style="font-size:12px;color:var(--gray);">' + count + ' record' + (count !== 1 ? 's' : '') + '</div></div></div>'
+            + '<div style="display:flex;gap:6px;">'
+            + '<button class="btn btn-sm" style="flex:1;background:#1e7e34;color:#fff;font-size:12px;" '
+            + 'onclick="rDownloadReport(\'' + s.id + '\',\'excel\')">📊 Excel</button>'
+            + '<button class="btn btn-sm" style="flex:1;background:#c82333;color:#fff;font-size:12px;" '
+            + 'onclick="rDownloadReport(\'' + s.id + '\',\'pdf\')">📄 PDF</button>'
+            + '</div></div>';
+    }).join('');
+
+    el.innerHTML =
+        '<div class="card" style="padding:18px 20px;margin-bottom:20px;background:linear-gradient(135deg,#37474f 0%,#263238 100%);color:#fff;border-radius:10px;">'
+        + '<div style="font-size:18px;font-weight:700;margin-bottom:4px;">⬇️ Download Reports</div>'
+        + '<div style="opacity:0.8;font-size:13px;">Export any module\'s data as an Excel spreadsheet (.xlsx) or PDF document.</div>'
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;">'
+        + cardsHtml
+        + '</div>';
+}
+
+function rDownloadReport(sectionId, format) {
+    var cfg = null;
+    for (var i = 0; i < _rSections.length; i++) {
+        if (_rSections[i].id === sectionId) { cfg = _rSections[i]; break; }
+    }
+    if (!cfg) { APP.notify('Unknown section', 'error'); return; }
+
+    var user = AUTH.currentUser();
+    var raw   = DB.get(cfg.dbKey) || [];
+    var items = (sectionId === 'staff' || sectionId === 'departments' || sectionId === 'inventory')
+        ? raw : _rRoleFilter(raw, user);
+    var rows  = items.map(cfg.getRow);
+
+    if (rows.length === 0) { APP.notify('No data to export', 'info'); return; }
+
+    if (format === 'excel') {
+        _rExportExcel(cfg.label, cfg.headers, rows);
+    } else {
+        _rExportPDF(cfg.label, cfg.headers, rows);
+    }
+}
+
+function _rExportExcel(title, headers, rows) {
+    if (typeof XLSX === 'undefined') {
+        APP.notify('Excel library not loaded yet — please wait a moment and retry', 'error');
+        return;
+    }
+    var wb = XLSX.utils.book_new();
+    var wsData = [headers].concat(rows);
+    var ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // auto column widths
+    ws['!cols'] = headers.map(function(h, ci) {
+        var max = h.length;
+        rows.forEach(function(r) {
+            var cell = r[ci] != null ? String(r[ci]) : '';
+            if (cell.length > max) max = cell.length;
+        });
+        return { wch: Math.min(max + 2, 45) };
+    });
+
+    XLSX.utils.book_append_sheet(wb, ws, title.substring(0, 31));
+    var fname = title.replace(/\s+/g, '_') + '_' + new Date().toISOString().substring(0, 10) + '.xlsx';
+    XLSX.writeFile(wb, fname);
+    APP.notify('Downloaded: ' + fname, 'success');
+}
+
+function _rExportPDF(title, headers, rows) {
+    if (typeof window.jspdf === 'undefined') {
+        APP.notify('PDF library not loaded yet — please wait a moment and retry', 'error');
+        return;
+    }
+    var jsPDF = window.jspdf.jsPDF;
+    var orientation = headers.length > 6 ? 'l' : 'p';
+    var doc = new jsPDF(orientation, 'mm', 'a4');
+    var pageW = doc.internal.pageSize.getWidth();
+
+    // Title block
+    doc.setFillColor(26, 115, 232);
+    doc.rect(0, 0, pageW, 22, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text('Hospital Management System', 14, 10);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(title + ' Report', 14, 17);
+
+    // Meta line
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(8);
+    var dateStr = new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
+    doc.text('Generated: ' + dateStr + '   |   Records: ' + rows.length, 14, 29);
+
+    // Table
+    doc.autoTable({
+        head: [headers],
+        body: rows,
+        startY: 33,
+        styles: { fontSize: 8, cellPadding: 2.5, overflow: 'linebreak' },
+        headStyles: { fillColor: [26, 115, 232], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+        alternateRowStyles: { fillColor: [240, 246, 255] },
+        margin: { left: 14, right: 14 },
+        didDrawPage: function(data) {
+            // page footer
+            doc.setFontSize(7);
+            doc.setTextColor(160, 160, 160);
+            var pg = doc.internal.getCurrentPageInfo().pageNumber;
+            var total = doc.internal.getNumberOfPages();
+            doc.text('Page ' + pg + ' of ' + total, pageW - 28, doc.internal.pageSize.getHeight() - 8);
+            doc.text('HMS — Confidential', 14, doc.internal.pageSize.getHeight() - 8);
+        }
+    });
+
+    var fname = title.replace(/\s+/g, '_') + '_' + new Date().toISOString().substring(0, 10) + '.pdf';
+    doc.save(fname);
+    APP.notify('Downloaded: ' + fname, 'success');
 }
