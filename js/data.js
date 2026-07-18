@@ -205,6 +205,8 @@ const AUTH = {
     },
     hasPermission(user, permission) {
         if (!user) return false;
+        // Budget is strictly admin-only — cannot be granted via feature rights
+        if (permission === 'budget') return user.isSuperAdmin || user.role === 'admin';
         if (user.isSuperAdmin || (user.permissions && user.permissions.includes('all'))) return true;
         // Role-based auto-grants (no manual permission config needed)
         if (permission === 'hod-dashboard' && user.role === 'hod') return true;
@@ -604,6 +606,7 @@ const APP = {
             checklists: renderChecklists,
             'material-requests': renderMaterialRequests,
             suggestions: renderSuggestions,
+            budget: renderBudget,
             reports: renderReports,
             'employee-dashboard': renderEmployeeDashboard
         };
@@ -634,6 +637,12 @@ const APP = {
             }
             if (!Array.isArray(DB.get('reports')) || DB.get('reports').length === 0) {
                 DB.set('reports', []);
+            }
+            if (!Array.isArray(DB.get('budgets'))) {
+                DB.set('budgets', []);
+            }
+            if (!Array.isArray(DB.get('budget_expenses'))) {
+                DB.set('budget_expenses', []);
             }
             if (!Array.isArray(existingRights) || existingRights.length === 0) {
                 const defaultRights = ['dashboard','users','departments','inventory','gate-security',

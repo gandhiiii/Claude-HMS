@@ -78,6 +78,7 @@ const Router = {
             { id: 'admin-checklists', label: 'Admin Checklists', icon: '🔖', permission: 'admin-checklists' },
             { id: 'material-requests', label: 'Material Requests', icon: '📦', permission: 'material-requests' },
             { id: 'suggestions', label: 'Suggestions', icon: '💡', permission: 'suggestions' },
+            { id: 'budget', label: 'Budget', icon: '💰', permission: 'budget', adminOnly: true },
             { id: 'reports', label: 'Reports & Analytics', icon: '📈', permission: 'reports' },
             { id: 'hod-dashboard', label: 'In-Charge Dashboard', icon: '👔', permission: 'hod-dashboard' },
             { id: 'employee-dashboard', label: 'My Dashboard', icon: '📊', permission: 'employee-dashboard' },
@@ -85,6 +86,7 @@ const Router = {
         ];
         let html = '';
         items.forEach(item => {
+            if (item.adminOnly && !(user.isSuperAdmin || user.role === 'admin')) return;
             if (AUTH.hasPermission(user, item.permission)) {
                 html += `<div class="nav-item" onclick="Router.navigate('${item.id}')" data-module="${item.id}">
                     <span>${item.icon}</span> <span>${item.label}</span>
@@ -136,6 +138,7 @@ const Router = {
             admissions: 'Admissions & Discharges', 'lost-found': 'Lost & Found',
             'admin-checklists': 'Admin Checklists', checklists: 'Checklists',
             'material-requests': 'Material Requests', suggestions: 'Suggestions',
+            budget: 'Budget Management',
             reports: 'Reports & Analytics',
             'employee-dashboard': 'My Dashboard',
             'hod-dashboard': 'In-Charge Dashboard'
@@ -166,6 +169,7 @@ const Router = {
             checklists: renderChecklists,
             'material-requests': renderMaterialRequests,
             suggestions: renderSuggestions,
+            budget: renderBudget,
             reports: renderReports,
             'employee-dashboard': renderEmployeeDashboard,
             'hod-dashboard': renderHodDashboard
