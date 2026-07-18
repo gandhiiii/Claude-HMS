@@ -78,6 +78,7 @@ const Router = {
             { id: 'admin-checklists', label: 'Admin Checklists', icon: '🔖', permission: 'admin-checklists' },
             { id: 'material-requests', label: 'Material Requests', icon: '📦', permission: 'material-requests' },
             { id: 'suggestions', label: 'Suggestions', icon: '💡', permission: 'suggestions' },
+            { id: 'reports', label: 'Reports & Analytics', icon: '📈', permission: 'reports' },
             { id: 'hod-dashboard', label: 'In-Charge Dashboard', icon: '👔', permission: 'hod-dashboard' },
             { id: 'employee-dashboard', label: 'My Dashboard', icon: '📊', permission: 'employee-dashboard' },
             { id: 'checklists', label: 'Checklists', icon: '✅', permission: 'checklists' }
@@ -135,6 +136,7 @@ const Router = {
             admissions: 'Admissions & Discharges', 'lost-found': 'Lost & Found',
             'admin-checklists': 'Admin Checklists', checklists: 'Checklists',
             'material-requests': 'Material Requests', suggestions: 'Suggestions',
+            reports: 'Reports & Analytics',
             'employee-dashboard': 'My Dashboard',
             'hod-dashboard': 'In-Charge Dashboard'
         };
@@ -164,6 +166,7 @@ const Router = {
             checklists: renderChecklists,
             'material-requests': renderMaterialRequests,
             suggestions: renderSuggestions,
+            reports: renderReports,
             'employee-dashboard': renderEmployeeDashboard,
             'hod-dashboard': renderHodDashboard
         };
