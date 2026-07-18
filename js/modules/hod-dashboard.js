@@ -99,9 +99,17 @@ function renderHodDashboard(container) {
     var allHodTasks = DB.get('hodTasks') || [];
     var myTasks     = allHodTasks.filter(function (t) { return t.department === dept; });
 
-    // Checklists assigned to this dept by admin
+    // Checklists: admin-assigned to dept + HOD-created for team members
     var allCl       = DB.get('checklists') || [];
-    var myCl        = allCl.filter(function (c) { return c.department === dept || c.assignedTo === 'common'; });
+    var teamFullNames = (DB.get('users') || [])
+        .filter(function(m){ return m.department === dept && m.role !== 'admin' && m.role !== 'super_admin'; })
+        .map(function(m){ return m.fullName; });
+    var myCl = allCl.filter(function (c) {
+        return c.department === dept ||
+               c.assignedTo === 'common' ||
+               c.assignedBy === u ||
+               teamFullNames.indexOf(c.assignedTo) !== -1;
+    });
 
     // HOD material requests for this dept
     var allReqs     = DB.get('hodRequests') || [];
@@ -728,49 +736,192 @@ function hodRemoveMember(username, fullName) {
 /* ═══════════════════════════════════════════════
    CHECKLISTS TAB — from admin, fulfilled by HOD
 ═══════════════════════════════════════════════ */
-function _hodChecklists(el) {
-    var d   = _hodData;
-    var cls = d.myCl;
-    var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
-        + '<div>'
-        + '<div style="font-weight:700;font-size:16px;">✅ Checklists — ' + d.dept + '</div>'
-        + '<div style="font-size:12px;color:var(--gray);margin-top:2px;">Checklists assigned by Admin to your department</div>'
-        + '</div>'
-        + '<a class="btn btn-sm btn-outline" onclick="Router.navigate(\'checklists\')">Manage →</a></div>';
+var _hodClView = 'all'; // 'all' | 'member'
 
-    if (cls.length === 0) {
-        html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;font-size:13px;color:var(--gray);">No checklists assigned to ' + d.dept + ' yet.<br>Admin will assign checklists that will appear here.</div>';
+function _hodChecklists(el) {
+    var d    = _hodData;
+    var user = d.user;
+    var cls  = d.myCl;
+    var pending   = cls.filter(function(c){ return c.status !== 'completed'; });
+    var completed = cls.filter(function(c){ return c.status === 'completed'; });
+
+    var html = ''
+        // ── Header ──
+        + '<div style="background:linear-gradient(135deg,#1b5e20 0%,#2e7d32 100%);border-radius:12px;padding:16px 20px;color:#fff;margin-bottom:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">'
+        + '<div><div style="font-size:15px;font-weight:700;">✅ Checklists — ' + d.dept + '</div>'
+        + '<div style="font-size:12px;opacity:0.8;margin-top:2px;">'
+        + cls.length + ' total &nbsp;·&nbsp; '
+        + pending.length + ' active &nbsp;·&nbsp; '
+        + completed.length + ' completed</div></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);" onclick="hodNewChecklist(\'\')">+ Assign Checklist</button>'
+        + '</div></div></div>'
+
+        // ── View toggle ──
+        + '<div style="display:flex;gap:4px;margin-bottom:14px;">'
+        + '<button class="tab-btn' + (_hodClView==='all'?' active':'') + '" onclick="hodClView(\'all\',this)">All Checklists</button>'
+        + '<button class="tab-btn' + (_hodClView==='member'?' active':'') + '" onclick="hodClView(\'member\',this)">By Team Member</button>'
+        + '</div>';
+
+    if (_hodClView === 'member') {
+        // ── Per-member view ──
+        var allMembers = d.team.slice();
+        // Add a "Common" bucket
+        var buckets = [{ name: 'Common (Everyone)', key: 'common' }]
+            .concat(allMembers.map(function(m){ return { name: m.fullName, key: m.fullName }; }));
+
+        buckets.forEach(function(bucket) {
+            var memberCls = cls.filter(function(c){
+                return bucket.key === 'common' ? c.assignedTo === 'common' : c.assignedTo === bucket.key;
+            });
+            var isTeamMember = bucket.key !== 'common';
+            html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);">'
+                + '<div style="display:flex;align-items:center;gap:10px;">'
+                + (isTeamMember ? _avatar(bucket.name, 30) : '<div style="width:30px;height:30px;border-radius:50%;background:#e8f5e9;display:flex;align-items:center;justify-content:center;font-size:16px;">👥</div>')
+                + '<div>'
+                + '<div style="font-size:13px;font-weight:700;">' + bucket.name + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);">' + memberCls.length + ' checklist' + (memberCls.length!==1?'s':'') + '</div>'
+                + '</div></div>'
+                + '<button class="btn btn-sm btn-primary" style="font-size:12px;" onclick="hodNewChecklist(\'' + bucket.key.replace(/'/g,"\\'") + '\')">+ Add</button>'
+                + '</div>'
+                + '<div style="padding:10px 14px;">';
+
+            if (memberCls.length === 0) {
+                html += '<div style="font-size:12px;color:var(--gray);padding:8px 0;">No checklists assigned — click + Add to create one.</div>';
+            } else {
+                memberCls.forEach(function(cl) {
+                    html += _hodClCard(cl, user);
+                });
+            }
+            html += '</div></div>';
+        });
+
     } else {
-        var pending   = cls.filter(function (c) { return c.status !== 'completed'; });
-        var completed = cls.filter(function (c) { return c.status === 'completed'; });
-        if (pending.length > 0) {
-            html += '<div style="font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;margin-bottom:8px;">Pending (' + pending.length + ')</div>';
-            pending.forEach(function (cl) { html += _clCard(cl); });
-        }
-        if (completed.length > 0) {
-            html += '<div style="font-size:12px;font-weight:700;color:var(--gray);text-transform:uppercase;margin:16px 0 8px;">Completed (' + completed.length + ')</div>';
-            completed.forEach(function (cl) { html += _clCard(cl); });
+        // ── Flat all view ──
+        if (cls.length === 0) {
+            html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
+                + '<div style="font-size:32px;margin-bottom:8px;">✅</div>'
+                + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No checklists yet</div>'
+                + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Create and assign checklists to your team members.</div>'
+                + '<button class="btn btn-primary" onclick="hodNewChecklist(\'\')">+ Assign First Checklist</button>'
+                + '</div>';
+        } else {
+            if (pending.length > 0) {
+                html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Active (' + pending.length + ')</div>';
+                pending.forEach(function(cl) { html += _hodClCard(cl, user); });
+            }
+            if (completed.length > 0) {
+                html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px;">Completed (' + completed.length + ')</div>';
+                completed.forEach(function(cl) { html += _hodClCard(cl, user); });
+            }
         }
     }
+
     el.innerHTML = html;
 }
 
-function _clCard(cl) {
-    var total = cl.items ? cl.items.length : 0;
-    var done  = cl.items ? cl.items.filter(function (i) { return i.status === 'ok'; }).length : 0;
-    var pct   = total > 0 ? Math.round(done / total * 100) : 0;
-    return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;">'
-        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'
-        + '<div><div style="font-size:14px;font-weight:700;">' + (cl.title || '') + '</div>'
-        + (cl.deadline ? '<div style="font-size:11px;color:var(--gray);margin-top:2px;">Due: ' + APP.formatDate(cl.deadline) + '</div>' : '')
+function hodClView(v, btn) {
+    _hodClView = v;
+    document.querySelectorAll('.tabs .tab-btn, .tab-btn').forEach(function(b){
+        if (b.getAttribute('onclick') && b.getAttribute('onclick').indexOf('hodClView') !== -1) b.classList.remove('active');
+    });
+    if (btn) btn.classList.add('active');
+    _renderHodTab('checklists');
+}
+
+function _hodClCard(cl, user) {
+    var total   = cl.items ? cl.items.length : 0;
+    var done    = cl.items ? cl.items.filter(function(i){ return i.status && i.status !== 'pending'; }).length : 0;
+    var pct     = total > 0 ? Math.round(done / total * 100) : 0;
+    var isOverdue = cl.deadline && new Date(cl.deadline) < new Date() && cl.status !== 'completed';
+    var canManage = user && (user.isSuperAdmin || user.role === 'admin' || cl.assignedBy === user.fullName);
+
+    return '<div style="background:var(--card);border:1px solid var(--border);' + (isOverdue?'border-left:4px solid var(--danger);':'') + 'border-radius:10px;padding:12px 14px;margin-bottom:8px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">'
+        + '<div style="flex:1;min-width:180px;">'
+        + '<div style="font-size:13px;font-weight:700;">' + (cl.title || '') + '</div>'
+        + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">'
+        + '👤 ' + (cl.assignedTo === 'common' ? 'Everyone' : cl.assignedTo)
+        + (cl.floor ? ' &nbsp;·&nbsp; 📍 ' + cl.floor : '')
+        + (cl.deadline ? ' &nbsp;·&nbsp; 📅 ' + APP.formatDate(cl.deadline) + (isOverdue?' <span style="color:var(--danger);font-weight:600;">⚠ Overdue</span>':'') : '')
+        + ' &nbsp;·&nbsp; by ' + (cl.assignedBy || '—')
         + '</div>'
-        + '<div style="display:flex;align-items:center;gap:8px;">'
-        + '<span class="badge ' + (cl.status === 'completed' ? 'badge-success' : 'badge-info') + '" style="font-size:11px;">' + (cl.status || 'active') + '</span>'
-        + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'checklists\')">Open</button></div></div>'
-        + '<div style="display:flex;align-items:center;gap:8px;">'
-        + '<div class="hq-bar" style="flex:1;"><div class="hq-fill" style="width:' + pct + '%;background:' + (pct === 100 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)') + ';"></div></div>'
-        + '<span style="font-size:12px;color:var(--gray);">' + done + '/' + total + ' items</span></div>'
-        + '</div>';
+        + '<div style="display:flex;align-items:center;gap:6px;margin-top:6px;">'
+        + '<div class="hq-bar" style="width:120px;"><div class="hq-fill" style="width:' + pct + '%;background:' + (pct===100?'var(--success)':pct>=50?'var(--warning)':'var(--danger)') + ';"></div></div>'
+        + '<span style="font-size:11px;color:var(--gray);">' + done + '/' + total + ' items</span>'
+        + '<span class="badge ' + (cl.status==='completed'?'badge-success':'badge-info') + '" style="font-size:10px;">' + (cl.status||'active') + '</span>'
+        + '</div></div>'
+        + '<div style="display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;">'
+        + (canManage
+            ? '<button class="btn btn-sm btn-primary" onclick="hodEditCl(\'' + cl.id + '\')">Edit</button>'
+              + (cl.status !== 'completed' ? '<button class="btn btn-sm btn-success" onclick="hodCompleteCl(\'' + cl.id + '\')">Done</button>' : '')
+              + '<button class="btn btn-sm btn-danger" onclick="hodDeleteCl(\'' + cl.id + '\')">Remove</button>'
+            : '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'checklists\')">View</button>')
+        + '</div></div></div>';
+}
+
+/* ── HOD Checklist Actions ── */
+function hodNewChecklist(preAssign) {
+    // Pre-select the team member in the form, then refresh HOD tab on save
+    window._clSaveCallback = function() { _hodRefreshCl(); };
+    var user = AUTH.currentUser();
+    if (!user) return;
+    // Build a stub "cl" object so showClForm pre-selects the right assignee
+    var stub = preAssign ? { assignedTo: preAssign, department: user.department } : null;
+    if (typeof showClForm === 'function') {
+        showClForm(stub);
+    } else {
+        APP.notify('Checklist module not loaded', 'error');
+    }
+}
+
+function hodEditCl(id) {
+    window._clSaveCallback = function() { _hodRefreshCl(); };
+    var cl = DB.getById('checklists', id);
+    if (cl && typeof showClForm === 'function') {
+        showClForm(cl);
+    } else {
+        APP.notify('Checklist not found', 'error');
+    }
+}
+
+function hodDeleteCl(id) {
+    var cl = DB.getById('checklists', id);
+    if (!cl) { APP.notify('Checklist not found', 'error'); return; }
+    var user = AUTH.currentUser();
+    if (cl.assignedBy !== (user && user.fullName) && !(user && (user.isSuperAdmin || user.role === 'admin'))) {
+        APP.notify('You can only remove checklists you created', 'error'); return;
+    }
+    confirmAction('Remove checklist "' + cl.title + '" from ' + (cl.assignedTo === 'common' ? 'everyone' : cl.assignedTo) + '?', function() {
+        DB.delete('checklists', id);
+        APP.notify('Checklist removed', 'success');
+        _hodRefreshCl();
+    });
+}
+
+function hodCompleteCl(id) {
+    DB.update('checklists', id, { status: 'completed' });
+    APP.notify('Checklist marked complete', 'success');
+    _hodRefreshCl();
+}
+
+function _hodRefreshCl() {
+    // Refresh myCl in _hodData then re-render checklists tab
+    var d    = _hodData;
+    var dept = d.dept;
+    var u    = d.u;
+    var teamFullNames = (DB.get('users') || [])
+        .filter(function(m){ return m.department === dept && m.role !== 'admin' && m.role !== 'super_admin'; })
+        .map(function(m){ return m.fullName; });
+    d.myCl = (DB.get('checklists') || []).filter(function(c) {
+        return c.department === dept ||
+               c.assignedTo === 'common' ||
+               c.assignedBy === u ||
+               teamFullNames.indexOf(c.assignedTo) !== -1;
+    });
+    _renderHodTab('checklists');
 }
 
 /* ═══════════════════════════════════════════════

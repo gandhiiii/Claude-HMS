@@ -286,7 +286,14 @@ function saveCl() {
         });
         APP.notify('Checklist created and assigned', 'success');
     }
-    renderClList();
+    // Allow caller (e.g. HOD dashboard) to override the post-save refresh
+    if (typeof window._clSaveCallback === 'function') {
+        var cb = window._clSaveCallback;
+        window._clSaveCallback = null;
+        cb();
+    } else {
+        renderClList();
+    }
 }
 
 function editCl(id) {
