@@ -143,11 +143,20 @@ function renderAdmListView() {
 }
 
 function renderAdmList() {
+    var user = AUTH.currentUser();
+    var isAdmin = !user || user.isSuperAdmin || user.role === 'admin';
     var admissions = DB.get('admissions');
     var search = (document.getElementById('admSearch') ? document.getElementById('admSearch').value : '').toLowerCase();
     var filtered = [];
     for (var i = 0; i < admissions.length; i++) {
         var a = admissions[i];
+        if (!isAdmin) {
+            if (user.role === 'hod') {
+                if (a.department !== user.department && a.createdBy !== user.username) continue;
+            } else {
+                if (a.createdBy !== user.username) continue;
+            }
+        }
         if (a.patientName.toLowerCase().indexOf(search) > -1 || (a.patientId || '').toLowerCase().indexOf(search) > -1 || a.roomNo.toLowerCase().indexOf(search) > -1 || (a.doctorName || '').toLowerCase().indexOf(search) > -1) {
             if (admFilter === 'all' || a.status === admFilter) filtered.push(a);
         }
@@ -648,6 +657,9 @@ function saveAdm() {
     data.dischargeSummary = '';
     data.billAmount = '';
     data.paymentStatus = 'pending';
+    var _adUser = AUTH.currentUser();
+    data.createdBy = _adUser ? _adUser.username : 'admin';
+    data.createdByName = _adUser ? _adUser.fullName : 'Admin';
     DB.add('admissions', data);
     var overrides = DB.get('roomStatus') || [];
     DB.set('roomStatus', overrides.filter(function(r) { return r.roomNo !== data.roomNo; }));

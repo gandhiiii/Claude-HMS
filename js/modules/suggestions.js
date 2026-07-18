@@ -23,8 +23,13 @@ function renderSugList() {
         for (var i = 0; i < all.length; i++) {
             var s = all[i];
             if (!s) continue;
-            if (user.role !== 'admin') {
-                if (s.createdBy !== user.username) continue;
+            var isAdmin = user.isSuperAdmin || user.role === 'admin';
+            if (!isAdmin) {
+                if (user.role === 'hod') {
+                    if (s.department !== user.department && s.createdBy !== user.username) continue;
+                } else {
+                    if (s.createdBy !== user.username) continue;
+                }
             }
             if (search && (s.title || '').toLowerCase().indexOf(search) < 0 && (s.description || '').toLowerCase().indexOf(search) < 0) continue;
             list.push(s);
@@ -63,19 +68,24 @@ function renderSugList() {
 
 function showSugForm() {
     var user = AUTH.currentUser();
+    var isAdmin = !user || user.isSuperAdmin || user.role === 'admin';
     var depts = DB.get('departments') || [];
-    var deptOpts = '';
-    for (var i = 0; i < depts.length; i++) {
-        var d = depts[i];
-        if (!d || d.active === false) continue;
-        var sel = d.name === user.department ? 'selected' : '';
-        deptOpts += '<option value="' + d.name.replace(/"/g,'&quot;') + '" ' + sel + '>' + d.name + '</option>';
+    var deptField;
+    if (isAdmin) {
+        var deptOpts = '';
+        for (var i = 0; i < depts.length; i++) {
+            var d = depts[i];
+            if (!d || d.active === false) continue;
+            deptOpts += '<option value="' + d.name.replace(/"/g,'&quot;') + '">' + d.name + '</option>';
+        }
+        deptField = '<select name="department" class="form-control">' + deptOpts + '</select>';
+    } else {
+        deptField = '<input type="text" name="department" class="form-control" value="' + (user.department || '').replace(/"/g,'&quot;') + '" readonly style="background:var(--light-gray);">';
     }
 
     var html = '<form id="sugForm">'
         + '<div class="form-group"><label>Title *</label><input type="text" name="title" class="form-control" required></div>'
-        + '<div class="form-group"><label>Department</label>'
-        + '<select name="department" class="form-control">' + deptOpts + '</select></div>'
+        + '<div class="form-group"><label>Department</label>' + deptField + '</div>'
         + '<div class="form-group"><label>Description *</label><textarea name="description" class="form-control" rows="4" required></textarea></div>'
         + '</form>';
 

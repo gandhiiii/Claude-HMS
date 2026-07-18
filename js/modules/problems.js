@@ -74,6 +74,14 @@ function renderProbList() {
 }
 
 function showProbForm() {
+    const user = AUTH.currentUser();
+    const isAdmin = !user || user.isSuperAdmin || user.role === 'admin';
+    const reportedByField = isAdmin
+        ? `<input type="text" name="reportedBy" class="form-control" required>`
+        : `<input type="text" name="reportedBy" class="form-control" value="${user.fullName}" readonly style="background:var(--light-gray);">`;
+    const deptField = isAdmin
+        ? `<input type="text" name="department" class="form-control">`
+        : `<input type="text" name="department" class="form-control" value="${user.department || ''}" readonly style="background:var(--light-gray);">`;
     const form = `
         <form id="probForm">
             <div class="grid-2">
@@ -104,12 +112,12 @@ function showProbForm() {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Reported By *</label>
-                    <input type="text" name="reportedBy" class="form-control" required>
+                    <label>Reported By</label>
+                    ${reportedByField}
                 </div>
                 <div class="form-group">
                     <label>Department</label>
-                    <input type="text" name="department" class="form-control">
+                    ${deptField}
                 </div>
                 <div class="form-group">
                     <label>Location</label>
@@ -134,6 +142,7 @@ function saveProb() {
     data.status = 'open';
     data.createdBy = user.username;
     data.createdByName = user.fullName;
+    data.reportedBy = data.reportedBy || user.fullName;
     data.department = data.department || user.department || '';
     data.solution = '';
     data.resolvedBy = '';

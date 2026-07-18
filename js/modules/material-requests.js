@@ -92,19 +92,24 @@ function showMatForm() {
         itemOpts += '<option value="' + inv.name.replace(/"/g,'&quot;') + '" data-unit="' + (inv.unit || 'pcs') + '">' + inv.name + ' (' + (inv.quantity || 0) + ' ' + (inv.unit || 'pcs') + ')</option>';
     }
 
+    var isAdmin = !user || user.isSuperAdmin || user.role === 'admin';
     var depts = DB.get('departments') || [];
-    var deptOpts = '';
-    for (var i = 0; i < depts.length; i++) {
-        var d = depts[i];
-        if (!d || d.active === false) continue;
-        var sel = d.name === user.department ? 'selected' : '';
-        deptOpts += '<option value="' + d.name.replace(/"/g,'&quot;') + '" ' + sel + '>' + d.name + '</option>';
+    var deptField;
+    if (isAdmin) {
+        var deptOpts = '';
+        for (var i = 0; i < depts.length; i++) {
+            var d = depts[i];
+            if (!d || d.active === false) continue;
+            deptOpts += '<option value="' + d.name.replace(/"/g,'&quot;') + '">' + d.name + '</option>';
+        }
+        deptField = '<select name="department" class="form-control">' + deptOpts + '</select>';
+    } else {
+        deptField = '<input type="text" name="department" class="form-control" value="' + (user.department || '').replace(/"/g,'&quot;') + '" readonly style="background:var(--light-gray);">';
     }
 
     var html = '<form id="matForm">'
         + '<div class="form-group"><label>Request Title *</label><input type="text" name="title" class="form-control" required></div>'
-        + '<div class="form-group"><label>Department</label>'
-        + '<select name="department" class="form-control">' + deptOpts + '</select></div>'
+        + '<div class="form-group"><label>Department</label>' + deptField + '</div>'
         + '<div class="form-group"><label>Reason / Notes</label><textarea name="reason" class="form-control" rows="2"></textarea></div>'
         + '<div class="form-group"><label>Items Needed</label>'
         + '<div id="matItemsContainer"><div class="mat-item-row" style="display:flex;gap:6px;margin-bottom:4px;">'

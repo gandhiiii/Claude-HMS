@@ -42,13 +42,19 @@ function switchLostTab(filter, btn) {
 }
 
 function renderLostList() {
+    const user = AUTH.currentUser();
+    const isAdmin = !user || user.isSuperAdmin || user.role === 'admin';
     const items = DB.get('lostfound');
     const search = (document.getElementById('lostSearch')?.value || '').toLowerCase();
-    let filtered = items.filter(i =>
-        i.itemName.toLowerCase().includes(search) ||
-        i.description.toLowerCase().includes(search) ||
-        i.location.toLowerCase().includes(search) ||
-        i.reportedBy.toLowerCase().includes(search)
+    let roleFiltered = isAdmin ? items : items.filter(i => {
+        if (user.role === 'hod') return i.department === user.department || i.createdBy === user.username;
+        return i.createdBy === user.username;
+    });
+    let filtered = roleFiltered.filter(i =>
+        (i.itemName || '').toLowerCase().includes(search) ||
+        (i.description || '').toLowerCase().includes(search) ||
+        (i.location || '').toLowerCase().includes(search) ||
+        (i.reportedBy || '').toLowerCase().includes(search)
     );
     if (lostFilter !== 'all') filtered = filtered.filter(i => i.type === lostFilter || (lostFilter === 'returned' && i.status === 'returned'));
 
@@ -73,6 +79,11 @@ function renderLostList() {
 }
 
 function showLostForm(type) {
+    const user = AUTH.currentUser();
+    const isAdmin = !user || user.isSuperAdmin || user.role === 'admin';
+    const reportedByField = isAdmin
+        ? `<input type="text" name="reportedBy" class="form-control" required>`
+        : `<input type="text" name="reportedBy" class="form-control" value="${user.fullName}" readonly style="background:var(--light-gray);">`;
     const form = `
         <form id="lostForm">
             <input type="hidden" name="type" value="${type}">
@@ -82,8 +93,8 @@ function showLostForm(type) {
                     <input type="text" name="itemName" class="form-control" placeholder="${type === 'lost' ? 'Item that was lost' : 'Item that was found'}" required>
                 </div>
                 <div class="form-group">
-                    <label>Reported By *</label>
-                    <input type="text" name="reportedBy" class="form-control" required>
+                    <label>Reported By</label>
+                    ${reportedByField}
                 </div>
                 <div class="form-group">
                     <label>Location *</label>
@@ -125,13 +136,18 @@ function showLostForm(type) {
 }
 
 function saveLostItem() {
+    const user = AUTH.currentUser();
     const data = getFormData('lostForm');
-    if (!data.itemName || !data.reportedBy || !data.location || !data.description) {
+    if (!data.itemName || !data.location || !data.description) {
         APP.notify('Please fill required fields', 'error'); return;
     }
     data.status = data.type === 'lost' ? 'lost' : 'found';
     data.returnedTo = '';
     data.returnedAt = '';
+    data.createdBy = user ? user.username : 'admin';
+    data.createdByName = user ? user.fullName : 'Admin';
+    data.department = user ? (user.department || '') : '';
+    data.reportedBy = data.reportedBy || (user ? user.fullName : 'Unknown');
     DB.add('lostfound', data);
     APP.notify(`${data.type === 'lost' ? 'Lost item' : 'Found item'} reported`, 'success');
     renderLostList();

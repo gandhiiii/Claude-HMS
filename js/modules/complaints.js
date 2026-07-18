@@ -109,9 +109,11 @@ function showCompForm() {
                     </select>
                 </div>
             </div>
-            <div class="form-group" ${user.role === 'admin' || user.role === 'hod' ? '' : 'style="display:none;"'}>
+            <div class="form-group">
                 <label>Department</label>
-                ${deptDropdown('department', user.department)}
+                ${(user.isSuperAdmin || user.role === 'admin')
+                    ? deptDropdown('department', user.department)
+                    : `<input type="text" name="department" class="form-control" value="${(user.department || '').replace(/"/g,'&quot;')}" readonly style="background:var(--light-gray);">`}
             </div>
             <div class="form-group">
                 <label>Complaint Details *</label>

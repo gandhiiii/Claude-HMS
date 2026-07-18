@@ -43,9 +43,9 @@ function renderTaskList() {
     const tasks = DB.get('tasks');
     const search = (document.getElementById('taskSearch')?.value || '').toLowerCase();
     let filtered = tasks.filter(t => {
-        if (user.role === 'admin') return true;
-        if (user.role === 'hod') return t.department === user.department;
-        return t.assignedTo === user.fullName;
+        if (!user || user.isSuperAdmin || user.role === 'admin') return true;
+        if (user.role === 'hod') return t.department === user.department || t.createdBy === user.username;
+        return t.assignedTo === user.fullName || t.createdBy === user.username;
     });
     filtered = filtered.filter(t =>
         t.title.toLowerCase().includes(search) ||
@@ -78,11 +78,22 @@ function showTaskForm(task) {
     const user = AUTH.currentUser();
     const users = DB.get('users');
     const depts = DB.get('departments');
+    const isAdmin = !user || user.isSuperAdmin || user.role === 'admin';
     let assignableUsers = users.filter(u => u.role !== 'admin');
     if (user.role === 'hod') {
         assignableUsers = assignableUsers.filter(u => u.department === user.department && u.role !== 'admin');
         if (task) assignableUsers = assignableUsers.concat(users.filter(u => u.fullName === task.assignedTo));
+    } else if (!isAdmin) {
+        // employees can only assign to themselves
+        assignableUsers = [user];
     }
+    const deptValue = task?.department || (isAdmin ? '' : (user.department || ''));
+    const deptField = isAdmin
+        ? `<select name="department" class="form-control">
+                <option value="">Select</option>
+                ${depts.map(d => `<option value="${d.name}" ${deptValue === d.name ? 'selected' : ''}>${d.name}</option>`).join('')}
+           </select>`
+        : `<input type="text" name="department" class="form-control" value="${deptValue}" readonly style="background:var(--light-gray);">`;
     const form = `
         <form id="taskForm">
             <input type="hidden" name="id" value="${task?.id || ''}">
@@ -96,16 +107,13 @@ function showTaskForm(task) {
                     <select name="assignedTo" class="form-control" required>
                         <option value="">Select Employee</option>
                         ${assignableUsers.map(u =>
-                            `<option value="${u.fullName}" ${task?.assignedTo === u.fullName ? 'selected' : ''}>${u.fullName} (${u.role})</option>`
+                            `<option value="${u.fullName}" ${(task?.assignedTo === u.fullName || (!task && !isAdmin && u.username === user.username)) ? 'selected' : ''}>${u.fullName} (${u.role})</option>`
                         ).join('')}
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Department</label>
-                    <select name="department" class="form-control">
-                        <option value="">Select</option>
-                        ${depts.map(d => `<option value="${d.name}" ${task?.department === d.name ? 'selected' : ''}>${d.name}</option>`).join('')}
-                    </select>
+                    ${deptField}
                 </div>
                 <div class="form-group">
                     <label>Deadline</label>
@@ -138,9 +146,15 @@ function showTaskForm(task) {
 }
 
 function saveTask() {
+    const user = AUTH.currentUser();
     const data = getFormData('taskForm');
     if (!data.title || !data.assignedTo) {
         APP.notify('Title and assignee required', 'error'); return;
+    }
+    if (!data.id) {
+        data.createdBy = user.username;
+        data.createdByName = user.fullName;
+        if (!data.department) data.department = user.department || '';
     }
     if (data.id) {
         DB.update('tasks', data.id, data);
