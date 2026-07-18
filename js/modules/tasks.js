@@ -162,13 +162,14 @@ function saveTask() {
     if (!data.title || !data.assignedTo) {
         APP.notify('Title and assignee required', 'error'); return;
     }
+    const store = data._store || 'tasks';
+    delete data._store; // don't persist UI metadata
     if (!data.id) {
         data.createdBy = user.username;
         data.createdByName = user.fullName;
         if (!data.department) data.department = user.department || '';
     }
     if (data.id) {
-        var store = data._store || 'tasks';
         DB.update(store, data.id, data);
         APP.notify('Task updated', 'success');
     } else {

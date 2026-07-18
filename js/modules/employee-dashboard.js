@@ -64,8 +64,9 @@ function renderEmployeeDashboard(container) {
     var u    = user.fullName || user.username;
     var q    = _getQuarter();
 
-    // Merge admin tasks + HOD-assigned tasks so employee sees work from both sources
-    var tasks         = (DB.get('tasks') || []).concat(DB.get('hodTasks') || []);
+    // Merge admin tasks + HOD-assigned tasks, tagging each with its source store
+    var tasks = (DB.get('tasks') || []).map(function(t){ return Object.assign({}, t, {_store: 'tasks'}); })
+               .concat((DB.get('hodTasks') || []).map(function(t){ return Object.assign({}, t, {_store: 'hodTasks'}); }));
     var problems      = DB.get('problems') || [];
     var requests      = DB.get('material_requests') || [];
     var checklists    = DB.get('checklists') || [];
@@ -792,6 +793,7 @@ function empMarkProbInProgress(id) {
 }
 
 function empUpdateTaskStatus(id, store) {
+    // Resolve correct store: use passed store, then search both
     var s = store || (DB.getById('tasks', id) ? 'tasks' : (DB.getById('hodTasks', id) ? 'hodTasks' : null));
     if (!s) { APP.notify('Task not found', 'error'); return; }
     var task = DB.getById(s, id);
@@ -805,9 +807,10 @@ function empUpdateTaskStatus(id, store) {
         updatedAt: new Date().toISOString()
     });
     APP.notify('Task ' + (newStatus === 'completed' ? 'marked done!' : 'started!'), newStatus === 'completed' ? 'success' : 'info');
-    // Refresh employee dashboard data and re-render work tab
-    if (typeof renderEmployeeDashboard === 'function') {
-        renderEmployeeDashboard(document.getElementById('pageContent'));
-        setTimeout(function(){ _renderEmpTab('work'); }, 50);
+    // Update _empData in-place and re-render work tab without full dashboard rebuild
+    if (_empData && _empData.myTasks) {
+        var idx = _empData.myTasks.findIndex(function(t){ return t.id === id; });
+        if (idx !== -1) _empData.myTasks[idx].status = newStatus;
+        _renderEmpTab('work');
     }
 }

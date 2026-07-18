@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Hospital Management System</title>
-    <link rel="stylesheet" href="css/style.css?v=40">
+    <link rel="stylesheet" href="css/style.css?v=41">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
@@ -31,7 +31,7 @@
 
     <div class="app-layout">
         <aside class="sidebar" id="sidebar">
-            <div class="sidebar-logo" onclick="Router.navigate(AUTH.currentUser()?.role === 'employee' ? 'employee-dashboard' : 'dashboard')">
+            <div class="sidebar-logo" onclick="(function(){var r=AUTH.currentUser()&&AUTH.currentUser().role;Router.navigate(r==='employee'?'employee-dashboard':r==='hod'?'hod-dashboard':'dashboard');})()">
                 <span>🏥</span> HMS
             </div>
             <nav class="sidebar-nav" id="sidebarNav"></nav>
@@ -43,34 +43,34 @@
         </main>
     </div>
 
-    <script src="js/data.js?v=40"></script>
-    <script src="js/firebase-config.js?v=40"></script>
-    <script src="js/sync.js?v=40"></script>
-    <script src="js/app.js?v=40"></script>
-    <script src="js/modules/dashboard-module.js?v=40"></script>
-    <script src="js/modules/users.js?v=40"></script>
-    <script src="js/modules/departments.js?v=40"></script>
-    <script src="js/modules/feature-rights.js?v=40"></script>
-    <script src="js/modules/inventory.js?v=40"></script>
-    <script src="js/modules/gate-security.js?v=40"></script>
-    <script src="js/modules/phase2.js?v=40"></script>
-    <script src="js/modules/projects.js?v=40"></script>
-    <script src="js/modules/ambulance.js?v=40"></script>
-    <script src="js/modules/problems.js?v=40"></script>
-    <script src="js/modules/tasks.js?v=40"></script>
-    <script src="js/modules/complaints.js?v=40"></script>
-    <script src="js/modules/room-checklist.js?v=40"></script>
-    <script src="js/modules/admissions.js?v=40"></script>
-    <script src="js/modules/lost-found.js?v=40"></script>
-    <script src="js/modules/admin-checklist.js?v=40"></script>
-    <script src="js/modules/checklists.js?v=40"></script>
-    <script src="js/modules/material-requests.js?v=40"></script>
-    <script src="js/modules/suggestions.js?v=40"></script>
-    <script src="js/modules/budget.js?v=40"></script>
-    <script src="js/modules/quarterly-priorities.js?v=40"></script>
-    <script src="js/modules/reports.js?v=40"></script>
-    <script src="js/modules/employee-dashboard.js?v=40"></script>
-    <script src="js/modules/hod-dashboard.js?v=40"></script>
+    <script src="js/data.js?v=41"></script>
+    <script src="js/firebase-config.js?v=41"></script>
+    <script src="js/sync.js?v=41"></script>
+    <script src="js/app.js?v=41"></script>
+    <script src="js/modules/dashboard-module.js?v=41"></script>
+    <script src="js/modules/users.js?v=41"></script>
+    <script src="js/modules/departments.js?v=41"></script>
+    <script src="js/modules/feature-rights.js?v=41"></script>
+    <script src="js/modules/inventory.js?v=41"></script>
+    <script src="js/modules/gate-security.js?v=41"></script>
+    <script src="js/modules/phase2.js?v=41"></script>
+    <script src="js/modules/projects.js?v=41"></script>
+    <script src="js/modules/ambulance.js?v=41"></script>
+    <script src="js/modules/problems.js?v=41"></script>
+    <script src="js/modules/tasks.js?v=41"></script>
+    <script src="js/modules/complaints.js?v=41"></script>
+    <script src="js/modules/room-checklist.js?v=41"></script>
+    <script src="js/modules/admissions.js?v=41"></script>
+    <script src="js/modules/lost-found.js?v=41"></script>
+    <script src="js/modules/admin-checklist.js?v=41"></script>
+    <script src="js/modules/checklists.js?v=41"></script>
+    <script src="js/modules/material-requests.js?v=41"></script>
+    <script src="js/modules/suggestions.js?v=41"></script>
+    <script src="js/modules/budget.js?v=41"></script>
+    <script src="js/modules/quarterly-priorities.js?v=41"></script>
+    <script src="js/modules/reports.js?v=41"></script>
+    <script src="js/modules/employee-dashboard.js?v=41"></script>
+    <script src="js/modules/hod-dashboard.js?v=41"></script>
     <script>
         window.addEventListener('DOMContentLoaded', function() {
             Router.init();
