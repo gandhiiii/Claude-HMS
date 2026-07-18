@@ -111,13 +111,20 @@ function renderHodDashboard(container) {
     var allAdm      = DB.get('admissions') || [];
     var cleaning    = (DB.get('roomCleaningTasks') || []).filter(function (t) { return t.status !== 'done'; });
 
+    // Admin-created tasks assigned to this dept
+    var adminTasks = (DB.get('tasks') || []).filter(function (t) { return t.department === dept; })
+        .map(function (t) { return Object.assign({}, t, { _source: 'admin' }); });
+    var allDeptTasks = myTasks.concat(adminTasks);
+
     _hodData = {
         user: user, dept: dept, u: u,
         team: team, teamNames: teamNames,
         myTasks: myTasks,
-        pendingTasks:   myTasks.filter(function (t) { return t.status !== 'completed'; }),
-        overdueTasks:   myTasks.filter(function (t) { return t.deadline && new Date(t.deadline) < new Date() && t.status !== 'completed'; }),
-        overTatTasks:   myTasks.filter(function (t) {
+        adminTasks: adminTasks,
+        allDeptTasks: allDeptTasks,
+        pendingTasks:   allDeptTasks.filter(function (t) { return t.status !== 'completed'; }),
+        overdueTasks:   allDeptTasks.filter(function (t) { return t.deadline && new Date(t.deadline) < new Date() && t.status !== 'completed'; }),
+        overTatTasks:   allDeptTasks.filter(function (t) {
             var ti = _tatInfo(t);
             return ti && ti.overTAT && t.status !== 'completed';
         }),
@@ -137,7 +144,8 @@ function renderHodDashboard(container) {
         { id: 'team',        label: '👥 My Team', badge: team.length, bc: 'badge-success' },
         { id: 'checklists',  label: 'Checklists', badge: pendingCl, bc: 'badge-info' },
         { id: 'requests',    label: 'Requests', badge: pendingReq, bc: 'badge-warning' },
-        { id: 'performance', label: 'Performance' }
+        { id: 'performance', label: 'Performance' },
+        { id: 'hodreports',  label: '📤 Reports' }
     ];
 
     var html = ''
@@ -203,12 +211,10 @@ function hodTabSwitch(tab) {
 function _renderHodTab(tab) {
     var el = document.getElementById('hodTabContent');
     if (!el) return;
-    ({ overview: _hodOverview, admissions: _hodAdmissions, tasks: _hodTasks,
-       team: _hodTeam, checklists: _hodChecklists, requests: _hodRequests,
-       performance: _hodPerformance })[tab]
-        ? ({ overview: _hodOverview, admissions: _hodAdmissions, tasks: _hodTasks,
-             team: _hodTeam, checklists: _hodChecklists, requests: _hodRequests,
-             performance: _hodPerformance })[tab](el) : null;
+    var map = { overview: _hodOverview, admissions: _hodAdmissions, tasks: _hodTasks,
+                team: _hodTeam, checklists: _hodChecklists, requests: _hodRequests,
+                performance: _hodPerformance, hodreports: _hodReports };
+    if (map[tab]) map[tab](el);
 }
 
 /* ═══════════════════════════════════════════════
@@ -365,23 +371,26 @@ function hodCleanDone(taskId) {
 }
 
 /* ═══════════════════════════════════════════════
-   TASKS TAB — HOD-created tasks only
+   TASKS TAB — HOD + Admin tasks for this dept
 ═══════════════════════════════════════════════ */
 function _hodTasks(el) {
     var d   = _hodData;
-    var all = d.myTasks;
+    var all = d.allDeptTasks;
 
     var filters = [
-        { id: 'all',       label: 'All (' + all.length + ')' },
-        { id: 'pending',   label: 'Pending' },
-        { id: 'inprogress',label: 'In Progress' },
-        { id: 'overdue',   label: 'Overdue' },
-        { id: 'over-tat',  label: 'Over TAT' },
-        { id: 'done',      label: 'Completed' }
+        { id: 'all',        label: 'All (' + all.length + ')' },
+        { id: 'hod',        label: '👔 By HOD (' + d.myTasks.length + ')' },
+        { id: 'admin',      label: '🔑 By Admin (' + d.adminTasks.length + ')' },
+        { id: 'pending',    label: 'Pending' },
+        { id: 'inprogress', label: 'In Progress' },
+        { id: 'overdue',    label: 'Overdue' },
+        { id: 'done',       label: 'Completed' }
     ];
 
     var filtered = all.filter(function (t) {
         if (_hodFilter === 'all')        return true;
+        if (_hodFilter === 'hod')        return !t._source || t._source === 'hod';
+        if (_hodFilter === 'admin')      return t._source === 'admin';
         if (_hodFilter === 'pending')    return t.status === 'pending';
         if (_hodFilter === 'inprogress') return t.status === 'in-progress';
         if (_hodFilter === 'overdue')    return t.deadline && new Date(t.deadline) < new Date() && t.status !== 'completed';
@@ -391,7 +400,10 @@ function _hodTasks(el) {
     });
 
     var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
-        + '<div style="font-weight:700;font-size:16px;">📝 Team Tasks</div>'
+        + '<div>'
+        + '<div style="font-weight:700;font-size:16px;">📝 Department Tasks</div>'
+        + '<div style="font-size:12px;color:var(--gray);margin-top:2px;">Tasks assigned by HOD and Admin for ' + d.dept + '</div>'
+        + '</div>'
         + '<button class="btn btn-primary btn-sm" onclick="hodCreateTask()">+ Assign Task</button></div>'
 
         + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:14px;">'
@@ -407,22 +419,32 @@ function _hodTasks(el) {
             var isOvd    = t.deadline && new Date(t.deadline) < new Date() && t.status !== 'completed';
             var isOvTat  = ti && ti.overTAT && t.status !== 'completed';
             var cls      = t.status === 'completed' ? 'done' : isOvd ? 'overdue' : isOvTat ? 'over-tat' : '';
+            var isAdmin  = t._source === 'admin';
+            var srcBadge = isAdmin
+                ? '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fff3e0;color:#e65100;font-weight:700;">🔑 Admin</span>'
+                : '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#f3e5f5;color:#6a1b9a;font-weight:700;">👔 HOD</span>';
+
             html += '<div class="hod-task-card ' + cls + '">'
                 + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">'
                 + '<div style="flex:1;min-width:180px;">'
-                + '<div style="font-size:14px;font-weight:700;">' + t.title + '</div>'
-                + (t.description ? '<div style="font-size:12px;color:var(--gray);margin-top:2px;">' + t.description.substring(0, 80) + (t.description.length > 80 ? '…' : '') + '</div>' : '')
+                + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">'
+                + '<span style="font-size:14px;font-weight:700;">' + t.title + '</span>'
+                + srcBadge + '</div>'
+                + (t.description ? '<div style="font-size:12px;color:var(--gray);margin-top:2px;">' + t.description.substring(0, 90) + (t.description.length > 90 ? '…' : '') + '</div>' : '')
                 + '<div style="font-size:11px;color:var(--gray);margin-top:4px;display:flex;flex-wrap:wrap;gap:8px;">'
                 + '<span>→ <strong>' + (t.assignedTo || 'Unassigned') + '</strong></span>'
                 + (t.priority ? '<span class="badge ' + (t.priority === 'high' ? 'badge-danger' : t.priority === 'medium' ? 'badge-warning' : 'badge-info') + '" style="font-size:10px;">' + t.priority + '</span>' : '')
                 + (t.deadline ? '<span>📅 ' + APP.formatDate(t.deadline) + '</span>' : '')
+                + (isAdmin && t.createdByName ? '<span>From: ' + t.createdByName + '</span>' : '')
                 + '</div>'
                 + _tatBar(t)
                 + '</div>'
                 + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">'
                 + '<span class="badge ' + APP.getStatusBadge(t.status) + '" style="font-size:11px;">' + (t.status || 'pending') + '</span>'
-                + '<button class="btn btn-sm btn-outline" onclick="hodEditTask(\'' + t.id + '\')">Edit</button>'
-                + (t.status !== 'completed' ? '<button class="btn btn-sm btn-success" style="font-size:11px;" onclick="hodMarkTaskDone(\'' + t.id + '\')">✓ Done</button>' : '')
+                + (!isAdmin ? '<button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="hodEditTask(\'' + t.id + '\')">Edit</button>' : '')
+                + (t.status !== 'completed'
+                    ? '<button class="btn btn-sm btn-success" style="font-size:11px;" onclick="hodMarkTaskDone(\'' + t.id + '\',\'' + (isAdmin ? 'tasks' : 'hodTasks') + '\')">✓ Done</button>'
+                    : '')
                 + '</div></div></div>';
         });
     }
@@ -439,13 +461,23 @@ function hodTaskFilter(f, btn) {
     _renderHodTab('tasks');
 }
 
-function hodMarkTaskDone(taskId) {
-    DB.update('hodTasks', taskId, { status: 'completed', completedAt: new Date().toISOString() });
+function hodMarkTaskDone(taskId, dbKey) {
+    dbKey = dbKey || 'hodTasks';
+    DB.update(dbKey, taskId, { status: 'completed', completedAt: new Date().toISOString() });
     APP.notify('Task marked complete', 'success');
-    _hodData.myTasks = (DB.get('hodTasks') || []).filter(function (t) { return t.department === _hodData.dept; });
-    _hodData.pendingTasks = _hodData.myTasks.filter(function (t) { return t.status !== 'completed'; });
-    _hodData.overdueTasks = _hodData.myTasks.filter(function (t) { return t.deadline && new Date(t.deadline) < new Date() && t.status !== 'completed'; });
+    _hodRefreshTasks();
     _renderHodTab('tasks');
+}
+
+function _hodRefreshTasks() {
+    var dept = _hodData.dept;
+    _hodData.myTasks     = (DB.get('hodTasks') || []).filter(function (t) { return t.department === dept; });
+    _hodData.adminTasks  = (DB.get('tasks')    || []).filter(function (t) { return t.department === dept; })
+                            .map(function (t) { return Object.assign({}, t, { _source: 'admin' }); });
+    _hodData.allDeptTasks = _hodData.myTasks.concat(_hodData.adminTasks);
+    _hodData.pendingTasks = _hodData.allDeptTasks.filter(function (t) { return t.status !== 'completed'; });
+    _hodData.overdueTasks = _hodData.allDeptTasks.filter(function (t) { return t.deadline && new Date(t.deadline) < new Date() && t.status !== 'completed'; });
+    _hodData.overTatTasks = _hodData.allDeptTasks.filter(function (t) { var ti = _tatInfo(t); return ti && ti.overTAT && t.status !== 'completed'; });
 }
 
 /* ─ Create / Edit Task ─ */
@@ -480,8 +512,7 @@ function hodSaveTask() {
     if (data.tat) data.tat = parseFloat(data.tat);
     DB.add('hodTasks', data);
     APP.notify('Task assigned to ' + data.assignedTo, 'success');
-    _hodData.myTasks = (DB.get('hodTasks') || []).filter(function (t) { return t.department === user.department; });
-    _hodData.pendingTasks = _hodData.myTasks.filter(function (t) { return t.status !== 'completed'; });
+    _hodRefreshTasks();
     _renderHodTab('tasks');
     return true;
 }
@@ -517,10 +548,7 @@ function hodUpdateTask(taskId) {
     if (data.tat) data.tat = parseFloat(data.tat);
     DB.update('hodTasks', taskId, data);
     APP.notify('Task updated', 'success');
-    var user = AUTH.currentUser();
-    _hodData.myTasks = (DB.get('hodTasks') || []).filter(function (t) { return t.department === (user ? user.department : ''); });
-    _hodData.pendingTasks = _hodData.myTasks.filter(function (t) { return t.status !== 'completed'; });
-    _hodData.overdueTasks = _hodData.myTasks.filter(function (t) { return t.deadline && new Date(t.deadline) < new Date() && t.status !== 'completed'; });
+    _hodRefreshTasks();
     _renderHodTab('tasks');
     return true;
 }
@@ -816,7 +844,7 @@ function hodSaveRequest() {
 ═══════════════════════════════════════════════ */
 function _hodPerformance(el) {
     var d   = _hodData;
-    var all = d.myTasks;
+    var all = d.allDeptTasks;
 
     var done    = all.filter(function (t) { return t.status === 'completed'; }).length;
     var overdue = d.overdueTasks.length;
@@ -876,6 +904,249 @@ function _pBox(val, label, color) {
     return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">'
         + '<div style="font-size:22px;font-weight:700;color:' + color + ';">' + val + '</div>'
         + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + label + '</div></div>';
+}
+
+/* ═══════════════════════════════════════════════
+   REPORTS TAB — Excel / PDF / WhatsApp / Email
+═══════════════════════════════════════════════ */
+function _hodReports(el) {
+    var d    = _hodData;
+    var all  = d.allDeptTasks;
+    var done = all.filter(function(t){ return t.status==='completed'; }).length;
+    var pend = all.filter(function(t){ return t.status==='pending'; }).length;
+    var prog = all.filter(function(t){ return t.status==='in-progress'; }).length;
+    var ovd  = d.overdueTasks.length;
+    var rate = all.length>0 ? Math.round(done/all.length*100) : 0;
+
+    function kBox(v,l,c){
+        return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">'
+            +'<div style="font-size:22px;font-weight:700;color:'+c+';">'+v+'</div>'
+            +'<div style="font-size:11px;color:var(--gray);margin-top:2px;">'+l+'</div></div>';
+    }
+
+    el.innerHTML =
+        '<div style="font-weight:700;font-size:16px;margin-bottom:4px;">📤 Department Reports — '+d.dept+'</div>'
+        +'<div style="font-size:12px;color:var(--gray);margin-bottom:16px;">Generate and share task performance reports for your department</div>'
+
+        // snapshot
+        +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:20px;">'
+        +kBox(all.length,'Total Tasks','var(--text)')
+        +kBox(done,'Completed','var(--success)')
+        +kBox(pend,'Pending','#ff9800')
+        +kBox(prog,'In Progress','#1a73e8')
+        +kBox(ovd,'Overdue','var(--danger)')
+        +kBox(rate+'%','Completion Rate', rate>=80?'var(--success)':rate>=50?'#ff9800':'var(--danger)')
+        +'</div>'
+
+        // report cards
+        +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">'
+
+        // Task Report card
+        +'<div class="card" style="padding:18px;border-top:3px solid #1a73e8;">'
+        +'<div style="font-size:15px;font-weight:700;margin-bottom:4px;">✅ Task Report</div>'
+        +'<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">All tasks assigned to '+d.dept+' (HOD + Admin)</div>'
+        +'<div style="display:flex;flex-direction:column;gap:8px;">'
+        +'<div style="display:flex;gap:8px;">'
+        +'<button class="btn btn-sm" style="flex:1;background:#1e7e34;color:#fff;" onclick="hodExportTasks(\'excel\')">📊 Excel</button>'
+        +'<button class="btn btn-sm" style="flex:1;background:#c82333;color:#fff;" onclick="hodExportTasks(\'pdf\')">📄 PDF</button>'
+        +'</div>'
+        +'<div style="display:flex;gap:8px;">'
+        +'<button class="btn btn-sm" style="flex:1;background:#25D366;color:#fff;" onclick="hodShareTasks(\'whatsapp\')">💬 WhatsApp</button>'
+        +'<button class="btn btn-sm" style="flex:1;background:#1a73e8;color:#fff;" onclick="hodShareTasks(\'email\')">✉️ Email</button>'
+        +'</div></div></div>'
+
+        // Performance Report card
+        +'<div class="card" style="padding:18px;border-top:3px solid #9c27b0;">'
+        +'<div style="font-size:15px;font-weight:700;margin-bottom:4px;">📊 Performance Report</div>'
+        +'<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Per-member task completion breakdown</div>'
+        +'<div style="display:flex;flex-direction:column;gap:8px;">'
+        +'<div style="display:flex;gap:8px;">'
+        +'<button class="btn btn-sm" style="flex:1;background:#1e7e34;color:#fff;" onclick="hodExportPerformance(\'excel\')">📊 Excel</button>'
+        +'<button class="btn btn-sm" style="flex:1;background:#c82333;color:#fff;" onclick="hodExportPerformance(\'pdf\')">📄 PDF</button>'
+        +'</div>'
+        +'<div style="display:flex;gap:8px;">'
+        +'<button class="btn btn-sm" style="flex:1;background:#25D366;color:#fff;" onclick="hodSharePerformance(\'whatsapp\')">💬 WhatsApp</button>'
+        +'<button class="btn btn-sm" style="flex:1;background:#1a73e8;color:#fff;" onclick="hodSharePerformance(\'email\')">✉️ Email</button>'
+        +'</div></div></div>'
+
+        // Summary Report card
+        +'<div class="card" style="padding:18px;border-top:3px solid #37474f;">'
+        +'<div style="font-size:15px;font-weight:700;margin-bottom:4px;">📑 Summary Report</div>'
+        +'<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Combined dept summary: tasks, requests & checklists</div>'
+        +'<div style="display:flex;flex-direction:column;gap:8px;">'
+        +'<div style="display:flex;gap:8px;">'
+        +'<button class="btn btn-sm" style="flex:1;background:#1e7e34;color:#fff;" onclick="hodExportSummary(\'excel\')">📊 Excel</button>'
+        +'<button class="btn btn-sm" style="flex:1;background:#c82333;color:#fff;" onclick="hodExportSummary(\'pdf\')">📄 PDF</button>'
+        +'</div>'
+        +'<div style="display:flex;gap:8px;">'
+        +'<button class="btn btn-sm" style="flex:1;background:#25D366;color:#fff;" onclick="hodShareSummary(\'whatsapp\')">💬 WhatsApp</button>'
+        +'<button class="btn btn-sm" style="flex:1;background:#1a73e8;color:#fff;" onclick="hodShareSummary(\'email\')">✉️ Email</button>'
+        +'</div></div></div>'
+
+        +'</div>'
+
+        // send to admin form
+        +'<div class="card" style="margin-top:16px;padding:18px;border-top:3px solid #6a1b9a;">'
+        +'<div style="font-size:15px;font-weight:700;margin-bottom:12px;">📬 Send Report to Admin</div>'
+        +'<form id="hodReportForm2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
+        +'<div class="form-group"><label>Report Title *</label><input type="text" name="title" class="form-control" required placeholder="e.g. Weekly Summary"></div>'
+        +'<div class="form-group"><label>Period</label><select name="category" class="form-control"><option value="daily">Daily</option><option value="weekly" selected>Weekly</option><option value="monthly">Monthly</option></select></div>'
+        +'<div class="form-group" style="grid-column:1/-1;"><label>Summary *</label><textarea name="description" class="form-control" rows="3" required placeholder="Summarise team performance, issues, highlights…"></textarea></div>'
+        +'</form>'
+        +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">'
+        +'<button class="btn btn-primary" onclick="hodSaveReport2()">📤 Send to Admin</button>'
+        +'</div></div>';
+}
+
+/* ── Export helpers ── */
+function _hodTaskRows() {
+    return (_hodData.allDeptTasks || []).map(function(t) {
+        return [
+            t.title||'', t._source==='admin'?'Admin':'HOD',
+            t.assignedTo||'', t.status||'', t.priority||'',
+            t.deadline ? APP.formatDate(t.deadline) : '',
+            t.createdByName||t.createdBy||'', APP.formatDate(t.createdAt),
+            t.completedAt ? APP.formatDate(t.completedAt) : ''
+        ];
+    });
+}
+
+function _hodPerfRows() {
+    var d = _hodData;
+    return (d.team||[]).map(function(m) {
+        var mt   = (d.allDeptTasks||[]).filter(function(t){ return t.assignedTo===m.fullName; });
+        var done = mt.filter(function(t){ return t.status==='completed'; }).length;
+        var ovd  = mt.filter(function(t){ return t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='completed'; }).length;
+        var rate = mt.length>0?Math.round(done/mt.length*100):0;
+        return [m.fullName, mt.length, done, mt.length-done, ovd, rate+'%'];
+    });
+}
+
+function hodExportTasks(fmt) {
+    var d = _hodData;
+    var headers = ['Title','Source','Assigned To','Status','Priority','Deadline','Created By','Created','Completed'];
+    var rows = _hodTaskRows();
+    if (rows.length===0){ APP.notify('No tasks to export','info'); return; }
+    fmt==='excel' ? _hodExcelExport(d.dept+' Task Report', headers, rows)
+                  : _hodPdfExport(d.dept+' Task Report', headers, rows);
+}
+
+function hodExportPerformance(fmt) {
+    var d = _hodData;
+    var headers = ['Member','Assigned','Completed','Pending','Overdue','Completion Rate'];
+    var rows = _hodPerfRows();
+    if (rows.length===0){ APP.notify('No team data to export','info'); return; }
+    fmt==='excel' ? _hodExcelExport(d.dept+' Performance Report', headers, rows)
+                  : _hodPdfExport(d.dept+' Performance Report', headers, rows);
+}
+
+function hodExportSummary(fmt) {
+    var d = _hodData;
+    var all = d.allDeptTasks||[];
+    var done= all.filter(function(t){return t.status==='completed';}).length;
+    var reqs= (d.myReqs||[]);
+    var reqPend=reqs.filter(function(r){return r.status==='pending';}).length;
+    var clTotal=0,clDone=0;
+    (d.myCl||[]).forEach(function(cl){ var items=cl.items||[]; clTotal+=items.length; clDone+=items.filter(function(i){return i.done||i.status==='ok';}).length; });
+    var headers = ['Category','Metric','Value'];
+    var rows = [
+        ['Tasks','Total Tasks', all.length],
+        ['Tasks','Completed', done],
+        ['Tasks','Pending', all.filter(function(t){return t.status==='pending';}).length],
+        ['Tasks','Overdue', d.overdueTasks.length],
+        ['Tasks','Completion Rate', (all.length>0?Math.round(done/all.length*100):0)+'%'],
+        ['Material Requests','Total Requests', reqs.length],
+        ['Material Requests','Pending Approval', reqPend],
+        ['Material Requests','Approved', reqs.filter(function(r){return r.status==='approved';}).length],
+        ['Checklists','Total Items', clTotal],
+        ['Checklists','Completed Items', clDone],
+        ['Checklists','Completion Rate', (clTotal>0?Math.round(clDone/clTotal*100):0)+'%'],
+        ['Team','Members', (d.team||[]).length]
+    ];
+    fmt==='excel' ? _hodExcelExport(d.dept+' Summary Report', headers, rows)
+                  : _hodPdfExport(d.dept+' Summary Report', headers, rows);
+}
+
+function _hodExcelExport(title, headers, rows) {
+    if (typeof XLSX==='undefined'){ APP.notify('Excel library not loaded','error'); return; }
+    var wb = XLSX.utils.book_new();
+    var ws = XLSX.utils.aoa_to_sheet([headers].concat(rows));
+    ws['!cols'] = headers.map(function(h,ci){
+        var max=h.length;
+        rows.forEach(function(r){ var v=r[ci]!=null?String(r[ci]):''; if(v.length>max) max=v.length; });
+        return { wch: Math.min(max+4,40) };
+    });
+    XLSX.utils.book_append_sheet(wb, ws, title.substring(0,31));
+    XLSX.writeFile(wb, title.replace(/[^a-z0-9]/gi,'_')+'.xlsx');
+    APP.notify('Excel downloaded', 'success');
+}
+
+function _hodPdfExport(title, headers, rows) {
+    if (typeof window.jspdf==='undefined'){ APP.notify('PDF library not loaded','error'); return; }
+    var doc = new window.jspdf.jsPDF({ orientation: rows[0] && rows[0].length > 6 ? 'landscape' : 'portrait' });
+    doc.setFontSize(14);
+    doc.text(title, 14, 15);
+    doc.setFontSize(9);
+    doc.text('Department: '+(_hodData.dept||'')+'   Generated: '+new Date().toLocaleDateString('en-IN'), 14, 22);
+    doc.autoTable({ head:[headers], body:rows, startY:27, styles:{fontSize:8}, headStyles:{fillColor:[106,27,154]} });
+    doc.save(title.replace(/[^a-z0-9]/gi,'_')+'.pdf');
+    APP.notify('PDF downloaded', 'success');
+}
+
+/* ── Share helpers ── */
+function _hodBuildText(title, headers, rows) {
+    var d = _hodData;
+    var lines = ['*'+title+'*','Department: '+d.dept,'Generated: '+new Date().toLocaleDateString('en-IN'),''];
+    lines.push(headers.join(' | '));
+    rows.forEach(function(r){ lines.push(r.join(' | ')); });
+    return lines.join('\n');
+}
+
+function hodShareTasks(via) {
+    var text = _hodBuildText(_hodData.dept+' Task Report',
+        ['Title','Source','Assigned To','Status','Priority','Deadline'],
+        _hodTaskRows().map(function(r){ return r.slice(0,6); }));
+    _hodShare(via, _hodData.dept+' Task Report', text);
+}
+
+function hodSharePerformance(via) {
+    var text = _hodBuildText(_hodData.dept+' Performance Report',
+        ['Member','Assigned','Completed','Pending','Overdue','Rate'], _hodPerfRows());
+    _hodShare(via, _hodData.dept+' Performance Report', text);
+}
+
+function hodShareSummary(via) {
+    var d = _hodData, all = d.allDeptTasks||[];
+    var done= all.filter(function(t){return t.status==='completed';}).length;
+    var rate= all.length>0?Math.round(done/all.length*100):0;
+    var text = '*'+d.dept+' Summary Report*\nDate: '+new Date().toLocaleDateString('en-IN')
+        +'\n\n*Tasks*\nTotal: '+all.length+'\nCompleted: '+done+'\nPending: '+all.filter(function(t){return t.status==='pending';}).length
+        +'\nOverdue: '+d.overdueTasks.length+'\nCompletion Rate: '+rate+'%'
+        +'\n\n*Material Requests*\nTotal: '+(d.myReqs||[]).length+'\nPending: '+(d.myReqs||[]).filter(function(r){return r.status==='pending';}).length
+        +'\n\n*Team Members*: '+(d.team||[]).length;
+    _hodShare(via, d.dept+' Summary Report', text);
+}
+
+function _hodShare(via, subject, text) {
+    if (via==='whatsapp') {
+        window.open('https://api.whatsapp.com/send?text='+encodeURIComponent(text), '_blank');
+    } else {
+        window.location.href = 'mailto:?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(text);
+    }
+}
+
+function hodSaveReport2() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var data = getFormData('hodReportForm2');
+    if (!data.title || !data.description) { APP.notify('Title and summary required','error'); return; }
+    DB.add('reports', {
+        title: data.title, category: data.category, description: data.description,
+        createdBy: user.username, createdByName: user.fullName,
+        department: user.department, status: 'sent', createdAt: new Date().toISOString()
+    });
+    APP.notify('Report sent to admin', 'success');
+    document.getElementById('hodReportForm2').reset();
 }
 
 /* ═══════════════════════════════════════════════
