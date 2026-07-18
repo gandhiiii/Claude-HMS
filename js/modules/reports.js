@@ -1,6 +1,6 @@
 // HMS — Reports & Analytics Module
 
-var _reportTab = 'overview';
+var _reportTab = 'summary';
 var _reportCharts = [];
 
 function _rDestroyCharts() {
@@ -47,6 +47,7 @@ function renderReports(container) {
     var user = AUTH.currentUser();
     var isAdmin = user && (user.isSuperAdmin || user.role === 'admin');
     var TABS = [
+        { id: 'summary',     label: '📑 Summary',     color: '#37474f' },
         { id: 'overview',    label: '📊 Overview',    color: '#1a73e8' },
         { id: 'tasks',       label: '✅ Tasks',        color: '#34a853' },
         { id: 'admissions',  label: '🏥 Admissions',  color: '#00bcd4' },
@@ -98,6 +99,7 @@ function _renderReportTab(tab) {
     var el = document.getElementById('rContent');
     if (!el) return;
     var map = {
+        summary:     _rSummary,
         overview:    _rOverview,
         tasks:       _rTasks,
         admissions:  _rAdmissions,
@@ -118,6 +120,270 @@ function _rRoleFilter(items, user) {
         if (user.role === 'hod') return item.department === user.department || item.createdBy === user.username;
         return item.createdBy === user.username || item.assignedTo === user.fullName;
     });
+}
+
+// ══════════════════════════════════════════════════════════════
+// SUMMARY (all-modules consolidated)
+// ══════════════════════════════════════════════════════════════
+function _rSummary(el) {
+    var user      = AUTH.currentUser();
+    var isAdmin   = user && (user.isSuperAdmin || user.role === 'admin');
+
+    // ── raw data ──
+    var tasks      = _rRoleFilter(DB.get('tasks') || [], user);
+    var hodTasks   = _rRoleFilter(DB.get('hodTasks') || [], user);
+    var allTasks   = tasks.concat(hodTasks);
+    var problems   = _rRoleFilter(DB.get('problems') || [], user);
+    var adms       = _rRoleFilter(DB.get('admissions') || [], user);
+    var matReqs    = _rRoleFilter(DB.get('material_requests') || [], user);
+    var complaints = _rRoleFilter(DB.get('complaints') || [], user);
+    var checklists = DB.get('checklists') || [];
+    var inventory  = DB.get('inventory') || [];
+    var users      = DB.get('users') || [];
+    var depts      = DB.get('departments') || [];
+    var budgets    = DB.get('budgets') || [];
+    var expenses   = DB.get('budget_expenses') || [];
+    var lostFound  = _rRoleFilter(DB.get('lostfound') || [], user);
+    var suggestions= DB.get('suggestions') || [];
+
+    // ── derived numbers ──
+    var tDone   = allTasks.filter(function(t){ return t.status==='completed'; }).length;
+    var tOver   = allTasks.filter(function(t){ return t.status!=='completed'&&t.deadline&&new Date(t.deadline)<new Date(); }).length;
+    var pOpen   = problems.filter(function(p){ return p.status!=='resolved'; }).length;
+    var pRes    = problems.length - pOpen;
+    var aCur    = adms.filter(function(a){ return a.status==='admitted'; }).length;
+    var aDis    = adms.filter(function(a){ return a.status==='discharged'; }).length;
+    var mPend   = matReqs.filter(function(r){ return r.status==='pending'; }).length;
+    var mApp    = matReqs.filter(function(r){ return r.status==='approved'; }).length;
+    var cOpen   = complaints.filter(function(c){ return c.status!=='resolved'; }).length;
+    var lowStk  = inventory.filter(function(i){ return (i.quantity||0)<5; }).length;
+    var staff   = users.filter(function(u){ return u.role!=='admin'; }).length;
+
+    // checklist completion
+    var clTotal = 0, clDone = 0;
+    checklists.forEach(function(cl) {
+        var items = cl.items || [];
+        clTotal += items.length;
+        clDone  += items.filter(function(i){ return i.done; }).length;
+    });
+    var clPct = clTotal > 0 ? Math.round(clDone/clTotal*100) : 0;
+
+    // budget (admin only)
+    var latestBudget = {};
+    budgets.forEach(function(b) {
+        if (!latestBudget[b.department] || b.createdAt > latestBudget[b.department].createdAt)
+            latestBudget[b.department] = b;
+    });
+    var totalBudget = Object.values(latestBudget).reduce(function(s,b){ return s+(parseFloat(b.amount)||0); },0);
+    var totalSpent  = expenses.reduce(function(s,e){ return s+(parseFloat(e.amount)||0); },0);
+    var utilPct     = totalBudget>0 ? Math.round(totalSpent/totalBudget*100) : 0;
+
+    function bFmt(n){ return '₹'+Number(n||0).toLocaleString('en-IN'); }
+    function pct(a,b){ return b>0?Math.round(a/b*100):0; }
+
+    // ── department performance matrix ──
+    var deptNames = depts.length
+        ? depts.map(function(d){ return d.name; })
+        : Array.from(new Set(
+            allTasks.map(function(t){ return t.department; })
+            .concat(problems.map(function(p){ return p.department; }))
+            .filter(Boolean)
+          ));
+
+    var deptRows = deptNames.map(function(nm) {
+        var dT  = allTasks.filter(function(t){ return t.department===nm; });
+        var dTD = dT.filter(function(t){ return t.status==='completed'; }).length;
+        var dP  = problems.filter(function(p){ return p.department===nm; });
+        var dPR = dP.filter(function(p){ return p.status==='resolved'; }).length;
+        var dM  = matReqs.filter(function(r){ return r.department===nm; }).length;
+        var dS  = users.filter(function(u){ return u.department===nm&&u.role!=='admin'; }).length;
+        var tp  = pct(dTD, dT.length);
+        var pp  = dP.length>0 ? pct(dPR,dP.length) : null;
+        var tCol= tp>=80?'#34a853':tp>=50?'#fbbc04':'#ea4335';
+        var pCol= pp===null?'var(--gray)':pp>=80?'#34a853':pp>=50?'#fbbc04':'#ea4335';
+
+        function bar(p,c) {
+            return '<div style="display:flex;align-items:center;gap:5px;">'
+                +'<div style="flex:1;height:7px;background:var(--light-gray);border-radius:4px;overflow:hidden;">'
+                +'<div style="height:100%;width:'+Math.min(p||0,100)+'%;background:'+c+';border-radius:4px;"></div></div>'
+                +'<span style="font-size:11px;font-weight:700;color:'+c+';">'+(p!==null?p+'%':'—')+'</span></div>';
+        }
+        return '<tr>'
+            +'<td><strong>'+nm+'</strong></td>'
+            +'<td style="text-align:center;">'+dS+'</td>'
+            +'<td style="min-width:110px;">'+bar(tp,tCol)+'<div style="font-size:10px;color:var(--gray);">'+dTD+'/'+dT.length+' done</div></td>'
+            +'<td style="min-width:110px;">'+bar(pp,pCol)+'<div style="font-size:10px;color:var(--gray);">'+(dP.length>0?dPR+'/'+dP.length+' resolved':'No issues')+'</div></td>'
+            +'<td style="text-align:center;">'+dM+'</td>'
+            +'</tr>';
+    }).join('');
+
+    // ── module status cards ──
+    function _mCard(icon, label, color, lines) {
+        return '<div class="card" style="padding:14px;border-top:3px solid '+color+';">'
+            +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">'
+            +'<span style="font-size:22px;">'+icon+'</span>'
+            +'<span style="font-size:13px;font-weight:700;color:var(--text);">'+label+'</span></div>'
+            +'<div style="display:flex;flex-direction:column;gap:5px;">'
+            +lines.map(function(l){
+                return '<div style="display:flex;justify-content:space-between;font-size:12px;">'
+                    +'<span style="color:var(--gray);">'+l[0]+'</span>'
+                    +'<span style="font-weight:700;color:'+(l[2]||'var(--text)')+';">'+l[1]+'</span></div>';
+            }).join('')
+            +'</div></div>';
+    }
+
+    // ── recent activity across all modules (last 5 items by date) ──
+    var activity = [];
+    allTasks.slice(-3).forEach(function(t){ activity.push({ icon:'✅', label: t.title||'Task', sub: t.department||'', date: t.createdAt, color:'#34a853' }); });
+    problems.slice(-3).forEach(function(p){ activity.push({ icon:'🔧', label: p.title||'Problem', sub: p.category||'', date: p.createdAt, color:'#ea4335' }); });
+    adms.slice(-2).forEach(function(a){ activity.push({ icon:'🏥', label: a.patientName||'Patient', sub: a.type||'', date: a.createdAt||a.admissionDate, color:'#00bcd4' }); });
+    matReqs.slice(-2).forEach(function(r){ activity.push({ icon:'📦', label: r.title||'Request', sub: r.department||'', date: r.createdAt, color:'#ff9800' }); });
+    complaints.slice(-2).forEach(function(c){ activity.push({ icon:'📝', label: c.patientName||'Complaint', sub: c.category||'', date: c.createdAt, color:'#fbbc04' }); });
+    activity.sort(function(a,b){ return (b.date||'') > (a.date||'') ? 1 : -1; });
+    var recentRows = activity.slice(0,8).map(function(a){
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--light-gray);">'
+            +'<span style="width:28px;height:28px;border-radius:50%;background:'+a.color+'22;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">'+a.icon+'</span>'
+            +'<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+a.label+'</div>'
+            +'<div style="font-size:11px;color:var(--gray);">'+a.sub+'</div></div>'
+            +'<div style="font-size:11px;color:var(--gray);white-space:nowrap;">'+APP.formatDate(a.date)+'</div>'
+            +'</div>';
+    }).join('') || '<div style="color:var(--gray);font-size:13px;padding:12px 0;">No recent activity.</div>';
+
+    el.innerHTML =
+        // header banner
+        '<div style="background:linear-gradient(135deg,#37474f 0%,#263238 100%);color:#fff;border-radius:10px;padding:18px 22px;margin-bottom:20px;">'
+        +'<div style="font-size:18px;font-weight:700;">📑 Hospital Summary Report</div>'
+        +'<div style="opacity:.75;font-size:13px;margin-top:3px;">Consolidated view across all modules • Generated '+new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+'</div>'
+        +'</div>'
+
+        // KPI grid — row 1
+        +'<div class="grid-4 mb-4">'
+        +_rKpi(allTasks.length, 'Total Tasks', '#1a73e8', '✅', tDone+' completed · '+tOver+' overdue')
+        +_rKpi(problems.length, 'Problems', '#ea4335', '🔧', pOpen+' open · '+pRes+' resolved')
+        +_rKpi(adms.length, 'Admissions', '#00bcd4', '🏥', aCur+' current · '+aDis+' discharged')
+        +_rKpi(matReqs.length, 'Material Reqs', '#ff9800', '📦', mPend+' pending · '+mApp+' approved')
+        +'</div>'
+        // KPI grid — row 2
+        +'<div class="grid-4 mb-4">'
+        +_rKpi(staff, 'Staff', '#9c27b0', '👥', depts.length+' departments')
+        +_rKpi(complaints.length, 'Complaints', '#fbbc04', '📝', cOpen+' open')
+        +_rKpi(clPct+'%', 'Checklist Done', '#34a853', '📋', clDone+'/'+clTotal+' items')
+        +_rKpi(lowStk, 'Low Stock', '#ea4335', '⚠️', inventory.length+' total items')
+        +'</div>'
+
+        // module status grid
+        +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:20px;">'
+        +_mCard('✅','Tasks','#34a853',[
+            ['Total', allTasks.length],
+            ['Completed', tDone, '#34a853'],
+            ['Overdue', tOver, tOver>0?'#ea4335':'#34a853'],
+            ['Completion Rate', pct(tDone,allTasks.length)+'%', pct(tDone,allTasks.length)>=70?'#34a853':'#ea4335']
+        ])
+        +_mCard('🏥','Admissions','#00bcd4',[
+            ['Total', adms.length],
+            ['Currently Admitted', aCur, '#00bcd4'],
+            ['Discharged', aDis],
+            ['Emergency', adms.filter(function(a){ return a.type==='emergency'; }).length, '#ea4335']
+        ])
+        +_mCard('🔧','Problems','#ea4335',[
+            ['Total', problems.length],
+            ['Open', pOpen, pOpen>0?'#ea4335':'#34a853'],
+            ['Resolved', pRes, '#34a853'],
+            ['Resolution Rate', pct(pRes,problems.length)+'%', pct(pRes,problems.length)>=70?'#34a853':'#fbbc04']
+        ])
+        +_mCard('📦','Materials','#ff9800',[
+            ['Requests', matReqs.length],
+            ['Pending', mPend, mPend>0?'#ff9800':'var(--text)'],
+            ['Approved', mApp, '#34a853'],
+            ['Rejected', matReqs.filter(function(r){ return r.status==='rejected'; }).length, '#ea4335']
+        ])
+        +_mCard('📝','Complaints','#fbbc04',[
+            ['Total', complaints.length],
+            ['Open', cOpen, cOpen>0?'#fbbc04':'#34a853'],
+            ['Resolved', complaints.length-cOpen, '#34a853'],
+            ['High Priority', complaints.filter(function(c){ return c.priority==='high'; }).length, '#ea4335']
+        ])
+        +_mCard('📋','Checklists','#fbbc04',[
+            ['Total Checklists', checklists.length],
+            ['Total Items', clTotal],
+            ['Completed', clDone, '#34a853'],
+            ['Completion Rate', clPct+'%', clPct>=80?'#34a853':clPct>=50?'#fbbc04':'#ea4335']
+        ])
+        +_mCard('🗂️','Inventory','#9c27b0',[
+            ['Total Items', inventory.length],
+            ['Low Stock (<5)', lowStk, lowStk>0?'#ea4335':'#34a853'],
+            ['Categories', Array.from(new Set(inventory.map(function(i){ return i.category; }).filter(Boolean))).length]
+        ])
+        +_mCard('🔍','Lost & Found','#78909c',[
+            ['Total', lostFound.length],
+            ['Lost', lostFound.filter(function(i){ return i.type==='lost'; }).length],
+            ['Found', lostFound.filter(function(i){ return i.type==='found'; }).length],
+            ['Returned', lostFound.filter(function(i){ return i.status==='returned'; }).length, '#34a853']
+        ])
+        +(isAdmin
+            ? _mCard('💰','Budget','#2e7d32',[
+                ['Total Budget', bFmt(totalBudget)],
+                ['Total Spent', bFmt(totalSpent), totalSpent>totalBudget?'#ea4335':'#34a853'],
+                ['Remaining', bFmt(totalBudget-totalSpent), (totalBudget-totalSpent)<0?'#ea4335':'#34a853'],
+                ['Utilization', utilPct+'%', utilPct>=90?'#ea4335':utilPct>=70?'#fbbc04':'#34a853']
+            ])
+            : '')
+        +'</div>'
+
+        // charts row
+        +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px;">'
+        +_rChartCard('Task Completion by Status','rsum_task',220)
+        +_rChartCard('Admission Type Breakdown','rsum_adm',220)
+        +_rChartCard('Problems: Open vs Resolved','rsum_prob',220)
+        +'</div>'
+
+        // department matrix + recent activity
+        +'<div style="display:grid;grid-template-columns:1fr 380px;gap:16px;">'
+
+        // dept matrix
+        +'<div class="card" style="padding:0;overflow:hidden;">'
+        +'<div style="padding:12px 16px;font-size:14px;font-weight:700;border-bottom:1px solid var(--light-gray);">🏢 Department Performance Matrix</div>'
+        +'<div class="table-responsive"><table>'
+        +'<thead><tr><th>Department</th><th style="text-align:center;">Staff</th><th>Task Progress</th><th>Problem Resolution</th><th style="text-align:center;">Material Reqs</th></tr></thead>'
+        +'<tbody>'+(deptRows||'<tr><td colspan="5" class="empty-state">No department data.</td></tr>')+'</tbody>'
+        +'</table></div></div>'
+
+        // recent activity feed
+        +'<div class="card" style="padding:16px;">'
+        +'<div style="font-size:14px;font-weight:700;margin-bottom:10px;">🕐 Recent Activity</div>'
+        +recentRows
+        +'</div>'
+
+        +'</div>';
+
+    setTimeout(function() {
+        _rMakeChart('rsum_task', {
+            type: 'doughnut',
+            data: { labels: ['Pending','In Progress','Completed','Overdue'],
+                datasets: [{ data: [
+                    allTasks.filter(function(t){ return t.status==='pending'; }).length,
+                    allTasks.filter(function(t){ return t.status==='in-progress'; }).length,
+                    tDone, tOver
+                ], backgroundColor: ['#fbbc04','#1a73e8','#34a853','#ea4335'], borderWidth: 2 }] },
+            options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ font:{ size:11 } } } } }
+        });
+        _rMakeChart('rsum_adm', {
+            type: 'pie',
+            data: { labels: ['Regular','Emergency','ICU'],
+                datasets: [{ data: [
+                    adms.filter(function(a){ return a.type==='regular'; }).length,
+                    adms.filter(function(a){ return a.type==='emergency'; }).length,
+                    adms.filter(function(a){ return a.type==='icu'; }).length
+                ], backgroundColor: ['#34a853','#ea4335','#fbbc04'], borderWidth: 2 }] },
+            options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ font:{ size:11 } } } } }
+        });
+        _rMakeChart('rsum_prob', {
+            type: 'doughnut',
+            data: { labels: ['Open','Resolved'],
+                datasets: [{ data: [pOpen, pRes], backgroundColor: ['#ea4335','#34a853'], borderWidth: 2 }] },
+            options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ font:{ size:11 } } } } }
+        });
+    }, 50);
 }
 
 // ══════════════════════════════════════════════════════════════
