@@ -55,6 +55,112 @@ const DB = {
     },
     getById(key, id) {
         return this.get(key).find(i => i.id === id) || null;
+    },
+
+    /* ── All keys synced to Firebase / exported in backups ── */
+    _ALL_KEYS: [
+        'users', 'departments', 'featureRights',
+        'inventory', 'inventory_receipts',
+        'gatesecurity', 'phase2Tasks',
+        'projects', 'ambulance', 'ambulance_trips',
+        'problems', 'tasks', 'hodTasks', 'hodRequests',
+        'complaints', 'roomchecklists', 'admissions', 'rooms', 'roomStatus',
+        'lostfound', 'adminChecklist', 'checklists',
+        'material_requests', 'suggestions', 'reports',
+        'roomCleaningTasks', 'floorItems',
+        'budgets', 'budget_expenses', 'quarterly_priorities'
+    ],
+
+    /* Export all app data as a downloadable JSON file */
+    exportAll(label) {
+        try {
+            var snapshot = { _meta: { exportedAt: new Date().toISOString(), label: label || 'manual', appVersion: 'v44' }, data: {} };
+            this._ALL_KEYS.forEach(function(key) {
+                try {
+                    var raw = localStorage.getItem('hms_' + key);
+                    if (raw) snapshot.data[key] = JSON.parse(raw);
+                } catch(e) {}
+            });
+            var json = JSON.stringify(snapshot, null, 2);
+            var blob = new Blob([json], { type: 'application/json' });
+            var url  = URL.createObjectURL(blob);
+            var a    = document.createElement('a');
+            var date = new Date().toISOString().slice(0, 10);
+            a.href     = url;
+            a.download = 'HMS_Backup_' + date + '.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            return true;
+        } catch(e) {
+            console.warn('DB.exportAll error:', e);
+            return false;
+        }
+    },
+
+    /* Import / restore from a backup JSON file — merges by id, preserving local-only records */
+    importAll(json, replaceAll) {
+        try {
+            var snapshot = JSON.parse(json);
+            var data = snapshot.data || snapshot; // support both wrapped and bare formats
+            var count = 0;
+            Object.keys(data).forEach(function(key) {
+                if (DB._ALL_KEYS.indexOf(key) === -1) return;
+                var incoming = data[key];
+                if (!Array.isArray(incoming) && typeof incoming !== 'object') return;
+                if (replaceAll || !Array.isArray(incoming)) {
+                    DB.set(key, incoming);
+                } else {
+                    // Merge: incoming wins for shared ids, local-only items are kept
+                    var existing = DB.get(key) || [];
+                    var incomingIds = {};
+                    incoming.forEach(function(i) { if (i && i.id) incomingIds[i.id] = true; });
+                    var merged = incoming.slice();
+                    existing.forEach(function(item) {
+                        if (item && item.id && !incomingIds[item.id]) merged.push(item);
+                    });
+                    DB.set(key, merged);
+                }
+                count++;
+            });
+            return { success: true, keys: count, meta: snapshot._meta || {} };
+        } catch(e) {
+            return { success: false, error: e.message };
+        }
+    },
+
+    /* Auto-backup: saves a snapshot to localStorage; keeps latest 3 rolling backups */
+    autoBackup(reason) {
+        try {
+            var snapshot = { _meta: { exportedAt: new Date().toISOString(), label: reason || 'auto', appVersion: 'v44' }, data: {} };
+            this._ALL_KEYS.forEach(function(key) {
+                try {
+                    var raw = localStorage.getItem('hms_' + key);
+                    if (raw) snapshot.data[key] = JSON.parse(raw);
+                } catch(e) {}
+            });
+            var json = JSON.stringify(snapshot);
+            // Rolling: shift backup_1 → backup_2 → backup_3 (oldest dropped)
+            try {
+                var b2 = localStorage.getItem('hms_backup_2');
+                if (b2) localStorage.setItem('hms_backup_3', b2);
+                var b1 = localStorage.getItem('hms_backup_1');
+                if (b1) localStorage.setItem('hms_backup_2', b1);
+            } catch(e) {}
+            localStorage.setItem('hms_backup_1', json);
+            localStorage.setItem('hms_backup_ts', new Date().toISOString());
+            return true;
+        } catch(e) {
+            return false;
+        }
+    },
+
+    /* Restore from the latest auto-backup stored in localStorage */
+    restoreLatestBackup() {
+        var raw = localStorage.getItem('hms_backup_1');
+        if (!raw) return { success: false, error: 'No auto-backup found' };
+        return this.importAll(raw, false);
     }
 };
 
@@ -558,8 +664,27 @@ APP_SYNC = {
 
 const APP = {
     currentModule: null,
+    _APP_VERSION: 'v44',
+
     init() {
         try {
+            // Auto-backup before anything else:
+            // 1. Always backup when app version changes (code was updated)
+            // 2. Also backup if more than 1 hour has passed since last backup
+            try {
+                var lastVer = localStorage.getItem('hms_app_version');
+                var lastTs  = localStorage.getItem('hms_backup_ts');
+                var hourAgo = new Date(Date.now() - 3600000).toISOString();
+                var needsBackup = (lastVer !== APP._APP_VERSION) || !lastTs || lastTs < hourAgo;
+                if (needsBackup) {
+                    var reason = (lastVer && lastVer !== APP._APP_VERSION)
+                        ? 'pre-update-' + lastVer + '-to-' + APP._APP_VERSION
+                        : 'hourly-auto';
+                    DB.autoBackup(reason);
+                    localStorage.setItem('hms_app_version', APP._APP_VERSION);
+                }
+            } catch(_e) {}
+
             AUTH.init();
             this.seedData();
             try {

@@ -1190,14 +1190,136 @@ function _rDownload(el) {
             + '</div></div>';
     }).join('');
 
-    el.innerHTML =
-        '<div class="card" style="padding:18px 20px;margin-bottom:20px;background:linear-gradient(135deg,#37474f 0%,#263238 100%);color:#fff;border-radius:10px;">'
+    // Auto-backup info
+    var lastTs  = localStorage.getItem('hms_backup_ts');
+    var lastVer = localStorage.getItem('hms_app_version');
+    var hasB1   = !!localStorage.getItem('hms_backup_1');
+    var hasB2   = !!localStorage.getItem('hms_backup_2');
+    var hasB3   = !!localStorage.getItem('hms_backup_3');
+    var lastBackupStr = lastTs
+        ? new Date(lastTs).toLocaleString('en-IN', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})
+        : 'Never';
+
+    var safetyHtml = '<div class="card" style="padding:20px;margin-bottom:20px;border-top:4px solid #1a73e8;">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">'
+        + '<div><div style="font-size:16px;font-weight:700;">💾 Data Safety & Backup</div>'
+        + '<div style="font-size:12px;color:var(--gray);margin-top:2px;">All app data is stored in your browser\'s localStorage. Back up regularly to avoid data loss.</div></div>'
+        + '<div style="display:flex;align-items:center;gap:6px;">'
+        + '<span style="width:10px;height:10px;background:' + (hasB1 ? 'var(--success)' : 'var(--danger)') + ';border-radius:50%;display:inline-block;"></span>'
+        + '<span style="font-size:12px;color:var(--gray);">Auto-backup: <strong>' + lastBackupStr + '</strong></span>'
+        + '</div></div>'
+
+        // Status row
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;">'
+        + '<div style="background:var(--light-gray);border-radius:8px;padding:12px;text-align:center;">'
+        + '<div style="font-size:18px;font-weight:700;color:var(--success);">' + (hasB1 ? '✓' : '—') + '</div>'
+        + '<div style="font-size:11px;color:var(--gray);">Backup 1 (latest)</div>'
+        + (hasB1 && lastTs ? '<div style="font-size:10px;color:var(--gray);">' + lastBackupStr + '</div>' : '')
+        + '</div>'
+        + '<div style="background:var(--light-gray);border-radius:8px;padding:12px;text-align:center;">'
+        + '<div style="font-size:18px;font-weight:700;color:' + (hasB2 ? 'var(--success)' : 'var(--gray)') + ';">' + (hasB2 ? '✓' : '—') + '</div>'
+        + '<div style="font-size:11px;color:var(--gray);">Backup 2</div>'
+        + '</div>'
+        + '<div style="background:var(--light-gray);border-radius:8px;padding:12px;text-align:center;">'
+        + '<div style="font-size:18px;font-weight:700;color:' + (hasB3 ? 'var(--success)' : 'var(--gray)') + ';">' + (hasB3 ? '✓' : '—') + '</div>'
+        + '<div style="font-size:11px;color:var(--gray);">Backup 3 (oldest)</div>'
+        + '</div>'
+        + '<div style="background:var(--light-gray);border-radius:8px;padding:12px;text-align:center;">'
+        + '<div style="font-size:18px;font-weight:700;color:var(--primary);">' + (lastVer || '—') + '</div>'
+        + '<div style="font-size:11px;color:var(--gray);">App Version</div>'
+        + '</div>'
+        + '</div>'
+
+        // Action buttons
+        + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">'
+        + '<button class="btn btn-primary" onclick="rExportAllData()">📥 Export Full Backup (JSON)</button>'
+        + '<button class="btn btn-sm btn-outline" onclick="rTriggerImport()">📤 Import / Restore from File</button>'
+        + '<input type="file" id="rImportFile" accept=".json" style="display:none;" onchange="rImportFile(this)">'
+        + (hasB1 ? '<button class="btn btn-sm btn-outline" onclick="rRestoreAutoBackup(1)">🔄 Restore Auto-Backup 1</button>' : '')
+        + (hasB2 ? '<button class="btn btn-sm btn-outline" onclick="rRestoreAutoBackup(2)">🔄 Restore Backup 2</button>' : '')
+        + (hasB3 ? '<button class="btn btn-sm btn-outline" onclick="rRestoreAutoBackup(3)">🔄 Restore Backup 3</button>' : '')
+        + '<button class="btn btn-sm btn-outline" onclick="rForceAutoBackup()">💾 Backup Now</button>'
+        + '</div>'
+
+        // Warning
+        + '<div style="background:#fff3e0;border:1px solid #ff9800;border-radius:8px;padding:10px 14px;font-size:12px;color:#e65100;">'
+        + '<strong>⚠️ Important:</strong> Data is stored in this browser only. '
+        + 'Export a JSON backup regularly and keep it safe. '
+        + 'Clearing browser data / cache will wipe all records. '
+        + 'To sync across devices, configure Firebase in <code>js/firebase-config.js</code>.'
+        + '</div></div>';
+
+    el.innerHTML = safetyHtml
+        + '<div class="card" style="padding:18px 20px;margin-bottom:20px;background:linear-gradient(135deg,#37474f 0%,#263238 100%);color:#fff;border-radius:10px;">'
         + '<div style="font-size:18px;font-weight:700;margin-bottom:4px;">⬇️ Download Reports</div>'
         + '<div style="opacity:0.8;font-size:13px;">Export any module\'s data as an Excel spreadsheet (.xlsx) or PDF document.</div>'
         + '</div>'
         + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;">'
         + cardsHtml
         + '</div>';
+}
+
+function rExportAllData() {
+    var ok = DB.exportAll('manual');
+    if (ok) {
+        APP.notify('Backup file downloaded!', 'success');
+    } else {
+        APP.notify('Export failed — check browser console', 'error');
+    }
+}
+
+function rTriggerImport() {
+    var input = document.getElementById('rImportFile');
+    if (input) input.click();
+}
+
+function rImportFile(input) {
+    var file = input.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var json = e.target.result;
+        if (confirm('This will MERGE the backup data with current data (local-only records are preserved). Continue?')) {
+            var result = DB.importAll(json, false);
+            if (result.success) {
+                APP.notify('Restored ' + result.keys + ' data stores successfully!', 'success');
+                setTimeout(function() { Router.navigate('reports'); }, 500);
+            } else {
+                APP.notify('Import failed: ' + result.error, 'error');
+            }
+        }
+        input.value = '';
+    };
+    reader.readAsText(file);
+}
+
+function rRestoreAutoBackup(n) {
+    var raw = localStorage.getItem('hms_backup_' + n);
+    if (!raw) { APP.notify('Backup ' + n + ' not found', 'error'); return; }
+    try {
+        var meta = JSON.parse(raw)._meta || {};
+        var dateStr = meta.exportedAt ? new Date(meta.exportedAt).toLocaleString('en-IN') : 'unknown time';
+        var label   = meta.label || 'auto';
+        if (confirm('Restore backup from ' + dateStr + ' (' + label + ')?\n\nLocal-only records not in the backup will be preserved.')) {
+            var result = DB.importAll(raw, false);
+            if (result.success) {
+                APP.notify('Backup ' + n + ' restored (' + result.keys + ' stores)!', 'success');
+                setTimeout(function() { Router.navigate('reports'); }, 500);
+            } else {
+                APP.notify('Restore failed: ' + result.error, 'error');
+            }
+        }
+    } catch(e) {
+        APP.notify('Invalid backup data', 'error');
+    }
+}
+
+function rForceAutoBackup() {
+    var ok = DB.autoBackup('manual-trigger');
+    APP.notify(ok ? 'Backup saved to browser storage!' : 'Backup failed', ok ? 'success' : 'error');
+    var el = document.getElementById('hodTabContent') || document.getElementById('pageContent');
+    // Re-render download tab to refresh timestamps
+    setTimeout(function() { Router.navigate('reports'); }, 300);
 }
 
 function rDownloadReport(sectionId, format) {
