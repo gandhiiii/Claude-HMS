@@ -883,15 +883,30 @@ var _rSections = [
         id: 'departments', label: 'Departments', icon: '🏢', color: '#e91e63', dbKey: 'departments',
         headers: ['Name','Status','HOD','Created At'],
         getRow: function(d){ return [d.name||'', d.active===false?'Inactive':'Active', d.hod||'', APP.formatDate(d.createdAt)]; }
+    },
+    {
+        id: 'budget_allocations', label: 'Budget Allocations', icon: '💰', color: '#2e7d32', dbKey: 'budgets',
+        adminOnly: true,
+        headers: ['Department','Amount (₹)','Period','Period Type','Set By','Date'],
+        getRow: function(b){ return [b.department||'', b.amount||0, b.period||'', b.periodType||'', b.createdByName||b.createdBy||'', APP.formatDate(b.createdAt)]; }
+    },
+    {
+        id: 'budget_expenses', label: 'Budget Expenses', icon: '💸', color: '#c62828', dbKey: 'budget_expenses',
+        adminOnly: true,
+        headers: ['Department','Category','Amount (₹)','Description','Date','Added By'],
+        getRow: function(e){ return [e.department||'', e.category||'', e.amount||0, e.description||'', e.expenseDate||APP.formatDate(e.createdAt), e.createdByName||e.createdBy||'']; }
     }
 ];
 
 function _rDownload(el) {
     var user = AUTH.currentUser();
+    var isAdmin = user && (user.isSuperAdmin || user.role === 'admin');
 
-    var cardsHtml = _rSections.map(function(s) {
+    var cardsHtml = _rSections.filter(function(s) {
+        return !s.adminOnly || isAdmin;
+    }).map(function(s) {
         var raw   = DB.get(s.dbKey) || [];
-        var items = (s.id === 'staff' || s.id === 'departments' || s.id === 'inventory')
+        var items = (s.id === 'staff' || s.id === 'departments' || s.id === 'inventory' || s.adminOnly)
             ? raw : _rRoleFilter(raw, user);
         var count = items.length;
         return '<div class="card" style="padding:16px;border-top:3px solid ' + s.color + ';">'
@@ -925,8 +940,11 @@ function rDownloadReport(sectionId, format) {
     if (!cfg) { APP.notify('Unknown section', 'error'); return; }
 
     var user = AUTH.currentUser();
+    if (cfg.adminOnly && !(user && (user.isSuperAdmin || user.role === 'admin'))) {
+        APP.notify('Access denied', 'error'); return;
+    }
     var raw   = DB.get(cfg.dbKey) || [];
-    var items = (sectionId === 'staff' || sectionId === 'departments' || sectionId === 'inventory')
+    var items = (sectionId === 'staff' || sectionId === 'departments' || sectionId === 'inventory' || cfg.adminOnly)
         ? raw : _rRoleFilter(raw, user);
     var rows  = items.map(cfg.getRow);
 
