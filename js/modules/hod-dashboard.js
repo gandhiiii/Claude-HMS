@@ -128,6 +128,13 @@ function renderHodDashboard(container) {
         .map(function (t) { return Object.assign({}, t, { _source: 'admin' }); });
     var allDeptTasks = myTasks.concat(adminTasks);
 
+    // Employee reports sent to this HOD's department
+    var teamReports = (DB.get('reports') || []).filter(function (r) {
+        return (r.sentTo === 'hod' || r.sentTo === 'both') &&
+               r.department === dept &&
+               r.createdBy !== user.username;
+    });
+
     _hodData = {
         user: user, dept: dept, u: u,
         team: team, teamNames: teamNames,
@@ -145,7 +152,8 @@ function renderHodDashboard(container) {
         pendingMatApprovals: pendingMatApprovals,
         routedProblems: routedProblems,
         cleaning: cleaning,
-        allAdm: allAdm
+        allAdm: allAdm,
+        teamReports: teamReports
     };
 
     var pendingCl  = myCl.filter(function (c) { return c.status !== 'completed'; }).length;
@@ -159,7 +167,7 @@ function renderHodDashboard(container) {
         { id: 'checklists',  label: 'Checklists', badge: pendingCl, bc: 'badge-info' },
         { id: 'requests',    label: 'Requests', badge: pendingReq, bc: 'badge-warning' },
         { id: 'performance', label: 'Performance' },
-        { id: 'hodreports',  label: '📤 Reports' },
+        { id: 'hodreports',  label: '📤 Reports', badge: teamReports.length, bc: 'badge-danger' },
         { id: 'hodqp',       label: '🎯 Q Priorities' }
     ];
 
@@ -999,6 +1007,11 @@ function _hodReports(el) {
     var prog = all.filter(function(t){ return t.status==='in-progress'; }).length;
     var ovd  = d.overdueTasks.length;
     var rate = all.length>0 ? Math.round(done/all.length*100) : 0;
+    var teamReps = d.teamReports || [];
+    var reqs  = d.myReqs || [];
+    var clTotal = 0, clDone2 = 0;
+    (d.myCl||[]).forEach(function(cl){ var items=cl.items||[]; clTotal+=items.length; clDone2+=items.filter(function(i){return i.done||i.status==='ok';}).length; });
+    var clRate = clTotal > 0 ? Math.round(clDone2/clTotal*100) : 0;
 
     function kBox(v,l,c){
         return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">'
@@ -1006,24 +1019,58 @@ function _hodReports(el) {
             +'<div style="font-size:11px;color:var(--gray);margin-top:2px;">'+l+'</div></div>';
     }
 
-    el.innerHTML =
-        '<div style="font-weight:700;font-size:16px;margin-bottom:4px;">📤 Department Reports — '+d.dept+'</div>'
-        +'<div style="font-size:12px;color:var(--gray);margin-bottom:16px;">Generate and share task performance reports for your department</div>'
+    var html = '';
 
-        // snapshot
-        +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:20px;">'
+    // ── Team Reports Inbox (top priority) ──
+    html += '<div style="background:linear-gradient(135deg,#1a237e 0%,#283593 100%);border-radius:12px;padding:16px 20px;color:#fff;margin-bottom:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
+        + '<div><div style="font-size:15px;font-weight:700;">📬 Team Reports Inbox</div>'
+        + '<div style="font-size:12px;opacity:0.8;margin-top:2px;">Reports sent by team members to HOD — ' + d.dept + '</div></div>'
+        + '<span class="badge" style="background:rgba(255,255,255,0.25);color:#fff;font-size:12px;padding:4px 10px;">' + teamReps.length + ' report' + (teamReps.length!==1?'s':'') + '</span>'
+        + '</div></div>';
+
+    if (teamReps.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:8px;padding:16px;text-align:center;font-size:13px;color:var(--gray);margin-bottom:16px;">'
+            + 'No reports from team members yet. When employees submit reports to HOD they will appear here.</div>';
+    } else {
+        teamReps.slice().reverse().forEach(function(r) {
+            var date = r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'}) : '-';
+            html += '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid #1a73e8;border-radius:10px;padding:14px;margin-bottom:10px;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">'
+                + '<div style="flex:1;min-width:200px;">'
+                + '<div style="font-size:14px;font-weight:700;">' + (r.title||'Report') + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">👤 ' + (r.createdByName||r.createdBy||'') + ' &nbsp;·&nbsp; 📅 ' + date + ' &nbsp;·&nbsp; ' + (r.category||'report').charAt(0).toUpperCase()+(r.category||'report').slice(1) + '</div>'
+                + (r._tasksTotal !== undefined
+                    ? '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-size:11px;color:var(--gray);">'
+                    + '<span>✅ Tasks: <strong>' + r._tasksDone + '/' + r._tasksTotal + '</strong></span>'
+                    + '<span>🔧 Issues: <strong>' + r._probsTotal + '</strong> (' + r._probsOpen + ' open)</span>'
+                    + '<span>📋 Checklist: <strong>' + r._clRate + '%</strong></span>'
+                    + '<span>📦 Requests: <strong>' + r._reqsTotal + '</strong></span>'
+                    + '</div>'
+                    : '')
+                + (r.description ? '<div style="font-size:12px;color:var(--text);margin-top:6px;line-height:1.5;background:var(--light-gray);padding:8px;border-radius:6px;">' + r.description.substring(0,250) + (r.description.length>250?'…':'') + '</div>' : '')
+                + '</div>'
+                + '<div style="display:flex;flex-direction:column;gap:4px;">'
+                + '<button class="btn btn-sm" style="background:#25D366;color:#fff;padding:4px 8px;white-space:nowrap;" onclick="hodShareReport(\'' + r.id + '\',\'whatsapp\')">💬 WA</button>'
+                + '<button class="btn btn-sm" style="background:#1a73e8;color:#fff;padding:4px 8px;white-space:nowrap;" onclick="hodShareReport(\'' + r.id + '\',\'email\')">✉️ Email</button>'
+                + '</div></div></div>';
+        });
+    }
+
+    // ── Dept Work Summary ──
+    html += '<div style="font-weight:700;font-size:16px;margin-bottom:4px;">📤 Department Reports — '+d.dept+'</div>'
+        +'<div style="font-size:12px;color:var(--gray);margin-bottom:12px;">Generate and share task performance reports for your department</div>'
+        +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:20px;">'
         +kBox(all.length,'Total Tasks','var(--text)')
         +kBox(done,'Completed','var(--success)')
         +kBox(pend,'Pending','#ff9800')
-        +kBox(prog,'In Progress','#1a73e8')
         +kBox(ovd,'Overdue','var(--danger)')
-        +kBox(rate+'%','Completion Rate', rate>=80?'var(--success)':rate>=50?'#ff9800':'var(--danger)')
+        +kBox(reqs.length,'Requests','#9c27b0')
+        +kBox(clRate+'%','Checklist', clRate>=80?'var(--success)':clRate>=50?'#ff9800':'var(--danger)')
         +'</div>'
 
         // report cards
         +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">'
-
-        // Task Report card
         +'<div class="card" style="padding:18px;border-top:3px solid #1a73e8;">'
         +'<div style="font-size:15px;font-weight:700;margin-bottom:4px;">✅ Task Report</div>'
         +'<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">All tasks assigned to '+d.dept+' (HOD + Admin)</div>'
@@ -1036,8 +1083,6 @@ function _hodReports(el) {
         +'<button class="btn btn-sm" style="flex:1;background:#25D366;color:#fff;" onclick="hodShareTasks(\'whatsapp\')">💬 WhatsApp</button>'
         +'<button class="btn btn-sm" style="flex:1;background:#1a73e8;color:#fff;" onclick="hodShareTasks(\'email\')">✉️ Email</button>'
         +'</div></div></div>'
-
-        // Performance Report card
         +'<div class="card" style="padding:18px;border-top:3px solid #9c27b0;">'
         +'<div style="font-size:15px;font-weight:700;margin-bottom:4px;">📊 Performance Report</div>'
         +'<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Per-member task completion breakdown</div>'
@@ -1050,8 +1095,6 @@ function _hodReports(el) {
         +'<button class="btn btn-sm" style="flex:1;background:#25D366;color:#fff;" onclick="hodSharePerformance(\'whatsapp\')">💬 WhatsApp</button>'
         +'<button class="btn btn-sm" style="flex:1;background:#1a73e8;color:#fff;" onclick="hodSharePerformance(\'email\')">✉️ Email</button>'
         +'</div></div></div>'
-
-        // Summary Report card
         +'<div class="card" style="padding:18px;border-top:3px solid #37474f;">'
         +'<div style="font-size:15px;font-weight:700;margin-bottom:4px;">📑 Summary Report</div>'
         +'<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Combined dept summary: tasks, requests & checklists</div>'
@@ -1064,40 +1107,99 @@ function _hodReports(el) {
         +'<button class="btn btn-sm" style="flex:1;background:#25D366;color:#fff;" onclick="hodShareSummary(\'whatsapp\')">💬 WhatsApp</button>'
         +'<button class="btn btn-sm" style="flex:1;background:#1a73e8;color:#fff;" onclick="hodShareSummary(\'email\')">✉️ Email</button>'
         +'</div></div></div>'
+        +'</div>';
 
-        +'</div>'
-
-        // send to admin form
-        +'<div class="card" style="margin-top:16px;padding:18px;border-top:3px solid #6a1b9a;">'
+    // send to admin form with auto-generated summary
+    var autoSummary = _genHodWorkSummary();
+    var today = new Date().toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'});
+    html += '<div class="card" style="margin-top:16px;padding:18px;border-top:3px solid #6a1b9a;">'
         +'<div style="font-size:15px;font-weight:700;margin-bottom:12px;">📬 Send Report to Admin</div>'
         +'<form id="hodReportForm2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
-        +'<div class="form-group"><label>Report Title *</label><input type="text" name="title" class="form-control" required placeholder="e.g. Weekly Summary"></div>'
+        +'<div class="form-group"><label>Report Title *</label><input type="text" name="title" class="form-control" value="' + (d.dept+' Report — '+today).replace(/"/g,'&quot;') + '" required></div>'
         +'<div class="form-group"><label>Period</label><select name="category" class="form-control"><option value="daily">Daily</option><option value="weekly" selected>Weekly</option><option value="monthly">Monthly</option></select></div>'
-        +'<div class="form-group" style="grid-column:1/-1;"><label>Summary *</label><textarea name="description" class="form-control" rows="3" required placeholder="Summarise team performance, issues, highlights…"></textarea></div>'
+        +'<div class="form-group" style="grid-column:1/-1;"><label>Work Summary (auto-generated — edit as needed)</label>'
+        +'<textarea name="description" class="form-control" rows="10" required style="font-family:monospace;font-size:12px;">' + autoSummary.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea></div>'
         +'</form>'
         +'<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">'
         +'<button class="btn btn-primary" onclick="hodSaveReport2()">📤 Send to Admin</button>'
         +'<button class="btn btn-sm" style="background:#25D366;color:#fff;" onclick="hodShareFormReport(\'whatsapp\')">💬 WhatsApp</button>'
         +'<button class="btn btn-sm" style="background:#1a73e8;color:#fff;" onclick="hodShareFormReport(\'email\')">✉️ Email</button>'
-        +'</div></div>'
+        +'</div></div>';
 
-        // submitted reports history
-        +(function(){
-            var deptReports = (DB.get('reports')||[]).filter(function(r){ return r.department === d.dept; }).slice().reverse().slice(0,10);
-            if (!deptReports.length) return '';
-            var rows = deptReports.map(function(r){
-                return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">'
-                    +'<div style="flex:1;min-width:160px;"><div style="font-size:13px;font-weight:600;">' + (r.title||'') + '</div>'
-                    +'<div style="font-size:11px;color:var(--gray);">' + (r.category||'') + ' · ' + (r.createdByName||r.createdBy||'') + ' · ' + APP.formatDate(r.createdAt) + '</div></div>'
-                    +'<span class="badge badge-success" style="font-size:10px;">sent</span>'
-                    +'<button class="btn btn-sm" style="background:#25D366;color:#fff;padding:3px 7px;" onclick="hodShareReport(\'' + r.id + '\',\'whatsapp\')">💬</button>'
-                    +'<button class="btn btn-sm" style="background:#1a73e8;color:#fff;padding:3px 7px;" onclick="hodShareReport(\'' + r.id + '\',\'email\')">✉️</button>'
-                    +'</div>';
-            }).join('');
-            return '<div class="card" style="margin-top:16px;padding:18px;">'
-                +'<div style="font-size:14px;font-weight:700;margin-bottom:10px;">📋 Recent Submitted Reports</div>'
-                + rows +'</div>';
-        })();
+    // submitted reports history
+    var deptReports = (DB.get('reports')||[]).filter(function(r){ return r.department === d.dept; }).slice().reverse().slice(0,10);
+    if (deptReports.length) {
+        var rows = deptReports.map(function(r){
+            return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">'
+                +'<div style="flex:1;min-width:160px;"><div style="font-size:13px;font-weight:600;">' + (r.title||'') + '</div>'
+                +'<div style="font-size:11px;color:var(--gray);">' + (r.category||'') + ' · ' + (r.createdByName||r.createdBy||'') + ' · ' + APP.formatDate(r.createdAt) + '</div></div>'
+                +'<span class="badge badge-success" style="font-size:10px;">sent</span>'
+                +'<button class="btn btn-sm" style="background:#25D366;color:#fff;padding:3px 7px;" onclick="hodShareReport(\'' + r.id + '\',\'whatsapp\')">💬</button>'
+                +'<button class="btn btn-sm" style="background:#1a73e8;color:#fff;padding:3px 7px;" onclick="hodShareReport(\'' + r.id + '\',\'email\')">✉️</button>'
+                +'</div>';
+        }).join('');
+        html += '<div class="card" style="margin-top:16px;padding:18px;">'
+            +'<div style="font-size:14px;font-weight:700;margin-bottom:10px;">📋 Recent Submitted Reports</div>'
+            + rows +'</div>';
+    }
+
+    el.innerHTML = html;
+}
+
+/* ── HOD work summary generator ── */
+function _genHodWorkSummary() {
+    var d   = _hodData;
+    if (!d || !d.user) return '';
+    var now = new Date().toLocaleDateString('en-IN', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    var all = d.allDeptTasks || [];
+    var done= all.filter(function(t){ return t.status==='completed'; });
+    var pend= all.filter(function(t){ return t.status==='pending'; });
+    var prog= all.filter(function(t){ return t.status==='in-progress'; });
+    var ovd = d.overdueTasks || [];
+    var reqs= d.myReqs || [];
+    var probs= d.routedProblems || [];
+
+    var lines = [];
+    lines.push('DEPARTMENT WORK SUMMARY REPORT');
+    lines.push('HOD: ' + d.user.fullName + ' | Department: ' + (d.dept||'—') + ' | Date: ' + now);
+    lines.push('Team Members: ' + (d.team||[]).length);
+    lines.push('');
+
+    lines.push('── TASK SUMMARY ──');
+    lines.push('Total: ' + all.length + ' | Completed: ' + done.length + ' | In Progress: ' + prog.length + ' | Pending: ' + pend.length + ' | Overdue: ' + ovd.length);
+    var rate = all.length > 0 ? Math.round(done.length/all.length*100) : 0;
+    lines.push('Completion Rate: ' + rate + '%');
+
+    if ((d.team||[]).length > 0) {
+        lines.push('');
+        lines.push('── TEAM PERFORMANCE ──');
+        (d.team||[]).forEach(function(m) {
+            var mt   = all.filter(function(t){ return t.assignedTo===m.fullName; });
+            var md   = mt.filter(function(t){ return t.status==='completed'; }).length;
+            var mo   = mt.filter(function(t){ return t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='completed'; }).length;
+            lines.push('  ' + m.fullName + ': ' + md + '/' + mt.length + ' done' + (mo>0?' | '+mo+' overdue':''));
+        });
+    }
+
+    lines.push('');
+    lines.push('── MATERIAL REQUESTS ──');
+    lines.push('Total: ' + reqs.length + ' | Pending: ' + reqs.filter(function(r){return r.status==='pending';}).length + ' | Approved: ' + reqs.filter(function(r){return r.status==='approved';}).length);
+
+    lines.push('');
+    lines.push('── OPEN ISSUES / PROBLEMS ──');
+    lines.push('Routed to Dept: ' + probs.length);
+    if (probs.length > 0) {
+        probs.slice(0,5).forEach(function(p,i){ lines.push('  '+(i+1)+'. ['+((p.status||'open').toUpperCase())+'] '+p.title); });
+        if (probs.length > 5) lines.push('  ... and ' + (probs.length-5) + ' more');
+    }
+
+    lines.push('');
+    lines.push('── CHECKLISTS ──');
+    var clTotal=0, clDone=0;
+    (d.myCl||[]).forEach(function(cl){ var items=cl.items||[]; clTotal+=items.length; clDone+=items.filter(function(i){return i.done||i.status==='ok';}).length; });
+    lines.push('Items: ' + clDone + '/' + clTotal + ' (' + (clTotal>0?Math.round(clDone/clTotal*100):0) + '% complete)');
+
+    return lines.join('\n');
 }
 
 /* ── Export helpers ── */
@@ -1241,12 +1343,24 @@ function _hodShare(via, subject, text) {
 function hodShareReport(id, via) {
     var r = (DB.get('reports')||[]).find(function(x){ return x.id === id; });
     if (!r) { APP.notify('Report not found','error'); return; }
-    var text = '*' + (r.title||'Report') + '*'
-        + '\nFrom: ' + (r.createdByName||r.createdBy||'')
-        + (r.department ? ' — ' + r.department : '')
-        + '\nDate: ' + (r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : '-')
-        + '\nPeriod: ' + (r.category||'-')
-        + '\n\n' + (r.description||'');
+    var dateStr = r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '-';
+    var text = '🏥 *HOSPITAL MANAGEMENT SYSTEM*\n'
+        + '*' + (r.title||'Report') + '*\n'
+        + '━━━━━━━━━━━━━━━━━━━━━\n'
+        + '👤 *From:* ' + (r.createdByName||r.createdBy||'') + '\n'
+        + '🏢 *Department:* ' + (r.department||'—') + '\n'
+        + '📅 *Date:* ' + dateStr + '\n'
+        + '📂 *Period:* ' + (r.category||'—') + '\n'
+        + '📨 *Sent To:* ' + (r.sentTo||'HOD/Admin') + '\n';
+    if (r._tasksTotal !== undefined) {
+        text += '━━━━━━━━━━━━━━━━━━━━━\n'
+            + '📋 *Tasks:* ' + r._tasksDone + '/' + r._tasksTotal + ' done'
+            + (r._tasksTotal>0?' ('+Math.round(r._tasksDone/r._tasksTotal*100)+'%)':'') + '\n'
+            + '🔧 *Issues:* ' + r._probsTotal + ' total, ' + r._probsOpen + ' open\n'
+            + '✅ *Checklist:* ' + r._clRate + '% compliance\n'
+            + '📦 *Requests:* ' + r._reqsTotal + '\n';
+    }
+    text += '━━━━━━━━━━━━━━━━━━━━━\n\n' + (r.description||'');
     _hodShare(via, r.title||'Report', text);
 }
 

@@ -552,38 +552,77 @@ function _renderEmpChecklists(checklists) {
 ══════════════════════════════════════════ */
 function renderEmpReportsTab(el) {
     var d = _empData;
+    var tasks    = d.myTasks     || [];
+    var probs    = d.myProblems  || [];
+    var reqs     = d.myRequests  || [];
+    var cls      = d.myChecklists|| [];
 
-    var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
-        + '<div style="font-weight:700;font-size:16px;">🔧 My Problems (' + d.myProblems.length + ')</div>'
+    var tDone    = tasks.filter(function(t){ return t.status==='completed'; }).length;
+    var tPend    = tasks.filter(function(t){ return t.status==='pending'; }).length;
+    var tOverdue = tasks.filter(function(t){ return t.deadline && new Date(t.deadline)<new Date() && t.status!=='completed'; }).length;
+    var pOpen    = probs.filter(function(p){ return p.status!=='resolved'; }).length;
+    var pRes     = probs.filter(function(p){ return p.status==='resolved'; }).length;
+    var clDone   = cls.filter(function(c){ return c.status==='completed'; }).length;
+    var clRate   = cls.length > 0 ? Math.round(clDone/cls.length*100) : 0;
+    var reqPend  = reqs.filter(function(r){ return r.status==='pending'||r.status==='hod_approved'; }).length;
+
+    function _sBox(val, lbl, color) {
+        return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;min-width:90px;">'
+            + '<div style="font-size:20px;font-weight:700;color:' + color + ';">' + val + '</div>'
+            + '<div style="font-size:10px;color:var(--gray);margin-top:2px;">' + lbl + '</div></div>';
+    }
+
+    var html = '<div style="background:linear-gradient(135deg,#6a1b9a 0%,#4a148c 100%);border-radius:12px;padding:16px 20px;color:#fff;margin-bottom:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">'
+        + '<div><div style="font-size:16px;font-weight:700;">📊 My Work Summary</div>'
+        + '<div style="font-size:12px;opacity:0.8;margin-top:2px;">' + d.user.fullName + ' &nbsp;·&nbsp; ' + (d.dept||'No Dept') + ' &nbsp;·&nbsp; ' + new Date().toLocaleDateString('en-IN') + '</div></div>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);" onclick="showReportForm()">+ Submit Report</button>'
+        + '</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
+        + _sBox(tDone,     'Tasks Done',    '#a5d6a7')
+        + _sBox(tPend,     'Pending',       '#fff176')
+        + _sBox(tOverdue,  'Overdue',       '#ef9a9a')
+        + _sBox(pOpen,     'Open Issues',   '#ef9a9a')
+        + _sBox(pRes,      'Issues Fixed',  '#a5d6a7')
+        + _sBox(clRate+'%','Checklist',     '#80cbc4')
+        + _sBox(reqs.length,'Requests',     '#b39ddb')
+        + '</div></div>';
+
+    // Problems section
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+        + '<div style="font-weight:700;font-size:15px;">🔧 My Problems (' + probs.length + ')</div>'
         + '<button class="btn btn-sm btn-primary" onclick="Router.navigate(\'problems\')">+ Report Problem</button></div>';
-
-    if (d.myProblems.length === 0) {
-        html += '<div style="color:var(--gray);font-size:13px;margin-bottom:20px;">No problems reported</div>';
+    if (probs.length === 0) {
+        html += '<div style="color:var(--gray);font-size:13px;margin-bottom:16px;">No problems reported</div>';
     } else {
-        d.myProblems.slice().reverse().forEach(function(p) {
+        probs.slice().reverse().slice(0,5).forEach(function(p) {
             html += '<div class="work-item">'
                 + '<div style="flex:1;"><div style="font-size:13px;font-weight:600;">' + (p.title||'') + '</div>'
                 + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + (p.category||'') + (p.createdAt?' · '+APP.formatDate(p.createdAt):'') + '</div></div>'
                 + '<span class="badge ' + APP.getStatusBadge(p.status) + '" style="font-size:11px;">' + (p.status||'open') + '</span>'
                 + '</div>';
         });
+        html += '<div style="margin-bottom:16px;"></div>';
     }
 
-    html += '<div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px;">'
-        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
-        + '<div style="font-weight:700;font-size:16px;">📋 My Reports (' + d.myReports.length + ')</div>'
+    // Reports section
+    html += '<div style="border-top:1px solid var(--border);padding-top:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+        + '<div style="font-weight:700;font-size:15px;">📋 My Reports (' + d.myReports.length + ')</div>'
         + '<button class="btn btn-sm btn-primary" onclick="showReportForm()">+ New Report</button></div>';
-
     if (d.myReports.length === 0) {
-        html += '<div style="color:var(--gray);font-size:13px;">No reports submitted yet</div>';
+        html += '<div style="color:var(--gray);font-size:13px;">No reports submitted yet. Click "+ New Report" to send a detailed work summary to your HOD/Admin.</div>';
     } else {
         d.myReports.slice().reverse().forEach(function(r) {
             html += '<div class="work-item" style="flex-wrap:wrap;gap:6px;">'
                 + '<div style="flex:1;min-width:180px;"><div style="font-size:13px;font-weight:600;">' + (r.title||'') + '</div>'
-                + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + (r.category||'') + ' · To: ' + (r.sentTo||'-') + ' · ' + APP.formatDate(r.createdAt) + '</div></div>'
-                + '<span class="badge ' + (r.status==='sent'?'badge-success':'badge-warning') + '" style="font-size:11px;">' + (r.status||'draft') + '</span>'
+                + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + (r.category||'') + ' · To: ' + (r.sentTo||'-') + ' · ' + APP.formatDate(r.createdAt) + '</div>'
+                + (r.description ? '<div style="font-size:11px;color:var(--text);margin-top:3px;line-height:1.4;">' + r.description.substring(0,100) + (r.description.length>100?'…':'') + '</div>' : '')
+                + '</div>'
+                + '<span class="badge ' + (r.status==='sent'?'badge-success':'badge-warning') + '" style="font-size:10px;">' + (r.status||'draft') + '</span>'
                 + '<button class="btn btn-sm" style="background:#25D366;color:#fff;padding:4px 8px;" title="Share via WhatsApp" onclick="empShareReport(\'' + r.id + '\',\'whatsapp\')">💬</button>'
                 + '<button class="btn btn-sm" style="background:#1a73e8;color:#fff;padding:4px 8px;" title="Share via Email" onclick="empShareReport(\'' + r.id + '\',\'email\')">✉️</button>'
+                + '<button class="btn btn-sm" style="background:#1e7e34;color:#fff;padding:4px 8px;" title="Download Excel" onclick="empExportReportExcel(\'' + r.id + '\')">📊</button>'
                 + '</div>';
         });
     }
@@ -748,16 +787,92 @@ function empCompleteCleaning(taskId) {
 /* ══════════════════════════════════════════
    REPORT FORM
 ══════════════════════════════════════════ */
+function _genEmpWorkSummary() {
+    var d = _empData;
+    if (!d || !d.user) return '';
+    var now = new Date().toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+    var tasks  = d.myTasks    || [];
+    var probs  = d.myProblems || [];
+    var reqs   = d.myRequests || [];
+    var cls    = d.myChecklists || [];
+
+    var tDone  = tasks.filter(function(t){ return t.status==='completed'; });
+    var tProg  = tasks.filter(function(t){ return t.status==='in-progress'; });
+    var tPend  = tasks.filter(function(t){ return t.status==='pending'; });
+    var tOver  = tasks.filter(function(t){ return t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='completed'; });
+    var pOpen  = probs.filter(function(p){ return p.status!=='resolved'; });
+    var pRes   = probs.filter(function(p){ return p.status==='resolved'; });
+    var clDone = cls.filter(function(c){ return c.status==='completed'; });
+    var clRate = cls.length > 0 ? Math.round(clDone.length/cls.length*100) : 0;
+
+    var lines = [];
+    lines.push('WORK SUMMARY REPORT');
+    lines.push('Employee: ' + d.user.fullName + ' | Department: ' + (d.dept||'—') + ' | Date: ' + now);
+    lines.push('');
+
+    lines.push('── TASKS ──');
+    lines.push('Completed: ' + tDone.length + ' | In Progress: ' + tProg.length + ' | Pending: ' + tPend.length + ' | Overdue: ' + tOver.length);
+    if (tDone.length > 0) {
+        lines.push('');
+        lines.push('Completed Tasks:');
+        tDone.forEach(function(t, i){ lines.push('  ' + (i+1) + '. ' + t.title + (t.deadline?' (Due: '+new Date(t.deadline).toLocaleDateString('en-IN')+')':'')); });
+    }
+    if (tProg.length > 0) {
+        lines.push('');
+        lines.push('In Progress:');
+        tProg.forEach(function(t, i){ lines.push('  ' + (i+1) + '. ' + t.title); });
+    }
+    if (tPend.length > 0) {
+        lines.push('');
+        lines.push('Pending Tasks:');
+        tPend.forEach(function(t, i){ lines.push('  ' + (i+1) + '. ' + t.title + (tOver.some(function(o){return o.id===t.id;})?'  ⚠ OVERDUE':'')); });
+    }
+
+    lines.push('');
+    lines.push('── PROBLEMS / ISSUES ──');
+    lines.push('Total: ' + probs.length + ' | Resolved: ' + pRes.length + ' | Open: ' + pOpen.length);
+    if (probs.length > 0) {
+        probs.slice(0,5).forEach(function(p, i){
+            lines.push('  ' + (i+1) + '. [' + (p.status||'open').toUpperCase() + '] ' + p.title + (p.category?' ('+p.category+')':''));
+        });
+        if (probs.length > 5) lines.push('  ... and ' + (probs.length-5) + ' more');
+    } else {
+        lines.push('  None reported');
+    }
+
+    lines.push('');
+    lines.push('── CHECKLISTS ──');
+    lines.push('Total: ' + cls.length + ' | Done: ' + clDone.length + ' | Compliance: ' + clRate + '%');
+
+    lines.push('');
+    lines.push('── MATERIAL REQUESTS ──');
+    lines.push('Total: ' + reqs.length);
+    if (reqs.length > 0) {
+        reqs.slice(0,5).forEach(function(r, i){
+            lines.push('  ' + (i+1) + '. ' + (r.title||'Request') + ' — ' + (r.status||'pending'));
+        });
+        if (reqs.length > 5) lines.push('  ... and ' + (reqs.length-5) + ' more');
+    } else {
+        lines.push('  None');
+    }
+
+    return lines.join('\n');
+}
+
 function showReportForm() {
     var user = AUTH.currentUser();
     if (!user) return;
+    var summary = _genEmpWorkSummary();
+    var today = new Date().toLocaleDateString('en-IN', {day:'numeric', month:'long', year:'numeric'});
+    var defaultTitle = 'Work Report — ' + today;
     var html = '<form id="reportForm">'
-        + '<div class="form-group"><label>Report Title</label><input type="text" name="title" class="form-control" required></div>'
+        + '<div class="form-group"><label>Report Title</label><input type="text" name="title" class="form-control" value="' + defaultTitle.replace(/"/g,'&quot;') + '" required></div>'
         + '<div class="form-group"><label>Category</label><select name="category" class="form-control"><option value="daily">Daily Report</option><option value="weekly">Weekly Report</option><option value="monthly">Monthly Report</option><option value="custom">Custom Report</option></select></div>'
         + '<div class="form-group"><label>Send To</label><select name="sentTo" class="form-control"><option value="hod">HOD</option><option value="admin">Admin</option><option value="both">Both HOD & Admin</option></select></div>'
-        + '<div class="form-group"><label>Description</label><textarea name="description" class="form-control" rows="5" required></textarea></div>'
+        + '<div class="form-group"><label>Work Summary (auto-generated — edit as needed)</label>'
+        + '<textarea name="description" class="form-control" rows="12" required style="font-family:monospace;font-size:12px;">' + summary.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</textarea></div>'
         + '</form>';
-    openFormModal('Submit Report', html, 'saveReport()', false);
+    openFormModal('Submit Work Report', html, 'saveReport()', false);
 }
 
 function saveReport() {
@@ -765,12 +880,22 @@ function saveReport() {
     if (!user) return false;
     var data = getFormData('reportForm');
     if (!data.title || !data.description) { APP.notify('Title and description required', 'error'); return false; }
-    data.createdBy = user.username;
-    data.createdByName = user.fullName;
-    data.status = 'sent';
-    var saved = DB.add('reports', data);
-    APP.notify('Report submitted! Share it using 💬 ✉️ buttons in My Reports.', 'success');
-    // Navigate to employee dashboard and open Reports tab
+    data.createdBy      = user.username;
+    data.createdByName  = user.fullName;
+    data.department     = user.department || '';
+    data.status         = 'sent';
+    // Attach snapshot stats for HOD inbox display
+    var d = _empData;
+    if (d && d.myTasks) {
+        data._tasksDone    = (d.myTasks.filter(function(t){ return t.status==='completed'; })).length;
+        data._tasksTotal   = d.myTasks.length;
+        data._probsOpen    = (d.myProblems||[]).filter(function(p){ return p.status!=='resolved'; }).length;
+        data._probsTotal   = (d.myProblems||[]).length;
+        data._reqsTotal    = (d.myRequests||[]).length;
+        data._clRate       = d.myChecklists&&d.myChecklists.length>0 ? Math.round(d.myChecklists.filter(function(c){ return c.status==='completed'; }).length/d.myChecklists.length*100) : 0;
+    }
+    DB.add('reports', data);
+    APP.notify('Report submitted! Share it using 💬 ✉️ 📊 buttons in My Reports.', 'success');
     Router.navigate('employee-dashboard');
     setTimeout(function(){ empTabSwitch('reports'); }, 80);
 }
@@ -779,17 +904,91 @@ function empShareReport(id, via) {
     var r = (DB.get('reports') || []).find(function(x){ return x.id === id; });
     if (!r) { APP.notify('Report not found', 'error'); return; }
     var user = AUTH.currentUser();
-    var text = '*' + (r.title || 'Report') + '*'
-        + '\nFrom: ' + (r.createdByName || (user && user.fullName) || '')
-        + (r.department ? ' (' + r.department + ')' : '')
-        + '\nDate: ' + (r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : '-')
-        + '\nCategory: ' + (r.category || '-')
-        + (r.sentTo ? '\nSent To: ' + r.sentTo : '')
-        + '\n\n' + (r.description || '');
+    var dateStr = r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN', {weekday:'long',day:'numeric',month:'long',year:'numeric'}) : '-';
+    var text = '🏥 *HOSPITAL MANAGEMENT SYSTEM*\n'
+        + '*' + (r.title||'Work Report') + '*\n'
+        + '━━━━━━━━━━━━━━━━━━━━━\n'
+        + '👤 *Employee:* ' + (r.createdByName||(user&&user.fullName)||'') + '\n'
+        + '🏢 *Department:* ' + (r.department||user&&user.department||'—') + '\n'
+        + '📅 *Date:* ' + dateStr + '\n'
+        + '📂 *Category:* ' + (r.category||'—').charAt(0).toUpperCase()+(r.category||'—').slice(1) + '\n'
+        + '📨 *Sent To:* ' + (r.sentTo||'—') + '\n'
+        + '━━━━━━━━━━━━━━━━━━━━━\n';
+    if (r._tasksTotal !== undefined) {
+        text += '📋 *Tasks:* ' + r._tasksDone + '/' + r._tasksTotal + ' done'
+            + (r._tasksTotal > 0 ? ' (' + Math.round(r._tasksDone/r._tasksTotal*100) + '%)' : '') + '\n'
+            + '🔧 *Issues:* ' + (r._tasksTotal!==undefined ? r._probsTotal : '—') + ' total, ' + r._probsOpen + ' open\n'
+            + '✅ *Checklist:* ' + r._clRate + '% compliance\n'
+            + '📦 *Material Requests:* ' + r._reqsTotal + '\n'
+            + '━━━━━━━━━━━━━━━━━━━━━\n';
+    }
+    text += '\n' + (r.description||'');
     if (via === 'whatsapp') {
         window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
     } else {
-        window.location.href = 'mailto:?subject=' + encodeURIComponent(r.title || 'Report') + '&body=' + encodeURIComponent(text);
+        window.location.href = 'mailto:?subject=' + encodeURIComponent(r.title||'Work Report') + '&body=' + encodeURIComponent(text);
+    }
+}
+
+function empExportReportExcel(id) {
+    var r = (DB.get('reports') || []).find(function(x){ return x.id === id; });
+    if (!r) { APP.notify('Report not found', 'error'); return; }
+    var user = AUTH.currentUser();
+    var d = _empData;
+    if (!d || !d.user) { APP.notify('Please view your dashboard first', 'error'); return; }
+    try {
+        var wb = XLSX.utils.book_new();
+
+        // Sheet 1: Report Info
+        var info = [
+            ['WORK REPORT'],
+            ['Title', r.title||''],
+            ['Employee', r.createdByName||''],
+            ['Department', r.department||''],
+            ['Date', r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN') : ''],
+            ['Category', r.category||''],
+            ['Sent To', r.sentTo||''],
+            ['Status', r.status||''],
+            [],
+            ['SUMMARY'],
+            ['Tasks Completed', r._tasksDone!==undefined ? r._tasksDone : '—'],
+            ['Total Tasks', r._tasksTotal!==undefined ? r._tasksTotal : '—'],
+            ['Open Issues', r._probsOpen!==undefined ? r._probsOpen : '—'],
+            ['Total Issues', r._probsTotal!==undefined ? r._probsTotal : '—'],
+            ['Checklist Compliance', r._clRate!==undefined ? r._clRate+'%' : '—'],
+            ['Material Requests', r._reqsTotal!==undefined ? r._reqsTotal : '—'],
+            [],
+            ['DESCRIPTION'],
+            [r.description||'']
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(info), 'Report Info');
+
+        // Sheet 2: Tasks
+        var taskRows = [['Title','Status','Priority','Deadline','Department','Created By']];
+        (d.myTasks||[]).forEach(function(t){
+            taskRows.push([t.title||'', t.status||'', t.priority||'', t.deadline||'', t.department||'', t.createdBy||'']);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(taskRows), 'Tasks');
+
+        // Sheet 3: Problems
+        var probRows = [['Title','Category','Status','Created At']];
+        (d.myProblems||[]).forEach(function(p){
+            probRows.push([p.title||'', p.category||'', p.status||'', p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN') : '']);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(probRows), 'Problems');
+
+        // Sheet 4: Material Requests
+        var reqRows = [['Title','Status','Created At']];
+        (d.myRequests||[]).forEach(function(req){
+            reqRows.push([req.title||'', req.status||'', req.createdAt ? new Date(req.createdAt).toLocaleDateString('en-IN') : '']);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(reqRows), 'Material Requests');
+
+        var fname = ((r.title||'Work_Report').replace(/[^a-z0-9]/gi,'_')) + '.xlsx';
+        XLSX.writeFile(wb, fname);
+        APP.notify('Excel downloaded: ' + fname, 'success');
+    } catch(e) {
+        APP.notify('Excel export failed: ' + e.message, 'error');
     }
 }
 
