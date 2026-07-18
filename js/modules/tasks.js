@@ -44,7 +44,7 @@ function renderTaskList() {
     const search = (document.getElementById('taskSearch')?.value || '').toLowerCase();
     let filtered = tasks.filter(t => {
         if (!user || user.isSuperAdmin || user.role === 'admin') return true;
-        if (user.role === 'hod') return t.department === user.department || t.createdBy === user.username;
+        if (user.role === 'hod') return t.department === user.department;
         return t.assignedTo === user.fullName || t.createdBy === user.username;
     });
     filtered = filtered.filter(t =>

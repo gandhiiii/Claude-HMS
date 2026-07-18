@@ -91,7 +91,7 @@ function renderEmployeeDashboard(container) {
                    (!t.assignedTo && t.department === dept);
         }),
         myProblems: problems.filter(function(p) {
-            return p.createdBy === user.username || p.createdBy === user.fullName;
+            return p.createdBy === user.username || p.createdBy === user.fullName || p.assignedTo === user.username;
         }),
         myRequests: requests.filter(function(r) {
             return r.createdBy === user.username || r.createdBy === user.fullName;
@@ -412,18 +412,65 @@ function renderEmpWorkTab(el) {
         html += '</div>';
     }
 
-    // Material requests
-    var pendingReqs = d.myRequests.filter(function(r){ return r.status === 'pending'; });
+    // Material requests with new multi-stage status display
+    var empMatStatusMap = {
+        'pending':           { label: 'Waiting HOD',      badge: 'badge-warning' },
+        'hod_approved':      { label: 'HOD Approved',     badge: 'badge-info' },
+        'hod_rejected':      { label: 'HOD Rejected',     badge: 'badge-danger' },
+        'facility_approved': { label: 'Facility Approved',badge: 'badge-info' },
+        'facility_rejected': { label: 'Facility Rejected',badge: 'badge-danger' },
+        'store_fulfilled':   { label: 'Ready to Collect', badge: 'badge-success' },
+        'confirmed':         { label: 'Confirmed',        badge: 'badge-success' },
+        'partial':           { label: 'Partial',          badge: 'badge-warning' },
+        'approved':          { label: 'Approved',         badge: 'badge-success' },
+        'rejected':          { label: 'Rejected',         badge: 'badge-danger' }
+    };
     if (d.myRequests.length > 0) {
+        var storeFulfilledReqs = d.myRequests.filter(function(r){ return r.status === 'store_fulfilled'; });
         html += '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
-            + '<div style="font-weight:700;font-size:15px;">📦 Material Requests (' + d.myRequests.length + ')</div>'
+            + '<div style="font-weight:700;font-size:15px;">&#128230; My Material Requests (' + d.myRequests.length + ')</div>'
             + '<button class="btn btn-sm btn-primary" onclick="Router.navigate(\'material-requests\')">+ New Request</button></div>';
-        d.myRequests.slice().reverse().slice(0,6).forEach(function(r) {
-            var badge = r.status === 'approved' ? 'badge-success' : r.status === 'rejected' ? 'badge-danger' : 'badge-warning';
-            html += '<div class="work-item"><div style="flex:1;font-size:13px;font-weight:600;">' + (r.title||'Request')
-                + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + APP.formatDate(r.createdAt) + (r.approvedBy ? ' · Reviewed by: ' + r.approvedBy : '') + '</div></div>'
-                + '<span class="badge ' + badge + '" style="font-size:11px;">' + (r.status||'pending') + '</span></div>';
+        if (storeFulfilledReqs.length > 0) {
+            html += '<div style="background:#e8f5e9;border:2px solid var(--success);border-radius:8px;padding:10px 14px;margin-bottom:10px;">'
+                + '<strong style="color:var(--success);">&#128230; ' + storeFulfilledReqs.length + ' request(s) ready to collect — please confirm receipt!</strong></div>';
+        }
+        d.myRequests.slice().reverse().slice(0, 6).forEach(function(r) {
+            var stInfo = empMatStatusMap[r.status] || { label: r.status || 'pending', badge: 'badge-warning' };
+            var canConfirm = r.status === 'store_fulfilled';
+            html += '<div class="work-item" style="flex-wrap:wrap;gap:6px;">'
+                + '<div style="flex:1;min-width:180px;">'
+                + '<div style="font-size:13px;font-weight:600;">' + (r.title || 'Request') + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + APP.formatDate(r.createdAt) + '</div>'
+                + '</div>'
+                + '<span class="badge ' + stInfo.badge + '" style="font-size:11px;">' + stInfo.label + '</span>'
+                + (canConfirm
+                    ? '<button class="btn btn-sm btn-success" onclick="empConfirmMatReq(\'' + r.id + '\',false)">Confirm</button>'
+                    + '<button class="btn btn-sm btn-warning" onclick="empConfirmMatReq(\'' + r.id + '\',true)">Partial</button>'
+                    : '')
+                + '</div>';
+        });
+        html += '</div>';
+    }
+
+    // Problems assigned to me
+    var assignedProbs = d.myProblems.filter(function(p) { return p.assignedTo === d.user.username && p.status !== 'resolved'; });
+    if (assignedProbs.length > 0) {
+        html += '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">'
+            + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">&#128295; Problems Assigned to Me (' + assignedProbs.length + ')</div>';
+        assignedProbs.forEach(function(p) {
+            var statusBadge = p.status === 'in_progress' ? 'badge-info' : 'badge-warning';
+            html += '<div class="work-item" style="flex-wrap:wrap;gap:6px;">'
+                + '<div style="flex:1;min-width:180px;">'
+                + '<div style="font-size:13px;font-weight:600;">' + (p.title || '') + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">'
+                + 'Category: ' + (p.category || '-') + ' &middot; ' + APP.formatDate(p.createdAt)
+                + (p.assignNote ? '<br>Note: ' + p.assignNote : '')
+                + '</div></div>'
+                + '<span class="badge ' + statusBadge + '" style="font-size:11px;">' + (p.status || 'assigned').replace('_', ' ') + '</span>'
+                + (p.status === 'assigned' ? '<button class="btn btn-sm btn-info" onclick="empMarkProbInProgress(\'' + p.id + '\')">Start</button>' : '')
+                + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'problems\')">View</button>'
+                + '</div>';
         });
         html += '</div>';
     }
@@ -717,5 +764,26 @@ function saveReport() {
     data.status = 'sent';
     DB.add('reports', data);
     APP.notify('Report submitted', 'success');
+    Router.navigate('employee-dashboard');
+}
+
+function empConfirmMatReq(id, partial) {
+    var note = prompt(partial ? 'What was partially received? Describe:' : 'Any notes about full receipt? (optional):');
+    if (note === null) return;
+    var user = AUTH.currentUser();
+    DB.update('material_requests', id, {
+        status: partial ? 'partial' : 'confirmed',
+        confirmedBy: user ? user.username : '',
+        confirmedByName: user ? user.fullName : '',
+        confirmedAt: new Date().toISOString(),
+        confirmationNote: note || ''
+    });
+    APP.notify(partial ? 'Marked as partially received' : 'Request confirmed and closed!', 'success');
+    Router.navigate('employee-dashboard');
+}
+
+function empMarkProbInProgress(id) {
+    DB.update('problems', id, { status: 'in_progress' });
+    APP.notify('Problem marked in progress', 'info');
     Router.navigate('employee-dashboard');
 }

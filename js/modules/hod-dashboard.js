@@ -107,6 +107,18 @@ function renderHodDashboard(container) {
     var allReqs     = DB.get('hodRequests') || [];
     var myReqs      = allReqs.filter(function (r) { return r.department === dept; });
 
+    // Material requests from material_requests that need this HOD's approval
+    var isFacHod = typeof _matProcurementDept === 'function' && dept === _matProcurementDept();
+    var pendingMatApprovals = (DB.get('material_requests') || []).filter(function (r) {
+        if (isFacHod) return r.status === 'hod_approved';
+        return r.status === 'pending' && r.department === dept;
+    });
+
+    // Problems routed to this department
+    var routedProblems = (DB.get('problems') || []).filter(function (p) {
+        return (p.routedTo === dept || (!p.routedTo && p.department === dept)) && p.status !== 'resolved';
+    });
+
     // Admissions for this dept context
     var allAdm      = DB.get('admissions') || [];
     var cleaning    = (DB.get('roomCleaningTasks') || []).filter(function (t) { return t.status !== 'done'; });
@@ -130,12 +142,14 @@ function renderHodDashboard(container) {
         }),
         myCl: myCl,
         myReqs: myReqs,
+        pendingMatApprovals: pendingMatApprovals,
+        routedProblems: routedProblems,
         cleaning: cleaning,
         allAdm: allAdm
     };
 
     var pendingCl  = myCl.filter(function (c) { return c.status !== 'completed'; }).length;
-    var pendingReq = myReqs.filter(function (r) { return r.status === 'pending'; }).length;
+    var pendingReq = myReqs.filter(function (r) { return r.status === 'pending'; }).length + pendingMatApprovals.length;
 
     var tabs = [
         { id: 'overview',    label: 'Overview' },
@@ -757,10 +771,61 @@ function _clCard(cl) {
 function _hodRequests(el) {
     var d    = _hodData;
     var reqs = d.myReqs;
+    var matApprovals = d.pendingMatApprovals || [];
+    var routedProbs  = d.routedProblems || [];
+
     var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
-        + '<div><div style="font-weight:700;font-size:16px;">📦 Material Requests</div>'
-        + '<div style="font-size:12px;color:var(--gray);">Requests submitted to Admin for ' + d.dept + '</div></div>'
+        + '<div><div style="font-weight:700;font-size:16px;">📦 Requests &amp; Approvals</div>'
+        + '<div style="font-size:12px;color:var(--gray);">Your dept requests + pending approvals for ' + d.dept + '</div></div>'
         + '<button class="btn btn-primary btn-sm" onclick="hodCreateRequest()">+ New Request</button></div>';
+
+    // ── Pending material request approvals ──
+    if (matApprovals.length > 0) {
+        html += '<div style="background:#fff3e0;border:2px solid var(--warning);border-radius:10px;padding:14px;margin-bottom:16px;">'
+            + '<div style="font-weight:700;font-size:14px;color:#e65100;margin-bottom:10px;">&#9888; ' + matApprovals.length + ' Material Request(s) Awaiting Your Approval</div>';
+        matApprovals.forEach(function (r) {
+            var items = (r.items || []).map(function (i) { return i.name + ' \xd7' + i.qty; }).join(', ');
+            var isFacHod = d.isFacHod || (typeof _matProcurementDept === 'function' && d.dept === _matProcurementDept());
+            html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">'
+                + '<div>'
+                + '<div style="font-size:13px;font-weight:700;">' + (r.title || 'Request') + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">'
+                + 'From: <strong>' + (r.createdByName || r.createdBy || '?') + '</strong>'
+                + ' &middot; Dept: <strong>' + (r.department || '-') + '</strong>'
+                + ' &middot; ' + APP.formatDate(r.createdAt)
+                + '</div>'
+                + (items ? '<div style="font-size:11px;color:var(--text);margin-top:3px;">Items: ' + items + '</div>' : '')
+                + (r.reason ? '<div style="font-size:11px;color:var(--gray);">Reason: ' + r.reason + '</div>' : '')
+                + '</div>'
+                + '<div style="display:flex;gap:6px;">'
+                + (isFacHod && r.status === 'hod_approved'
+                    ? '<button class="btn btn-sm btn-success" onclick="facilityApproveMatReq(\'' + r.id + '\');_hodRefreshAndShow()">&#10003; Approve</button>'
+                    + '<button class="btn btn-sm btn-danger" onclick="facilityRejectMatReq(\'' + r.id + '\');_hodRefreshAndShow()">&#10007; Reject</button>'
+                    : '<button class="btn btn-sm btn-success" onclick="hodApproveMatReq(\'' + r.id + '\');_hodRefreshAndShow()">&#10003; Approve</button>'
+                    + '<button class="btn btn-sm btn-danger" onclick="hodRejectMatReq(\'' + r.id + '\');_hodRefreshAndShow()">&#10007; Reject</button>')
+                + '</div></div></div>';
+        });
+        html += '</div>';
+    }
+
+    // ── Problems routed to this dept ──
+    var openProbs = routedProbs.filter(function (p) { return p.status === 'open'; });
+    if (openProbs.length > 0) {
+        html += '<div style="background:#fce4ec;border:2px solid var(--danger);border-radius:10px;padding:14px;margin-bottom:16px;">'
+            + '<div style="font-weight:700;font-size:14px;color:var(--danger);margin-bottom:10px;">&#128295; ' + openProbs.length + ' Open Problem(s) Routed to ' + d.dept + '</div>';
+        openProbs.slice(0, 5).forEach(function (p) {
+            html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">'
+                + '<div>'
+                + '<div style="font-size:13px;font-weight:600;">' + (p.title || '') + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);">Category: ' + (p.category || '-') + ' &middot; From: ' + (p.reportedBy || '-') + ' &middot; ' + APP.formatDate(p.createdAt) + '</div>'
+                + '</div>'
+                + '<button class="btn btn-sm btn-warning" onclick="showAssignProbForm(\'' + p.id + '\')">Assign</button>'
+                + '</div>';
+        });
+        if (openProbs.length > 5) html += '<div style="font-size:12px;color:var(--gray);text-align:center;padding:4px;">+ ' + (openProbs.length - 5) + ' more — <a onclick="Router.navigate(\'problems\')" style="cursor:pointer;color:var(--primary);">View all in Problems module</a></div>';
+        html += '</div>';
+    }
 
     if (reqs.length === 0) {
         html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
@@ -808,6 +873,22 @@ function hodAddReqItem() {
     row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;';
     row.innerHTML = '<input type="text" name="item_name_' + _hodReqItemCount + '" class="form-control" placeholder="Item name"><input type="number" name="item_qty_' + _hodReqItemCount + '" class="form-control" placeholder="Qty" style="max-width:80px;">';
     area.appendChild(row);
+}
+
+function _hodRefreshAndShow() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = _hodData.dept;
+    var isFacHod = typeof _matProcurementDept === 'function' && dept === _matProcurementDept();
+    _hodData.pendingMatApprovals = (DB.get('material_requests') || []).filter(function (r) {
+        if (isFacHod) return r.status === 'hod_approved';
+        return r.status === 'pending' && r.department === dept;
+    });
+    _hodData.routedProblems = (DB.get('problems') || []).filter(function (p) {
+        return (p.routedTo === dept || (!p.routedTo && p.department === dept)) && p.status !== 'resolved';
+    });
+    _hodData.myReqs = (DB.get('hodRequests') || []).filter(function (r) { return r.department === dept; });
+    _renderHodTab('requests');
 }
 
 function hodSaveRequest() {
