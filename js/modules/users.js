@@ -159,7 +159,8 @@ function renderUsersList() {
         if (searchInput) search = searchInput.value.toLowerCase();
 
         var rows = '';
-        var valid = [];
+        var sanitized = [];  // all non-null valid objects (for DB cleanup only)
+        var displayed = 0;   // count of search-matching rows shown
 
         for (var i = 0; i < users.length; i++) {
             var u = users[i];
@@ -175,6 +176,8 @@ function renderUsersList() {
             var isSuperAdmin = !!u.isSuperAdmin;
             var permissions = Array.isArray(u.permissions) ? u.permissions : [];
 
+            sanitized.push(u);  // collect ALL valid objects regardless of search
+
             var match = fullName.toLowerCase().includes(search) ||
                 username.toLowerCase().includes(search) ||
                 email.toLowerCase().includes(search) ||
@@ -182,7 +185,7 @@ function renderUsersList() {
                 department.toLowerCase().includes(search);
 
             if (!match) continue;
-            valid.push(u);
+            displayed++;
 
             var deptFeatures = typeof getDepartmentFeatures === 'function' ? getDepartmentFeatures(department) : [];
             var totalPerms = new Set(deptFeatures.concat(permissions)).size;
@@ -202,15 +205,16 @@ function renderUsersList() {
                 + '</tr>';
         }
 
-        if (valid.length !== users.length) {
-            DB.set('users', valid);
+        // Only sanitize null/corrupt entries — never filter by search when saving
+        if (sanitized.length !== users.length) {
+            DB.set('users', sanitized);
         }
 
         var tbody = document.getElementById('usersTableBody');
         if (tbody) tbody.innerHTML = rows || '<tr><td colspan="8" class="empty-state">No users found</td></tr>';
 
         var countEl = document.getElementById('userCount');
-        if (countEl) countEl.textContent = valid.length + ' users';
+        if (countEl) countEl.textContent = (search ? displayed + ' of ' + sanitized.length : sanitized.length) + ' users';
     } catch (e) {
         console.warn('renderUsersList error:', e.message, e.stack);
         if (typeof APP !== 'undefined' && APP.notify) APP.notify('Error loading users: ' + e.message, 'error');
