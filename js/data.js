@@ -74,7 +74,7 @@ const DB = {
     /* Export all app data as a downloadable JSON file */
     exportAll(label) {
         try {
-            var snapshot = { _meta: { exportedAt: new Date().toISOString(), label: label || 'manual', appVersion: 'v45' }, data: {} };
+            var snapshot = { _meta: { exportedAt: new Date().toISOString(), label: label || 'manual', appVersion: 'v46' }, data: {} };
             this._ALL_KEYS.forEach(function(key) {
                 try {
                     var raw = localStorage.getItem('hms_' + key);
@@ -133,7 +133,7 @@ const DB = {
     /* Auto-backup: saves a snapshot to localStorage; keeps latest 3 rolling backups */
     autoBackup(reason) {
         try {
-            var snapshot = { _meta: { exportedAt: new Date().toISOString(), label: reason || 'auto', appVersion: 'v45' }, data: {} };
+            var snapshot = { _meta: { exportedAt: new Date().toISOString(), label: reason || 'auto', appVersion: 'v46' }, data: {} };
             this._ALL_KEYS.forEach(function(key) {
                 try {
                     var raw = localStorage.getItem('hms_' + key);
@@ -664,7 +664,7 @@ APP_SYNC = {
 
 const APP = {
     currentModule: null,
-    _APP_VERSION: 'v45',
+    _APP_VERSION: 'v46',
 
     init() {
         try {

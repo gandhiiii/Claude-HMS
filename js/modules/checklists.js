@@ -105,14 +105,20 @@ function renderClList() {
             <div style="display:flex;flex-direction:column;gap:4px;">
                 ${items.map((item, idx) => {
                     const st = item.status || 'pending';
-                    return `<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;background:${st === 'pending' ? 'var(--bg)' : '#f0faf0'};font-size:13px;">
-                        <span style="display:inline-block;width:70px;text-align:center;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;color:white;background:${statusColor(st)};">${statusText(st)}</span>
-                        <span style="flex:1;">${item.task}</span>
-                        ${item.unit ? '<span style="font-size:11px;color:var(--gray);background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid #ddd;">' + item.unit + '</span>' : ''}
-                        ${isAssignee(c) && c.status !== 'completed' ? `
-                            <select class="form-control" style="width:auto;padding:2px 4px;font-size:12px;" onchange="updateClItemStatus('${c.id}',${idx},this.value)">
-                                <option value="">Set</option>
-                                ${CL_STATUSES.map(s => '<option value="' + s + '">' + s.toUpperCase() + '</option>').join('')}
+                    const canFill = isAssignee(c) && c.status !== 'completed';
+                    const bgColor = st === 'ok' ? '#f0faf0' : st === 'fault' ? '#fff5f5' : st === 'problem' ? '#fff8f0' : st === 'na' ? '#f5f5f5' : 'var(--bg)';
+                    return `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;background:${bgColor};font-size:13px;flex-wrap:wrap;">
+                        <span style="display:inline-block;min-width:70px;text-align:center;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;color:white;background:${statusColor(st)};flex-shrink:0;">${statusText(st)}</span>
+                        <span style="flex:1;min-width:120px;">${item.task}</span>
+                        ${item.unit ? (canFill
+                            ? `<input type="number" step="any" class="form-control" style="width:80px;padding:3px 6px;font-size:12px;text-align:right;" value="${item.value !== undefined && item.value !== '' ? item.value : ''}" placeholder="0" title="Enter reading in ${item.unit}" onchange="updateClItemValue('${c.id}',${idx},this.value)">`
+                            : (item.value !== undefined && item.value !== '' ? `<span style="font-size:12px;font-weight:700;color:var(--text);">${item.value}</span>` : '')
+                        ) : ''}
+                        ${item.unit ? `<span style="font-size:11px;color:var(--gray);background:var(--card);padding:2px 7px;border-radius:4px;border:1px solid var(--border);font-weight:600;flex-shrink:0;">${item.unit}</span>` : ''}
+                        ${canFill ? `
+                            <select class="form-control" style="width:auto;padding:3px 4px;font-size:12px;flex-shrink:0;" onchange="updateClItemStatus('${c.id}',${idx},this.value)">
+                                <option value="">-- Status</option>
+                                ${CL_STATUSES.map(s => `<option value="${s}" ${item.status === s ? 'selected' : ''}>${s.toUpperCase()}</option>`).join('')}
                             </select>
                         ` : ''}
                     </div>`;
@@ -324,6 +330,16 @@ function updateClItemStatus(id, idx, value) {
     DB.update('checklists', id, { items: cl.items, status: cl.status, completedAt: cl.completedAt });
     APP.notify('Item set to ' + value.toUpperCase(), 'success');
     renderClList();
+}
+
+function updateClItemValue(id, idx, value) {
+    const cl = DB.getById('checklists', id);
+    if (!cl || !cl.items[idx]) return;
+    cl.items[idx].value = value;
+    cl.items[idx].updatedAt = new Date().toISOString();
+    cl.items[idx].updatedBy = AUTH.currentUser()?.fullName || '';
+    // Save quietly — no re-render so the input keeps focus
+    DB.update('checklists', id, { items: cl.items });
 }
 
 function completeCl(id) {
