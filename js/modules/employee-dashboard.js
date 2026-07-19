@@ -486,24 +486,34 @@ function renderEmpWorkTab(el) {
    CHECKLISTS TAB
 ══════════════════════════════════════════ */
 function renderEmpChecklistsTab(el) {
-    var d = _empData;
-    var clPending   = d.myChecklists.filter(function(c){ return c.status !== 'completed'; });
-    var clCompleted = d.myChecklists.filter(function(c){ return c.status === 'completed'; });
+    var user = AUTH.currentUser();
+    if (!user) return;
+
+    // Always re-read from DB — catches checklists assigned after the dashboard loaded
+    var allCl = DB.get('checklists') || [];
+    var myChecklists = allCl.filter(function(c) {
+        return c.assignedTo === user.fullName || c.assignedTo === 'common';
+    });
+    // Keep _empData in sync so KPI cards stay accurate
+    if (_empData) _empData.myChecklists = myChecklists;
+
+    var active    = myChecklists.filter(function(c){ return c.status !== 'completed'; });
+    var completed = myChecklists.filter(function(c){ return c.status === 'completed'; });
 
     var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
-        + '<div style="font-weight:700;font-size:16px;">✅ My Checklists</div>'
+        + '<div style="font-weight:700;font-size:16px;">✅ My Checklists'
+        + ' <span class="badge badge-primary" style="font-size:11px;margin-left:4px;">' + myChecklists.length + '</span></div>'
         + '<div style="display:flex;gap:4px;">'
-        + '<button class="tab-btn active" onclick="filterEmpCl(\'daily\',this)">Daily</button>'
-        + '<button class="tab-btn" onclick="filterEmpCl(\'weekly\',this)">Weekly</button>'
-        + '<button class="tab-btn" onclick="filterEmpCl(\'monthly\',this)">Monthly</button>'
-        + '<button class="tab-btn" onclick="filterEmpCl(\'all\',this)">All</button>'
+        + '<button class="tab-btn active" onclick="filterEmpCl(\'all\',this)">All (' + myChecklists.length + ')</button>'
+        + '<button class="tab-btn" onclick="filterEmpCl(\'active\',this)">Active (' + active.length + ')</button>'
+        + '<button class="tab-btn" onclick="filterEmpCl(\'completed\',this)">Done (' + completed.length + ')</button>'
         + '</div></div>';
 
     html += '<div id="empClListNew"></div>';
     el.innerHTML = html;
-    _empClFilter = 'daily';
-    window._empChecklists = d.myChecklists;
-    _renderEmpChecklists(d.myChecklists);
+    _empClFilter = 'all';
+    window._empChecklists = myChecklists;
+    _renderEmpChecklists(myChecklists);
 }
 
 function filterEmpCl(filter, btn) {
@@ -517,11 +527,15 @@ function _renderEmpChecklists(checklists) {
     var el = document.getElementById('empClListNew');
     if (!el) return;
     var filtered = checklists.filter(function(cl) {
-        if (_empClFilter === 'all') return true;
-        return (cl.title || '').toLowerCase().indexOf(_empClFilter) !== -1;
+        if (_empClFilter === 'active')    return cl.status !== 'completed';
+        if (_empClFilter === 'completed') return cl.status === 'completed';
+        return true; // 'all'
     });
     if (filtered.length === 0) {
-        el.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:20px;text-align:center;">No ' + _empClFilter + ' checklists assigned</div>';
+        var msg = _empClFilter === 'completed' ? 'No completed checklists yet'
+                : _empClFilter === 'active'    ? 'No active checklists — all done! 🎉'
+                : 'No checklists assigned yet. Your HOD or Admin will assign them here.';
+        el.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:24px;text-align:center;background:var(--light-gray);border-radius:8px;">' + msg + '</div>';
         return;
     }
     var html = '';
