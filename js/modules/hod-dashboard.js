@@ -223,6 +223,9 @@ function renderHodDashboard(container) {
     container.innerHTML = html;
     _hodTab = 'overview';
     _renderHodTab('overview');
+
+    // Start background browser-notification check (30-min interval, once per session)
+    if (typeof HMS_REM !== 'undefined') HMS_REM.scheduleCheck(user);
 }
 
 function _hKpi(icon, label, val, bg, color, tab) {
@@ -253,6 +256,12 @@ function _renderHodTab(tab) {
 ═══════════════════════════════════════════════ */
 function _hodOverview(el) {
     var d = _hodData;
+
+    // Reminder banners for HOD's own work (tasks assigned to HOD + own checklists)
+    var hodOwnCl    = (d.myCl || []).filter(function (c) { return c.assignedTo === d.u || c.assignedTo === 'common'; });
+    var hodOwnTasks = (d.allDeptTasks || []).filter(function (t) { return t.assignedTo === d.u || t.assignedTo === d.user.username; });
+    var remHtml = typeof HMS_REM !== 'undefined' ? HMS_REM.checkHod(d.user, hodOwnTasks, hodOwnCl) : '';
+
     var urgent = d.pendingTasks.filter(function (t) {
         var ti = _tatInfo(t);
         var isToday = t.deadline && (function() {
@@ -321,7 +330,7 @@ function _hodOverview(el) {
         + '<button class="btn btn-outline" onclick="hodShowReportForm()">📋 Send Report</button>'
         + '</div></div>';
 
-    el.innerHTML = html;
+    el.innerHTML = remHtml + html;
 }
 
 /* ═══════════════════════════════════════════════

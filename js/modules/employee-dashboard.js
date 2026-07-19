@@ -302,6 +302,9 @@ function renderEmployeeDashboard(container) {
 
     _empTab = 'overview';
     _renderEmpTab('overview');
+
+    // Start background browser-notification check (30-min interval, once per session)
+    if (typeof HMS_REM !== 'undefined') HMS_REM.scheduleCheck(user);
 }
 
 function _kpiCard(icon, label, val, bg, color, tab) {
@@ -360,6 +363,11 @@ function renderEmpOverview(el) {
     var pendingReqs    = d.myRequests.filter(function(r){ return r.status === 'pending'; }).slice(0, 4);
 
     var html = '';
+
+    // Reminder banners (weekly/monthly checklists, urgent tasks)
+    if (typeof HMS_REM !== 'undefined') {
+        html += HMS_REM.checkEmployee(d.user, d.myChecklists || [], d.myTasks || []);
+    }
 
     // Overdue alert
     if (overdueTasks.length > 0) {
