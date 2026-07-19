@@ -1,6 +1,13 @@
 // Problems — Department-routed issue tracking with assignment workflow
 // Flow: open → assigned (HOD assigns to team member) → in_progress → resolved
 
+function _genTicketId() {
+    var now = new Date();
+    var d = now.getFullYear() + ('0' + (now.getMonth() + 1)).slice(-2) + ('0' + now.getDate()).slice(-2);
+    var rand = Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+    return 'TKT-' + d + '-' + (rand || 'XXXX');
+}
+
 function renderProblems(container) {
     container.innerHTML = ''
         + '<div class="flex-between mb-4">'
@@ -15,7 +22,7 @@ function renderProblems(container) {
         + '<button class="tab-btn" onclick="switchProbTab(\'resolved\',this)">Resolved</button>'
         + '</div>'
         + '<div class="card"><div class="table-responsive"><table>'
-        + '<thead><tr><th>ID</th><th>Title</th><th>Category</th><th>Routed To</th><th>Reported By</th><th>Date</th><th>Priority</th><th>Status</th><th>Actions</th></tr></thead>'
+        + '<thead><tr><th>Ticket ID</th><th>Title</th><th>Category</th><th>Routed To</th><th>Reported By</th><th>Date</th><th>Priority</th><th>Status</th><th>Actions</th></tr></thead>'
         + '<tbody id="probTableBody"></tbody></table></div></div>';
     renderProbList();
 }
@@ -79,7 +86,8 @@ function renderProbList() {
         var canResolve = p.status !== 'resolved' && (isAdmin || isHodOfDept || (p.assignedTo && p.assignedTo === user.username));
 
         return '<tr>'
-            + '<td><strong>#' + p.id.slice(-6) + '</strong></td>'
+            + '<td><strong style="color:var(--primary);font-size:12px;">' + (p.ticketId || '#' + p.id.slice(-6)) + '</strong>'
+            + (p.source === 'checklist' ? '<br><span style="font-size:10px;color:var(--gray);">📋 Checklist</span>' : '') + '</td>'
             + '<td>' + (p.title || '') + '</td>'
             + '<td>' + (p.category || '-') + '</td>'
             + '<td><span style="font-size:12px;color:var(--primary);font-weight:600;">' + (p.routedTo || p.department || '-') + '</span></td>'
@@ -159,6 +167,7 @@ function saveProb() {
         APP.notify('Please select which department should handle this problem', 'error'); return false;
     }
     data.status = 'open';
+    data.ticketId = _genTicketId();
     data.createdBy = user ? user.username : '';
     data.createdByName = user ? user.fullName : '';
     data.reportedBy = data.reportedBy || (user ? user.fullName : '');
@@ -248,8 +257,13 @@ function viewProb(id) {
     var canResolve = p.status !== 'resolved' && (isAdmin || isHodOfDept || (user && p.assignedTo === user.username));
 
     var html = '<div class="modal-header">'
-        + '<h3>#' + p.id.slice(-6) + ' — ' + (p.title || '') + '</h3>'
+        + '<h3>' + (p.title || '') + '</h3>'
         + '<button class="modal-close" onclick="this.closest(\'.modal\').remove()">&times;</button>'
+        + '</div>'
+        + '<div style="background:#fff3e0;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
+        + '<span style="font-size:16px;font-weight:800;color:#e65100;">' + (p.ticketId || '#' + p.id.slice(-6)) + '</span>'
+        + '<span class="badge ' + statusBadge + '" style="font-size:12px;">' + (p.status || 'open').replace('_', ' ') + '</span>'
+        + (p.source === 'checklist' ? '<span style="font-size:12px;color:var(--primary);">📋 From checklist: ' + (p.checklistTitle || '') + '</span>' : '')
         + '</div>'
         + '<div class="grid-2" style="gap:12px;margin-bottom:14px;">'
         + '<div><strong>Category:</strong> ' + (p.category || '-') + '</div>'

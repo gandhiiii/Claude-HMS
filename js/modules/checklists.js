@@ -338,8 +338,54 @@ function updateClItemStatus(id, idx, value) {
         cl.completedAt = new Date().toISOString();
     }
     DB.update('checklists', id, { items: cl.items, status: cl.status, completedAt: cl.completedAt });
+    // Auto-create a problem ticket when item is flagged as "problem"
+    if (value === 'problem') _autoCreateProblemFromCl(id, idx);
     APP.notify('Item set to ' + value.toUpperCase(), 'success');
     renderClList();
+}
+
+function _autoCreateProblemFromCl(clId, idx) {
+    const cl = DB.getById('checklists', clId);
+    if (!cl || !cl.items[idx]) return;
+    const item = cl.items[idx];
+    const user = AUTH.currentUser();
+    // Prevent duplicate: if an open ticket already exists for this item, skip
+    const existing = (DB.get('problems') || []).find(function(p) {
+        return p.source === 'checklist' && p.checklistId === clId &&
+               p.itemIdx === idx && p.status !== 'resolved';
+    });
+    if (existing) {
+        APP.notify('Ticket ' + (existing.ticketId || '') + ' already open for this item', 'info');
+        return;
+    }
+    const dept = cl.department || (user ? user.department : '') || '';
+    const ticketId = (typeof _genTicketId === 'function') ? _genTicketId() : ('TKT-' + Date.now());
+    const desc = 'Problem flagged in checklist "' + cl.title + '"'
+        + '\nItem: ' + item.task
+        + (item.value !== undefined && item.value !== '' ? '\nReading: ' + item.value + (item.unit ? ' ' + item.unit : '') : '')
+        + '\nFlagged by: ' + (user ? user.fullName : 'Unknown')
+        + '\nFloor/Area: ' + (cl.floor || 'N/A');
+    DB.add('problems', {
+        title: '[CL] ' + cl.title + ' — ' + item.task,
+        category: 'Checklist',
+        description: desc,
+        routedTo: dept,
+        department: user ? (user.department || dept) : dept,
+        priority: 'medium',
+        reportedBy: user ? user.fullName : '',
+        location: cl.floor || '',
+        createdBy: user ? user.username : '',
+        createdByName: user ? user.fullName : '',
+        status: 'open',
+        ticketId: ticketId,
+        source: 'checklist',
+        checklistId: clId,
+        checklistTitle: cl.title,
+        itemIdx: idx,
+        itemTask: item.task,
+        solution: '', resolvedBy: '', resolvedAt: '', assignedTo: '', assignedToName: ''
+    });
+    APP.notify('⚠️ Problem ticket ' + ticketId + ' created and sent to HOD', 'warning');
 }
 
 function updateClItemValue(id, idx, value) {

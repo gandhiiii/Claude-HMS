@@ -118,6 +118,15 @@ function _clAutoReport(cl, user, periodKey) {
         var v = (item.value !== undefined && item.value !== '') ? ' = ' + item.value + (item.unit ? ' ' + item.unit : '') : '';
         lines.push((i + 1) + '. ' + item.task + ': ' + (item.status || 'pending').toUpperCase() + v);
     });
+    // Include any problem tickets raised from this checklist
+    var clTickets = (DB.get('problems') || []).filter(function(p){ return p.checklistId === cl.id; });
+    if (clTickets.length > 0) {
+        lines.push('');
+        lines.push('PROBLEM TICKETS:');
+        clTickets.forEach(function(p){
+            lines.push((p.ticketId || ('#'+p.id.slice(-6))) + ' — ' + (p.itemTask || p.title) + ' [' + (p.status || 'open').toUpperCase() + ']');
+        });
+    }
     DB.add('reports', {
         title: '[Auto] ' + cl.title + ' — ' + periodKey,
         description: lines.join('\n'),
@@ -723,6 +732,15 @@ function empSubmitClPeriod(id) {
         var v = (item.value !== undefined && item.value !== '') ? ' = ' + item.value + (item.unit ? ' ' + item.unit : '') : '';
         lines.push((i + 1) + '. ' + item.task + ': ' + (item.status || 'pending').toUpperCase() + v);
     });
+    // Include problem tickets for this checklist
+    var clTickets = (DB.get('problems') || []).filter(function(p){ return p.checklistId === id; });
+    if (clTickets.length > 0) {
+        lines.push('');
+        lines.push('PROBLEM TICKETS:');
+        clTickets.forEach(function(p){
+            lines.push((p.ticketId || ('#'+p.id.slice(-6))) + ' — ' + (p.itemTask || p.title) + ' [' + (p.status || 'open').toUpperCase() + ']');
+        });
+    }
     DB.add('reports', {
         title: cl.title + ' — ' + periodKey,
         description: lines.join('\n'),

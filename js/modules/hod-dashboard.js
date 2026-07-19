@@ -978,20 +978,32 @@ function _hodRequests(el) {
     }
 
     // ── Problems routed to this dept ──
-    var openProbs = routedProbs.filter(function (p) { return p.status === 'open'; });
+    var openProbs = routedProbs.filter(function (p) { return p.status !== 'resolved'; });
     if (openProbs.length > 0) {
         html += '<div style="background:#fce4ec;border:2px solid var(--danger);border-radius:10px;padding:14px;margin-bottom:16px;">'
-            + '<div style="font-weight:700;font-size:14px;color:var(--danger);margin-bottom:10px;">&#128295; ' + openProbs.length + ' Open Problem(s) Routed to ' + d.dept + '</div>';
-        openProbs.slice(0, 5).forEach(function (p) {
-            html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">'
-                + '<div>'
-                + '<div style="font-size:13px;font-weight:600;">' + (p.title || '') + '</div>'
-                + '<div style="font-size:11px;color:var(--gray);">Category: ' + (p.category || '-') + ' &middot; From: ' + (p.reportedBy || '-') + ' &middot; ' + APP.formatDate(p.createdAt) + '</div>'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px;">'
+            + '<div style="font-weight:700;font-size:14px;color:var(--danger);">🔧 ' + openProbs.length + ' Problem(s) Routed to ' + d.dept + '</div>'
+            + '<a onclick="Router.navigate(\'problems\')" style="cursor:pointer;color:var(--primary);font-size:12px;">View all →</a></div>';
+        openProbs.slice(0, 8).forEach(function (p) {
+            var statusBadgeClr = p.status === 'in_progress' ? '#1565c0' : p.status === 'assigned' ? '#e65100' : 'var(--danger)';
+            html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">'
+                + '<div style="flex:1;min-width:0;">'
+                + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'
+                + '<span style="font-size:11px;font-weight:700;background:#fff3e0;color:#e65100;padding:2px 8px;border-radius:10px;white-space:nowrap;">' + (p.ticketId || '#' + p.id.slice(-6)) + '</span>'
+                + '<span style="background:' + statusBadgeClr + ';color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">' + (p.status || 'open').replace('_', ' ').toUpperCase() + '</span>'
+                + (p.priority === 'high' ? '<span style="background:var(--danger);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;">HIGH</span>' : '')
                 + '</div>'
-                + '<button class="btn btn-sm btn-warning" onclick="showAssignProbForm(\'' + p.id + '\')">Assign</button>'
-                + '</div>';
+                + '<div style="font-size:13px;font-weight:600;">' + (p.title || '') + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);margin-top:3px;">Category: ' + (p.category || '-') + ' · Reported by: ' + (p.reportedBy || '-') + ' · ' + APP.formatDate(p.createdAt) + '</div>'
+                + (p.source === 'checklist' ? '<div style="font-size:11px;color:var(--primary);margin-top:2px;">📋 Checklist: ' + (p.checklistTitle || '') + ' — ' + (p.itemTask || '') + '</div>' : '')
+                + (p.assignedToName ? '<div style="font-size:11px;color:var(--gray);margin-top:2px;">→ Assigned to: ' + p.assignedToName + '</div>' : '')
+                + '</div>'
+                + '<div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">'
+                + '<button class="btn btn-sm btn-success" onclick="hodSolveProb(\'' + p.id + '\')" style="font-size:11px;">✓ Solve</button>'
+                + '<button class="btn btn-sm btn-warning" onclick="showAssignProbForm(\'' + p.id + '\')" style="font-size:11px;">Assign</button>'
+                + '</div></div></div>';
         });
-        if (openProbs.length > 5) html += '<div style="font-size:12px;color:var(--gray);text-align:center;padding:4px;">+ ' + (openProbs.length - 5) + ' more — <a onclick="Router.navigate(\'problems\')" style="cursor:pointer;color:var(--primary);">View all in Problems module</a></div>';
         html += '</div>';
     }
 
@@ -1018,6 +1030,48 @@ function _hodRequests(el) {
         });
     }
     el.innerHTML = html;
+}
+
+function hodSolveProb(id) {
+    var p = DB.getById('problems', id);
+    if (!p) return;
+    var tkt = p.ticketId || ('#' + p.id.slice(-6));
+    var form = '<form id="hodSolveProbForm">'
+        + '<input type="hidden" id="hodSolveProbId" value="' + id + '">'
+        + '<div style="background:#fff3e0;border-radius:8px;padding:10px 14px;margin-bottom:14px;">'
+        + '<div style="font-size:13px;font-weight:800;color:#e65100;margin-bottom:2px;">' + tkt + '</div>'
+        + '<div style="font-size:14px;font-weight:600;">' + (p.title || '') + '</div>'
+        + (p.source === 'checklist' ? '<div style="font-size:12px;color:var(--primary);margin-top:4px;">📋 From: ' + (p.checklistTitle || '') + ' — ' + (p.itemTask || '') + '</div>' : '')
+        + '</div>'
+        + '<div class="form-group"><label>Resolution / Solution *</label>'
+        + '<textarea id="hodSolveSolution" class="form-control" rows="3" required placeholder="Describe how the problem was resolved and what action was taken..."></textarea></div>'
+        + '</form>';
+    openFormModal('Solve Problem — ' + tkt, form, 'hodSaveSolution()', false);
+}
+
+function hodSaveSolution() {
+    var id       = (document.getElementById('hodSolveProbId') || {}).value;
+    var solution = ((document.getElementById('hodSolveSolution') || {}).value || '').trim();
+    if (!solution) { APP.notify('Please describe the solution', 'error'); return false; }
+    var user = AUTH.currentUser();
+    var p    = DB.getById('problems', id);
+    DB.update('problems', id, {
+        status: 'resolved',
+        solution: solution,
+        resolvedBy: user ? user.fullName : '',
+        resolvedAt: new Date().toISOString()
+    });
+    var tkt = p ? (p.ticketId || '#' + p.id.slice(-6)) : '';
+    APP.notify('Problem ' + tkt + ' solved ✓', 'success');
+    var modal = document.querySelector('.modal');
+    if (modal) modal.remove();
+    // Refresh data and re-render
+    var dept = _hodData.dept;
+    _hodData.routedProblems = (DB.get('problems') || []).filter(function (pb) {
+        return (pb.routedTo === dept || (!pb.routedTo && pb.department === dept)) && pb.status !== 'resolved';
+    });
+    _renderHodTab('requests');
+    return true;
 }
 
 function hodCreateRequest() {
