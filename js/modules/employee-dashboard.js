@@ -55,6 +55,112 @@ function _isThisWeek(dateStr) {
 })();
 
 /* ══════════════════════════════════════════
+   CHECKLIST PERIOD HELPERS (5 AM boundary)
+══════════════════════════════════════════ */
+function _clPad(n) { return ('0' + n).slice(-2); }
+
+function _clPeriodKey(freq) {
+    // "Day" starts at 5:00 AM — subtract 5 h so anything before 5 AM still counts as yesterday
+    var adj = new Date(new Date().getTime() - 5 * 60 * 60 * 1000);
+    var y = adj.getFullYear(), m = adj.getMonth(), d = adj.getDate();
+    if (freq === 'weekly') {
+        var dow = adj.getDay();
+        var mon = new Date(adj); mon.setDate(d - (dow === 0 ? 6 : dow - 1));
+        var wy = mon.getFullYear();
+        var wk = Math.ceil((((mon - new Date(wy, 0, 1)) / 86400000) + new Date(wy, 0, 1).getDay() + 1) / 7);
+        return wy + '-W' + _clPad(wk);
+    }
+    if (freq === 'monthly') return y + '-' + _clPad(m + 1);
+    return y + '-' + _clPad(m + 1) + '-' + _clPad(d);
+}
+
+function _clPeriodLabel(freq) {
+    var adj = new Date(new Date().getTime() - 5 * 60 * 60 * 1000);
+    if (freq === 'weekly')  return 'Week of ' + adj.toLocaleDateString('en-IN', {month:'short', day:'numeric'});
+    if (freq === 'monthly') return adj.toLocaleDateString('en-IN', {month:'long', year:'numeric'});
+    return 'Today (' + adj.toLocaleDateString('en-IN', {weekday:'short', day:'numeric', month:'short'}) + ')';
+}
+
+function _clNextReset(freq) {
+    var now = new Date();
+    var t5 = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 5, 0, 0);
+    if (now >= t5) t5.setDate(t5.getDate() + 1);
+    if (freq === 'daily') return t5;
+    if (freq === 'weekly') {
+        var dow = now.getDay();
+        var daysToMon = dow === 0 ? 1 : 8 - dow;
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysToMon, 5, 0, 0);
+    }
+    if (freq === 'monthly') return new Date(now.getFullYear(), now.getMonth() + 1, 1, 5, 0, 0);
+    return t5;
+}
+
+function _clTimeUntil(date) {
+    var ms = date - new Date();
+    if (ms <= 0) return 'now';
+    var h = Math.floor(ms / 3600000), min = Math.floor((ms % 3600000) / 60000);
+    if (h >= 24) { var days = Math.floor(h / 24); return days + 'd ' + (h % 24) + 'h'; }
+    return h + 'h ' + min + 'm';
+}
+
+function _clAutoReport(cl, user, periodKey) {
+    var items = cl.items || [];
+    var done = items.filter(function(i){ return i.status && i.status !== 'pending'; }).length;
+    var pct  = items.length ? Math.round(done / items.length * 100) : 0;
+    var lines = [
+        'Auto-submitted checklist report',
+        'Period: ' + periodKey + ' (' + (cl.frequency || 'daily') + ')',
+        'Submitted by: system (employee did not submit before reset)',
+        'Completion: ' + done + '/' + items.length + ' items (' + pct + '%)',
+        ''
+    ];
+    items.forEach(function(item, i) {
+        var v = (item.value !== undefined && item.value !== '') ? ' = ' + item.value + (item.unit ? ' ' + item.unit : '') : '';
+        lines.push((i + 1) + '. ' + item.task + ': ' + (item.status || 'pending').toUpperCase() + v);
+    });
+    DB.add('reports', {
+        title: '[Auto] ' + cl.title + ' — ' + periodKey,
+        description: lines.join('\n'),
+        type: 'checklist-auto',
+        frequency: cl.frequency || 'daily',
+        periodKey: periodKey,
+        checklistId: cl.id,
+        checklistTitle: cl.title,
+        department: cl.department || user.department,
+        sentTo: 'hod',
+        createdBy: user.username,
+        createdByName: user.fullName || user.username,
+        autoSubmitted: true,
+        _tasksDone: done, _tasksTotal: items.length, _clRate: pct,
+        createdAt: new Date().toISOString(),
+        status: 'sent'
+    });
+}
+
+function _checkAndResetChecklists(checklists, user) {
+    checklists.forEach(function(cl) {
+        if (!cl.frequency) return; // legacy checklists without frequency skip auto-reset
+        var expected = _clPeriodKey(cl.frequency);
+        var stored   = cl.periodKey || '';
+        if (!stored) {
+            DB.update('checklists', cl.id, { periodKey: expected, periodSubmitted: false });
+            cl.periodKey = expected; cl.periodSubmitted = false;
+            return;
+        }
+        if (stored === expected) return; // same period, nothing to do
+        // Period crossed — auto-report if employee didn't submit, then reset items
+        if (!cl.periodSubmitted) _clAutoReport(cl, user, stored);
+        var resetItems = (cl.items || []).map(function(item) {
+            return { task: item.task, unit: item.unit || '', status: 'pending', value: '' };
+        });
+        DB.update('checklists', cl.id, {
+            items: resetItems, periodKey: expected, periodSubmitted: false, status: 'active'
+        });
+        cl.items = resetItems; cl.periodKey = expected; cl.periodSubmitted = false; cl.status = 'active';
+    });
+}
+
+/* ══════════════════════════════════════════
    MAIN RENDER
 ══════════════════════════════════════════ */
 function renderEmployeeDashboard(container) {
@@ -494,20 +600,25 @@ function renderEmpChecklistsTab(el) {
     var myChecklists = allCl.filter(function(c) {
         return c.assignedTo === user.fullName || c.assignedTo === 'common';
     });
-    // Keep _empData in sync so KPI cards stay accurate
     if (_empData) _empData.myChecklists = myChecklists;
 
-    var active    = myChecklists.filter(function(c){ return c.status !== 'completed'; });
-    var completed = myChecklists.filter(function(c){ return c.status === 'completed'; });
+    // Check for period crossings — auto-report and reset items as needed
+    _checkAndResetChecklists(myChecklists, user);
 
-    var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
+    var daily   = myChecklists.filter(function(c){ return !c.frequency || c.frequency === 'daily'; });
+    var weekly  = myChecklists.filter(function(c){ return c.frequency === 'weekly'; });
+    var monthly = myChecklists.filter(function(c){ return c.frequency === 'monthly'; });
+
+    var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">'
         + '<div style="font-weight:700;font-size:16px;">✅ My Checklists'
         + ' <span class="badge badge-primary" style="font-size:11px;margin-left:4px;">' + myChecklists.length + '</span></div>'
-        + '<div style="display:flex;gap:4px;">'
+        + '</div>'
+        + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;">'
         + '<button class="tab-btn active" onclick="filterEmpCl(\'all\',this)">All (' + myChecklists.length + ')</button>'
-        + '<button class="tab-btn" onclick="filterEmpCl(\'active\',this)">Active (' + active.length + ')</button>'
-        + '<button class="tab-btn" onclick="filterEmpCl(\'completed\',this)">Done (' + completed.length + ')</button>'
-        + '</div></div>';
+        + '<button class="tab-btn" onclick="filterEmpCl(\'daily\',this)">🔄 Daily (' + daily.length + ')</button>'
+        + '<button class="tab-btn" onclick="filterEmpCl(\'weekly\',this)">📅 Weekly (' + weekly.length + ')</button>'
+        + '<button class="tab-btn" onclick="filterEmpCl(\'monthly\',this)">🗓️ Monthly (' + monthly.length + ')</button>'
+        + '</div>';
 
     html += '<div id="empClListNew"></div>';
     el.innerHTML = html;
@@ -527,38 +638,103 @@ function _renderEmpChecklists(checklists) {
     var el = document.getElementById('empClListNew');
     if (!el) return;
     var filtered = checklists.filter(function(cl) {
-        if (_empClFilter === 'active')    return cl.status !== 'completed';
-        if (_empClFilter === 'completed') return cl.status === 'completed';
+        if (_empClFilter === 'daily')   return !cl.frequency || cl.frequency === 'daily';
+        if (_empClFilter === 'weekly')  return cl.frequency === 'weekly';
+        if (_empClFilter === 'monthly') return cl.frequency === 'monthly';
         return true; // 'all'
     });
     if (filtered.length === 0) {
-        var msg = _empClFilter === 'completed' ? 'No completed checklists yet'
-                : _empClFilter === 'active'    ? 'No active checklists — all done! 🎉'
-                : 'No checklists assigned yet. Your HOD or Admin will assign them here.';
+        var msg = _empClFilter === 'all'
+            ? 'No checklists assigned yet. Your HOD or Admin will assign them here.'
+            : 'No ' + _empClFilter + ' checklists assigned.';
         el.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:24px;text-align:center;background:var(--light-gray);border-radius:8px;">' + msg + '</div>';
         return;
     }
+    var freqBg   = { daily:'#e3f2fd', weekly:'#f3e5f5', monthly:'#e8f5e9' };
+    var freqClr  = { daily:'#1565c0', weekly:'#6a1b9a', monthly:'#2e7d32' };
+    var freqIcon = { daily:'🔄', weekly:'📅', monthly:'🗓️' };
     var html = '';
     filtered.forEach(function(cl) {
+        var freq  = cl.frequency || 'daily';
         var total = cl.items ? cl.items.length : 0;
-        var done  = cl.items ? cl.items.filter(function(i){ return i.status === 'ok'; }).length : 0;
-        var pct   = total > 0 ? Math.round((done/total)*100) : 0;
+        var done  = cl.items ? cl.items.filter(function(i){ return i.status && i.status !== 'pending'; }).length : 0;
+        var pct   = total > 0 ? Math.round((done / total) * 100) : 0;
         var isDue = cl.deadline && _isToday(cl.deadline);
-        html += '<div class="work-item' + (isDue?' urgent':'') + '" style="flex-direction:column;align-items:stretch;gap:8px;">'
-            + '<div style="display:flex;justify-content:space-between;align-items:center;">'
-            + '<div style="font-size:14px;font-weight:600;">' + (cl.title||'') + (cl.floor ? ' <span style="font-size:11px;color:var(--gray);">· ' + cl.floor + '</span>' : '') + '</div>'
-            + '<div style="display:flex;align-items:center;gap:8px;">'
-            + '<span class="badge ' + (cl.status==='completed'?'badge-success':'badge-info') + '" style="font-size:11px;">' + (cl.status||'active') + '</span>'
-            + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'checklists\')">Open</button>'
-            + '</div></div>'
-            + '<div style="display:flex;align-items:center;gap:8px;">'
-            + '<div style="flex:1;height:8px;background:var(--light-gray);border-radius:4px;"><div style="height:100%;width:' + pct + '%;background:' + (pct===100?'var(--success)':pct>=50?'var(--warning)':'var(--danger)') + ';border-radius:4px;"></div></div>'
-            + '<span style="font-size:12px;color:var(--gray);min-width:50px;">' + done + '/' + total + ' items</span>'
+        var bg    = freqBg[freq]  || '#e3f2fd';
+        var clr   = freqClr[freq] || '#1565c0';
+        var icon  = freqIcon[freq]|| '🔄';
+        var periodLabel = _clPeriodLabel(freq);
+        var timeLeft    = _clTimeUntil(_clNextReset(freq));
+        var submitted   = !!cl.periodSubmitted;
+
+        html += '<div class="work-item' + (isDue ? ' urgent' : '') + '" style="flex-direction:column;align-items:stretch;gap:8px;border-left:4px solid ' + clr + ';">'
+            // Title + actions row
+            + '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">'
+            + '<div>'
+            + '<div style="font-size:14px;font-weight:600;">' + (cl.title || '') + (cl.floor ? ' <span style="font-size:11px;color:var(--gray);">· ' + cl.floor + '</span>' : '') + '</div>'
+            + '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:4px;">'
+            + '<span style="background:' + bg + ';color:' + clr + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + icon + ' ' + freq.charAt(0).toUpperCase() + freq.slice(1) + '</span>'
+            + '<span style="font-size:11px;color:var(--gray);">' + periodLabel + '</span>'
+            + '<span style="font-size:11px;color:var(--gray);">⏱ Resets in ' + timeLeft + '</span>'
+            + (submitted ? '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">✓ Submitted</span>' : '')
             + '</div>'
-            + (cl.deadline ? '<div style="font-size:11px;color:' + (isDue?'var(--warning)':'var(--gray)') + ';">📅 Due: ' + APP.formatDate(cl.deadline) + '</div>' : '')
+            + '</div>'
+            + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+            + '<span class="badge ' + (cl.status === 'completed' ? 'badge-success' : 'badge-info') + '" style="font-size:11px;">' + (cl.status || 'active') + '</span>'
+            + (!submitted ? '<button class="btn btn-sm btn-success" onclick="empSubmitClPeriod(\'' + cl.id + '\')" style="font-size:11px;padding:3px 8px;">📤 Submit</button>' : '')
+            + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'checklists\')" style="font-size:11px;padding:3px 8px;">Open</button>'
+            + '</div></div>'
+            // Progress bar
+            + '<div style="display:flex;align-items:center;gap:8px;">'
+            + '<div style="flex:1;height:8px;background:var(--light-gray);border-radius:4px;"><div style="height:100%;width:' + pct + '%;background:' + (pct === 100 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)') + ';border-radius:4px;transition:width .3s;"></div></div>'
+            + '<span style="font-size:12px;color:var(--gray);min-width:55px;">' + done + '/' + total + ' done</span>'
+            + '</div>'
+            + (cl.deadline ? '<div style="font-size:11px;color:' + (isDue ? 'var(--warning)' : 'var(--gray)') + ';">📅 Deadline: ' + APP.formatDate(cl.deadline) + '</div>' : '')
             + '</div>';
     });
     el.innerHTML = html;
+}
+
+function empSubmitClPeriod(id) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var cl = DB.getById('checklists', id);
+    if (!cl) return;
+    var freq = cl.frequency || 'daily';
+    var periodKey = _clPeriodKey(freq);
+    var items = cl.items || [];
+    var done  = items.filter(function(i){ return i.status && i.status !== 'pending'; }).length;
+    var pct   = items.length ? Math.round(done / items.length * 100) : 0;
+    var lines = [
+        'Checklist Report submitted by ' + (user.fullName || user.username),
+        'Period: ' + periodKey + ' (' + freq + ')',
+        'Completion: ' + done + '/' + items.length + ' items (' + pct + '%)',
+        ''
+    ];
+    items.forEach(function(item, i) {
+        var v = (item.value !== undefined && item.value !== '') ? ' = ' + item.value + (item.unit ? ' ' + item.unit : '') : '';
+        lines.push((i + 1) + '. ' + item.task + ': ' + (item.status || 'pending').toUpperCase() + v);
+    });
+    DB.add('reports', {
+        title: cl.title + ' — ' + periodKey,
+        description: lines.join('\n'),
+        type: 'checklist-report',
+        frequency: freq,
+        periodKey: periodKey,
+        checklistId: id,
+        checklistTitle: cl.title,
+        department: cl.department || user.department,
+        sentTo: 'hod',
+        createdBy: user.username,
+        createdByName: user.fullName || user.username,
+        autoSubmitted: false,
+        _tasksDone: done, _tasksTotal: items.length, _clRate: pct,
+        createdAt: new Date().toISOString(),
+        status: 'sent'
+    });
+    DB.update('checklists', id, { periodSubmitted: true, periodKey: periodKey });
+    APP.notify('Checklist report submitted to HOD ✓', 'success');
+    renderEmpChecklistsTab(document.getElementById('empTabContent'));
 }
 
 /* ══════════════════════════════════════════

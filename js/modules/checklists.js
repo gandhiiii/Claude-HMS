@@ -91,6 +91,7 @@ function renderClList() {
                         ${c.floor ? ' | 📍 ' + c.floor : ''}
                         ${c.deadline ? ' | Due: ' + APP.formatDate(c.deadline) : ''}
                         ${c.deadline && APP.daysBetween(new Date().toISOString(), c.deadline) < 0 && c.status !== 'completed' ? ' ⚠️ Overdue' : ''}
+                        ${c.frequency === 'weekly' ? ' | 📅 Weekly' : c.frequency === 'monthly' ? ' | 🗓️ Monthly' : ' | 🔄 Daily'}
                     </span>
                 </div>
                 <div style="text-align:right;">
@@ -180,6 +181,14 @@ function showClForm(cl) {
                     <label>Deadline</label>
                     <input type="date" name="deadline" class="form-control" value="${cl?.deadline ? cl.deadline.split('T')[0] : ''}">
                 </div>
+                <div class="form-group">
+                    <label>Frequency ⏱</label>
+                    <select name="frequency" class="form-control">
+                        <option value="daily"   ${(cl?.frequency||'daily')==='daily'  ?'selected':''}>🔄 Daily — resets every day at 5 AM</option>
+                        <option value="weekly"  ${cl?.frequency==='weekly' ?'selected':''}>📅 Weekly — resets every Monday at 5 AM</option>
+                        <option value="monthly" ${cl?.frequency==='monthly'?'selected':''}>🗓️ Monthly — resets 1st of month at 5 AM</option>
+                    </select>
+                </div>
             </div>
             <div class="form-group">
                 <label>Description (optional)</label>
@@ -267,6 +276,7 @@ function saveCl() {
     const status = form.querySelector('[name="status"]')?.value || 'active';
     const description = form.querySelector('[name="description"]')?.value;
     const department = form.querySelector('[name="department"]')?.value || user.department || '';
+    const frequency  = form.querySelector('[name="frequency"]')?.value  || 'daily';
     if (!title || !assignedTo) { APP.notify('Title and assignment required', 'error'); return; }
     const items = [];
     const rows = form.querySelectorAll('.cl-item-row');
@@ -283,12 +293,12 @@ function saveCl() {
         items.forEach(item => {
             if (statusMap[item.task] !== undefined) item.status = statusMap[item.task];
         });
-        DB.update('checklists', id, { title, assignedTo, floor, deadline, description, items, status, department });
+        DB.update('checklists', id, { title, assignedTo, floor, deadline, description, items, status, department, frequency });
         APP.notify('Checklist updated', 'success');
     } else {
         DB.add('checklists', {
             title, assignedTo, floor: floor || '', deadline: deadline || '', description: description || '',
-            department, items, status: 'active', assignedBy: user.fullName
+            department, items, status: 'active', assignedBy: user.fullName, frequency
         });
         APP.notify('Checklist created and assigned', 'success');
     }
