@@ -166,6 +166,7 @@ function renderHodDashboard(container) {
 
     var pendingCl  = myCl.filter(function (c) { return c.status !== 'completed'; }).length;
     var pendingReq = myReqs.filter(function (r) { return r.status === 'pending'; }).length + pendingMatApprovals.length;
+    var openProblems = routedProblems.length;
 
     var tabs = [
         { id: 'overview',    label: 'Overview' },
@@ -173,7 +174,7 @@ function renderHodDashboard(container) {
         { id: 'tasks',       label: 'Tasks', badge: _hodData.overdueTasks.length, bc: 'badge-danger' },
         { id: 'team',        label: '👥 My Team', badge: team.length, bc: 'badge-success' },
         { id: 'checklists',  label: 'Checklists', badge: pendingCl, bc: 'badge-info' },
-        { id: 'requests',    label: 'Requests', badge: pendingReq, bc: 'badge-warning' },
+        { id: 'requests',    label: '🔧 Problems & Requests', badge: pendingReq + openProblems, bc: 'badge-danger' },
         { id: 'performance', label: 'Performance' },
         { id: 'hodreports',  label: '📤 Reports', badge: teamReports.length, bc: 'badge-danger' },
         { id: 'hodqp',       label: '🎯 Q Priorities' }
@@ -209,6 +210,12 @@ function renderHodDashboard(container) {
             ? '<div style="background:#fff3e0;border:1px solid var(--warning);border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;" onclick="hodTabSwitch(\'admissions\')">'
               + '<span style="font-size:13px;font-weight:600;color:#e65100;">🧹 ' + cleaning.length + ' room(s) awaiting cleaning</span>'
               + '<button class="btn btn-sm btn-warning" style="color:#fff;">Manage</button></div>'
+            : '')
+
+        + (openProblems > 0
+            ? '<div style="background:#fce4ec;border:1px solid var(--danger);border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;" onclick="hodTabSwitch(\'requests\')">'
+              + '<span style="font-size:13px;font-weight:600;color:var(--danger);">🔧 ' + openProblems + ' open problem(s) need your attention — click to Solve</span>'
+              + '<button class="btn btn-sm btn-danger">View & Solve</button></div>'
             : '')
 
         // Tab bar — flex-wrap so all tabs are always visible on any screen width

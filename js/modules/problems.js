@@ -80,9 +80,10 @@ function renderProbList() {
             : p.status === 'assigned' ? 'badge-warning'
             : 'badge-danger';
 
-        var isHodOfDept = user && user.role === 'hod' && p.routedTo === user.department;
+        var isHodOfDept = user && user.role === 'hod' &&
+            (p.routedTo === user.department || (!p.routedTo && p.department === user.department));
         var isAdmin = user && (user.isSuperAdmin || user.role === 'admin');
-        var canAssign = (isAdmin || isHodOfDept) && p.status !== 'resolved';
+        var canAssign  = (isAdmin || isHodOfDept) && p.status !== 'resolved';
         var canResolve = p.status !== 'resolved' && (isAdmin || isHodOfDept || (p.assignedTo && p.assignedTo === user.username));
 
         return '<tr>'
@@ -100,7 +101,7 @@ function renderProbList() {
             + '<td style="white-space:nowrap;">'
             + '<button class="btn btn-sm btn-primary" onclick="viewProb(\'' + p.id + '\')">View</button>'
             + (canAssign ? ' <button class="btn btn-sm btn-warning" onclick="showAssignProbForm(\'' + p.id + '\')">Assign</button>' : '')
-            + (canResolve ? ' <button class="btn btn-sm btn-success" onclick="resolveProb(\'' + p.id + '\')">Resolve</button>' : '')
+            + (canResolve ? ' <button class="btn btn-sm btn-success" onclick="resolveProb(\'' + p.id + '\')">✓ Solve</button>' : '')
             + '</td></tr>';
     }).join('');
 }
@@ -252,7 +253,8 @@ function viewProb(id) {
         : p.status === 'assigned' ? 'badge-warning' : 'badge-danger';
 
     var isAdmin = user && (user.isSuperAdmin || user.role === 'admin');
-    var isHodOfDept = user && user.role === 'hod' && p.routedTo === user.department;
+    var isHodOfDept = user && user.role === 'hod' &&
+        (p.routedTo === user.department || (!p.routedTo && p.department === user.department));
     var canMarkInProgress = p.status === 'assigned' && user && p.assignedTo === user.username;
     var canResolve = p.status !== 'resolved' && (isAdmin || isHodOfDept || (user && p.assignedTo === user.username));
 
@@ -308,18 +310,37 @@ function markProbInProgress(id) {
 function resolveProb(id) {
     var p = DB.getById('problems', id);
     if (!p || p.status === 'resolved') { APP.notify('Already resolved', 'info'); return; }
+    var tkt = p.ticketId || ('#' + p.id.slice(-6));
+    var form = '<form id="solveProbForm">'
+        + '<input type="hidden" id="solveProbId" value="' + id + '">'
+        + '<div style="background:#fff3e0;border-radius:8px;padding:10px 14px;margin-bottom:14px;">'
+        + '<div style="font-size:14px;font-weight:800;color:#e65100;">' + tkt + '</div>'
+        + '<div style="font-size:13px;font-weight:600;margin-top:2px;">' + (p.title || '') + '</div>'
+        + '</div>'
+        + '<div class="form-group"><label>Resolution / Solution *</label>'
+        + '<textarea id="solveProbSolution" class="form-control" rows="3" required placeholder="Describe how the problem was resolved..."></textarea></div>'
+        + '</form>';
+    openFormModal('✓ Solve Problem — ' + tkt, form, 'saveProbSolution()', false);
+}
+
+function saveProbSolution() {
+    var id       = (document.getElementById('solveProbId') || {}).value;
+    var solution = ((document.getElementById('solveProbSolution') || {}).value || '').trim();
+    if (!solution) { APP.notify('Please describe the solution', 'error'); return false; }
     var user = AUTH.currentUser();
-    var solution = prompt('Describe how the problem was resolved:');
-    if (solution === null) return;
-    if (!solution.trim()) { APP.notify('Please describe the solution', 'error'); return; }
+    var p    = DB.getById('problems', id);
     DB.update('problems', id, {
         status: 'resolved',
         solution: solution,
         resolvedBy: user ? user.fullName : '',
         resolvedAt: new Date().toISOString()
     });
-    APP.notify('Problem resolved', 'success');
+    var tkt = p ? (p.ticketId || '#' + p.id.slice(-6)) : '';
+    APP.notify('Problem ' + tkt + ' marked as solved ✓', 'success');
+    var modal = document.querySelector('.modal');
+    if (modal) modal.remove();
     renderProbList();
+    return true;
 }
 
 function resolveProbDirect(id) {
