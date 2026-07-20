@@ -198,6 +198,10 @@
                     createdAt: new Date().toISOString()
                 };
                 DB.set('users', [admin]);
+                // Push to Firebase immediately so all devices can log in
+                if (window.FB_DB) {
+                    try { window.FB_DB.ref('hms/users').set([admin]); } catch(fbErr) {}
+                }
                 var result = AUTH.login(uname, pass);
                 if (result.success) {
                     window.location.replace('dashboard.html');
