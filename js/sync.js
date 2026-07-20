@@ -16,7 +16,7 @@ var SYNC = (function () {
         'roomCleaningTasks', 'floorItems', 'resetTokens',
         'hodTasks', 'hodRequests',
         'budgets', 'budget_expenses',
-        'quarterly_priorities'
+        'quarterly_priorities', 'pwResetRequests'
     ];
 
     var _pushing    = {};  // key -> true while a Firebase write is in-flight
