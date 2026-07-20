@@ -415,40 +415,52 @@ function openPhotoCamera(previewId) {
     }, 300);
 }
 
-let _capturedPhotoData = null;
-
 function capturePhoto(previewId) {
     const video = document.getElementById('photoVideo');
     const canvas = document.getElementById('photoCanvas');
     if (!video || !canvas) return;
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    const w = video.videoWidth || video.clientWidth || 640;
+    const h = video.videoHeight || video.clientHeight || 480;
+    canvas.width = w;
+    canvas.height = h;
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    _capturedPhotoData = canvas.toDataURL('image/jpeg', 0.8);
+    ctx.drawImage(video, 0, 0, w, h);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+    // Store on canvas so usePhoto can read it without a global variable
+    canvas.dataset.photoData = dataUrl;
 
-    document.getElementById('photoCaptureOverlay').style.display = 'block';
-    document.getElementById('photoCapturedImg').src = _capturedPhotoData;
+    const overlay = document.getElementById('photoCaptureOverlay');
+    const capturedImg = document.getElementById('photoCapturedImg');
+    if (overlay) overlay.style.display = 'block';
+    if (capturedImg) capturedImg.src = dataUrl;
     video.style.display = 'none';
-    document.getElementById('btnCapture').style.display = 'none';
-    document.getElementById('btnRetake').style.display = 'inline-block';
-    document.getElementById('btnUsePhoto').style.display = 'inline-block';
+    const btnCapture = document.getElementById('btnCapture');
+    const btnRetake = document.getElementById('btnRetake');
+    const btnUse = document.getElementById('btnUsePhoto');
+    if (btnCapture) btnCapture.style.display = 'none';
+    if (btnRetake) btnRetake.style.display = 'inline-block';
+    if (btnUse) btnUse.style.display = 'inline-block';
     stopPhotoStream();
 }
 
 function retakePhoto() {
-    _capturedPhotoData = null;
-    document.getElementById('photoCaptureOverlay').style.display = 'none';
-    document.getElementById('photoVideo').style.display = 'block';
-    document.getElementById('btnCapture').style.display = 'inline-block';
-    document.getElementById('btnRetake').style.display = 'none';
-    document.getElementById('btnUsePhoto').style.display = 'none';
-
+    const canvas = document.getElementById('photoCanvas');
+    if (canvas) canvas.dataset.photoData = '';
+    const overlay = document.getElementById('photoCaptureOverlay');
     const video = document.getElementById('photoVideo');
+    if (overlay) overlay.style.display = 'none';
+    if (video) video.style.display = 'block';
+    const btnCapture = document.getElementById('btnCapture');
+    const btnRetake = document.getElementById('btnRetake');
+    const btnUse = document.getElementById('btnUsePhoto');
+    if (btnCapture) btnCapture.style.display = 'inline-block';
+    if (btnRetake) btnRetake.style.display = 'none';
+    if (btnUse) btnUse.style.display = 'none';
+
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } })
         .then(stream => {
             window._photoStream = stream;
-            video.srcObject = stream;
+            if (video) video.srcObject = stream;
         })
         .catch(() => {});
 }
@@ -461,19 +473,22 @@ function stopPhotoStream() {
 }
 
 function usePhoto(previewId) {
-    if (!_capturedPhotoData) return;
-    const preview = document.getElementById(previewId);
-    const hidden = document.getElementById(previewId + '_data');
-    const status = document.getElementById(previewId + '_status');
-    if (preview) {
-        preview.innerHTML = '<img src="' + _capturedPhotoData + '" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">';
+    const canvas = document.getElementById('photoCanvas');
+    const photoData = canvas && canvas.dataset.photoData;
+    if (!photoData) {
+        APP.notify('No photo captured — please tap 📸 Capture first', 'error');
+        return;
     }
-    if (hidden) hidden.value = _capturedPhotoData;
-    if (status) status.innerHTML = '<span style="color:green;">✅ Photo captured</span>';
+    const preview = document.getElementById(previewId);
+    const hidden  = document.getElementById(previewId + '_data');
+    const status  = document.getElementById(previewId + '_status');
+    if (preview) preview.innerHTML = '<img src="' + photoData + '" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">';
+    if (hidden)  hidden.value = photoData;
+    if (status)  status.innerHTML = '<span style="color:var(--secondary);">✅ Photo added</span>';
     stopPhotoStream();
-    // Close only the camera modal, not the patient/doctor form modal behind it
-    var cameraModal = document.getElementById('photoVideo');
-    if (cameraModal) cameraModal.closest('.modal').remove();
+    // Close only the camera modal — not the patient/doctor form behind it
+    const videoEl = document.getElementById('photoVideo');
+    if (videoEl) videoEl.closest('.modal').remove();
 }
 
 function openPhotoUpload(previewId) {
