@@ -113,25 +113,27 @@
             try { users = DB.get('users') || []; } catch(e) {}
 
             if (users.length === 0 && window.FB_DB) {
-                // localStorage empty — pull data from Firebase in the background.
-                // Login form stays visible so mobile users are never stuck on a spinner.
+                // localStorage empty — pull from Firebase in the background.
+                // Login form stays visible; setup form never auto-shows while Firebase is configured
+                // (data may just not have synced to Firebase from the admin device yet).
                 var _errEl = document.getElementById('loginError');
                 _errEl.style.color = 'var(--gray)';
                 _errEl.textContent = '⟳ Loading your data…';
                 var _done = false;
 
-                // Safety timeout: if Firebase doesn't respond in 7 s, clear the message
+                function _showRetry(msg) {
+                    _errEl.style.color = '#b45309';
+                    _errEl.innerHTML = (msg || 'Database not ready.')
+                        + ' <a href="#" onclick="location.reload();return false;" '
+                        + 'style="color:var(--primary);text-decoration:underline;">Tap to retry</a>';
+                }
+
+                // 8-second timeout — show retry, never the setup form
                 var _t = setTimeout(function() {
                     if (_done) return;
                     _done = true;
-                    _errEl.style.color = '';
-                    _errEl.textContent = '';
-                    var u2 = DB.get('users') || [];
-                    if (u2.length === 0) {
-                        document.getElementById('loginForm').style.display = 'none';
-                        document.getElementById('setupForm').classList.add('active');
-                    }
-                }, 7000);
+                    _showRetry('Could not reach database.');
+                }, 8000);
 
                 window.FB_DB.ref('hms').once('value').then(function(snap) {
                     if (_done) return;
@@ -148,22 +150,20 @@
                         _errEl.style.color = 'var(--secondary)';
                         _errEl.textContent = '✅ Data loaded. Please log in.';
                     } else {
-                        _errEl.style.color = '';
+                        // Firebase is empty too — this is truly the first install
+                        // (admin has not created any account anywhere yet)
+                        document.getElementById('loginForm').style.display = 'none';
                         _errEl.textContent = '';
-                        var u2 = DB.get('users') || [];
-                        if (u2.length === 0) {
-                            document.getElementById('loginForm').style.display = 'none';
-                            document.getElementById('setupForm').classList.add('active');
-                        }
+                        document.getElementById('setupForm').classList.add('active');
                     }
                 }).catch(function() {
                     if (_done) return;
                     _done = true;
                     clearTimeout(_t);
-                    _errEl.style.color = '';
-                    _errEl.textContent = '';
+                    _showRetry('Database connection failed.');
                 });
             } else if (users.length === 0) {
+                // No Firebase configured at all — true first install
                 document.getElementById('loginForm').style.display = 'none';
                 document.getElementById('setupForm').classList.add('active');
             }
