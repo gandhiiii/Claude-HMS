@@ -224,17 +224,29 @@ const Router = {
             const payload = btoa(encodeURIComponent(JSON.stringify({ users: users })));
             const base = window.location.href.replace('dashboard.html', 'index.html').split('#')[0].split('?')[0];
             const url = base + '#import=' + payload;
+
+            // Show each user's username so the admin knows what to use on mobile
+            const adminUsers = users.filter(function(u){ return u.role === 'admin' || u.isSuperAdmin; });
+            const userListHtml = adminUsers.map(function(u){
+                return `<span style="display:inline-block;background:var(--primary-light);color:var(--primary);padding:3px 10px;border-radius:20px;font-size:13px;font-weight:600;margin:2px;">${u.username}</span>`;
+            }).join(' ');
+
             const html = `
                 <div class="modal-overlay" id="mobileSetupModal" onclick="if(event.target===this)this.remove()">
-                    <div class="modal-content" style="max-width:380px;text-align:center;">
+                    <div class="modal-content" style="max-width:400px;text-align:center;">
                         <h3 style="margin-bottom:6px;">📱 Mobile Setup</h3>
-                        <p style="font-size:13px;color:var(--gray);margin-bottom:14px;">
-                            Scan this QR code with your mobile camera to set up login on mobile — no internet needed.
-                        </p>
-                        <div id="mobileQrBox" style="display:flex;justify-content:center;margin-bottom:14px;"></div>
-                        <p style="font-size:11px;color:var(--gray);margin-bottom:4px;">Or copy this link and open it on mobile:</p>
-                        <div id="mobileImportUrl" style="font-size:10px;word-break:break-all;background:var(--bg);padding:8px;border-radius:6px;margin-bottom:10px;max-height:60px;overflow:auto;">${url}</div>
-                        <button class="btn btn-sm btn-primary" onclick="navigator.clipboard.writeText(document.getElementById('mobileImportUrl').textContent).then(function(){APP.notify('Link copied!','success')})">Copy Link</button>
+
+                        <div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:10px 14px;margin-bottom:14px;text-align:left;">
+                            <p style="font-size:12px;font-weight:700;color:#2e7d32;margin-bottom:4px;">Your admin username${adminUsers.length > 1 ? 's' : ''}:</p>
+                            <div style="text-align:center;">${userListHtml || '<em style="color:var(--gray)">none</em>'}</div>
+                            <p style="font-size:11px;color:#2e7d32;margin-top:6px;margin-bottom:0;">Use this username + your password on the mobile login page.</p>
+                        </div>
+
+                        <p style="font-size:13px;color:var(--gray);margin-bottom:10px;">Or scan this QR code to import all accounts automatically:</p>
+                        <div id="mobileQrBox" style="display:flex;justify-content:center;margin-bottom:12px;"></div>
+                        <p style="font-size:11px;color:var(--gray);margin-bottom:4px;">Can't scan? Copy this link and open it on mobile:</p>
+                        <div id="mobileImportUrl" style="font-size:10px;word-break:break-all;background:var(--bg);padding:8px;border-radius:6px;margin-bottom:10px;max-height:54px;overflow:auto;">${url}</div>
+                        <button class="btn btn-sm btn-primary" onclick="navigator.clipboard.writeText(document.getElementById('mobileImportUrl').textContent).then(function(){APP.notify('Link copied — open it on mobile!','success')})">📋 Copy Link</button>
                         <div class="modal-footer">
                             <button class="btn" onclick="document.getElementById('mobileSetupModal').remove()">Close</button>
                         </div>
@@ -243,12 +255,12 @@ const Router = {
             document.body.insertAdjacentHTML('beforeend', html);
             setTimeout(function () {
                 try {
-                    new QRCode(document.getElementById('mobileQrBox'), { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.L });
+                    new QRCode(document.getElementById('mobileQrBox'), { text: url, width: 180, height: 180, correctLevel: QRCode.CorrectLevel.L });
                 } catch (e) {
                     document.getElementById('mobileQrBox').innerHTML = '<p style="color:var(--gray);font-size:12px;">QR unavailable — use the link above.</p>';
                 }
             }, 100);
-        } catch (e) { APP.notify('Could not generate setup code: ' + e.message, 'error'); }
+        } catch (e) { APP.notify('Could not generate setup: ' + e.message, 'error'); }
     },
     _syncNow() {
         if (!window.FB_DB) { APP.notify('No database connection', 'error'); return; }
