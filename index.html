@@ -11,8 +11,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     <style>
-        .spinner { width: 40px; height: 40px; border: 4px solid var(--light-gray); border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
-        @keyframes spin { to { transform: rotate(360deg); } }
         .reset-section { display: none; }
         .reset-section.active { display: block; }
         .login-logo { font-size: 36px; text-align: center; margin-bottom: 8px; }
@@ -28,6 +26,7 @@
             <h1>Hospital Management</h1>
             <p class="subtitle">Admin Login Portal</p>
 
+            <!-- Login Form -->
             <div id="loginForm">
                 <div class="form-group">
                     <label>Username</label>
@@ -37,27 +36,22 @@
                     <label>Password</label>
                     <input type="password" id="loginPass" class="form-control" placeholder="Enter password">
                 </div>
-                <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleLogin()">
-                    Sign In
-                </button>
+                <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleLogin()">Sign In</button>
                 <div class="login-footer">
                     <a href="#" onclick="showReset()" style="font-size:13px;">Forgot Password? Reset Here</a>
                 </div>
-                <div id="loginError" style="color:var(--danger);font-size:13px;margin-top:8px;text-align:center;"></div>
+                <div id="loginMsg" style="font-size:13px;margin-top:8px;text-align:center;"></div>
             </div>
 
+            <!-- Password Reset Form -->
             <div id="resetForm" class="reset-section">
                 <h3 style="margin-bottom:8px;">Reset Password</h3>
-                <p style="font-size:13px;color:var(--gray);margin-bottom:16px;">
-                    Enter your username, email, or phone number.
-                </p>
+                <p style="font-size:13px;color:var(--gray);margin-bottom:16px;">Enter your username, email, or phone number.</p>
                 <div class="form-group">
                     <label>Username / Email / Phone</label>
                     <input type="text" id="resetIdentifier" class="form-control" placeholder="Enter username, email or phone">
                 </div>
-                <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleResetRequest()">
-                    Send Reset Link
-                </button>
+                <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleResetRequest()">Send Reset Request</button>
                 <div class="login-footer">
                     <a href="#" onclick="showLogin()" style="font-size:13px;">Back to Login</a>
                 </div>
@@ -73,10 +67,11 @@
                 </div>
             </div>
 
+            <!-- Admin Setup Form (shown only when no accounts exist anywhere) -->
             <div id="setupForm" class="setup-section">
                 <div class="setup-badge">ADMIN SETUP</div>
                 <h3 style="margin-bottom:4px;">Create Admin Account</h3>
-                <p style="font-size:13px;color:var(--gray);margin-bottom:16px;">No accounts found in database. Create the administrator account to get started.</p>
+                <p style="font-size:13px;color:var(--gray);margin-bottom:16px;">No accounts found. Create the administrator account.</p>
                 <div class="form-group">
                     <label>Full Name</label>
                     <input type="text" id="setupName" class="form-control" placeholder="e.g. Hospital Administrator">
@@ -87,153 +82,101 @@
                 </div>
                 <div class="form-group">
                     <label>Password</label>
-                    <input type="password" id="setupPass" class="form-control" placeholder="Choose a password (min 6 chars)" autocomplete="new-password">
+                    <input type="password" id="setupPass" class="form-control" placeholder="Min 6 characters" autocomplete="new-password">
                 </div>
                 <div class="form-group">
                     <label>Confirm Password</label>
                     <input type="password" id="setupPass2" class="form-control" placeholder="Re-enter password" autocomplete="new-password">
                 </div>
                 <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleSetup()">Create Admin &amp; Sign In</button>
+                <div style="margin-top:8px;text-align:center;">
+                    <a href="#" onclick="showLogin();return false;" style="font-size:12px;color:var(--gray);">← Back to login</a>
+                </div>
                 <div id="setupError" style="color:var(--danger);font-size:13px;margin-top:8px;text-align:center;"></div>
             </div>
         </div>
     </div>
-    <script src="js/data.js?v=57"></script>
-    <script src="js/firebase-config.js"></script>
-    <script src="js/sync.js"></script>
+
+    <script src="js/data.js?v=58"></script>
+    <script src="js/firebase-config.js?v=58"></script>
+    <script src="js/sync.js?v=58"></script>
     <script>
-        // Redirect already-logged-in users; auto-recover from Firebase if localStorage was cleared
-        (function() {
+        (function () {
+            // Already logged in → go straight to dashboard
             try {
-                var user = AUTH.currentUser();
-                if (user) { window.location.replace('dashboard.html'); return; }
-            } catch(e) {}
+                if (AUTH.currentUser()) { window.location.replace('dashboard.html'); return; }
+            } catch (e) {}
 
             var users = [];
-            try { users = DB.get('users') || []; } catch(e) {}
+            try { users = DB.get('users') || []; } catch (e) {}
 
-            function _showSetup() {
-                document.getElementById('loginForm').style.display = 'none';
-                document.getElementById('setupForm').classList.add('active');
+            if (users.length > 0) {
+                // Local data exists — show login form, nothing else needed
+                return;
             }
 
-            if (users.length === 0 && window.FB_DB) {
-                // localStorage empty — check Firebase first
-                var _errEl = document.getElementById('loginError');
-                _errEl.style.color = 'var(--gray)';
-                _errEl.textContent = '⟳ Connecting…';
-                var _done = false;
+            if (window.FB_DB) {
+                // localStorage empty but Firebase is connected — pull data silently
+                var msgEl = document.getElementById('loginMsg');
+                msgEl.style.color = 'var(--gray)';
+                msgEl.textContent = '⟳ Connecting…';
 
-                // If Firebase takes too long, go straight to setup
-                var _t = setTimeout(function() {
-                    if (_done) return;
-                    _done = true;
-                    _errEl.textContent = '';
-                    _showSetup();
-                }, 8000);
-
-                window.FB_DB.ref('hms').once('value').then(function(snap) {
-                    if (_done) return;
-                    _done = true;
-                    clearTimeout(_t);
+                window.FB_DB.ref('hms').once('value').then(function (snap) {
                     var remote = snap.val();
                     var hasUsers = remote && remote.users &&
                         (Array.isArray(remote.users) ? remote.users.length : Object.keys(remote.users).length) > 0;
+
                     if (hasUsers) {
-                        // Restore all data from Firebase then show login
-                        Object.keys(remote).forEach(function(key) {
-                            try { localStorage.setItem('hms_' + key, JSON.stringify(remote[key])); } catch(e2) {}
+                        Object.keys(remote).forEach(function (key) {
+                            try { localStorage.setItem('hms_' + key, JSON.stringify(remote[key])); } catch (e2) {}
                         });
                         localStorage.setItem('hms_last_cloud_sync', new Date().toISOString());
-                        _errEl.style.color = 'var(--secondary)';
-                        _errEl.textContent = '✅ Data loaded. Please log in.';
+                        msgEl.style.color = 'var(--secondary)';
+                        msgEl.textContent = '✅ Ready. Please log in.';
                     } else {
-                        // Database confirmed empty — must create admin account
-                        _errEl.textContent = '';
-                        _showSetup();
+                        // No accounts in Firebase either — show setup form
+                        msgEl.textContent = '';
+                        document.getElementById('loginForm').style.display = 'none';
+                        document.getElementById('setupForm').classList.add('active');
                     }
-                }).catch(function() {
-                    if (_done) return;
-                    _done = true;
-                    clearTimeout(_t);
-                    _errEl.textContent = '';
-                    _showSetup();
+                }).catch(function () {
+                    msgEl.textContent = '';
                 });
-            } else if (users.length === 0) {
-                _showSetup();
+            } else {
+                // No Firebase — show setup immediately
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('setupForm').classList.add('active');
             }
         })();
 
-        function handleSetup() {
-            var name = (document.getElementById('setupName').value || '').trim();
-            var uname = (document.getElementById('setupUser').value || '').trim();
-            var pass = (document.getElementById('setupPass').value || '').trim();
-            var pass2 = (document.getElementById('setupPass2').value || '').trim();
-            var errEl = document.getElementById('setupError');
-            errEl.textContent = '';
-            if (!name) { errEl.textContent = 'Full name is required.'; return; }
-            if (!uname || uname.length < 3) { errEl.textContent = 'Username must be at least 3 characters.'; return; }
-            if (!pass || pass.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
-            if (pass !== pass2) { errEl.textContent = 'Passwords do not match.'; return; }
-            try {
-                var admin = {
-                    id: 'admin_' + Date.now(),
-                    username: uname,
-                    password: pass,
-                    fullName: name,
-                    email: '',
-                    phone: '',
-                    role: 'admin',
-                    department: 'Administration',
-                    isSuperAdmin: true,
-                    permissions: ['all'],
-                    createdAt: new Date().toISOString()
-                };
-                DB.set('users', [admin]);
-                // Push to Firebase immediately so all devices can log in
-                if (window.FB_DB) {
-                    try { window.FB_DB.ref('hms/users').set([admin]); } catch(fbErr) {}
-                }
-                var result = AUTH.login(uname, pass);
-                if (result.success) {
-                    window.location.replace('dashboard.html');
-                } else {
-                    errEl.textContent = result.message;
-                }
-            } catch(e) {
-                errEl.textContent = 'Setup error: ' + (e.message || e);
-            }
-        }
-
-        var currentResetToken = null;
-
+        /* ── Login ── */
         function handleLogin() {
             var username = document.getElementById('loginUser').value.trim();
             var password = document.getElementById('loginPass').value.trim();
-            var errEl = document.getElementById('loginError');
-            errEl.textContent = '';
-            if (!username || !password) {
-                errEl.textContent = 'Please enter username and password';
-                return;
-            }
+            var msgEl = document.getElementById('loginMsg');
+            msgEl.style.color = 'var(--danger)';
+            msgEl.textContent = '';
+            if (!username || !password) { msgEl.textContent = 'Please enter username and password.'; return; }
             try {
                 var result = AUTH.login(username, password);
                 if (result.success) {
                     window.location.replace('dashboard.html');
                 } else {
-                    errEl.textContent = result.message;
+                    msgEl.textContent = result.message;
                 }
-            } catch(e) {
-                errEl.textContent = 'Login error: ' + (e.message || e);
-            }
+            } catch (e) { msgEl.textContent = 'Login error: ' + (e.message || e); }
         }
 
-        document.getElementById('loginPass').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') handleLogin();
-        });
-        document.getElementById('loginUser').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') handleLogin();
-        });
+        document.getElementById('loginPass').addEventListener('keydown', function (e) { if (e.key === 'Enter') handleLogin(); });
+        document.getElementById('loginUser').addEventListener('keydown', function (e) { if (e.key === 'Enter') handleLogin(); });
+
+        /* ── Show/hide sections ── */
+        function showLogin() {
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('resetForm').classList.remove('active');
+            document.getElementById('setupForm').classList.remove('active');
+            document.getElementById('loginMsg').textContent = '';
+        }
 
         function showReset() {
             document.getElementById('loginForm').style.display = 'none';
@@ -242,26 +185,52 @@
             document.getElementById('resetLinkBox').style.display = 'none';
         }
 
-        function showLogin() {
-            document.getElementById('loginForm').style.display = 'block';
-            document.getElementById('resetForm').classList.remove('active');
-            document.getElementById('loginError').textContent = '';
+        /* ── Admin setup (first-time only) ── */
+        function handleSetup() {
+            var name  = (document.getElementById('setupName').value  || '').trim();
+            var uname = (document.getElementById('setupUser').value  || '').trim();
+            var pass  = (document.getElementById('setupPass').value  || '').trim();
+            var pass2 = (document.getElementById('setupPass2').value || '').trim();
+            var errEl = document.getElementById('setupError');
+            errEl.textContent = '';
+            if (!name)                    { errEl.textContent = 'Full name is required.'; return; }
+            if (!uname || uname.length < 3) { errEl.textContent = 'Username must be at least 3 characters.'; return; }
+            if (!pass  || pass.length < 6)  { errEl.textContent = 'Password must be at least 6 characters.'; return; }
+            if (pass !== pass2)           { errEl.textContent = 'Passwords do not match.'; return; }
+            try {
+                var admin = {
+                    id: 'admin_' + Date.now(), username: uname, password: pass,
+                    fullName: name, email: '', phone: '',
+                    role: 'admin', department: 'Administration',
+                    isSuperAdmin: true, permissions: ['all'],
+                    createdAt: new Date().toISOString()
+                };
+                DB.set('users', [admin]);
+                if (window.FB_DB) {
+                    try { window.FB_DB.ref('hms/users').set([admin]); } catch (fbErr) {}
+                }
+                var result = AUTH.login(uname, pass);
+                if (result.success) { window.location.replace('dashboard.html'); }
+                else { errEl.textContent = result.message; }
+            } catch (e) { errEl.textContent = 'Setup error: ' + (e.message || e); }
         }
+
+        /* ── Password reset ── */
+        var currentResetToken = null;
 
         function handleResetRequest() {
             var identifier = document.getElementById('resetIdentifier').value.trim();
             var resultEl = document.getElementById('resetResult');
             resultEl.style.color = '';
-            if (!identifier) { resultEl.textContent = 'Please enter username, email or phone'; return; }
+            if (!identifier) { resultEl.textContent = 'Please enter username, email or phone.'; return; }
             try {
                 var users = DB.get('users') || [];
-                var user = users.find(function(u) {
+                var user = users.find(function (u) {
                     return u.username === identifier || u.email === identifier || u.phone === identifier;
                 });
-                if (!user) { resultEl.textContent = 'No account found with that username, email or phone.'; return; }
+                if (!user) { resultEl.textContent = 'No account found.'; return; }
 
                 if (user.role === 'admin' || user.isSuperAdmin) {
-                    // Admin: direct token-based reset (existing flow)
                     var result = AUTH.requestReset(identifier);
                     resultEl.textContent = result.message;
                     if (result.success) {
@@ -270,44 +239,38 @@
                         currentResetToken = result.token;
                     }
                 } else {
-                    // Non-admin: submit a reset request — admin will reset it from the Users module
-                    var existing = (DB.get('pwResetRequests') || []).find(function(r) {
+                    var existing = (DB.get('pwResetRequests') || []).find(function (r) {
                         return r.userId === user.id && r.status === 'pending';
                     });
                     if (existing) {
                         resultEl.style.color = 'orange';
-                        resultEl.textContent = 'A request is already pending. Please wait for the administrator to process it.';
+                        resultEl.textContent = 'A request is already pending. Please wait for the administrator.';
                     } else {
                         DB.add('pwResetRequests', {
-                            userId: user.id,
-                            username: user.username,
+                            userId: user.id, username: user.username,
                             fullName: user.fullName || user.username,
-                            department: user.department || '',
-                            role: user.role,
-                            requestedAt: new Date().toISOString(),
-                            status: 'pending'
+                            department: user.department || '', role: user.role,
+                            requestedAt: new Date().toISOString(), status: 'pending'
                         });
                         resultEl.style.color = 'var(--secondary)';
-                        resultEl.textContent = 'Your request has been sent to the administrator. They will reset your password and inform you.';
+                        resultEl.textContent = 'Request sent to administrator.';
                     }
                 }
-            } catch(e) {
-                resultEl.textContent = 'Error: ' + (e.message || e);
-            }
+            } catch (e) { resultEl.textContent = 'Error: ' + (e.message || e); }
         }
 
         function handlePasswordReset() {
             var newPass = document.getElementById('newPassword').value.trim();
             if (!newPass || newPass.length < 4) {
-                document.getElementById('resetResult').textContent = 'Password must be at least 4 characters';
+                document.getElementById('resetResult').textContent = 'Password must be at least 4 characters.';
                 return;
             }
             var result = AUTH.resetPassword(currentResetToken, newPass);
             document.getElementById('resetResult').textContent = result.message;
-            if (result.success) { setTimeout(function() { showLogin(); }, 2000); }
+            if (result.success) { setTimeout(showLogin, 2000); }
         }
 
-        window.addEventListener('load', function() {
+        window.addEventListener('load', function () {
             var params = new URLSearchParams(window.location.search);
             var resetToken = params.get('reset');
             if (resetToken) {
@@ -321,7 +284,7 @@
                     document.getElementById('resetResult').style.color = 'var(--secondary)';
                     document.getElementById('resetResult').textContent = 'Token verified successfully!';
                 } else {
-                    document.getElementById('resetResult').textContent = 'Invalid or expired token';
+                    document.getElementById('resetResult').textContent = 'Invalid or expired token.';
                     document.getElementById('resetResult').style.color = 'var(--danger)';
                 }
             }
