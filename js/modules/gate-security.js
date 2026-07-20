@@ -580,6 +580,7 @@ function savePatientVisit() {
     data.status = 'active';
     const visit = DB.add('patientVisits', data);
     renderPatientList();
+    if (document.getElementById('genPassBody')) renderGenPassList();
     showModal(`
         <div class="modal-header">
             <h3>✅ Visitor Pass Generated</h3>
@@ -712,6 +713,7 @@ function checkOutPatient(id) {
         DB.update('patientVisits', id, { status: 'completed', exitTime: new Date().toISOString() });
         APP.notify('Patient "' + v.patientName + '" checked out. Pass deactivated.', 'success');
         renderPatientList();
+        if (document.getElementById('genPassBody')) renderGenPassList();
     });
 }
 
@@ -919,6 +921,7 @@ function saveDoctorVisit() {
     data.submittedBy = user ? user.fullName : 'Unknown';
     const visit = DB.add('doctorVisits', data);
     renderDoctorList();
+    if (document.getElementById('genPassBody')) renderGenPassList();
     APP.notify('Doctor entry submitted for HOD approval', 'success');
     showModal(`
         <div class="modal-header"><h3>✅ Request Submitted</h3><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
@@ -1225,6 +1228,7 @@ function checkOutDoctor(id) {
         DB.update('doctorVisits', id, { status: 'completed', exitTime: new Date().toISOString() });
         APP.notify('Doctor "' + v.doctorName + '" checked out. Pass deactivated.', 'success');
         renderDoctorList();
+        if (document.getElementById('genPassBody')) renderGenPassList();
     });
 }
 
@@ -1376,7 +1380,7 @@ function renderGenPassList() {
 }
 
 function showGenPassForm(type) {
-    if (type === 'visitor') {
+    if (type === 'visitor' || type === 'patient') {
         showPatientForm();
     } else {
         showDoctorForm();
