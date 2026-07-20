@@ -53,6 +53,11 @@
                     <a href="#" onclick="showReset();return false;" style="font-size:13px;">Forgot Password? Reset Here</a>
                 </div>
                 <div id="loginMsg" style="font-size:13px;margin-top:8px;text-align:center;min-height:20px;"></div>
+                <!-- Shown when Firebase is reachable but empty (data not synced yet) -->
+                <div id="noAccountsMsg" style="display:none;margin-top:12px;padding:10px 12px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;font-size:12px;color:#5f4900;line-height:1.5;">
+                    <strong>Already have an account?</strong><br>
+                    Open the dashboard on your <strong>PC/Desktop</strong> first — it will upload your data to the database. Then tap <strong>Refresh</strong> above.
+                </div>
                 <!-- Only shown when no accounts exist anywhere -->
                 <div id="setupLink"><a href="#" onclick="showSetup();return false;">⚙ First time? Create admin account</a></div>
             </div>
@@ -111,9 +116,9 @@
         </div>
     </div>
 
-    <script src="js/data.js?v=59"></script>
-    <script src="js/firebase-config.js?v=59"></script>
-    <script src="js/sync.js?v=59"></script>
+    <script src="js/data.js?v=60"></script>
+    <script src="js/firebase-config.js?v=60"></script>
+    <script src="js/sync.js?v=60"></script>
     <script>
         var _fbPullDone = false;
 
@@ -170,8 +175,10 @@
                         msgEl.style.color = 'var(--secondary)';
                         msgEl.textContent = '✅ Ready. Please log in.';
                     } else {
+                        // Firebase is reachable but has no accounts yet
                         msgEl.style.color = 'var(--gray)';
-                        msgEl.textContent = 'No accounts found.';
+                        msgEl.innerHTML = 'Database empty. <a href="#" onclick="retryFbConnect();return false;" style="color:var(--primary);">Refresh</a>';
+                        document.getElementById('noAccountsMsg').style.display = 'block';
                         document.getElementById('setupLink').style.display = 'block';
                     }
                 }).catch(function (err) {

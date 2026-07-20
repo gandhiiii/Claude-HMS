@@ -108,7 +108,7 @@ var SYNC = (function () {
             });
 
             // Step 2: push local keys that Firebase doesn't have yet
-            // (covers partial-sync case where only some keys reached Firebase)
+            var _pushedCount = 0;
             SHARED_KEYS.forEach(function (key) {
                 if (remote.hasOwnProperty(key)) return; // already handled above
                 try {
@@ -116,10 +116,15 @@ var SYNC = (function () {
                     if (raw) {
                         var d = JSON.parse(raw);
                         var hasData = Array.isArray(d) ? d.length > 0 : !!d;
-                        if (hasData) fbPush(key, d);
+                        if (hasData) { fbPush(key, d); _pushedCount++; }
                     }
                 } catch (e) {}
             });
+            if (_pushedCount > 0) {
+                setTimeout(function () {
+                    try { if (typeof APP !== 'undefined') APP.notify('Data uploaded to cloud database ✓', 'success'); } catch (e) {}
+                }, 1500);
+            }
 
             if (cb) cb();
         }).catch(function (e) {
