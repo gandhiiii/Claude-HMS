@@ -19,16 +19,16 @@ var SYNC = (function () {
         'quarterly_priorities'
     ];
 
-    var _pushing     = {};  // key -> true while a Firebase write is in-flight
-    var _pending     = {};  // key -> latest data queued while a write is in-flight
-    var _lastWriteTs = 0;   // ms timestamp of most recent local write (loop prevention)
-    var _inited      = false;
+    var _pushing    = {};  // key -> true while a Firebase write is in-flight
+    var _pending    = {};  // key -> latest data queued while a write is in-flight
+    var _pushedKeys = {};  // key -> timestamp of last local push (per-key echo prevention)
+    var _inited     = false;
 
     /* ── Queue-based push — never drops a write even when multiple saves fire quickly ── */
     function fbPush(key, data) {
         if (!window.FB_DB) return;
         if (SHARED_KEYS.indexOf(key) === -1) return;
-        _lastWriteTs = Date.now();
+        _pushedKeys[key] = Date.now();      // per-key echo prevention timestamp
         _pending[key] = data;               // always store the latest value
         if (!_pushing[key]) _flush(key);
     }
@@ -130,13 +130,13 @@ var SYNC = (function () {
     function fbListen() {
         if (!window.FB_DB) return;
         window.FB_DB.ref('hms').on('value', function (snap) {
-            // Ignore events that fire within 2 s of a local write — those are echoes of our own push
-            if (Date.now() - _lastWriteTs < 2000) return;
             var remote = snap.val();
             if (!remote) return;
             var changed = false;
             Object.keys(remote).forEach(function (key) {
                 if (SHARED_KEYS.indexOf(key) === -1) return;
+                // Per-key echo prevention: skip keys that WE pushed within the last 2 seconds
+                if (_pushedKeys[key] && Date.now() - _pushedKeys[key] < 2000) return;
                 try {
                     var json = JSON.stringify(remote[key]);
                     var existing = localStorage.getItem('hms_' + key);

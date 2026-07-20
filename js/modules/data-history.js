@@ -28,14 +28,28 @@ function _renderDataHistoryContent(container) {
                     </div>
                     <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
                         <button class="btn btn-sm btn-primary" onclick="dataHistoryPushToCloud()">⬆ Push to Cloud</button>
-                        <button class="btn btn-sm btn-outline" onclick="dataHistoryPullFromCloud()">⬇ Pull from Cloud</button>
+                        <button class="btn btn-sm" style="background:#e8f5e9;border:1px solid #34a853;color:#1b5e20;" onclick="dataHistoryPullFromCloud()">⬇ Pull from Cloud</button>
                     </div>
                 </div>
-                <div style="font-size:12px;color:var(--gray);background:var(--light-gray);border-radius:6px;padding:8px 12px;">
-                    ✅ Your data is automatically synced to Firebase on every change.<br>
-                    ✅ If you clear browser cache, reopen the app — data restores from the cloud automatically.<br>
-                    ✅ Changes from any device appear here in real time.
+                <div style="font-size:12px;color:var(--gray);background:var(--light-gray);border-radius:6px;padding:8px 12px;margin-bottom:12px;">
+                    ✅ Auto-synced on every change &nbsp;·&nbsp; ✅ Cache-clear safe &nbsp;·&nbsp; ✅ Real-time updates across devices
                 </div>
+
+                <details>
+                    <summary style="font-weight:600;font-size:13px;cursor:pointer;padding:4px 0;color:var(--primary);">📲 Configure Firebase on another device</summary>
+                    <div style="margin-top:10px;background:var(--light-gray);border-radius:8px;padding:12px 14px;">
+                        <p style="font-size:13px;color:var(--text);margin-bottom:10px;">Other devices need the same Firebase credentials to sync. Use one of these methods:</p>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+                            <button class="btn btn-sm btn-primary" onclick="dataHistoryShowQR()">📱 Share via QR Code</button>
+                            <button class="btn btn-sm btn-outline" onclick="dataHistoryShareConfig()">🔗 Copy Share Link</button>
+                            <button class="btn btn-sm btn-outline" onclick="dataHistoryDownloadFbConfig()">📄 Download firebase-config.js</button>
+                        </div>
+                        <div style="font-size:12px;color:var(--gray);line-height:1.8;">
+                            <strong>QR / Share Link:</strong> Scan or open the link on another device — Firebase auto-configures there.<br>
+                            <strong>Download file:</strong> Replace <code>js/firebase-config.js</code> in your project with the downloaded file, push to GitHub — all devices connect automatically.
+                        </div>
+                    </div>
+                </details>
             </div>
         </div>`;
     } else {
@@ -169,6 +183,126 @@ function _renderDataHistoryContent(container) {
             Download a current backup first to be safe.
         </div>
     `;
+}
+
+/* ── Cross-device Firebase config sharing ── */
+function _dataHistoryGetCfg() {
+    var cfg = window.HMS_FB_CFG || null;
+    if (!cfg) { try { cfg = JSON.parse(localStorage.getItem('hms_firebase_cfg')); } catch(e) {} }
+    return (cfg && cfg.apiKey) ? cfg : null;
+}
+
+function dataHistoryShareConfig() {
+    var cfg = _dataHistoryGetCfg();
+    if (!cfg) { APP.notify('Firebase config not available on this device', 'error'); return; }
+    try {
+        var encoded = btoa(JSON.stringify(cfg));
+        var href = window.location.href.replace(/#.*$/, '');
+        var base = href.substring(0, href.lastIndexOf('/') + 1);
+        var url = base + 'dashboard.html#fbcfg=' + encoded;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(function() {
+                APP.notify('Link copied! Open it on the other device — Firebase will auto-configure there.', 'success');
+            });
+        } else {
+            var ta = document.createElement('textarea');
+            ta.value = url; document.body.appendChild(ta); ta.select();
+            document.execCommand('copy'); document.body.removeChild(ta);
+            APP.notify('Link copied! Open it on the other device.', 'success');
+        }
+    } catch(e) { APP.notify('Error: ' + e.message, 'error'); }
+}
+
+function dataHistoryShowQR() {
+    var cfg = _dataHistoryGetCfg();
+    if (!cfg) { APP.notify('Firebase config not available on this device', 'error'); return; }
+    try {
+        var encoded = btoa(JSON.stringify(cfg));
+        var href = window.location.href.replace(/#.*$/, '');
+        var base = href.substring(0, href.lastIndexOf('/') + 1);
+        var url = base + 'dashboard.html#fbcfg=' + encoded;
+        var escapedUrl = url.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+        openFormModal('Scan to Configure Firebase on Another Device',
+            '<div style="text-align:center;padding:8px 0;">'
+            + '<div id="fbConfigQR" style="display:inline-block;margin-bottom:12px;border:6px solid #fff;border-radius:4px;"></div>'
+            + '<p style="font-size:12px;color:var(--gray);margin-bottom:10px;">Scan this QR code on another device\'s browser to auto-configure Firebase sync.</p>'
+            + '<p style="font-size:12px;color:var(--gray);margin-bottom:6px;">Or copy the link:</p>'
+            + '<input type="text" value="' + escapedUrl + '" readonly class="form-control" style="font-size:11px;" onclick="this.select()">'
+            + '</div>',
+            null, false);
+        setTimeout(function() {
+            var qrEl = document.getElementById('fbConfigQR');
+            if (qrEl && typeof QRCode !== 'undefined') {
+                new QRCode(qrEl, { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
+            } else if (qrEl) {
+                qrEl.textContent = 'QR library not loaded — use the link above.';
+            }
+        }, 150);
+    } catch(e) { APP.notify('Error: ' + e.message, 'error'); }
+}
+
+function dataHistoryDownloadFbConfig() {
+    var cfg = _dataHistoryGetCfg();
+    if (!cfg) { APP.notify('Firebase config not available on this device', 'error'); return; }
+    function esc(s) { return (s || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"'); }
+    var content = [
+        '// ═══════════════════════════════════════════════════════════════════',
+        '// HMS — Firebase Configuration (Generated ' + new Date().toLocaleString() + ')',
+        '// Replace js/firebase-config.js with this file, then push to GitHub',
+        '// so ALL devices automatically connect to Firebase.',
+        '// ═══════════════════════════════════════════════════════════════════',
+        '',
+        'var firebaseConfig = {',
+        '    apiKey:            "' + esc(cfg.apiKey) + '",',
+        '    authDomain:        "' + esc(cfg.authDomain || '') + '",',
+        '    databaseURL:       "' + esc(cfg.databaseURL || '') + '",',
+        '    projectId:         "' + esc(cfg.projectId || '') + '",',
+        '    storageBucket:     "' + esc(cfg.storageBucket || '') + '",',
+        '    messagingSenderId: "' + esc(cfg.messagingSenderId || '') + '",',
+        '    appId:             "' + esc(cfg.appId || '') + '"',
+        '};',
+        '',
+        '(function () {',
+        '    try {',
+        '        if (typeof firebase === \'undefined\') { window.FB_DB = null; window.FB_CONFIGURED = false; return; }',
+        '        // Hash-fragment sharing: dashboard.html#fbcfg=BASE64',
+        '        try {',
+        '            var m = (window.location.hash||\'\').match(/[#&]fbcfg=([A-Za-z0-9+\\/=%-]+)/);',
+        '            if (m) {',
+        '                var d = JSON.parse(atob(decodeURIComponent(m[1])));',
+        '                if (d && d.apiKey && !d.apiKey.startsWith(\'REPLACE_\')) {',
+        '                    localStorage.setItem(\'hms_firebase_cfg\', JSON.stringify(d));',
+        '                    try { history.replaceState(null,null,location.pathname+location.search); } catch(e2){}',
+        '                    firebaseConfig = d;',
+        '                }',
+        '            }',
+        '        } catch(e) {}',
+        '        // localStorage override',
+        '        try {',
+        '            var s = JSON.parse(localStorage.getItem(\'hms_firebase_cfg\')||\'null\');',
+        '            if (s && s.apiKey && !s.apiKey.startsWith(\'REPLACE_\')) firebaseConfig = s;',
+        '        } catch(e) {}',
+        '        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);',
+        '        window.FB_DB = firebase.database();',
+        '        window.FB_CONFIGURED = true;',
+        '        window.FB_PROJECT_ID = firebaseConfig.projectId;',
+        '        window.HMS_FB_CFG = firebaseConfig;',
+        '        console.info(\'[HMS] Firebase connected ✓\');',
+        '    } catch(e) {',
+        '        console.warn(\'[HMS] Firebase init failed:\', e.message);',
+        '        window.FB_DB = null; window.FB_CONFIGURED = false;',
+        '    }',
+        '})();'
+    ].join('\n');
+    try {
+        var blob = new Blob([content], { type: 'text/javascript' });
+        var bUrl = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = bUrl; a.download = 'firebase-config.js';
+        document.body.appendChild(a); a.click();
+        setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(bUrl); }, 200);
+        APP.notify('Downloaded. Replace js/firebase-config.js and push to GitHub — all devices will auto-connect.', 'success');
+    } catch(e) { APP.notify('Download failed: ' + e.message, 'error'); }
 }
 
 /* ── Firebase setup ── */
