@@ -16,6 +16,9 @@
         .reset-section { display: none; }
         .reset-section.active { display: block; }
         .login-logo { font-size: 36px; text-align: center; margin-bottom: 8px; }
+        .setup-section { display: none; }
+        .setup-section.active { display: block; }
+        .setup-badge { background: var(--secondary); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; display: inline-block; margin-bottom: 8px; letter-spacing: 0.5px; }
     </style>
 </head>
 <body>
@@ -28,11 +31,11 @@
             <div id="loginForm">
                 <div class="form-group">
                     <label>Username</label>
-                    <input type="text" id="loginUser" class="form-control" placeholder="Enter username" value="admin">
+                    <input type="text" id="loginUser" class="form-control" placeholder="Enter username">
                 </div>
                 <div class="form-group">
                     <label>Password</label>
-                    <input type="password" id="loginPass" class="form-control" placeholder="Enter password" value="admin123">
+                    <input type="password" id="loginPass" class="form-control" placeholder="Enter password">
                 </div>
                 <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleLogin()">
                     Sign In
@@ -69,19 +72,87 @@
                     </div>
                 </div>
             </div>
+
+            <div id="setupForm" class="setup-section">
+                <div class="setup-badge">FIRST TIME SETUP</div>
+                <h3 style="margin-bottom:4px;">Create Admin Account</h3>
+                <p style="font-size:13px;color:var(--gray);margin-bottom:16px;">No accounts exist yet. Set up the first administrator account.</p>
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="setupName" class="form-control" placeholder="e.g. Hospital Administrator">
+                </div>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="setupUser" class="form-control" placeholder="Choose a username" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="setupPass" class="form-control" placeholder="Choose a password (min 6 chars)" autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label>Confirm Password</label>
+                    <input type="password" id="setupPass2" class="form-control" placeholder="Re-enter password" autocomplete="new-password">
+                </div>
+                <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleSetup()">Create Admin &amp; Sign In</button>
+                <div id="setupError" style="color:var(--danger);font-size:13px;margin-top:8px;text-align:center;"></div>
+            </div>
         </div>
     </div>
-    <script src="js/data.js?v=15"></script>
+    <script src="js/data.js?v=52"></script>
     <script src="js/firebase-config.js"></script>
     <script src="js/sync.js"></script>
     <script>
-        // Redirect already-logged-in users
+        // Redirect already-logged-in users; show setup if no accounts exist
         (function() {
             try {
                 var user = AUTH.currentUser();
-                if (user) { window.location.replace('dashboard.html'); }
+                if (user) { window.location.replace('dashboard.html'); return; }
+            } catch(e) {}
+            try {
+                var users = DB.get('users');
+                if (!Array.isArray(users) || users.length === 0) {
+                    document.getElementById('loginForm').style.display = 'none';
+                    document.getElementById('setupForm').classList.add('active');
+                }
             } catch(e) {}
         })();
+
+        function handleSetup() {
+            var name = (document.getElementById('setupName').value || '').trim();
+            var uname = (document.getElementById('setupUser').value || '').trim();
+            var pass = (document.getElementById('setupPass').value || '').trim();
+            var pass2 = (document.getElementById('setupPass2').value || '').trim();
+            var errEl = document.getElementById('setupError');
+            errEl.textContent = '';
+            if (!name) { errEl.textContent = 'Full name is required.'; return; }
+            if (!uname || uname.length < 3) { errEl.textContent = 'Username must be at least 3 characters.'; return; }
+            if (!pass || pass.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
+            if (pass !== pass2) { errEl.textContent = 'Passwords do not match.'; return; }
+            try {
+                var admin = {
+                    id: 'admin_' + Date.now(),
+                    username: uname,
+                    password: pass,
+                    fullName: name,
+                    email: '',
+                    phone: '',
+                    role: 'admin',
+                    department: 'Administration',
+                    isSuperAdmin: true,
+                    permissions: ['all'],
+                    createdAt: new Date().toISOString()
+                };
+                DB.set('users', [admin]);
+                var result = AUTH.login(uname, pass);
+                if (result.success) {
+                    window.location.replace('dashboard.html');
+                } else {
+                    errEl.textContent = result.message;
+                }
+            } catch(e) {
+                errEl.textContent = 'Setup error: ' + (e.message || e);
+            }
+        }
 
         var currentResetToken = null;
 

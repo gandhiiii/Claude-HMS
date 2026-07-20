@@ -164,19 +164,6 @@ const DB = {
     }
 };
 
-const DEFAULT_ADMIN = {
-    id: 'admin_super',
-    username: 'admin',
-    password: 'admin123',
-    fullName: 'Super Admin',
-    email: 'admin@hospital.com',
-    phone: '9876543210',
-    role: 'admin',
-    department: 'Administration',
-    isSuperAdmin: true,
-    permissions: ['all']
-};
-
 const AUTH = {
     _sid() {
         try {
@@ -196,18 +183,6 @@ const AUTH = {
     },
     init() {
         try {
-            let users = DB.get('users');
-            if (!Array.isArray(users) || users.length === 0) {
-                const admin = { ...DEFAULT_ADMIN, createdAt: new Date().toISOString() };
-                DB.set('users', [admin]);
-            } else {
-                const hasAdmin = users.some(u => u.isSuperAdmin || u.username === 'admin');
-                if (!hasAdmin) {
-                    const admin = { ...DEFAULT_ADMIN, createdAt: new Date().toISOString() };
-                    users.push(admin);
-                    DB.set('users', users);
-                }
-            }
             if (!localStorage.getItem('hms_resetTokens') || typeof DB.get('resetTokens')?.length === 'undefined') {
                 DB.set('resetTokens', []);
             }
@@ -219,9 +194,7 @@ const AUTH = {
         try {
             let users = DB.get('users');
             if (!Array.isArray(users) || users.length === 0) {
-                const admin = { ...DEFAULT_ADMIN, createdAt: new Date().toISOString() };
-                DB.set('users', [admin]);
-                users = [admin];
+                return { success: false, message: 'No accounts found. Please complete first-time setup.' };
             }
             const user = users.find(u => u.username === username && u.password === password);
             if (user) {
@@ -664,7 +637,7 @@ APP_SYNC = {
 
 const APP = {
     currentModule: null,
-    _APP_VERSION: 'v51',
+    _APP_VERSION: 'v52',
 
     init() {
         try {
