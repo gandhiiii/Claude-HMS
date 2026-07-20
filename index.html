@@ -35,8 +35,9 @@
                     <input type="password" id="loginPass" class="form-control" placeholder="Enter password">
                 </div>
                 <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleLogin()">Sign In</button>
-                <div class="login-footer">
-                    <a href="#" onclick="showReset()" style="font-size:13px;">Forgot Password? Reset Here</a>
+                <div class="login-footer" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;">
+                    <a href="#" onclick="showReset();return false;" style="font-size:13px;">Forgot Password?</a>
+                    <a href="#" onclick="showSetup();return false;" style="font-size:13px;">New device? Setup</a>
                 </div>
                 <div id="loginError" style="color:var(--danger);font-size:13px;margin-top:8px;text-align:center;"></div>
             </div>
@@ -67,9 +68,9 @@
 
             <!-- Admin Setup Form (first time only) -->
             <div id="setupForm" class="setup-section">
-                <div class="setup-badge">ADMIN SETUP</div>
-                <h3 style="margin-bottom:4px;">Create Admin Account</h3>
-                <p style="font-size:13px;color:var(--gray);margin-bottom:16px;">No accounts found. Create the administrator account.</p>
+                <div class="setup-badge">DEVICE SETUP</div>
+                <h3 style="margin-bottom:4px;">Set Up This Device</h3>
+                <p style="font-size:13px;color:var(--gray);margin-bottom:16px;">Enter the <strong>same username and password</strong> you use on your other device (PC/desktop) to set up login here.</p>
                 <div class="form-group">
                     <label>Full Name</label>
                     <input type="text" id="setupName" class="form-control" placeholder="e.g. Hospital Administrator">
@@ -159,9 +160,17 @@
 
         function showReset() {
             document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('resetForm').classList.remove('active');
+            document.getElementById('setupForm').classList.remove('active');
             document.getElementById('resetForm').classList.add('active');
             document.getElementById('resetResult').textContent = '';
             document.getElementById('resetLinkBox').style.display = 'none';
+        }
+
+        function showSetup() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('resetForm').classList.remove('active');
+            document.getElementById('setupForm').classList.add('active');
         }
 
         function handleSetup() {
