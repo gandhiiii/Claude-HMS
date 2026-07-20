@@ -126,10 +126,10 @@ function renderClList() {
                 }).join('')}
             </div>
             ${c.description ? '<div style="font-size:12px;color:var(--gray);margin-top:6px;padding:4px 8px;background:var(--bg);border-radius:4px;">📝 ' + c.description + '</div>' : ''}
-            ${canEdit(c) ? '<div style="margin-top:8px;display:flex;gap:4px;">' +
-                '<button class="btn btn-sm btn-primary" onclick="editCl(\'' + c.id + '\')">Edit</button>' +
-                (c.status !== 'completed' ? '<button class="btn btn-sm btn-success" onclick="completeCl(\'' + c.id + '\')">Mark Complete</button>' : '') +
-                '<button class="btn btn-sm btn-danger" onclick="deleteCl(\'' + c.id + '\')">Del</button>' +
+            ${canEdit(c) ? '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;">' +
+                '<button class="btn btn-sm btn-primary" onclick="editCl(\'' + c.id + '\')">✏️ Edit</button>' +
+                (c.status !== 'completed' ? '<button class="btn btn-sm btn-success" onclick="completeCl(\'' + c.id + '\')">✅ Mark Complete</button>' : '') +
+                '<button class="btn btn-sm btn-danger" onclick="deleteCl(\'' + c.id + '\',\'' + (c.title||'').replace(/'/g,"\\'") + '\')">🗑 Delete</button>' +
             '</div>' : ''}
         </div>`;
     }).join('');
@@ -317,8 +317,9 @@ function editCl(id) {
     if (cl) showClForm(cl);
 }
 
-function deleteCl(id) {
-    confirmAction('Delete this checklist?', () => {
+function deleteCl(id, title) {
+    var msg = title ? 'Delete checklist "' + title + '"? This cannot be undone.' : 'Delete this checklist? This cannot be undone.';
+    confirmAction(msg, () => {
         DB.delete('checklists', id);
         APP.notify('Checklist deleted', 'success');
         renderClList();
