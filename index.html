@@ -8,27 +8,13 @@
     <meta http-equiv="Expires" content="0">
     <title>Hospital Management System - Login</title>
     <link rel="stylesheet" href="css/style.css">
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     <style>
-        body { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); overflow-x: hidden; }
-        .login-page {
-            min-height: 100vh;
-            min-height: 100dvh;
-            padding: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: transparent;
-        }
-        .login-logo { font-size: 36px; text-align: center; margin-bottom: 8px; }
         .reset-section { display: none; }
         .reset-section.active { display: block; }
+        .login-logo { font-size: 36px; text-align: center; margin-bottom: 8px; }
         .setup-section { display: none; }
         .setup-section.active { display: block; }
         .setup-badge { background: var(--secondary); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; display: inline-block; margin-bottom: 8px; letter-spacing: 0.5px; }
-        #setupLink { display:none; text-align:center; margin-top:12px; }
-        #setupLink a { font-size:12px; color:var(--gray); }
     </style>
 </head>
 <body>
@@ -38,28 +24,21 @@
             <h1>Hospital Management</h1>
             <p class="subtitle">Admin Login Portal</p>
 
-            <!-- Login Form — always shown first on every device -->
+            <!-- Login Form -->
             <div id="loginForm">
                 <div class="form-group">
                     <label>Username</label>
-                    <input type="text" id="loginUser" class="form-control" placeholder="Enter username" autocomplete="username">
+                    <input type="text" id="loginUser" class="form-control" placeholder="Enter username">
                 </div>
                 <div class="form-group">
                     <label>Password</label>
-                    <input type="password" id="loginPass" class="form-control" placeholder="Enter password" autocomplete="current-password">
+                    <input type="password" id="loginPass" class="form-control" placeholder="Enter password">
                 </div>
                 <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleLogin()">Sign In</button>
                 <div class="login-footer">
-                    <a href="#" onclick="showReset();return false;" style="font-size:13px;">Forgot Password? Reset Here</a>
+                    <a href="#" onclick="showReset()" style="font-size:13px;">Forgot Password? Reset Here</a>
                 </div>
-                <div id="loginMsg" style="font-size:13px;margin-top:8px;text-align:center;min-height:20px;"></div>
-                <!-- Shown when Firebase is reachable but empty (data not synced yet) -->
-                <div id="noAccountsMsg" style="display:none;margin-top:12px;padding:10px 12px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;font-size:12px;color:#5f4900;line-height:1.5;">
-                    <strong>Already have an account?</strong><br>
-                    Open the dashboard on your <strong>PC/Desktop</strong> first — it will upload your data to the database. Then tap <strong>Refresh</strong> above.
-                </div>
-                <!-- Only shown when no accounts exist anywhere -->
-                <div id="setupLink"><a href="#" onclick="showSetup();return false;">⚙ First time? Create admin account</a></div>
+                <div id="loginError" style="color:var(--danger);font-size:13px;margin-top:8px;text-align:center;"></div>
             </div>
 
             <!-- Password Reset Form -->
@@ -70,9 +49,9 @@
                     <label>Username / Email / Phone</label>
                     <input type="text" id="resetIdentifier" class="form-control" placeholder="Enter username, email or phone">
                 </div>
-                <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleResetRequest()">Send Reset Request</button>
+                <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleResetRequest()">Send Reset Link</button>
                 <div class="login-footer">
-                    <a href="#" onclick="showLogin();return false;" style="font-size:13px;">Back to Login</a>
+                    <a href="#" onclick="showLogin()" style="font-size:13px;">Back to Login</a>
                 </div>
                 <div id="resetResult" style="font-size:13px;margin-top:8px;text-align:center;"></div>
                 <div id="resetLinkBox" style="display:none;margin-top:12px;padding:12px;background:#f0f8ff;border-radius:8px;border:1px solid #c2d7f8;">
@@ -86,7 +65,7 @@
                 </div>
             </div>
 
-            <!-- Admin Setup Form — only shown via the "Create admin account" link -->
+            <!-- Admin Setup Form (first time only) -->
             <div id="setupForm" class="setup-section">
                 <div class="setup-badge">ADMIN SETUP</div>
                 <h3 style="margin-bottom:4px;">Create Admin Account</h3>
@@ -117,10 +96,8 @@
     </div>
 
     <script src="js/data.js?v=61"></script>
-    <script src="js/firebase-config.js?v=61"></script>
-    <script src="js/sync.js?v=61"></script>
     <script>
-        // ── Mobile import via QR/link: #import=BASE64 ──
+        // Import accounts shared via QR / link from another device
         (function () {
             try {
                 var m = window.location.hash.match(/[#&]import=([A-Za-z0-9+\/=%]+)/);
@@ -128,156 +105,56 @@
                 var data = JSON.parse(decodeURIComponent(atob(m[1])));
                 if (data && data.users && data.users.length > 0) {
                     localStorage.setItem('hms_users', JSON.stringify(data.users));
-                    // Also import any other keys included in the payload
                     Object.keys(data).forEach(function (k) {
-                        if (k !== 'users') {
-                            try { localStorage.setItem('hms_' + k, JSON.stringify(data[k])); } catch (e2) {}
-                        }
+                        if (k !== 'users') try { localStorage.setItem('hms_' + k, JSON.stringify(data[k])); } catch (e) {}
                     });
                     try { history.replaceState(null, null, window.location.pathname); } catch (e) {}
-                    var msgEl = document.getElementById('loginMsg');
-                    if (msgEl) { msgEl.style.color = 'var(--secondary)'; msgEl.textContent = '✅ Account imported! Please log in.'; }
+                    document.getElementById('loginError').style.color = 'var(--secondary)';
+                    document.getElementById('loginError').textContent = '✅ Account imported! Please log in.';
                 }
             } catch (e) {}
         })();
 
-        var _fbPullDone = false;
-
+        // Redirect if already logged in; show setup if no accounts exist
         (function () {
-            // Already logged in → dashboard
             try {
                 if (AUTH.currentUser()) { window.location.replace('dashboard.html'); return; }
             } catch (e) {}
-
-            // Check localStorage first — if we already have users, nothing to do
-            var localUsers = [];
-            try { localUsers = DB.get('users') || []; } catch (e) {}
-            if (localUsers.length > 0) { _fbPullDone = true; return; }
-
-            // No local data — try to pull from Firebase in background
-            var msgEl = document.getElementById('loginMsg');
-
-            if (!window.FB_DB) {
-                // No Firebase configured at all
-                _fbPullDone = true;
-                msgEl.style.color = 'var(--gray)';
-                msgEl.textContent = 'No database connected.';
-                document.getElementById('setupLink').style.display = 'block';
-                return;
+            var users = [];
+            try { users = DB.get('users') || []; } catch (e) {}
+            if (users.length === 0) {
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('setupForm').classList.add('active');
             }
-
-            msgEl.style.color = 'var(--gray)';
-            msgEl.textContent = '⟳ Connecting…';
-
-            // 10-second timeout — after this, user can still log in if they know credentials
-            var _timeout = setTimeout(function () {
-                if (_fbPullDone) return;
-                _fbPullDone = true;
-                msgEl.style.color = 'var(--warning)';
-                msgEl.innerHTML = '⚠ Database unreachable. <a href="#" onclick="retryFbConnect();return false;" style="color:var(--primary);">Retry</a>';
-            }, 10000);
-
-            function _doFbPull() {
-                window.FB_DB.ref('hms').once('value').then(function (snap) {
-                    if (_fbPullDone) return;
-                    clearTimeout(_timeout);
-                    _fbPullDone = true;
-
-                    var remote = snap.val();
-                    var remoteUsers = remote && remote.users
-                        ? (Array.isArray(remote.users) ? remote.users : Object.values(remote.users))
-                        : [];
-
-                    if (remoteUsers.length > 0) {
-                        Object.keys(remote).forEach(function (key) {
-                            try { localStorage.setItem('hms_' + key, JSON.stringify(remote[key])); } catch (e2) {}
-                        });
-                        localStorage.setItem('hms_last_cloud_sync', new Date().toISOString());
-                        msgEl.style.color = 'var(--secondary)';
-                        msgEl.textContent = '✅ Ready. Please log in.';
-                    } else {
-                        // Firebase is reachable but has no accounts yet
-                        msgEl.style.color = 'var(--gray)';
-                        msgEl.innerHTML = 'Database empty. <a href="#" onclick="retryFbConnect();return false;" style="color:var(--primary);">Refresh</a>';
-                        document.getElementById('noAccountsMsg').style.display = 'block';
-                        document.getElementById('setupLink').style.display = 'block';
-                    }
-                }).catch(function (err) {
-                    if (_fbPullDone) return;
-                    clearTimeout(_timeout);
-                    _fbPullDone = true;
-                    var code = err && err.code ? ' (' + err.code + ')' : '';
-                    msgEl.style.color = 'var(--warning)';
-                    msgEl.innerHTML = '⚠ Database error' + code + '. <a href="#" onclick="retryFbConnect();return false;" style="color:var(--primary);">Retry</a>';
-                    console.warn('[HMS] login pull error:', err && err.message);
-                });
-            }
-
-            window.retryFbConnect = function () {
-                _fbPullDone = false;
-                msgEl.style.color = 'var(--gray)';
-                msgEl.textContent = '⟳ Connecting…';
-                _doFbPull();
-            };
-
-            _doFbPull();
         })();
 
-        /* ── Login ── */
+        var currentResetToken = null;
+
         function handleLogin() {
             var username = document.getElementById('loginUser').value.trim();
             var password = document.getElementById('loginPass').value.trim();
-            var msgEl = document.getElementById('loginMsg');
-            if (!username || !password) {
-                msgEl.style.color = 'var(--danger)';
-                msgEl.textContent = 'Please enter username and password.';
-                return;
-            }
-
-            // If Firebase pull is still in progress, wait for it (up to 5s) then try
-            if (!_fbPullDone && window.FB_DB) {
-                msgEl.style.color = 'var(--gray)';
-                msgEl.textContent = '⟳ Loading accounts… please wait.';
-                var waited = 0;
-                var waiter = setInterval(function () {
-                    waited += 200;
-                    if (_fbPullDone || waited >= 5000) {
-                        clearInterval(waiter);
-                        _doLogin(username, password);
-                    }
-                }, 200);
-                return;
-            }
-
-            _doLogin(username, password);
-        }
-
-        function _doLogin(username, password) {
-            var msgEl = document.getElementById('loginMsg');
-            msgEl.style.color = 'var(--danger)';
-            msgEl.textContent = '';
+            var errEl = document.getElementById('loginError');
+            errEl.textContent = '';
+            errEl.style.color = 'var(--danger)';
+            if (!username || !password) { errEl.textContent = 'Please enter username and password.'; return; }
             try {
                 var result = AUTH.login(username, password);
                 if (result.success) {
-                    if (window.FB_DB) { try { SYNC.pushAll(); } catch (e) {} }
                     window.location.replace('dashboard.html');
                 } else {
-                    msgEl.textContent = result.message;
+                    errEl.textContent = result.message;
                 }
-            } catch (e) {
-                msgEl.textContent = 'Login error: ' + (e.message || e);
-            }
+            } catch (e) { errEl.textContent = 'Login error: ' + (e.message || e); }
         }
 
         document.getElementById('loginPass').addEventListener('keydown', function (e) { if (e.key === 'Enter') handleLogin(); });
         document.getElementById('loginUser').addEventListener('keydown', function (e) { if (e.key === 'Enter') handleLogin(); });
 
-        /* ── Show / hide sections ── */
         function showLogin() {
             document.getElementById('loginForm').style.display = 'block';
             document.getElementById('resetForm').classList.remove('active');
             document.getElementById('setupForm').classList.remove('active');
-            document.getElementById('loginMsg').textContent = '';
+            document.getElementById('loginError').textContent = '';
         }
 
         function showReset() {
@@ -287,12 +164,6 @@
             document.getElementById('resetLinkBox').style.display = 'none';
         }
 
-        function showSetup() {
-            document.getElementById('loginForm').style.display = 'none';
-            document.getElementById('setupForm').classList.add('active');
-        }
-
-        /* ── Admin setup ── */
         function handleSetup() {
             var name  = (document.getElementById('setupName').value  || '').trim();
             var uname = (document.getElementById('setupUser').value  || '').trim();
@@ -313,17 +184,11 @@
                     createdAt: new Date().toISOString()
                 };
                 DB.set('users', [admin]);
-                if (window.FB_DB) {
-                    try { window.FB_DB.ref('hms/users').set([admin]); } catch (fbErr) {}
-                }
                 var result = AUTH.login(uname, pass);
                 if (result.success) { window.location.replace('dashboard.html'); }
                 else { errEl.textContent = result.message; }
             } catch (e) { errEl.textContent = 'Setup error: ' + (e.message || e); }
         }
-
-        /* ── Password reset ── */
-        var currentResetToken = null;
 
         function handleResetRequest() {
             var identifier = document.getElementById('resetIdentifier').value.trim();
@@ -336,7 +201,6 @@
                     return u.username === identifier || u.email === identifier || u.phone === identifier;
                 });
                 if (!user) { resultEl.textContent = 'No account found.'; return; }
-
                 if (user.role === 'admin' || user.isSuperAdmin) {
                     var result = AUTH.requestReset(identifier);
                     resultEl.textContent = result.message;
