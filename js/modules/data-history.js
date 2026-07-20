@@ -8,113 +8,23 @@ function renderDataHistory(container) {
 }
 
 function _renderDataHistoryContent(container) {
-    var fb       = !!window.FB_DB;
-    var syncStat = (typeof SYNC !== 'undefined') ? SYNC.status() : { connected: false, lastSync: null, projectId: null };
-    var lastSync = syncStat.lastSync
-        ? new Date(syncStat.lastSync).toLocaleString('en-IN', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:true })
-        : 'Never';
+    var fb = !!window.FB_DB;
 
     /* ── Cloud Sync Section ── */
     var cloudHtml = '';
     if (fb) {
         cloudHtml = `
-        <div class="card" style="margin-bottom:20px;border-left:4px solid #34a853;">
-            <div style="padding:14px 16px;">
-                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
-                    <span style="font-size:20px;">☁️</span>
-                    <div>
-                        <div style="font-weight:700;font-size:15px;color:#34a853;">Cloud Sync Active</div>
-                        <div style="font-size:12px;color:var(--gray);">Firebase project: <strong>${syncStat.projectId || 'connected'}</strong> &nbsp;·&nbsp; Last sync: <span id="cloudSyncTs">${lastSync}</span></div>
-                    </div>
-                    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
-                        <button class="btn btn-sm btn-primary" onclick="dataHistoryPushToCloud()">⬆ Push to Cloud</button>
-                        <button class="btn btn-sm" style="background:#e8f5e9;border:1px solid #34a853;color:#1b5e20;" onclick="dataHistoryPullFromCloud()">⬇ Pull from Cloud</button>
-                    </div>
-                </div>
-                <div style="font-size:12px;color:var(--gray);background:var(--light-gray);border-radius:6px;padding:8px 12px;margin-bottom:12px;">
-                    ✅ Auto-synced on every change &nbsp;·&nbsp; ✅ Cache-clear safe &nbsp;·&nbsp; ✅ Real-time updates across devices
-                </div>
-
-                <details>
-                    <summary style="font-weight:600;font-size:13px;cursor:pointer;padding:4px 0;color:var(--primary);">📲 Configure Firebase on another device</summary>
-                    <div style="margin-top:10px;background:var(--light-gray);border-radius:8px;padding:12px 14px;">
-                        <p style="font-size:13px;color:var(--text);margin-bottom:10px;">Other devices need the same Firebase credentials to sync. Use one of these methods:</p>
-                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-                            <button class="btn btn-sm btn-primary" onclick="dataHistoryShowQR()">📱 Share via QR Code</button>
-                            <button class="btn btn-sm btn-outline" onclick="dataHistoryShareConfig()">🔗 Copy Share Link</button>
-                            <button class="btn btn-sm btn-outline" onclick="dataHistoryDownloadFbConfig()">📄 Download firebase-config.js</button>
-                        </div>
-                        <div style="font-size:12px;color:var(--gray);line-height:1.8;">
-                            <strong>QR / Share Link:</strong> Scan or open the link on another device — Firebase auto-configures there.<br>
-                            <strong>Download file:</strong> Replace <code>js/firebase-config.js</code> in your project with the downloaded file, push to GitHub — all devices connect automatically.
-                        </div>
-                    </div>
-                </details>
-            </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:10px 14px;border-radius:10px;background:rgba(52,168,83,0.08);border:1px solid rgba(52,168,83,0.25);">
+            <span style="width:10px;height:10px;border-radius:50%;background:#34a853;animation:pulse 2s ease-in-out infinite;flex-shrink:0;display:inline-block;"></span>
+            <span style="font-weight:700;color:#34a853;font-size:13px;">Live Database</span>
+            <span style="font-size:12px;color:var(--gray);">— changes on any device sync instantly to all others</span>
         </div>`;
     } else {
-        /* Not configured — show setup wizard */
-        var savedCfg = {};
-        try { savedCfg = JSON.parse(localStorage.getItem('hms_firebase_cfg') || '{}'); } catch(e) {}
         cloudHtml = `
-        <div class="card" style="margin-bottom:20px;border-left:4px solid #f59e0b;">
-            <div style="padding:14px 16px;">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-                    <span style="font-size:20px;">⚠️</span>
-                    <div>
-                        <div style="font-weight:700;font-size:15px;color:#b45309;">Cloud Sync Not Configured</div>
-                        <div style="font-size:12px;color:var(--gray);">Clearing browser cache will erase all data. Set up Firebase to protect it.</div>
-                    </div>
-                </div>
-
-                <details style="margin-bottom:14px;">
-                    <summary style="font-weight:600;font-size:13px;cursor:pointer;padding:6px 0;">📋 How to get your Firebase credentials (5 min)</summary>
-                    <ol style="font-size:12px;color:var(--text);line-height:1.9;margin:10px 0 0 16px;padding:0;">
-                        <li>Go to <a href="https://console.firebase.google.com/" target="_blank" style="color:var(--primary);">console.firebase.google.com</a> → <strong>Add project</strong></li>
-                        <li>Name it (e.g. "HMS-Hospital") → Continue → Disable Analytics → <strong>Create project</strong></li>
-                        <li>Click the <strong>&lt;/&gt; Web</strong> icon → Register app → give it a nickname → <strong>Register</strong></li>
-                        <li>Copy the entire <code>firebaseConfig = { ... }</code> block shown on screen</li>
-                        <li>Go to <strong>Build → Realtime Database → Create database</strong> → Start in test mode → Enable</li>
-                        <li>Paste each value into the fields below and click <strong>Save & Connect</strong></li>
-                    </ol>
-                </details>
-
-                <form id="fbSetupForm" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                    <div class="form-group" style="margin:0;">
-                        <label style="font-size:12px;">API Key *</label>
-                        <input type="text" id="fb_apiKey" class="form-control" placeholder="AIzaSy..." value="${(savedCfg.apiKey||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}">
-                    </div>
-                    <div class="form-group" style="margin:0;">
-                        <label style="font-size:12px;">Auth Domain *</label>
-                        <input type="text" id="fb_authDomain" class="form-control" placeholder="your-project.firebaseapp.com" value="${(savedCfg.authDomain||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}">
-                    </div>
-                    <div class="form-group" style="margin:0;grid-column:span 2;">
-                        <label style="font-size:12px;">Database URL * <span style="color:var(--gray);">(from Realtime Database → Data tab)</span></label>
-                        <input type="text" id="fb_databaseURL" class="form-control" placeholder="https://your-project-default-rtdb.firebaseio.com" value="${(savedCfg.databaseURL||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}">
-                    </div>
-                    <div class="form-group" style="margin:0;">
-                        <label style="font-size:12px;">Project ID *</label>
-                        <input type="text" id="fb_projectId" class="form-control" placeholder="your-project-id" value="${(savedCfg.projectId||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}">
-                    </div>
-                    <div class="form-group" style="margin:0;">
-                        <label style="font-size:12px;">Storage Bucket</label>
-                        <input type="text" id="fb_storageBucket" class="form-control" placeholder="your-project.appspot.com" value="${(savedCfg.storageBucket||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}">
-                    </div>
-                    <div class="form-group" style="margin:0;">
-                        <label style="font-size:12px;">Messaging Sender ID</label>
-                        <input type="text" id="fb_messagingSenderId" class="form-control" placeholder="123456789" value="${(savedCfg.messagingSenderId||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}">
-                    </div>
-                    <div class="form-group" style="margin:0;">
-                        <label style="font-size:12px;">App ID *</label>
-                        <input type="text" id="fb_appId" class="form-control" placeholder="1:123:web:abc..." value="${(savedCfg.appId||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')}">
-                    </div>
-                </form>
-                <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-                    <button class="btn btn-primary" onclick="dataHistorySaveFbConfig()">Save &amp; Connect to Firebase</button>
-                    <button class="btn btn-outline" onclick="dataHistoryClearFbConfig()" style="font-size:12px;">Clear saved config</button>
-                </div>
-                <div id="fbSetupMsg" style="margin-top:8px;font-size:13px;"></div>
-            </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:10px 14px;border-radius:10px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);">
+            <span style="width:10px;height:10px;border-radius:50%;background:#f59e0b;flex-shrink:0;display:inline-block;"></span>
+            <span style="font-weight:700;color:#b45309;font-size:13px;">Connecting to database…</span>
+            <span style="font-size:12px;color:var(--gray);">— please wait or try refreshing the page</span>
         </div>`;
     }
 

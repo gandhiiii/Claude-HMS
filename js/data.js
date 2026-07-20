@@ -700,19 +700,17 @@ APP_SYNC = {
     _updateStatus() {
         const el = document.getElementById('liveIndicator');
         if (!el) return;
-        const fb = !!window.FB_DB;
-        const lastSync = (typeof SYNC !== 'undefined') ? SYNC._lastSyncTs : null;
-        const timeStr  = lastSync ? new Date(lastSync).toLocaleTimeString() : null;
-        if (fb) {
-            el.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;background:#34a853;animation:pulse 1.5s infinite;display:inline-block;"></span>&nbsp;☁️ CLOUD SYNC';
-            el.style.cssText = 'display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#34a853;padding:3px 9px;border-radius:12px;background:rgba(52,168,83,0.12);border:1px solid rgba(52,168,83,0.35);cursor:pointer;';
-            el.title = 'Cloud sync active' + (timeStr ? ' · Last sync ' + timeStr : '') + ' · Click to manage';
+        if (window.FB_DB) {
+            el.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#34a853;animation:pulse 2s ease-in-out infinite;display:inline-block;flex-shrink:0;"></span><span style="color:#34a853;font-size:11px;font-weight:700;letter-spacing:0.3px;">LIVE</span>';
+            el.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:12px;background:rgba(52,168,83,0.10);border:1px solid rgba(52,168,83,0.3);cursor:default;';
+            el.title = 'Real-time sync active — changes on any device appear everywhere instantly';
+            el.onclick = null;
         } else {
-            el.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;background:#f59e0b;display:inline-block;"></span>&nbsp;⚠️ LOCAL ONLY';
-            el.style.cssText = 'display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#b45309;padding:3px 9px;border-radius:12px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);cursor:pointer;';
-            el.title = 'Not synced to cloud — clearing cache will wipe data. Click to set up Firebase.';
+            el.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#9aa0a6;display:inline-block;flex-shrink:0;"></span><span style="color:#9aa0a6;font-size:11px;font-weight:600;">offline</span>';
+            el.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:12px;background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.1);cursor:default;';
+            el.title = 'No connection to database';
+            el.onclick = null;
         }
-        el.onclick = function() { try { Router.navigate('data-history'); } catch(e) {} };
     },
     _cleanup() {
         if (DB._channel) { try { DB._channel.close(); } catch(e) {} }
@@ -733,7 +731,7 @@ APP_SYNC = {
 
 const APP = {
     currentModule: null,
-    _APP_VERSION: 'v57',
+    _APP_VERSION: 'v58',
 
     init() {
         try {
