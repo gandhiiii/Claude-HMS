@@ -143,46 +143,56 @@
             msgEl.style.color = 'var(--gray)';
             msgEl.textContent = '⟳ Connecting…';
 
-            // 8-second timeout so the form never hangs forever
+            // 10-second timeout — after this, user can still log in if they know credentials
             var _timeout = setTimeout(function () {
                 if (_fbPullDone) return;
                 _fbPullDone = true;
-                msgEl.style.color = 'var(--danger)';
-                msgEl.textContent = 'Could not reach database. Try logging in or check your connection.';
-            }, 8000);
+                msgEl.style.color = 'var(--warning)';
+                msgEl.innerHTML = '⚠ Database unreachable. <a href="#" onclick="retryFbConnect();return false;" style="color:var(--primary);">Retry</a>';
+            }, 10000);
 
-            window.FB_DB.ref('hms').once('value').then(function (snap) {
-                if (_fbPullDone) return;
-                clearTimeout(_timeout);
-                _fbPullDone = true;
+            function _doFbPull() {
+                window.FB_DB.ref('hms').once('value').then(function (snap) {
+                    if (_fbPullDone) return;
+                    clearTimeout(_timeout);
+                    _fbPullDone = true;
 
-                var remote = snap.val();
-                var remoteUsers = remote && remote.users
-                    ? (Array.isArray(remote.users) ? remote.users : Object.values(remote.users))
-                    : [];
+                    var remote = snap.val();
+                    var remoteUsers = remote && remote.users
+                        ? (Array.isArray(remote.users) ? remote.users : Object.values(remote.users))
+                        : [];
 
-                if (remoteUsers.length > 0) {
-                    // Populate localStorage from Firebase
-                    Object.keys(remote).forEach(function (key) {
-                        try { localStorage.setItem('hms_' + key, JSON.stringify(remote[key])); } catch (e2) {}
-                    });
-                    localStorage.setItem('hms_last_cloud_sync', new Date().toISOString());
-                    msgEl.style.color = 'var(--secondary)';
-                    msgEl.textContent = '✅ Ready. Please log in.';
-                } else {
-                    // No accounts anywhere — offer setup link (don't auto-switch)
-                    msgEl.style.color = 'var(--gray)';
-                    msgEl.textContent = 'No accounts found.';
-                    document.getElementById('setupLink').style.display = 'block';
-                }
-            }).catch(function (err) {
-                if (_fbPullDone) return;
-                clearTimeout(_timeout);
-                _fbPullDone = true;
-                msgEl.style.color = 'var(--danger)';
-                msgEl.textContent = 'Database error. Try logging in with your credentials.';
-                console.warn('[HMS] login pull error:', err && err.message);
-            });
+                    if (remoteUsers.length > 0) {
+                        Object.keys(remote).forEach(function (key) {
+                            try { localStorage.setItem('hms_' + key, JSON.stringify(remote[key])); } catch (e2) {}
+                        });
+                        localStorage.setItem('hms_last_cloud_sync', new Date().toISOString());
+                        msgEl.style.color = 'var(--secondary)';
+                        msgEl.textContent = '✅ Ready. Please log in.';
+                    } else {
+                        msgEl.style.color = 'var(--gray)';
+                        msgEl.textContent = 'No accounts found.';
+                        document.getElementById('setupLink').style.display = 'block';
+                    }
+                }).catch(function (err) {
+                    if (_fbPullDone) return;
+                    clearTimeout(_timeout);
+                    _fbPullDone = true;
+                    var code = err && err.code ? ' (' + err.code + ')' : '';
+                    msgEl.style.color = 'var(--warning)';
+                    msgEl.innerHTML = '⚠ Database error' + code + '. <a href="#" onclick="retryFbConnect();return false;" style="color:var(--primary);">Retry</a>';
+                    console.warn('[HMS] login pull error:', err && err.message);
+                });
+            }
+
+            window.retryFbConnect = function () {
+                _fbPullDone = false;
+                msgEl.style.color = 'var(--gray)';
+                msgEl.textContent = '⟳ Connecting…';
+                _doFbPull();
+            };
+
+            _doFbPull();
         })();
 
         /* ── Login ── */
