@@ -471,7 +471,9 @@ function usePhoto(previewId) {
     if (hidden) hidden.value = _capturedPhotoData;
     if (status) status.innerHTML = '<span style="color:green;">✅ Photo captured</span>';
     stopPhotoStream();
-    document.querySelector('.modal.active')?.remove();
+    // Close only the camera modal, not the patient/doctor form modal behind it
+    var cameraModal = document.getElementById('photoVideo');
+    if (cameraModal) cameraModal.closest('.modal').remove();
 }
 
 function openPhotoUpload(previewId) {
