@@ -311,9 +311,9 @@ function renderP2TaskListView(tasks) {
                             </td>
                             <td><span class="badge" style="background:${P2_STATUS_COLORS[t.status] || '#6c757d'};color:white;">${t.status}</span></td>
                             <td style="font-size:12px;">${t.assignedTo || '-'}</td>
-                            <td>
-                                <button class="btn btn-sm btn-primary" onclick="editP2Task('${t.id}')">Edit</button>
-                                <button class="btn btn-sm btn-danger" onclick="deleteP2Task('${t.id}')">Del</button>
+                            <td style="white-space:nowrap;">
+                                <button class="btn btn-sm btn-primary" onclick="editP2Task('${t.id}')">✏️ Edit</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteP2Task('${t.id}','${(t.title||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}')">🗑 Delete</button>
                             </td>
                         </tr>`;
                     }).join('')}</tbody>
@@ -331,6 +331,9 @@ function renderP2GanttView(tasks) {
     const dates = tasks.filter(t => t.startDate && t.endDate);
     if (dates.length === 0) return '<div class="card"><div class="empty-state">Add start/end dates to tasks to see the Gantt chart.</div></div>';
 
+    const cu = AUTH.currentUser();
+    const isAdmin = cu && (cu.role === 'admin' || cu.isSuperAdmin);
+
     const today = new Date();
     const minDate = new Date(Math.min(...dates.map(t => new Date(t.startDate).getTime())));
     const maxDate = new Date(Math.max(...dates.map(t => new Date(t.endDate).getTime()), today.getTime()));
@@ -338,8 +341,9 @@ function renderP2GanttView(tasks) {
     const weeks = Math.ceil(totalDays / 7);
 
     // Build header with week columns
+    const labelColW = isAdmin ? 260 : 220;
     let headerHtml = '<div style="display:flex;border-bottom:2px solid #333;font-size:11px;font-weight:600;">';
-    headerHtml += '<div style="width:220px;min-width:220px;padding:6px 8px;">Task</div>';
+    headerHtml += `<div style="width:${labelColW}px;min-width:${labelColW}px;padding:6px 8px;">Task</div>`;
     for (let w = 0; w < weeks; w++) {
         const weekStart = new Date(minDate);
         weekStart.setDate(weekStart.getDate() + w * 7);
@@ -351,8 +355,6 @@ function renderP2GanttView(tasks) {
     const dayWidth = 100 / totalDays;
 
     const rowsHtml = dates.map(t => {
-        const start = new Date(t.startDate);
-        const end = new Date(t.endDate);
         const startOffset = APP.daysBetween(minDate.toISOString(), t.startDate);
         const duration = Math.max(APP.daysBetween(t.startDate, t.endDate), 1);
         const leftPct = (startOffset / totalDays) * 100;
@@ -363,13 +365,23 @@ function renderP2GanttView(tasks) {
             : `<div style="height:20px;background:${color};border-radius:4px;width:100%;position:relative;overflow:hidden;">
                 <div style="position:absolute;top:0;left:0;height:100%;width:${t.progress || 0}%;background:rgba(255,255,255,0.3);"></div>
                </div>`;
+        const safeTitle = (t.title||'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+        const adminBtns = isAdmin
+            ? `<div style="display:flex;gap:3px;margin-top:3px;">
+                <button class="btn btn-sm btn-primary" style="padding:2px 7px;font-size:11px;" onclick="editP2Task('${t.id}')">✏️ Edit</button>
+                <button class="btn btn-sm btn-danger" style="padding:2px 7px;font-size:11px;" onclick="deleteP2Task('${t.id}','${safeTitle}')">🗑</button>
+               </div>`
+            : '';
 
         return `<div style="display:flex;align-items:center;border-bottom:1px solid #eee;font-size:13px;">
-            <div style="width:220px;min-width:220px;padding:6px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${t.title}">
-                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px;"></span>
-                ${t.title}
+            <div style="width:${labelColW}px;min-width:${labelColW}px;padding:6px 8px;">
+                <div style="display:flex;align-items:center;gap:6px;overflow:hidden;">
+                    <span style="display:inline-block;width:8px;height:8px;min-width:8px;border-radius:50%;background:${color};"></span>
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${safeTitle}">${t.title}</span>
+                </div>
+                ${adminBtns}
             </div>
-            <div style="flex:1;position:relative;height:32px;padding:6px 0;">
+            <div style="flex:1;position:relative;height:${isAdmin ? 48 : 32}px;padding:6px 0;">
                 <div style="position:absolute;left:${leftPct}%;width:${widthPct}%;top:6px;">
                     ${barHtml}
                 </div>
@@ -510,8 +522,9 @@ function editP2Task(id) {
     if (task) showP2TaskForm(task);
 }
 
-function deleteP2Task(id) {
-    confirmAction('Delete this task?', () => {
+function deleteP2Task(id, title) {
+    var msg = title ? 'Delete task "' + title + '"? This cannot be undone.' : 'Delete this task? This cannot be undone.';
+    confirmAction(msg, () => {
         DB.delete('phase2Tasks', id);
         APP.notify('Task deleted', 'success');
         renderP2TaskList();
