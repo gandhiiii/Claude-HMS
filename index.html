@@ -98,7 +98,7 @@
             </div>
         </div>
     </div>
-    <script src="js/data.js?v=52"></script>
+    <script src="js/data.js?v=53"></script>
     <script src="js/firebase-config.js"></script>
     <script src="js/sync.js"></script>
     <script>
@@ -199,13 +199,49 @@
 
         function handleResetRequest() {
             var identifier = document.getElementById('resetIdentifier').value.trim();
-            if (!identifier) { document.getElementById('resetResult').textContent = 'Please enter username, email or phone'; return; }
-            var result = AUTH.requestReset(identifier);
-            document.getElementById('resetResult').textContent = result.message;
-            if (result.success) {
-                document.getElementById('resetLinkBox').style.display = 'block';
-                document.getElementById('resetLinkDisplay').textContent = 'Token: ' + result.token;
-                currentResetToken = result.token;
+            var resultEl = document.getElementById('resetResult');
+            resultEl.style.color = '';
+            if (!identifier) { resultEl.textContent = 'Please enter username, email or phone'; return; }
+            try {
+                var users = DB.get('users') || [];
+                var user = users.find(function(u) {
+                    return u.username === identifier || u.email === identifier || u.phone === identifier;
+                });
+                if (!user) { resultEl.textContent = 'No account found with that username, email or phone.'; return; }
+
+                if (user.role === 'admin' || user.isSuperAdmin) {
+                    // Admin: direct token-based reset (existing flow)
+                    var result = AUTH.requestReset(identifier);
+                    resultEl.textContent = result.message;
+                    if (result.success) {
+                        document.getElementById('resetLinkBox').style.display = 'block';
+                        document.getElementById('resetLinkDisplay').textContent = 'Token: ' + result.token;
+                        currentResetToken = result.token;
+                    }
+                } else {
+                    // Non-admin: submit a reset request — admin will reset it from the Users module
+                    var existing = (DB.get('pwResetRequests') || []).find(function(r) {
+                        return r.userId === user.id && r.status === 'pending';
+                    });
+                    if (existing) {
+                        resultEl.style.color = 'orange';
+                        resultEl.textContent = 'A request is already pending. Please wait for the administrator to process it.';
+                    } else {
+                        DB.add('pwResetRequests', {
+                            userId: user.id,
+                            username: user.username,
+                            fullName: user.fullName || user.username,
+                            department: user.department || '',
+                            role: user.role,
+                            requestedAt: new Date().toISOString(),
+                            status: 'pending'
+                        });
+                        resultEl.style.color = 'var(--secondary)';
+                        resultEl.textContent = 'Your request has been sent to the administrator. They will reset your password and inform you.';
+                    }
+                }
+            } catch(e) {
+                resultEl.textContent = 'Error: ' + (e.message || e);
             }
         }
 

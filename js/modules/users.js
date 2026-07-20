@@ -5,7 +5,39 @@ function renderUsers(container) {
     var cu = AUTH.currentUser();
     var isAdmin = cu && (cu.isSuperAdmin || cu.role === 'admin');
 
-    container.innerHTML = `
+    var _pendingPwReqs = isAdmin ? (DB.get('pwResetRequests') || []).filter(function(r){ return r.status === 'pending'; }) : [];
+    var _pwReqBanner = '';
+    if (_pendingPwReqs.length > 0) {
+        _pwReqBanner = '<div class="card mb-4" style="border-left:4px solid #f59e0b;">'
+            + '<div style="padding:14px 16px;">'
+            + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">🔑 Password Reset Requests'
+            + ' <span style="background:#f59e0b;color:#fff;font-size:11px;padding:2px 8px;border-radius:20px;margin-left:6px;">' + _pendingPwReqs.length + ' pending</span></div>'
+            + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+            + '<thead><tr style="border-bottom:1px solid var(--border);">'
+            + '<th style="padding:6px 8px;text-align:left;">Username</th><th style="padding:6px 8px;text-align:left;">Full Name</th>'
+            + '<th style="padding:6px 8px;text-align:left;">Department</th><th style="padding:6px 8px;text-align:left;">Role</th>'
+            + '<th style="padding:6px 8px;text-align:left;">Requested At</th><th style="padding:6px 8px;"></th>'
+            + '</tr></thead><tbody>';
+        _pendingPwReqs.forEach(function(r) {
+            var when = r.requestedAt ? new Date(r.requestedAt).toLocaleString() : '-';
+            var safeU = (r.username||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+            var safeN = (r.fullName||'-').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+            var safeD = (r.department||'-').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+            _pwReqBanner += '<tr style="border-bottom:1px solid var(--border);">'
+                + '<td style="padding:7px 8px;"><strong>' + safeU + '</strong></td>'
+                + '<td style="padding:7px 8px;">' + safeN + '</td>'
+                + '<td style="padding:7px 8px;">' + safeD + '</td>'
+                + '<td style="padding:7px 8px;"><span class="badge ' + APP.getRoleBadge(r.role||'employee') + '">' + (r.role||'').toUpperCase().replace(/_/g,' ') + '</span></td>'
+                + '<td style="padding:7px 8px;font-size:12px;color:var(--gray);">' + when + '</td>'
+                + '<td style="padding:7px 8px;white-space:nowrap;">'
+                + '<button class="btn btn-sm btn-primary" onclick="adminResetUserPw(\'' + r.id + '\')">Reset Password</button> '
+                + '<button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="adminDismissPwReq(\'' + r.id + '\')">Dismiss</button>'
+                + '</td></tr>';
+        });
+        _pwReqBanner += '</tbody></table></div></div></div>';
+    }
+
+    container.innerHTML = _pwReqBanner + `
         <div class="flex-between mb-4" style="flex-wrap:wrap;gap:8px;">
             <div style="display:flex;gap:4px;background:var(--light-gray);border-radius:10px;padding:4px;">
                 <button id="viewListBtn" class="btn btn-sm ${_usersView==='list'?'btn-primary':'btn-outline'}" style="border-radius:7px;font-weight:600;" onclick="usersSetView('list')">👤 All Users</button>
@@ -418,4 +450,40 @@ function deleteUser(id) {
         APP.notify('User deleted', 'success');
         renderUsersList();
     });
+}
+
+function adminResetUserPw(reqId) {
+    var req = (DB.get('pwResetRequests') || []).find(function(r){ return r.id === reqId; });
+    if (!req) { APP.notify('Request not found', 'error'); return; }
+    var form = '<form id="adminPwResetForm">'
+        + '<input type="hidden" id="adminPwResetReqId" value="' + reqId + '">'
+        + '<input type="hidden" id="adminPwResetUserId" value="' + req.userId + '">'
+        + '<div style="background:var(--light-gray);border-radius:8px;padding:10px 14px;margin-bottom:14px;">'
+        + '<strong>' + (req.fullName || req.username).replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</strong>'
+        + '<div style="font-size:12px;color:var(--gray);margin-top:2px;">@' + req.username + ' &nbsp;·&nbsp; ' + (req.role||'').replace(/_/g,' ').toUpperCase() + (req.department ? ' &nbsp;·&nbsp; ' + req.department : '') + '</div>'
+        + '</div>'
+        + '<div class="form-group"><label>New Password *</label><input type="password" id="adminPwResetNew" class="form-control" placeholder="Min 6 characters"></div>'
+        + '<div class="form-group"><label>Confirm Password *</label><input type="password" id="adminPwResetNew2" class="form-control" placeholder="Re-enter password"></div>'
+        + '</form>';
+    openFormModal('Reset Password — ' + (req.fullName || req.username), form, 'adminSavePwReset()', false);
+}
+
+function adminSavePwReset() {
+    var reqId = document.getElementById('adminPwResetReqId').value;
+    var userId = document.getElementById('adminPwResetUserId').value;
+    var newPass = (document.getElementById('adminPwResetNew').value || '').trim();
+    var newPass2 = (document.getElementById('adminPwResetNew2').value || '').trim();
+    if (!newPass || newPass.length < 6) { APP.notify('Password must be at least 6 characters', 'error'); return false; }
+    if (newPass !== newPass2) { APP.notify('Passwords do not match', 'error'); return false; }
+    DB.update('users', userId, { password: newPass });
+    DB.update('pwResetRequests', reqId, { status: 'resolved', resolvedAt: new Date().toISOString() });
+    APP.notify('Password reset successfully', 'success');
+    APP.refreshCurrent();
+    return true;
+}
+
+function adminDismissPwReq(reqId) {
+    DB.update('pwResetRequests', reqId, { status: 'dismissed', dismissedAt: new Date().toISOString() });
+    APP.notify('Request dismissed', 'info');
+    APP.refreshCurrent();
 }
