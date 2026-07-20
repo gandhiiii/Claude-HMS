@@ -119,7 +119,7 @@ function renderHodDashboard(container) {
     var isFacHod = typeof _matProcurementDept === 'function' && dept === _matProcurementDept();
     var pendingMatApprovals = (DB.get('material_requests') || []).filter(function (r) {
         if (isFacHod) return r.status === 'hod_approved';
-        return r.status === 'pending' && r.department === dept;
+        return r.status === 'pending' && (r.department || '').trim().toLowerCase() === (dept || '').trim().toLowerCase();
     });
 
     // Problems routed to this department
@@ -945,9 +945,24 @@ function _hodRefreshCl() {
 ═══════════════════════════════════════════════ */
 function _hodRequests(el) {
     var d    = _hodData;
-    var reqs = d.myReqs;
-    var matApprovals = d.pendingMatApprovals || [];
-    var routedProbs  = d.routedProblems || [];
+    var dept = d.dept;
+    var isFacHod = typeof _matProcurementDept === 'function' && dept === _matProcurementDept();
+
+    // Always re-read fresh from DB so requests submitted after page load are visible
+    var matApprovals = (DB.get('material_requests') || []).filter(function (r) {
+        if (isFacHod) return r.status === 'hod_approved';
+        // Case-insensitive department match to handle any naming inconsistencies
+        return r.status === 'pending' && (r.department || '').trim().toLowerCase() === (dept || '').trim().toLowerCase();
+    });
+    d.pendingMatApprovals = matApprovals;
+
+    var routedProbs = (DB.get('problems') || []).filter(function (p) {
+        return (p.routedTo === dept || (!p.routedTo && p.department === dept)) && p.status !== 'resolved';
+    });
+    d.routedProblems = routedProbs;
+
+    var reqs = (DB.get('hodRequests') || []).filter(function (r) { return r.department === dept; });
+    d.myReqs = reqs;
 
     var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
         + '<div><div style="font-weight:700;font-size:16px;">📦 Requests &amp; Approvals</div>'
@@ -1111,7 +1126,7 @@ function _hodRefreshAndShow() {
     var isFacHod = typeof _matProcurementDept === 'function' && dept === _matProcurementDept();
     _hodData.pendingMatApprovals = (DB.get('material_requests') || []).filter(function (r) {
         if (isFacHod) return r.status === 'hod_approved';
-        return r.status === 'pending' && r.department === dept;
+        return r.status === 'pending' && (r.department || '').trim().toLowerCase() === (dept || '').trim().toLowerCase();
     });
     _hodData.routedProblems = (DB.get('problems') || []).filter(function (p) {
         return (p.routedTo === dept || (!p.routedTo && p.department === dept)) && p.status !== 'resolved';
