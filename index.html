@@ -98,8 +98,8 @@
         </div>
     </div>
 
-    <script src="js/data.js?v=64"></script>
-    <script src="js/firebase-config.js?v=64"></script>
+    <script src="js/data.js?v=65"></script>
+    <script src="js/firebase-config.js?v=65"></script>
     <script>
         // ── Import via QR / shared link: index.html#import=BASE64 ──
         (function () {
@@ -118,34 +118,59 @@
             } catch(e) {}
         })();
 
-        // ── On load: redirect if already logged in, else pull from Firebase silently ──
+        // ── On load: redirect if already logged in, else pull from Firebase ──
         (function () {
             try { if (AUTH.currentUser()) { window.location.replace('dashboard.html'); return; } } catch(e){}
 
             var localUsers = [];
             try { localUsers = DB.get('users') || []; } catch(e){}
 
-            if (localUsers.length > 0) return; // have local data — show form, nothing else needed
+            if (localUsers.length > 0) return; // have local data — nothing else needed
 
-            // No local data — try Firebase silently in background (no spinner, no blocking)
-            if (!window.FB_DB) return; // Firebase not configured — user must use Device Setup
+            if (!window.FB_DB) {
+                setMsg('⚠ No cloud configured. Use "New device? Setup" below.', 'orange');
+                return;
+            }
 
-            window.FB_DB.ref('hms/users').once('value').then(function(snap) {
-                var remoteUsers = snap.val();
-                if (!remoteUsers) return; // Firebase also empty
-                var arr = Array.isArray(remoteUsers) ? remoteUsers : Object.values(remoteUsers);
-                if (arr.length === 0) return;
+            setMsg('⏳ Loading accounts from cloud…', 'var(--gray)');
 
-                // Pull ALL data from Firebase into localStorage
-                window.FB_DB.ref('hms').once('value').then(function(fullSnap) {
-                    var remote = fullSnap.val() || {};
-                    Object.keys(remote).forEach(function(key) {
-                        try { localStorage.setItem('hms_' + key, JSON.stringify(remote[key])); } catch(e2){}
-                    });
-                    localStorage.setItem('hms_last_cloud_sync', new Date().toISOString());
-                    setMsg('✅ Ready. Please log in.', 'var(--secondary)');
+            var _timer = setTimeout(function() {
+                setMsg('⚠ Cloud timeout. Check internet or use "New device? Setup".', 'orange');
+            }, 10000);
+
+            window.FB_DB.ref('hms').once('value').then(function(snap) {
+                clearTimeout(_timer);
+                var remote = snap.val();
+                if (!remote || !remote.users) {
+                    setMsg('⚠ No accounts in cloud yet. Use "New device? Setup".', 'orange');
+                    return;
+                }
+                // Convert Firebase object-arrays back to real arrays
+                Object.keys(remote).forEach(function(key) {
+                    try {
+                        var val = remote[key];
+                        if (val && typeof val === 'object' && !Array.isArray(val)) {
+                            var ks = Object.keys(val);
+                            if (ks.length > 0 && ks.every(function(k){ return /^\d+$/.test(k); })) {
+                                val = ks.map(function(k){ return val[k]; });
+                            }
+                        }
+                        localStorage.setItem('hms_' + key, JSON.stringify(val));
+                    } catch(e2){}
                 });
-            }).catch(function() {}); // silently ignore errors — form is still usable
+                localStorage.setItem('hms_last_cloud_sync', new Date().toISOString());
+                var count = 0;
+                try {
+                    var u = JSON.parse(localStorage.getItem('hms_users'));
+                    count = Array.isArray(u) ? u.length : (u ? Object.keys(u).length : 0);
+                } catch(e3){}
+                setMsg('✅ ' + count + ' account(s) loaded. Please log in.', 'var(--secondary)');
+            }).catch(function(err) {
+                clearTimeout(_timer);
+                var msg = err && err.message ? err.message : 'unknown error';
+                setMsg('⚠ Cloud error: ' + msg + ' — use "New device? Setup".', 'orange');
+                console.error('[HMS] Firebase pull failed:', msg);
+            });
         })();
 
         function setMsg(text, color) {
