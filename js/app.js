@@ -225,28 +225,45 @@ const Router = {
             const base = window.location.href.replace('dashboard.html', 'index.html').split('#')[0].split('?')[0];
             const url = base + '#import=' + payload;
 
-            // Show each user's username so the admin knows what to use on mobile
-            const adminUsers = users.filter(function(u){ return u.role === 'admin' || u.isSuperAdmin; });
-            const userListHtml = adminUsers.map(function(u){
-                return `<span style="display:inline-block;background:var(--primary-light);color:var(--primary);padding:3px 10px;border-radius:20px;font-size:13px;font-weight:600;margin:2px;">${u.username}</span>`;
-            }).join(' ');
+            const isLocalhost = base.includes('localhost') || base.includes('127.0.0.1');
+            const localhostWarn = isLocalhost ? `
+                <div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:#e65100;text-align:left;">
+                    ⚠ You are running on <strong>localhost</strong>. This link will only work on <em>this computer</em>, not on mobile.<br>
+                    Open the app from <strong>GitHub Pages</strong> on your PC, then use the 📱 Mobile button there.
+                </div>` : '';
+
+            const userListHtml = users.map(function(u){
+                const badge = (u.role === 'admin' || u.isSuperAdmin) ? 'admin' : u.role;
+                return `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--light-gray);font-size:13px;">
+                    <span style="font-weight:600;">${u.username}</span>
+                    <span style="color:var(--gray);font-size:11px;">${badge}</span>
+                </div>`;
+            }).join('');
+
+            const waLink = 'https://wa.me/?text=' + encodeURIComponent('Open this link on your mobile to set up HMS login:\n' + url);
 
             const html = `
                 <div class="modal-overlay" id="mobileSetupModal" onclick="if(event.target===this)this.remove()">
-                    <div class="modal-content" style="max-width:400px;text-align:center;">
-                        <h3 style="margin-bottom:6px;">📱 Mobile Setup</h3>
+                    <div class="modal-content" style="max-width:420px;">
+                        <h3 style="margin-bottom:6px;text-align:center;">📱 Mobile Setup for All Users</h3>
+                        <p style="font-size:13px;color:var(--gray);margin-bottom:12px;text-align:center;">Share this link with <strong>all users</strong>. Opening it on mobile imports every account so each person can log in with their own username &amp; password.</p>
 
-                        <div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:10px 14px;margin-bottom:14px;text-align:left;">
-                            <p style="font-size:12px;font-weight:700;color:#2e7d32;margin-bottom:4px;">Your admin username${adminUsers.length > 1 ? 's' : ''}:</p>
-                            <div style="text-align:center;">${userListHtml || '<em style="color:var(--gray)">none</em>'}</div>
-                            <p style="font-size:11px;color:#2e7d32;margin-top:6px;margin-bottom:0;">Use this username + your password on the mobile login page.</p>
+                        ${localhostWarn}
+
+                        <div style="background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:12px;max-height:140px;overflow-y:auto;">
+                            <p style="font-size:11px;font-weight:700;color:var(--gray);margin-bottom:4px;">ACCOUNTS INCLUDED (${users.length}):</p>
+                            ${userListHtml}
                         </div>
 
-                        <p style="font-size:13px;color:var(--gray);margin-bottom:10px;">Or scan this QR code to import all accounts automatically:</p>
                         <div id="mobileQrBox" style="display:flex;justify-content:center;margin-bottom:12px;"></div>
-                        <p style="font-size:11px;color:var(--gray);margin-bottom:4px;">Can't scan? Copy this link and open it on mobile:</p>
-                        <div id="mobileImportUrl" style="font-size:10px;word-break:break-all;background:var(--bg);padding:8px;border-radius:6px;margin-bottom:10px;max-height:54px;overflow:auto;">${url}</div>
-                        <button class="btn btn-sm btn-primary" onclick="navigator.clipboard.writeText(document.getElementById('mobileImportUrl').textContent).then(function(){APP.notify('Link copied — open it on mobile!','success')})">📋 Copy Link</button>
+
+                        <p style="font-size:11px;color:var(--gray);margin-bottom:4px;text-align:center;">Can't scan? Copy &amp; share the link:</p>
+                        <div id="mobileImportUrl" style="font-size:10px;word-break:break-all;background:var(--bg);padding:8px;border-radius:6px;margin-bottom:10px;max-height:48px;overflow:auto;">${url}</div>
+
+                        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+                            <button class="btn btn-sm btn-primary" onclick="navigator.clipboard.writeText(document.getElementById('mobileImportUrl').textContent).then(function(){APP.notify('Link copied!','success')})">📋 Copy Link</button>
+                            <a href="${waLink}" target="_blank" class="btn btn-sm btn-success" style="text-decoration:none;">💬 Share via WhatsApp</a>
+                        </div>
                         <div class="modal-footer">
                             <button class="btn" onclick="document.getElementById('mobileSetupModal').remove()">Close</button>
                         </div>
