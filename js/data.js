@@ -29,6 +29,7 @@ const DB = {
         try { sessionStorage.setItem('hms_' + key, json); } catch (e) { console.warn('sessionStorage set error:', e); }
     },
     add(key, item) {
+        this._autoSnapBeforeChange(key, 'add');
         const items = this.get(key);
         item.id = Date.now() + '_' + Math.random().toString(36).substr(2, 5);
         item.createdAt = new Date().toISOString();
@@ -38,6 +39,7 @@ const DB = {
         return item;
     },
     update(key, id, updates) {
+        this._autoSnapBeforeChange(key, 'update');
         const items = this.get(key);
         const idx = items.findIndex(i => i.id === id);
         if (idx > -1) {
@@ -49,6 +51,7 @@ const DB = {
         return null;
     },
     delete(key, id) {
+        this._autoSnapBeforeChange(key, 'delete');
         const items = this.get(key).filter(i => i.id !== id);
         this.set(key, items);
         this._emit('change', { store: key, action: 'delete', id });
@@ -74,7 +77,7 @@ const DB = {
     /* Export all app data as a downloadable JSON file */
     exportAll(label) {
         try {
-            var snapshot = { _meta: { exportedAt: new Date().toISOString(), label: label || 'manual', appVersion: 'v46' }, data: {} };
+            var snapshot = { _meta: { exportedAt: new Date().toISOString(), label: label || 'manual', appVersion: (typeof APP !== 'undefined' ? APP._APP_VERSION : 'hms') }, data: {} };
             this._ALL_KEYS.forEach(function(key) {
                 try {
                     var raw = localStorage.getItem('hms_' + key);
@@ -130,10 +133,14 @@ const DB = {
         }
     },
 
-    /* Auto-backup: saves a snapshot to localStorage; keeps latest 3 rolling backups */
+    /* Max backup slots kept in localStorage */
+    _MAX_BK_SLOTS: 15,
+
+    /* Auto-backup: saves a full snapshot; keeps up to _MAX_BK_SLOTS indexed backups */
     autoBackup(reason) {
         try {
-            var snapshot = { _meta: { exportedAt: new Date().toISOString(), label: reason || 'auto', appVersion: 'v46' }, data: {} };
+            var appVer = (typeof APP !== 'undefined' ? APP._APP_VERSION : 'hms');
+            var snapshot = { _meta: { exportedAt: new Date().toISOString(), label: reason || 'auto', appVersion: appVer }, data: {} };
             this._ALL_KEYS.forEach(function(key) {
                 try {
                     var raw = localStorage.getItem('hms_' + key);
@@ -141,25 +148,100 @@ const DB = {
                 } catch(e) {}
             });
             var json = JSON.stringify(snapshot);
-            // Rolling: shift backup_1 → backup_2 → backup_3 (oldest dropped)
+            var now  = new Date().toISOString();
+
+            // — Indexed slot system —
+            var idx = [];
+            try { idx = JSON.parse(localStorage.getItem('hms_bk_idx') || '[]'); } catch(e) {}
+            var n;
+            if (idx.length < this._MAX_BK_SLOTS) {
+                var used = idx.map(function(e){ return e.n; });
+                n = 0; while (used.indexOf(n) !== -1) n++;
+            } else {
+                idx.sort(function(a,b){ return new Date(a.ts) - new Date(b.ts); });
+                n = idx[0].n;
+                idx.splice(0, 1);
+            }
+            try { localStorage.setItem('hms_bk_' + n, json); } catch(storageErr) {
+                // Storage full — free oldest slot and retry once
+                if (idx.length > 0) {
+                    idx.sort(function(a,b){ return new Date(a.ts) - new Date(b.ts); });
+                    var freed = idx.shift();
+                    try { localStorage.removeItem('hms_bk_' + freed.n); } catch(e2) {}
+                    try { localStorage.setItem('hms_bk_' + n, json); } catch(e3) { return false; }
+                }
+            }
+            idx.push({ n: n, ts: now, label: reason || 'auto' });
+            try { localStorage.setItem('hms_bk_idx', JSON.stringify(idx)); } catch(e) {}
+
+            // — Legacy slots (hms_backup_1/2/3) kept for compatibility —
             try {
                 var b2 = localStorage.getItem('hms_backup_2');
                 if (b2) localStorage.setItem('hms_backup_3', b2);
                 var b1 = localStorage.getItem('hms_backup_1');
                 if (b1) localStorage.setItem('hms_backup_2', b1);
+                localStorage.setItem('hms_backup_1', json);
             } catch(e) {}
-            localStorage.setItem('hms_backup_1', json);
-            localStorage.setItem('hms_backup_ts', new Date().toISOString());
+            try { localStorage.setItem('hms_backup_ts', now); } catch(e) {}
             return true;
         } catch(e) {
             return false;
         }
     },
 
-    /* Restore from the latest auto-backup stored in localStorage */
+    /* Throttled snapshot triggered before every DB mutation (max 1 per 3 min) */
+    _autoSnapBeforeChange(key, action) {
+        // Skip noisy internal keys to avoid unnecessary snapshots
+        var skipKeys = ['problemDailyLog', 'pwResetRequests', 'adminChecklist',
+                        'resetTokens', 'ambulance_trips'];
+        if (skipKeys.indexOf(key) !== -1) return;
+        try {
+            var last  = parseInt(localStorage.getItem('hms_bk_last_change_ts') || '0', 10);
+            var gap   = 3 * 60 * 1000; // 3 minutes
+            if (Date.now() - last < gap) return;
+            localStorage.setItem('hms_bk_last_change_ts', Date.now().toString());
+            this.autoBackup('before-' + action + ':' + key);
+        } catch(e) {}
+    },
+
+    /* Return the backup index (newest-first) */
+    getBackupIndex() {
+        try {
+            var idx = JSON.parse(localStorage.getItem('hms_bk_idx') || '[]');
+            return idx.sort(function(a,b){ return new Date(b.ts) - new Date(a.ts); });
+        } catch(e) { return []; }
+    },
+
+    /* Restore all data from slot n (full replace) */
+    restoreFromSlot(n) {
+        var raw = localStorage.getItem('hms_bk_' + n);
+        if (!raw) return { success: false, error: 'Backup slot not found' };
+        return this.importAll(raw, true);
+    },
+
+    /* Download slot n as a JSON file */
+    downloadBackupSlot(n) {
+        try {
+            var raw = localStorage.getItem('hms_bk_' + n);
+            if (!raw) { if (typeof APP !== 'undefined') APP.notify('Backup not found', 'error'); return; }
+            var meta = JSON.parse(raw)._meta || {};
+            var ts   = (meta.exportedAt || new Date().toISOString()).slice(0, 16).replace(/[:T]/g, '-');
+            var lbl  = (meta.label || 'backup').replace(/[^a-z0-9_-]/gi, '-');
+            var blob = new Blob([raw], { type: 'application/json' });
+            var url  = URL.createObjectURL(blob);
+            var a    = document.createElement('a');
+            a.href = url; a.download = 'hms-' + lbl + '-' + ts + '.json';
+            document.body.appendChild(a); a.click();
+            setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+        } catch(e) {}
+    },
+
+    /* Restore from the latest backup (legacy helper kept for compatibility) */
     restoreLatestBackup() {
+        var idx = this.getBackupIndex();
+        if (idx.length > 0) return this.restoreFromSlot(idx[0].n);
         var raw = localStorage.getItem('hms_backup_1');
-        if (!raw) return { success: false, error: 'No auto-backup found' };
+        if (!raw) return { success: false, error: 'No backup found' };
         return this.importAll(raw, false);
     }
 };
@@ -637,7 +719,7 @@ APP_SYNC = {
 
 const APP = {
     currentModule: null,
-    _APP_VERSION: 'v54',
+    _APP_VERSION: 'v55',
 
     init() {
         try {
