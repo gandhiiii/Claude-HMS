@@ -46,7 +46,7 @@ const Router = {
             </div>
             <div class="header-right">
                 <span id="liveIndicator" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--success);padding:3px 8px;border-radius:12px;background:rgba(52,168,83,0.1);border:1px solid rgba(52,168,83,0.3);"><span style="width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 1.5s infinite;"></span>LIVE</span>
-                ${(user.role === 'admin' || user.isSuperAdmin) ? `<button id="syncNowBtn" class="btn btn-sm" style="font-size:11px;padding:4px 10px;background:rgba(52,168,83,0.1);border:1px solid rgba(52,168,83,0.4);color:var(--secondary);" onclick="APP._syncNow()" title="Upload all local data to cloud database">☁ Sync</button>` : ''}
+                ${(user.role === 'admin' || user.isSuperAdmin) ? `<button id="syncNowBtn" class="btn btn-sm" style="font-size:11px;padding:4px 10px;background:rgba(52,168,83,0.1);border:1px solid rgba(52,168,83,0.4);color:var(--secondary);" onclick="APP._syncNow()" title="Upload all local data to cloud database">☁ Sync</button><button class="btn btn-sm" style="font-size:11px;padding:4px 10px;" onclick="APP._mobileSetup()" title="Get QR code to set up login on mobile">📱 Mobile</button>` : ''}
                 <span class="role-badge" style="font-size:13px;color:var(--gray);">${user.role.toUpperCase()}</span>
                 <div class="header-user" onclick="Router.showProfile()">
                     <div class="avatar">${user.fullName.charAt(0).toUpperCase()}</div>
@@ -216,6 +216,39 @@ const Router = {
             </div>
         `;
         document.body.insertAdjacentHTML('beforeend', html);
+    },
+    _mobileSetup() {
+        const users = DB.get('users') || [];
+        if (users.length === 0) { APP.notify('No user data found', 'error'); return; }
+        try {
+            const payload = btoa(encodeURIComponent(JSON.stringify({ users: users })));
+            const base = window.location.href.replace('dashboard.html', 'index.html').split('#')[0].split('?')[0];
+            const url = base + '#import=' + payload;
+            const html = `
+                <div class="modal-overlay" id="mobileSetupModal" onclick="if(event.target===this)this.remove()">
+                    <div class="modal-content" style="max-width:380px;text-align:center;">
+                        <h3 style="margin-bottom:6px;">📱 Mobile Setup</h3>
+                        <p style="font-size:13px;color:var(--gray);margin-bottom:14px;">
+                            Scan this QR code with your mobile camera to set up login on mobile — no internet needed.
+                        </p>
+                        <div id="mobileQrBox" style="display:flex;justify-content:center;margin-bottom:14px;"></div>
+                        <p style="font-size:11px;color:var(--gray);margin-bottom:4px;">Or copy this link and open it on mobile:</p>
+                        <div id="mobileImportUrl" style="font-size:10px;word-break:break-all;background:var(--bg);padding:8px;border-radius:6px;margin-bottom:10px;max-height:60px;overflow:auto;">${url}</div>
+                        <button class="btn btn-sm btn-primary" onclick="navigator.clipboard.writeText(document.getElementById('mobileImportUrl').textContent).then(function(){APP.notify('Link copied!','success')})">Copy Link</button>
+                        <div class="modal-footer">
+                            <button class="btn" onclick="document.getElementById('mobileSetupModal').remove()">Close</button>
+                        </div>
+                    </div>
+                </div>`;
+            document.body.insertAdjacentHTML('beforeend', html);
+            setTimeout(function () {
+                try {
+                    new QRCode(document.getElementById('mobileQrBox'), { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.L });
+                } catch (e) {
+                    document.getElementById('mobileQrBox').innerHTML = '<p style="color:var(--gray);font-size:12px;">QR unavailable — use the link above.</p>';
+                }
+            }, 100);
+        } catch (e) { APP.notify('Could not generate setup code: ' + e.message, 'error'); }
     },
     _syncNow() {
         if (!window.FB_DB) { APP.notify('No database connection', 'error'); return; }
