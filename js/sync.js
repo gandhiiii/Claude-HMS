@@ -167,8 +167,19 @@ var SYNC = (function () {
         };
     }
 
+    function _recordSyncTs() {
+        var ts = new Date().toISOString();
+        try { localStorage.setItem('hms_last_cloud_sync', ts); } catch (e) {}
+        SYNC._lastSyncTs = ts;
+        try {
+            var el = document.getElementById('cloudSyncTs');
+            if (el) el.textContent = 'Last sync: ' + new Date(ts).toLocaleTimeString();
+        } catch (e) {}
+    }
+
     return {
         _refreshTimer: null,
+        _lastSyncTs: (function(){ try { return localStorage.getItem('hms_last_cloud_sync'); } catch(e){ return null; } })(),
 
         init: function () {
             if (_inited) return;
@@ -179,28 +190,53 @@ var SYNC = (function () {
             if (window.FB_DB) {
                 // Pull latest data first (with merge), THEN start listening for live changes
                 fbPullAll(function () {
+                    _recordSyncTs();
                     fbListen();
+                    try { if (typeof APP_SYNC !== 'undefined') APP_SYNC._updateStatus(); } catch (e) {}
                     try { if (typeof APP !== 'undefined') APP.refreshCurrent(); } catch (e) {}
                 });
+            } else {
+                try { if (typeof APP_SYNC !== 'undefined') APP_SYNC._updateStatus(); } catch (e) {}
             }
 
             // Also wire up same-browser BroadcastChannel sync
             try { if (typeof APP_SYNC !== 'undefined') APP_SYNC.init(); } catch (e) {}
         },
 
-        /* Push ALL current localStorage data to Firebase (first-time migration) */
+        /* Push ALL current localStorage data to Firebase */
         pushAll: function () {
-            if (!window.FB_DB) { console.warn('[HMS] Firebase not configured'); return; }
+            if (!window.FB_DB) { if (typeof APP !== 'undefined') APP.notify('Firebase not configured', 'error'); return; }
             SHARED_KEYS.forEach(function (key) {
                 try {
                     var raw = localStorage.getItem('hms_' + key);
-                    if (raw) {
-                        var data = JSON.parse(raw);
-                        fbPush(key, data);
-                    }
+                    if (raw) fbPush(key, JSON.parse(raw));
                 } catch (e) {}
             });
-            console.info('[HMS] Pushed all local data to Firebase.');
+            _recordSyncTs();
+            if (typeof APP !== 'undefined') APP.notify('All data pushed to cloud', 'success');
+        },
+
+        /* Pull ALL data from Firebase into localStorage right now */
+        pullNow: function (cb) {
+            if (!window.FB_DB) {
+                if (typeof APP !== 'undefined') APP.notify('Firebase not configured', 'error');
+                if (cb) cb(false);
+                return;
+            }
+            fbPullAll(function () {
+                _recordSyncTs();
+                if (typeof APP !== 'undefined') APP.notify('Data pulled from cloud', 'success');
+                if (cb) cb(true);
+            });
+        },
+
+        /* Return connection + last-sync status */
+        status: function () {
+            return {
+                connected: !!window.FB_DB,
+                projectId: window.FB_PROJECT_ID || null,
+                lastSync:  this._lastSyncTs
+            };
         }
     };
 })();

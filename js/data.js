@@ -687,18 +687,32 @@ APP_SYNC = {
             };
         }
         window.addEventListener('beforeunload', () => this._cleanup());
+        this._updateStatus();
     },
     _debounceTimer: null,
     _flash() {
         const el = document.getElementById('liveIndicator');
-        if (el) {
-            el.style.background = 'rgba(66,133,244,0.2)';
-            el.style.borderColor = 'var(--info)';
-            setTimeout(() => {
-                el.style.background = 'rgba(52,168,83,0.1)';
-                el.style.borderColor = 'rgba(52,168,83,0.3)';
-            }, 400);
+        if (!el) return;
+        el.style.background = 'rgba(66,133,244,0.25)';
+        el.style.borderColor = '#4285f4';
+        setTimeout(() => this._updateStatus(), 500);
+    },
+    _updateStatus() {
+        const el = document.getElementById('liveIndicator');
+        if (!el) return;
+        const fb = !!window.FB_DB;
+        const lastSync = (typeof SYNC !== 'undefined') ? SYNC._lastSyncTs : null;
+        const timeStr  = lastSync ? new Date(lastSync).toLocaleTimeString() : null;
+        if (fb) {
+            el.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;background:#34a853;animation:pulse 1.5s infinite;display:inline-block;"></span>&nbsp;☁️ CLOUD SYNC';
+            el.style.cssText = 'display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#34a853;padding:3px 9px;border-radius:12px;background:rgba(52,168,83,0.12);border:1px solid rgba(52,168,83,0.35);cursor:pointer;';
+            el.title = 'Cloud sync active' + (timeStr ? ' · Last sync ' + timeStr : '') + ' · Click to manage';
+        } else {
+            el.innerHTML = '<span style="width:7px;height:7px;border-radius:50%;background:#f59e0b;display:inline-block;"></span>&nbsp;⚠️ LOCAL ONLY';
+            el.style.cssText = 'display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#b45309;padding:3px 9px;border-radius:12px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);cursor:pointer;';
+            el.title = 'Not synced to cloud — clearing cache will wipe data. Click to set up Firebase.';
         }
+        el.onclick = function() { try { Router.navigate('data-history'); } catch(e) {} };
     },
     _cleanup() {
         if (DB._channel) { try { DB._channel.close(); } catch(e) {} }
@@ -719,7 +733,7 @@ APP_SYNC = {
 
 const APP = {
     currentModule: null,
-    _APP_VERSION: 'v55',
+    _APP_VERSION: 'v56',
 
     init() {
         try {

@@ -1,15 +1,15 @@
 // ═══════════════════════════════════════════════════════════════════
 // HMS — Firebase Configuration (Multi-Device Real-Time Sync)
 // ═══════════════════════════════════════════════════════════════════
-// SETUP STEPS (one-time, 5 minutes):
+// HOW TO SET UP (one-time, 5 minutes):
 //   1. Go to https://console.firebase.google.com/
 //   2. Click "Add project" → give it a name → Continue
 //   3. Disable Google Analytics → Create project
-//   4. Click "Web" (</>) icon to add a web app → Register app
-//   5. Copy the firebaseConfig values below
-//   6. Go to Build → Realtime Database → Create database
+//   4. Click "Web" (</>) icon → Register app → copy firebaseConfig
+//   5. Go to Build → Realtime Database → Create database
 //      Choose "Start in test mode" → Enable
-//   7. Replace EACH "REPLACE_WITH_..." value below with your real values
+//   6. OR: use the in-app Cloud Sync Setup (Data History page)
+//      to paste your config — it saves without editing this file.
 // ═══════════════════════════════════════════════════════════════════
 
 var firebaseConfig = {
@@ -26,22 +26,38 @@ var firebaseConfig = {
     try {
         if (typeof firebase === 'undefined') {
             window.FB_DB = null;
+            window.FB_CONFIGURED = false;
             return;
         }
-        // If any value is still a placeholder, run in local-only mode
+
+        // Allow in-app configuration — credentials saved via the Cloud Sync Setup page
+        // override the placeholder values above without editing this file.
+        try {
+            var _saved = JSON.parse(localStorage.getItem('hms_firebase_cfg') || 'null');
+            if (_saved && _saved.apiKey && !_saved.apiKey.startsWith('REPLACE_')) {
+                firebaseConfig = _saved;
+            }
+        } catch (e) {}
+
+        // If every field is still a placeholder, run local-only
         var configured = !firebaseConfig.apiKey.startsWith('REPLACE_');
         if (!configured) {
             window.FB_DB = null;
-            console.info('[HMS] Firebase not configured — local-only mode. Edit js/firebase-config.js to enable multi-device sync.');
+            window.FB_CONFIGURED = false;
+            console.info('[HMS] Firebase not configured — local-only mode. Use the "Data History" page to set up cloud sync.');
             return;
         }
+
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
         window.FB_DB = firebase.database();
-        console.info('[HMS] Firebase connected ✓ — multi-device sync active.');
+        window.FB_CONFIGURED = true;
+        window.FB_PROJECT_ID = firebaseConfig.projectId;
+        console.info('[HMS] Firebase connected ✓ — multi-device cloud sync active.');
     } catch (e) {
         console.warn('[HMS] Firebase init failed:', e.message);
         window.FB_DB = null;
+        window.FB_CONFIGURED = false;
     }
 })();
