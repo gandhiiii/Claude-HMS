@@ -113,46 +113,55 @@
             try { users = DB.get('users') || []; } catch(e) {}
 
             if (users.length === 0 && window.FB_DB) {
-                // localStorage is empty but Firebase is configured — try cloud recovery
-                var card = document.querySelector('.login-card');
-                var loader = document.createElement('div');
-                loader.id = 'cloudRecoveryLoader';
-                loader.innerHTML = '<div style="text-align:center;padding:20px 0;">'
-                    + '<div class="spinner"></div>'
-                    + '<p style="color:var(--gray);margin-top:12px;font-size:13px;">Recovering data from cloud...</p></div>';
-                if (card) card.appendChild(loader);
-                document.getElementById('loginForm').style.display = 'none';
+                // localStorage empty — pull data from Firebase in the background.
+                // Login form stays visible so mobile users are never stuck on a spinner.
+                var _errEl = document.getElementById('loginError');
+                _errEl.style.color = 'var(--gray)';
+                _errEl.textContent = '⟳ Loading your data…';
+                var _done = false;
+
+                // Safety timeout: if Firebase doesn't respond in 7 s, clear the message
+                var _t = setTimeout(function() {
+                    if (_done) return;
+                    _done = true;
+                    _errEl.style.color = '';
+                    _errEl.textContent = '';
+                    var u2 = DB.get('users') || [];
+                    if (u2.length === 0) {
+                        document.getElementById('loginForm').style.display = 'none';
+                        document.getElementById('setupForm').classList.add('active');
+                    }
+                }, 7000);
 
                 window.FB_DB.ref('hms').once('value').then(function(snap) {
+                    if (_done) return;
+                    _done = true;
+                    clearTimeout(_t);
                     var remote = snap.val();
-                    var loader2 = document.getElementById('cloudRecoveryLoader');
-                    if (loader2) loader2.remove();
-
-                    if (remote && remote.users && (Array.isArray(remote.users) ? remote.users.length : Object.keys(remote.users).length) > 0) {
-                        // Restore all keys from Firebase
+                    var hasUsers = remote && remote.users &&
+                        (Array.isArray(remote.users) ? remote.users.length : Object.keys(remote.users).length) > 0;
+                    if (hasUsers) {
                         Object.keys(remote).forEach(function(key) {
                             try { localStorage.setItem('hms_' + key, JSON.stringify(remote[key])); } catch(e2) {}
                         });
                         localStorage.setItem('hms_last_cloud_sync', new Date().toISOString());
-                        // Show login with recovery notice
-                        var errEl = document.getElementById('loginError');
-                        errEl.style.color = 'var(--secondary)';
-                        errEl.textContent = '✅ Data restored from cloud. Please log in.';
-                        document.getElementById('loginForm').style.display = 'block';
+                        _errEl.style.color = 'var(--secondary)';
+                        _errEl.textContent = '✅ Data loaded. Please log in.';
                     } else {
-                        // Firebase also empty — check local again, maybe show setup
+                        _errEl.style.color = '';
+                        _errEl.textContent = '';
                         var u2 = DB.get('users') || [];
                         if (u2.length === 0) {
                             document.getElementById('loginForm').style.display = 'none';
                             document.getElementById('setupForm').classList.add('active');
-                        } else {
-                            document.getElementById('loginForm').style.display = 'block';
                         }
                     }
                 }).catch(function() {
-                    var l3 = document.getElementById('cloudRecoveryLoader');
-                    if (l3) l3.remove();
-                    document.getElementById('loginForm').style.display = 'block';
+                    if (_done) return;
+                    _done = true;
+                    clearTimeout(_t);
+                    _errEl.style.color = '';
+                    _errEl.textContent = '';
                 });
             } else if (users.length === 0) {
                 document.getElementById('loginForm').style.display = 'none';
