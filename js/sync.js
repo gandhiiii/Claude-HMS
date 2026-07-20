@@ -93,32 +93,34 @@ var SYNC = (function () {
     function fbPullAll(cb) {
         if (!window.FB_DB) { if (cb) cb(); return; }
         window.FB_DB.ref('hms').once('value').then(function (snap) {
-            var remote = snap.val();
-            if (remote) {
-                Object.keys(remote).forEach(function (key) {
-                    if (SHARED_KEYS.indexOf(key) === -1) return;
-                    var hadLocalOnly = _mergeIntoLocal(key, remote[key]);
-                    if (hadLocalOnly) {
-                        // Push merged data back so Firebase gains the locally-created items too
-                        try {
-                            var merged = JSON.parse(localStorage.getItem('hms_' + key));
-                            fbPush(key, merged);
-                        } catch (e) {}
-                    }
-                });
-            } else {
-                // Firebase is empty — push everything local so it gets stored
-                SHARED_KEYS.forEach(function (key) {
+            var remote = snap.val() || {};
+
+            // Step 1: merge keys Firebase has into local storage
+            Object.keys(remote).forEach(function (key) {
+                if (SHARED_KEYS.indexOf(key) === -1) return;
+                var hadLocalOnly = _mergeIntoLocal(key, remote[key]);
+                if (hadLocalOnly) {
                     try {
-                        var raw = localStorage.getItem('hms_' + key);
-                        if (raw) {
-                            var d = JSON.parse(raw);
-                            var hasData = Array.isArray(d) ? d.length > 0 : !!d;
-                            if (hasData) fbPush(key, d);
-                        }
+                        var merged = JSON.parse(localStorage.getItem('hms_' + key));
+                        fbPush(key, merged);
                     } catch (e) {}
-                });
-            }
+                }
+            });
+
+            // Step 2: push local keys that Firebase doesn't have yet
+            // (covers partial-sync case where only some keys reached Firebase)
+            SHARED_KEYS.forEach(function (key) {
+                if (remote.hasOwnProperty(key)) return; // already handled above
+                try {
+                    var raw = localStorage.getItem('hms_' + key);
+                    if (raw) {
+                        var d = JSON.parse(raw);
+                        var hasData = Array.isArray(d) ? d.length > 0 : !!d;
+                        if (hasData) fbPush(key, d);
+                    }
+                } catch (e) {}
+            });
+
             if (cb) cb();
         }).catch(function (e) {
             console.warn('[HMS] Firebase pull error:', e.message);
