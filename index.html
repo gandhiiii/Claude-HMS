@@ -11,23 +11,24 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     <style>
-        /* Override body background so it matches the login gradient on all screen sizes */
         body { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); overflow-x: hidden; }
         .login-page {
             min-height: 100vh;
-            min-height: 100dvh; /* accounts for mobile browser chrome (URL bar) */
+            min-height: 100dvh;
             padding: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: transparent; /* body now provides the gradient */
+            background: transparent;
         }
+        .login-logo { font-size: 36px; text-align: center; margin-bottom: 8px; }
         .reset-section { display: none; }
         .reset-section.active { display: block; }
-        .login-logo { font-size: 36px; text-align: center; margin-bottom: 8px; }
         .setup-section { display: none; }
         .setup-section.active { display: block; }
         .setup-badge { background: var(--secondary); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; display: inline-block; margin-bottom: 8px; letter-spacing: 0.5px; }
+        #setupLink { display:none; text-align:center; margin-top:12px; }
+        #setupLink a { font-size:12px; color:var(--gray); }
     </style>
 </head>
 <body>
@@ -37,21 +38,23 @@
             <h1>Hospital Management</h1>
             <p class="subtitle">Admin Login Portal</p>
 
-            <!-- Login Form -->
+            <!-- Login Form — always shown first on every device -->
             <div id="loginForm">
                 <div class="form-group">
                     <label>Username</label>
-                    <input type="text" id="loginUser" class="form-control" placeholder="Enter username">
+                    <input type="text" id="loginUser" class="form-control" placeholder="Enter username" autocomplete="username">
                 </div>
                 <div class="form-group">
                     <label>Password</label>
-                    <input type="password" id="loginPass" class="form-control" placeholder="Enter password">
+                    <input type="password" id="loginPass" class="form-control" placeholder="Enter password" autocomplete="current-password">
                 </div>
                 <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleLogin()">Sign In</button>
                 <div class="login-footer">
-                    <a href="#" onclick="showReset()" style="font-size:13px;">Forgot Password? Reset Here</a>
+                    <a href="#" onclick="showReset();return false;" style="font-size:13px;">Forgot Password? Reset Here</a>
                 </div>
-                <div id="loginMsg" style="font-size:13px;margin-top:8px;text-align:center;"></div>
+                <div id="loginMsg" style="font-size:13px;margin-top:8px;text-align:center;min-height:20px;"></div>
+                <!-- Only shown when no accounts exist anywhere -->
+                <div id="setupLink"><a href="#" onclick="showSetup();return false;">⚙ First time? Create admin account</a></div>
             </div>
 
             <!-- Password Reset Form -->
@@ -64,7 +67,7 @@
                 </div>
                 <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleResetRequest()">Send Reset Request</button>
                 <div class="login-footer">
-                    <a href="#" onclick="showLogin()" style="font-size:13px;">Back to Login</a>
+                    <a href="#" onclick="showLogin();return false;" style="font-size:13px;">Back to Login</a>
                 </div>
                 <div id="resetResult" style="font-size:13px;margin-top:8px;text-align:center;"></div>
                 <div id="resetLinkBox" style="display:none;margin-top:12px;padding:12px;background:#f0f8ff;border-radius:8px;border:1px solid #c2d7f8;">
@@ -78,7 +81,7 @@
                 </div>
             </div>
 
-            <!-- Admin Setup Form (shown only when no accounts exist anywhere) -->
+            <!-- Admin Setup Form — only shown via the "Create admin account" link -->
             <div id="setupForm" class="setup-section">
                 <div class="setup-badge">ADMIN SETUP</div>
                 <h3 style="margin-bottom:4px;">Create Admin Account</h3>
@@ -112,52 +115,74 @@
     <script src="js/firebase-config.js?v=59"></script>
     <script src="js/sync.js?v=59"></script>
     <script>
+        var _fbPullDone = false;
+
         (function () {
-            // Already logged in → go straight to dashboard
+            // Already logged in → dashboard
             try {
                 if (AUTH.currentUser()) { window.location.replace('dashboard.html'); return; }
             } catch (e) {}
 
-            var users = [];
-            try { users = DB.get('users') || []; } catch (e) {}
+            // Check localStorage first — if we already have users, nothing to do
+            var localUsers = [];
+            try { localUsers = DB.get('users') || []; } catch (e) {}
+            if (localUsers.length > 0) { _fbPullDone = true; return; }
 
-            if (users.length > 0) {
-                // Local data exists — show login form, nothing else needed
+            // No local data — try to pull from Firebase in background
+            var msgEl = document.getElementById('loginMsg');
+
+            if (!window.FB_DB) {
+                // No Firebase configured at all
+                _fbPullDone = true;
+                msgEl.style.color = 'var(--gray)';
+                msgEl.textContent = 'No database connected.';
+                document.getElementById('setupLink').style.display = 'block';
                 return;
             }
 
-            if (window.FB_DB) {
-                // localStorage empty but Firebase is connected — pull data silently
-                var msgEl = document.getElementById('loginMsg');
-                msgEl.style.color = 'var(--gray)';
-                msgEl.textContent = '⟳ Connecting…';
+            msgEl.style.color = 'var(--gray)';
+            msgEl.textContent = '⟳ Connecting…';
 
-                window.FB_DB.ref('hms').once('value').then(function (snap) {
-                    var remote = snap.val();
-                    var hasUsers = remote && remote.users &&
-                        (Array.isArray(remote.users) ? remote.users.length : Object.keys(remote.users).length) > 0;
+            // 8-second timeout so the form never hangs forever
+            var _timeout = setTimeout(function () {
+                if (_fbPullDone) return;
+                _fbPullDone = true;
+                msgEl.style.color = 'var(--danger)';
+                msgEl.textContent = 'Could not reach database. Try logging in or check your connection.';
+            }, 8000);
 
-                    if (hasUsers) {
-                        Object.keys(remote).forEach(function (key) {
-                            try { localStorage.setItem('hms_' + key, JSON.stringify(remote[key])); } catch (e2) {}
-                        });
-                        localStorage.setItem('hms_last_cloud_sync', new Date().toISOString());
-                        msgEl.style.color = 'var(--secondary)';
-                        msgEl.textContent = '✅ Ready. Please log in.';
-                    } else {
-                        // No accounts in Firebase either — show setup form
-                        msgEl.textContent = '';
-                        document.getElementById('loginForm').style.display = 'none';
-                        document.getElementById('setupForm').classList.add('active');
-                    }
-                }).catch(function () {
-                    msgEl.textContent = '';
-                });
-            } else {
-                // No Firebase — show setup immediately
-                document.getElementById('loginForm').style.display = 'none';
-                document.getElementById('setupForm').classList.add('active');
-            }
+            window.FB_DB.ref('hms').once('value').then(function (snap) {
+                if (_fbPullDone) return;
+                clearTimeout(_timeout);
+                _fbPullDone = true;
+
+                var remote = snap.val();
+                var remoteUsers = remote && remote.users
+                    ? (Array.isArray(remote.users) ? remote.users : Object.values(remote.users))
+                    : [];
+
+                if (remoteUsers.length > 0) {
+                    // Populate localStorage from Firebase
+                    Object.keys(remote).forEach(function (key) {
+                        try { localStorage.setItem('hms_' + key, JSON.stringify(remote[key])); } catch (e2) {}
+                    });
+                    localStorage.setItem('hms_last_cloud_sync', new Date().toISOString());
+                    msgEl.style.color = 'var(--secondary)';
+                    msgEl.textContent = '✅ Ready. Please log in.';
+                } else {
+                    // No accounts anywhere — offer setup link (don't auto-switch)
+                    msgEl.style.color = 'var(--gray)';
+                    msgEl.textContent = 'No accounts found.';
+                    document.getElementById('setupLink').style.display = 'block';
+                }
+            }).catch(function (err) {
+                if (_fbPullDone) return;
+                clearTimeout(_timeout);
+                _fbPullDone = true;
+                msgEl.style.color = 'var(--danger)';
+                msgEl.textContent = 'Database error. Try logging in with your credentials.';
+                console.warn('[HMS] login pull error:', err && err.message);
+            });
         })();
 
         /* ── Login ── */
@@ -165,24 +190,51 @@
             var username = document.getElementById('loginUser').value.trim();
             var password = document.getElementById('loginPass').value.trim();
             var msgEl = document.getElementById('loginMsg');
+            if (!username || !password) {
+                msgEl.style.color = 'var(--danger)';
+                msgEl.textContent = 'Please enter username and password.';
+                return;
+            }
+
+            // If Firebase pull is still in progress, wait for it (up to 5s) then try
+            if (!_fbPullDone && window.FB_DB) {
+                msgEl.style.color = 'var(--gray)';
+                msgEl.textContent = '⟳ Loading accounts… please wait.';
+                var waited = 0;
+                var waiter = setInterval(function () {
+                    waited += 200;
+                    if (_fbPullDone || waited >= 5000) {
+                        clearInterval(waiter);
+                        _doLogin(username, password);
+                    }
+                }, 200);
+                return;
+            }
+
+            _doLogin(username, password);
+        }
+
+        function _doLogin(username, password) {
+            var msgEl = document.getElementById('loginMsg');
             msgEl.style.color = 'var(--danger)';
             msgEl.textContent = '';
-            if (!username || !password) { msgEl.textContent = 'Please enter username and password.'; return; }
             try {
                 var result = AUTH.login(username, password);
                 if (result.success) {
-                    if (window.FB_DB) { try { SYNC.pushAll(); } catch(e) {} }
+                    if (window.FB_DB) { try { SYNC.pushAll(); } catch (e) {} }
                     window.location.replace('dashboard.html');
                 } else {
                     msgEl.textContent = result.message;
                 }
-            } catch (e) { msgEl.textContent = 'Login error: ' + (e.message || e); }
+            } catch (e) {
+                msgEl.textContent = 'Login error: ' + (e.message || e);
+            }
         }
 
         document.getElementById('loginPass').addEventListener('keydown', function (e) { if (e.key === 'Enter') handleLogin(); });
         document.getElementById('loginUser').addEventListener('keydown', function (e) { if (e.key === 'Enter') handleLogin(); });
 
-        /* ── Show/hide sections ── */
+        /* ── Show / hide sections ── */
         function showLogin() {
             document.getElementById('loginForm').style.display = 'block';
             document.getElementById('resetForm').classList.remove('active');
@@ -197,7 +249,12 @@
             document.getElementById('resetLinkBox').style.display = 'none';
         }
 
-        /* ── Admin setup (first-time only) ── */
+        function showSetup() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('setupForm').classList.add('active');
+        }
+
+        /* ── Admin setup ── */
         function handleSetup() {
             var name  = (document.getElementById('setupName').value  || '').trim();
             var uname = (document.getElementById('setupUser').value  || '').trim();
@@ -205,10 +262,10 @@
             var pass2 = (document.getElementById('setupPass2').value || '').trim();
             var errEl = document.getElementById('setupError');
             errEl.textContent = '';
-            if (!name)                    { errEl.textContent = 'Full name is required.'; return; }
+            if (!name)                      { errEl.textContent = 'Full name is required.'; return; }
             if (!uname || uname.length < 3) { errEl.textContent = 'Username must be at least 3 characters.'; return; }
             if (!pass  || pass.length < 6)  { errEl.textContent = 'Password must be at least 6 characters.'; return; }
-            if (pass !== pass2)           { errEl.textContent = 'Passwords do not match.'; return; }
+            if (pass !== pass2)             { errEl.textContent = 'Passwords do not match.'; return; }
             try {
                 var admin = {
                     id: 'admin_' + Date.now(), username: uname, password: pass,
