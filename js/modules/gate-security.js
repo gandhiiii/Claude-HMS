@@ -345,9 +345,10 @@ function renderPatientList() {
             <td>${APP.formatDateTime(v.entryTime)}</td>
             <td>${v.exitTime ? APP.formatDateTime(v.exitTime) : '<span style="color:var(--gray);">-</span>'}</td>
             <td><span class="badge ${v.status === 'active' ? 'badge-success' : 'badge-secondary'}">${v.status === 'active' ? 'IN' : 'OUT'}</span></td>
-            <td>
+            <td style="white-space:nowrap;">
                 <button class="btn btn-sm btn-primary" onclick="viewPatientPass('${v.id}')">Pass</button>
-                ${v.status === 'active' ? `<button class="btn btn-sm btn-danger" onclick="checkOutPatient('${v.id}')">Check Out</button>` : ''}
+                ${v.status === 'active' ? `<button class="btn btn-sm btn-warning" onclick="checkOutPatient('${v.id}')">Check Out</button>` : ''}
+                <button class="btn btn-sm btn-danger" onclick="deletePass('visitor','${v.id}','${(v.patientName||'').replace(/'/g,"\\'")}','${v.uniqueCode}')">🗑</button>
             </td>
         </tr>
     `).join('') || '<tr><td colspan="8" class="empty-state">No patient visits</td></tr>';
@@ -850,15 +851,16 @@ function renderDoctorList() {
             <td>${APP.formatDateTime(v.entryTime)}</td>
             <td>${v.approvedBy || (v.status === 'rejected' ? '<span style="color:red;">Rejected by '+(v.rejectedBy||'N/A')+'</span>' : v.status === 'pending' ? '<span style="color:var(--warning);">⏳ Pending</span>' : '-')}</td>
             <td><span class="badge ${statusBadge(v.status)}">${statusLabel(v.status)}</span></td>
-            <td>
+            <td style="white-space:nowrap;">
                 ${v.status === 'pending' && isUserHodOfDept(v.department) ? `
                     <button class="btn btn-sm btn-success" onclick="approveDoctorEntry('${v.id}')">Approve</button>
                     <button class="btn btn-sm btn-danger" onclick="showRejectReason('doctorVisits','${v.id}')">Reject</button>
                 ` : ''}
                 ${v.status === 'active' ? `<button class="btn btn-sm btn-primary" onclick="viewDoctorPass('${v.id}')">Pass</button>` : ''}
                 ${v.status === 'pending' ? `<button class="btn btn-sm btn-info" onclick="viewDoctorPass('${v.id}')">View</button>` : ''}
-                ${v.status === 'active' ? `<button class="btn btn-sm btn-danger" onclick="checkOutDoctor('${v.id}')">Check Out</button>` : ''}
+                ${v.status === 'active' ? `<button class="btn btn-sm btn-warning" onclick="checkOutDoctor('${v.id}')">Check Out</button>` : ''}
                 ${v.status === 'rejected' ? '<span style="color:var(--danger);font-size:11px;font-weight:600;">⛔ REJECTED</span>' : ''}
+                <button class="btn btn-sm btn-danger" onclick="deletePass('doctor','${v.id}','${(v.doctorName||'').replace(/'/g,"\\'")}','${v.uniqueCode}')">🗑</button>
             </td>
         </tr>
     `).join('') || '<tr><td colspan="9" class="empty-state">No doctor visits</td></tr>';
@@ -1385,15 +1387,30 @@ function renderGenPassList() {
             <td style="font-size:12px;">${p.purpose || '-'}</td>
             <td style="font-size:12px;">${APP.formatDateTime(p.entryTime)}</td>
             <td><span class="badge ${statusBadge(p.status)}">${statusLabel(p.status)}</span></td>
-            <td>
+            <td style="white-space:nowrap;">
                 ${p._type === 'visitor' && p.status === 'active' ? `<button class="btn btn-sm btn-primary" onclick="viewPatientPass('${p.id}')">Pass</button>` : ''}
                 ${p._type === 'doctor' ? `<button class="btn btn-sm ${p.status === 'active' ? 'btn-primary' : 'btn-info'}" onclick="viewDoctorPass('${p.id}')">${p.status === 'active' ? 'Pass' : p.status === 'pending' ? 'Pending' : 'View'}</button>` : ''}
                 ${p.status === 'active' ? `<button class="btn btn-sm btn-info" onclick="${p._type === 'visitor' ? 'printPatientPass' : 'printDoctorPass'}('${p.id}')">🖨️</button>` : ''}
-                ${p.status === 'active' ? `<button class="btn btn-sm btn-danger" onclick="${p._type === 'visitor' ? 'checkOutPatient' : 'checkOutDoctor'}('${p.id}')">Check Out</button>` : ''}
+                ${p.status === 'active' ? `<button class="btn btn-sm btn-warning" onclick="${p._type === 'visitor' ? 'checkOutPatient' : 'checkOutDoctor'}('${p.id}')">Check Out</button>` : ''}
                 ${p.status === 'rejected' ? '<span style="color:var(--danger);font-size:11px;font-weight:600;">⛔ REJECTED</span>' : ''}
+                <button class="btn btn-sm btn-danger" onclick="deletePass('${p._type}','${p.id}','${(p._name||'').replace(/'/g,"\\'")}','${p.uniqueCode}')">🗑</button>
             </td>
         </tr>
     `).join('') || '<tr><td colspan="8" class="empty-state">No passes found</td></tr>';
+}
+
+function deletePass(type, id, name, code) {
+    var cu = AUTH.currentUser();
+    if (!cu || (cu.role !== 'admin' && !cu.isSuperAdmin)) { APP.notify('Only admin can delete passes', 'error'); return; }
+    var label = name ? '"' + name + '" (' + code + ')' : code;
+    confirmAction('Delete pass for ' + label + '? This permanently removes the record.', function() {
+        var key = type === 'visitor' ? 'patientVisits' : 'doctorVisits';
+        DB.delete(key, id);
+        APP.notify('Pass deleted', 'success');
+        renderPatientList();
+        renderDoctorList();
+        if (document.getElementById('genPassBody')) renderGenPassList();
+    });
 }
 
 function showGenPassForm(type) {
