@@ -8,33 +8,27 @@ function renderUsers(container) {
     var _pendingPwReqs = isAdmin ? (DB.get('pwResetRequests') || []).filter(function(r){ return r.status === 'pending'; }) : [];
     var _pwReqBanner = '';
     if (_pendingPwReqs.length > 0) {
-        _pwReqBanner = '<div class="card mb-4" style="border-left:4px solid #f59e0b;">'
-            + '<div style="padding:14px 16px;">'
-            + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">🔑 Password Reset Requests'
-            + ' <span style="background:#f59e0b;color:#fff;font-size:11px;padding:2px 8px;border-radius:20px;margin-left:6px;">' + _pendingPwReqs.length + ' pending</span></div>'
-            + '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
-            + '<thead><tr style="border-bottom:1px solid var(--border);">'
-            + '<th style="padding:6px 8px;text-align:left;">Username</th><th style="padding:6px 8px;text-align:left;">Full Name</th>'
-            + '<th style="padding:6px 8px;text-align:left;">Department</th><th style="padding:6px 8px;text-align:left;">Role</th>'
-            + '<th style="padding:6px 8px;text-align:left;">Requested At</th><th style="padding:6px 8px;"></th>'
-            + '</tr></thead><tbody>';
+        _pwReqBanner = '<div class="card mb-4" style="border-left:4px solid #f59e0b;padding:14px 16px;">'
+            + '<div style="font-weight:700;font-size:15px;margin-bottom:12px;">🔑 Password Reset Requests'
+            + ' <span style="background:#f59e0b;color:#fff;font-size:12px;padding:2px 10px;border-radius:20px;margin-left:6px;">' + _pendingPwReqs.length + ' pending</span></div>'
+            + '<div style="display:flex;flex-direction:column;gap:10px;">';
         _pendingPwReqs.forEach(function(r) {
             var when = r.requestedAt ? new Date(r.requestedAt).toLocaleString() : '-';
             var safeU = (r.username||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
             var safeN = (r.fullName||'-').replace(/&/g,'&amp;').replace(/</g,'&lt;');
             var safeD = (r.department||'-').replace(/&/g,'&amp;').replace(/</g,'&lt;');
-            _pwReqBanner += '<tr style="border-bottom:1px solid var(--border);">'
-                + '<td style="padding:7px 8px;"><strong>' + safeU + '</strong></td>'
-                + '<td style="padding:7px 8px;">' + safeN + '</td>'
-                + '<td style="padding:7px 8px;">' + safeD + '</td>'
-                + '<td style="padding:7px 8px;"><span class="badge ' + APP.getRoleBadge(r.role||'employee') + '">' + (r.role||'').toUpperCase().replace(/_/g,' ') + '</span></td>'
-                + '<td style="padding:7px 8px;font-size:12px;color:var(--gray);">' + when + '</td>'
-                + '<td style="padding:7px 8px;white-space:nowrap;">'
-                + '<button class="btn btn-sm btn-primary" onclick="adminResetUserPw(\'' + r.id + '\')">Reset Password</button> '
-                + '<button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="adminDismissPwReq(\'' + r.id + '\')">Dismiss</button>'
-                + '</td></tr>';
+            _pwReqBanner += '<div style="background:var(--bg);border-radius:8px;padding:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">'
+                + '<div>'
+                + '<div style="font-weight:600;font-size:14px;">' + safeN + ' <span style="color:var(--gray);font-size:13px;">@' + safeU + '</span></div>'
+                + '<div style="font-size:13px;color:var(--gray);margin-top:2px;">' + safeD + ' &bull; <span class="badge ' + APP.getRoleBadge(r.role||'employee') + '">' + (r.role||'').toUpperCase().replace(/_/g,' ') + '</span></div>'
+                + '<div style="font-size:12px;color:var(--gray);margin-top:2px;">Requested: ' + when + '</div>'
+                + '</div>'
+                + '<div style="display:flex;gap:6px;flex-shrink:0;">'
+                + '<button class="btn btn-sm btn-primary" onclick="adminResetUserPw(\'' + r.id + '\')">Reset Password</button>'
+                + '<button class="btn btn-sm btn-outline" onclick="adminDismissPwReq(\'' + r.id + '\')">Dismiss</button>'
+                + '</div></div>';
         });
-        _pwReqBanner += '</tbody></table></div></div></div>';
+        _pwReqBanner += '</div></div>';
     }
 
     container.innerHTML = _pwReqBanner + `

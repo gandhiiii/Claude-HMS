@@ -129,7 +129,41 @@ function renderDashboard(container) {
     const totalKm = trips.reduce((s, t) => s + (parseFloat(t.kilometers) || 0), 0);
     const totalFare = trips.reduce((s, t) => s + (parseFloat(t.fare) || 0), 0);
 
+    const pendingPwReqs = isAdmin ? (DB.get('pwResetRequests') || []).filter(function(r){ return r.status === 'pending'; }) : [];
+    const pwReqAlert = pendingPwReqs.length > 0
+        ? `<div class="card" style="border-left:4px solid #f59e0b;margin-bottom:16px;padding:14px 16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:22px;">🔑</span>
+                    <div>
+                        <div style="font-weight:700;font-size:15px;">Password Reset Requests</div>
+                        <div style="font-size:13px;color:var(--gray);">${pendingPwReqs.length} pending — staff waiting for password reset</div>
+                    </div>
+                </div>
+                <button class="btn btn-warning" onclick="Router.navigate('users')" style="white-space:nowrap;">View &amp; Resolve</button>
+            </div>
+            <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">
+                ${pendingPwReqs.map(function(r){
+                    var safeU = (r.username||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+                    var safeN = (r.fullName||'-').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+                    var safeD = (r.department||'-').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+                    var when = r.requestedAt ? new Date(r.requestedAt).toLocaleString() : '-';
+                    return '<div style="background:var(--bg);border-radius:8px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">'
+                        + '<div>'
+                        + '<div style="font-weight:600;font-size:14px;">'+safeN+' <span style="color:var(--gray);font-size:12px;">@'+safeU+'</span></div>'
+                        + '<div style="font-size:12px;color:var(--gray);">'+safeD+' &bull; '+when+'</div>'
+                        + '</div>'
+                        + '<div style="display:flex;gap:6px;">'
+                        + '<button class="btn btn-sm btn-primary" onclick="adminResetUserPw(\''+r.id+'\')">Reset</button>'
+                        + '<button class="btn btn-sm btn-outline" onclick="adminDismissPwReq(\''+r.id+'\')">Dismiss</button>'
+                        + '</div></div>';
+                }).join('')}
+            </div>
+           </div>`
+        : '';
+
     container.innerHTML = `
+        ${pwReqAlert}
         <div style="margin-bottom:20px;">
             <h2 style="font-size:20px;font-weight:700;">👋 Welcome, ${user.fullName}</h2>
             <p style="font-size:13px;color:var(--gray);">Hospital overview & Key Performance Indicators</p>
