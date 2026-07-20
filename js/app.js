@@ -103,6 +103,12 @@ const Router = {
         if (!u) { window.location.href = 'index.html'; return; }
         if (module === 'dashboard' && u && u.role === 'employee') module = 'employee-dashboard';
         if (module === 'dashboard' && u && u.role === 'hod') module = 'hod-dashboard';
+        // HOD and employees must not access admin-only modules directly
+        var _adminOnly = ['reports', 'data-history', 'budget', 'quarterly-priorities', 'feature-rights'];
+        if (_adminOnly.indexOf(module) !== -1 && u.role !== 'admin' && !u.isSuperAdmin) {
+            if (u.role === 'hod') { module = 'hod-dashboard'; }
+            else { module = 'employee-dashboard'; }
+        }
 
         // Cleanup ambulance tracking when leaving that module
         if (APP.currentModule === 'ambulance' && module !== 'ambulance') {
