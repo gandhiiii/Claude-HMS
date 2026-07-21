@@ -195,19 +195,24 @@ function skStoreFulfill(id) {
         fulfilledByName: user.fullName,
         fulfilledAt: new Date().toISOString()
     });
-    // Record stock-out movements for each item
+    // Deduct stock for each item in the request (case-insensitive name match)
+    var now = new Date().toISOString();
     (r.items || []).forEach(function(item) {
-        var inv = (DB.get('inventory') || []).find(function(i) { return i.name === item.name; });
+        var nameLow = (item.name || '').trim().toLowerCase();
+        var inv = (DB.get('inventory') || []).find(function(i) {
+            return (i.name || '').trim().toLowerCase() === nameLow;
+        });
         if (inv) {
-            var newQty = Math.max(0, (parseInt(inv.quantity) || 0) - (parseInt(item.qty) || 0));
+            var issueQty = parseInt(item.qty) || 0;
+            var newQty   = Math.max(0, (parseInt(inv.quantity) || 0) - issueQty);
             DB.update('inventory', inv.id, { quantity: newQty });
             DB.add('inventory_movements', {
                 itemId: inv.id, itemName: inv.name, type: 'out',
-                qty: parseInt(item.qty) || 0, unit: inv.unit || item.unit || 'pcs',
-                unitPrice: inv.price || 0,
-                totalValue: (parseInt(item.qty) || 0) * (parseFloat(inv.price) || 0),
+                qty: issueQty, unit: inv.unit || item.unit || 'pcs',
+                unitPrice: parseFloat(inv.price) || 0,
+                totalValue: issueQty * (parseFloat(inv.price) || 0),
                 dept: r.department || '', by: user.fullName,
-                notes: 'Fulfilled: ' + (r.title || ''), date: new Date().toISOString()
+                notes: 'Request fulfilled: ' + (r.title || ''), date: now
             });
         }
     });

@@ -734,7 +734,7 @@ APP_SYNC = {
 
 const APP = {
     currentModule: null,
-    _APP_VERSION: 'v79',
+    _APP_VERSION: 'v80',
 
     init() {
         try {

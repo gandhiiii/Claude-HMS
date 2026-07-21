@@ -431,12 +431,38 @@ function facilityRejectMatReq(id) {
 function storeFulfillMatReq(id) {
     if (!confirm('Mark this request as fulfilled? The requester will be notified to confirm receipt.')) return;
     var user = AUTH.currentUser();
+    var now  = new Date().toISOString();
+    var r    = DB.getById('material_requests', id);
     DB.update('material_requests', id, {
         status: 'store_fulfilled',
         fulfilledBy: user.username,
         fulfilledByName: user.fullName,
-        fulfilledAt: new Date().toISOString()
+        fulfilledAt: now
     });
+    // Deduct inventory for each item in the request
+    if (r) {
+        (r.items || []).forEach(function(item) {
+            var nameLow = (item.name || '').trim().toLowerCase();
+            var inv = (DB.get('inventory') || []).find(function(i) {
+                return (i.name || '').trim().toLowerCase() === nameLow;
+            });
+            if (inv) {
+                var issueQty = parseInt(item.qty) || 0;
+                var newQty   = Math.max(0, (parseInt(inv.quantity) || 0) - issueQty);
+                DB.update('inventory', inv.id, { quantity: newQty });
+                DB.add('inventory_movements', {
+                    itemId: inv.id, itemName: inv.name, type: 'out',
+                    qty: issueQty, unit: inv.unit || item.unit || 'pcs',
+                    unitPrice: parseFloat(inv.price) || 0,
+                    totalValue: issueQty * (parseFloat(inv.price) || 0),
+                    dept: r.department || '',
+                    by: user.fullName,
+                    notes: 'Request fulfilled: ' + (r.title || ''),
+                    date: now
+                });
+            }
+        });
+    }
     APP.notify('Marked as fulfilled — awaiting creator confirmation', 'success');
     renderMatList();
 }
