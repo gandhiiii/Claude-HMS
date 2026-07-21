@@ -109,6 +109,35 @@ var LANG = (function () {
             prob_view:        'View',
             prob_category:    'Category:',
             prob_note:        'Note:',
+
+            /* Sidebar nav labels */
+            nav_dashboard:        'Dashboard',
+            nav_users:            'User Management',
+            nav_departments:      'Departments',
+            nav_feature_rights:   'Feature Rights',
+            nav_inventory:        'Inventory',
+            nav_gate_security:    'Gate Security',
+            nav_phase2:           'Phase 2 Infra',
+            nav_projects:         'Projects',
+            nav_ambulance:        'Ambulance',
+            nav_problems:         'Problems & Solutions',
+            nav_tasks:            'Tasks',
+            nav_complaints:       'Complaints',
+            nav_room_checklist:   'Room Checklist',
+            nav_admissions:       'Admissions',
+            nav_lost_found:       'Lost & Found',
+            nav_admin_checklists: 'Admin Checklists',
+            nav_material_requests:'Material Requests',
+            nav_suggestions:      'Suggestions',
+            nav_budget:           'Budget',
+            nav_quarterly:        'Quarterly Priorities',
+            nav_data_history:     'Data History',
+            nav_hospital_settings:'Hospital Settings',
+            nav_reports:          'Reports & Analytics',
+            nav_hod_dashboard:    'In-Charge Dashboard',
+            nav_employee_dashboard:'My Dashboard',
+            nav_storekeeper_dashboard:'Storekeeper Dashboard',
+            nav_checklists:       'Checklists',
         },
 
         hi: {
@@ -204,6 +233,34 @@ var LANG = (function () {
             prob_view:        'देखें',
             prob_category:    'श्रेणी:',
             prob_note:        'टिप्पणी:',
+
+            nav_dashboard:        'डैशबोर्ड',
+            nav_users:            'उपयोगकर्ता प्रबंधन',
+            nav_departments:      'विभाग',
+            nav_feature_rights:   'फ़ीचर अधिकार',
+            nav_inventory:        'इन्वेंटरी',
+            nav_gate_security:    'गेट सुरक्षा',
+            nav_phase2:           'फेज़ 2 इंफ्रा',
+            nav_projects:         'प्रोजेक्ट्स',
+            nav_ambulance:        'एम्बुलेंस',
+            nav_problems:         'समस्याएँ व समाधान',
+            nav_tasks:            'कार्य',
+            nav_complaints:       'शिकायतें',
+            nav_room_checklist:   'रूम चेकलिस्ट',
+            nav_admissions:       'भर्ती',
+            nav_lost_found:       'खोया-पाया',
+            nav_admin_checklists: 'एडमिन चेकलिस्ट',
+            nav_material_requests:'सामग्री अनुरोध',
+            nav_suggestions:      'सुझाव',
+            nav_budget:           'बजट',
+            nav_quarterly:        'त्रैमासिक प्राथमिकताएँ',
+            nav_data_history:     'डेटा इतिहास',
+            nav_hospital_settings:'अस्पताल सेटिंग्स',
+            nav_reports:          'रिपोर्ट व विश्लेषण',
+            nav_hod_dashboard:    'इंचार्ज डैशबोर्ड',
+            nav_employee_dashboard:'मेरा डैशबोर्ड',
+            nav_storekeeper_dashboard:'स्टोरकीपर डैशबोर्ड',
+            nav_checklists:       'चेकलिस्ट',
         },
 
         gu: {
@@ -299,6 +356,34 @@ var LANG = (function () {
             prob_view:        'જુઓ',
             prob_category:    'શ્રેણી:',
             prob_note:        'નોંધ:',
+
+            nav_dashboard:        'ડેશબોર્ડ',
+            nav_users:            'વપરાશકર્તા વ્યવસ્થાપન',
+            nav_departments:      'વિભાગો',
+            nav_feature_rights:   'ફીચર અધિકારો',
+            nav_inventory:        'ઇન્વેન્ટરી',
+            nav_gate_security:    'ગેટ સુરક્ષા',
+            nav_phase2:           'ફેઝ 2 ઇન્ફ્રા',
+            nav_projects:         'પ્રોજેક્ટ્સ',
+            nav_ambulance:        'એમ્બ્યુલન્સ',
+            nav_problems:         'સમસ્યાઓ અને ઉકેલ',
+            nav_tasks:            'કાર્યો',
+            nav_complaints:       'ફરિયાદો',
+            nav_room_checklist:   'રૂમ ચેકલિસ્ટ',
+            nav_admissions:       'દાખલો',
+            nav_lost_found:       'ખોવાયેલ-મળેલ',
+            nav_admin_checklists: 'એડમિન ચેકલિસ્ટ',
+            nav_material_requests:'સામગ્રી વિનંતી',
+            nav_suggestions:      'સૂચનો',
+            nav_budget:           'બજેટ',
+            nav_quarterly:        'ત્રિમાસિક પ્રાથમિકતાઓ',
+            nav_data_history:     'ડેટા ઇતિહાસ',
+            nav_hospital_settings:'હોસ્પિટલ સેટિંગ્સ',
+            nav_reports:          'અહેવાલ અને વિશ્લેષણ',
+            nav_hod_dashboard:    'ઇન્ચાર્જ ડેશબોર્ડ',
+            nav_employee_dashboard:'મારું ડેશબોર્ડ',
+            nav_storekeeper_dashboard:'સ્ટોરકીપર ડેશબોર્ડ',
+            nav_checklists:       'ચેકલિસ્ટ',
         }
     };
 
@@ -347,8 +432,9 @@ var LANG = (function () {
 
     function switchTo(lang) {
         set(lang);
-        /* Refresh header (switcher itself) and whatever module is currently on screen */
+        /* Refresh header, sidebar nav labels, and whatever module is currently on screen */
         try { if (typeof Router !== 'undefined') Router.renderHeader(); } catch(e) {}
+        try { if (typeof Router !== 'undefined') Router.renderSidebar(); } catch(e) {}
         try {
             if (typeof APP !== 'undefined' && APP.currentModule && typeof Router !== 'undefined') {
                 Router.navigate(APP.currentModule);
