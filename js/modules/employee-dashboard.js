@@ -262,9 +262,8 @@ function renderEmployeeDashboard(container) {
         + '<div style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;font-size:24px;">👤</div>'
         + '<div><div style="font-size:20px;font-weight:700;">' + u + '</div>'
         + '<div style="font-size:13px;opacity:0.85;">' + (dept || 'No Department') + ' &nbsp;·&nbsp; ' + (user.role || 'employee').replace(/_/g,' ') + '</div></div></div>'
-        + '<div style="text-align:right;font-size:13px;display:flex;flex-direction:column;align-items:flex-end;gap:6px;">'
-        + '<span style="opacity:0.85;">' + new Date().toLocaleDateString('en-IN', {weekday:'long',day:'numeric',month:'long',year:'numeric'}) + '</span>'
-        + (typeof LANG !== 'undefined' ? LANG.switcher() : '')
+        + '<div style="text-align:right;opacity:0.85;font-size:13px;">'
+        + new Date().toLocaleDateString('en-IN', {weekday:'long',day:'numeric',month:'long',year:'numeric'})
         + '</div></div>'
 
         // ── KPI strip ──

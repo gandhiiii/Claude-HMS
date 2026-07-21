@@ -347,11 +347,11 @@ var LANG = (function () {
 
     function switchTo(lang) {
         set(lang);
-        /* Re-render employee dashboard */
+        /* Refresh header (switcher itself) and whatever module is currently on screen */
+        try { if (typeof Router !== 'undefined') Router.renderHeader(); } catch(e) {}
         try {
-            var content = document.getElementById('pageContent');
-            if (content && typeof renderEmployeeDashboard === 'function') {
-                renderEmployeeDashboard(content);
+            if (typeof APP !== 'undefined' && APP.currentModule && typeof Router !== 'undefined') {
+                Router.navigate(APP.currentModule);
             }
         } catch(e) {}
     }
