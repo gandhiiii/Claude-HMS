@@ -430,6 +430,8 @@ function renderInvMovementsView() {
     });
     const el = document.getElementById('movContent');
     if (!el) return;
+    const _cu = AUTH.currentUser();
+    const isAdmin = _cu && (_cu.role === 'admin' || _cu.role === 'super_admin');
     if (filtered.length === 0) {
         el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--gray);">No movements recorded yet. Use 📥 In / 📤 Out buttons on inventory items.</div>';
         return;
@@ -457,7 +459,7 @@ function renderInvMovementsView() {
         </div>
     </div>
     <div class="table-responsive"><table class="data-table" style="font-size:13px;">
-        <thead><tr><th>Date</th><th>Type</th><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total Value</th><th>Dept / To</th><th>By</th><th>Notes</th></tr></thead>
+        <thead><tr><th>Date</th><th>Type</th><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total Value</th><th>Dept / To</th><th>By</th><th>Notes</th>${isAdmin ? '<th>Action</th>' : ''}</tr></thead>
         <tbody>`;
     filtered.forEach(m => {
         const isIn = m.type === 'in';
@@ -471,10 +473,22 @@ function renderInvMovementsView() {
             <td>${m.dept || '-'}</td>
             <td>${m.by || '-'}</td>
             <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;">${m.notes || '-'}</td>
+            ${isAdmin ? `<td><button onclick="deleteInvMovement('${m.id}')" class="btn btn-sm" style="background:#e53935;color:#fff;padding:3px 10px;border-radius:6px;font-size:12px;">🗑 Delete</button></td>` : ''}
         </tr>`;
     });
     html += '</tbody></table></div>';
     el.innerHTML = html;
+}
+
+function deleteInvMovement(id) {
+    const cu = AUTH.currentUser();
+    if (!cu || (cu.role !== 'admin' && cu.role !== 'super_admin')) {
+        APP.notify('Permission denied', 'error'); return;
+    }
+    if (!confirm('Delete this inventory movement record? This cannot be undone.')) return;
+    DB.delete('inventory_movements', id);
+    APP.notify('Movement record deleted', 'success');
+    renderInvMovementsView();
 }
 
 function generateBarcodeSvgs() {
