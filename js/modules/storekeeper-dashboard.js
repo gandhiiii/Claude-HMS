@@ -48,10 +48,11 @@ function renderStorekeeperDashboard(container) {
         + '</div></div>'
 
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;">'
-        + _skKpi('✅', 'To Fulfill',  pendingFulfill.length, '#e8f5e9', '#2e7d32',      'fulfill')
-        + _skKpi('📦', 'My Requests', myRequests.length,     '#e3f2fd', '#1565c0',      'myrequests')
-        + _skKpi('⚠️', 'Low Stock',   lowStock.length,       '#fff3e0', '#e65100',      'inventory')
-        + _skKpi('❌', 'Out of Stock', outOfStock.length,    '#ffebee', 'var(--danger)', 'inventory')
+        + _skKpi('✅', 'To Fulfill',   pendingFulfill.length,                                                    '#e8f5e9', '#2e7d32',      'fulfill')
+        + _skKpi('🔢', 'Total Stock',  inventory.reduce(function(s,i){ return s+(parseInt(i.quantity)||0); },0), '#f3e5f5', '#6a1b9a',      'inventory')
+        + _skKpi('📦', 'My Requests',  myRequests.length,                                                        '#e3f2fd', '#1565c0',      'myrequests')
+        + _skKpi('⚠️', 'Low Stock',    lowStock.length,                                                          '#fff3e0', '#e65100',      'inventory')
+        + _skKpi('❌', 'Out of Stock',  outOfStock.length,                                                       '#ffebee', 'var(--danger)', 'inventory')
         + '</div>'
 
         + (pendingFulfill.length > 0
@@ -197,41 +198,103 @@ function _skFulfill(el) {
     el.innerHTML = html;
 }
 
+var _skFulfillId = null;
+
 function skStoreFulfill(id) {
     var r = DB.getById('material_requests', id);
     if (!r) { APP.notify('Request not found', 'error'); return; }
-    if (!confirm('Mark "' + (r.title || 'this request') + '" as fulfilled?\nThe requester will be asked to confirm receipt.')) return;
+    _skFulfillId = id;
+    var inventory = DB.get('inventory') || [];
+
+    // Build per-item rows with dropdown to pick the matching inventory item
+    var allOpts = '<option value="">-- Skip (no stock deduction) --</option>'
+        + inventory.map(function(inv) {
+            return '<option value="' + inv.id + '">' + inv.name + ' (Stock: ' + (inv.quantity || 0) + ' ' + (inv.unit || 'pcs') + ')</option>';
+        }).join('');
+
+    var itemRows = (r.items || []).map(function(item, i) {
+        // Try to pre-select matching inventory item
+        var nameLow = (item.name || '').trim().toLowerCase();
+        var matched = inventory.find(function(inv) {
+            return (inv.name || '').trim().toLowerCase() === nameLow;
+        });
+
+        var opts = '<option value="">-- Skip (no stock deduction) --</option>'
+            + inventory.map(function(inv) {
+                var sel = (matched && inv.id === matched.id) ? ' selected' : '';
+                return '<option value="' + inv.id + '"' + sel + '>' + inv.name + ' (Stock: ' + (inv.quantity || 0) + ' ' + (inv.unit || 'pcs') + ')</option>';
+            }).join('');
+
+        var matchBadge = matched
+            ? '<span style="background:#e8f5e9;color:#2e7d32;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:6px;">✓ matched</span>'
+            : '<span style="background:#fff3e0;color:#e65100;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:6px;">⚠ no auto-match — select below</span>';
+
+        return '<div style="background:var(--light-gray);border-radius:8px;padding:12px;margin-bottom:8px;">'
+            + '<div style="font-size:13px;font-weight:700;margin-bottom:8px;">'
+            + item.name + ' ×' + item.qty + (item.unit ? ' ' + item.unit : '') + matchBadge + '</div>'
+            + '<div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;">'
+            + '<select class="form-control sk-fulfill-inv" data-idx="' + i + '" data-req-name="' + (item.name || '').replace(/"/g, '') + '" data-req-qty="' + item.qty + '" data-req-unit="' + (item.unit || 'pcs') + '">'
+            + opts + '</select>'
+            + '<input type="number" class="form-control sk-fulfill-qty" data-idx="' + i + '" value="' + item.qty + '" min="0" style="width:80px;" title="Qty to deduct">'
+            + '</div>'
+            + '<div style="font-size:11px;color:var(--gray);margin-top:4px;">Select inventory item to deduct from, and adjust quantity if needed</div>'
+            + '</div>';
+    }).join('');
+
+    var html = '<div>'
+        + '<p style="font-size:13px;color:var(--gray);margin-bottom:12px;">Request from: <strong>' + (r.createdByName || r.createdBy) + '</strong> · ' + (r.department || '-') + '</p>'
+        + (r.reason ? '<p style="font-size:12px;color:var(--gray);margin-bottom:10px;">Reason: ' + r.reason + '</p>' : '')
+        + itemRows
+        + '<p style="font-size:11px;color:var(--gray);margin-top:4px;">Items set to "Skip" will not reduce stock. Quantity can be adjusted before confirming.</p>'
+        + '</div>';
+
+    openFormModal('📦 Fulfill: ' + (r.title || 'Request'), html, 'skDoFulfill()', false);
+}
+
+function skDoFulfill() {
+    var id = _skFulfillId;
+    if (!id) return false;
+    var r = DB.getById('material_requests', id);
+    if (!r) { APP.notify('Request not found', 'error'); return false; }
     var user = AUTH.currentUser();
+    var now  = new Date().toISOString();
+
+    var deducted = 0, skipped = 0;
+    document.querySelectorAll('.sk-fulfill-inv').forEach(function(sel, i) {
+        var invId = sel.value;
+        if (!invId) { skipped++; return; }
+        var qtyInput = document.querySelectorAll('.sk-fulfill-qty')[i];
+        var issueQty = parseInt((qtyInput || {}).value) || 0;
+        if (issueQty <= 0) { skipped++; return; }
+
+        var inv = DB.getById('inventory', invId);
+        if (!inv) { skipped++; return; }
+        var newQty = Math.max(0, (parseInt(inv.quantity) || 0) - issueQty);
+        DB.update('inventory', invId, { quantity: newQty });
+        DB.add('inventory_movements', {
+            itemId: invId, itemName: inv.name, type: 'out',
+            qty: issueQty, unit: inv.unit || 'pcs',
+            unitPrice: parseFloat(inv.price) || 0,
+            totalValue: issueQty * (parseFloat(inv.price) || 0),
+            dept: r.department || '', by: user.fullName,
+            notes: 'Request fulfilled: ' + (r.title || ''), date: now
+        });
+        deducted++;
+    });
+
     DB.update('material_requests', id, {
         status: 'store_fulfilled',
         fulfilledBy: user.username,
         fulfilledByName: user.fullName,
-        fulfilledAt: new Date().toISOString()
+        fulfilledAt: now
     });
-    // Deduct stock for each item in the request (case-insensitive name match)
-    var now = new Date().toISOString();
-    (r.items || []).forEach(function(item) {
-        var nameLow = (item.name || '').trim().toLowerCase();
-        var inv = (DB.get('inventory') || []).find(function(i) {
-            return (i.name || '').trim().toLowerCase() === nameLow;
-        });
-        if (inv) {
-            var issueQty = parseInt(item.qty) || 0;
-            var newQty   = Math.max(0, (parseInt(inv.quantity) || 0) - issueQty);
-            DB.update('inventory', inv.id, { quantity: newQty });
-            DB.add('inventory_movements', {
-                itemId: inv.id, itemName: inv.name, type: 'out',
-                qty: issueQty, unit: inv.unit || item.unit || 'pcs',
-                unitPrice: parseFloat(inv.price) || 0,
-                totalValue: issueQty * (parseFloat(inv.price) || 0),
-                dept: r.department || '', by: user.fullName,
-                notes: 'Request fulfilled: ' + (r.title || ''), date: now
-            });
-        }
-    });
-    APP.notify('Marked as fulfilled — waiting for requester confirmation', 'success');
+
+    var msg = 'Fulfilled! ' + deducted + ' item(s) deducted from stock';
+    if (skipped > 0) msg += ', ' + skipped + ' skipped';
+    APP.notify(msg, 'success');
     _skData.pendingFulfill = (DB.get('material_requests') || []).filter(function(r) { return r.status === 'facility_approved'; });
     _renderSkTab('fulfill');
+    return true;
 }
 
 /* ═══ MY REQUESTS ═══ */
@@ -324,14 +387,16 @@ function _skInventory(el) {
     });
 
     var totalValue = inventory.reduce(function(s,i){ return s + (parseInt(i.quantity)||0)*(parseFloat(i.price)||0); }, 0);
+    var totalQty   = inventory.reduce(function(s,i){ return s + (parseInt(i.quantity)||0); }, 0);
     var lowStock   = inventory.filter(function(i){ return parseInt(i.quantity) < 10; });
     var critical   = lowStock.filter(function(i){ var p=_predict(i); return p.days !== null && p.days <= 7; });
 
     var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;">'
-        + _skKpi('📦', 'Total Items',    inventory.length,   '#e3f2fd', '#1565c0', 'inventory')
-        + _skKpi('💰', 'Total Value',    '₹' + totalValue.toFixed(0), '#e8f5e9', '#2e7d32', 'inventory')
-        + _skKpi('⚠️', 'Low Stock',      lowStock.length,    '#fff3e0', '#e65100', 'inventory')
-        + _skKpi('🚨', 'Critical ≤7d',   critical.length,   '#ffebee', 'var(--danger)', 'inventory')
+        + _skKpi('📦', 'Total Items',    inventory.length,             '#e3f2fd', '#1565c0',      'inventory')
+        + _skKpi('🔢', 'Total Qty',      totalQty,                     '#f3e5f5', '#6a1b9a',      'inventory')
+        + _skKpi('💰', 'Total Value',    '₹' + totalValue.toFixed(0), '#e8f5e9', '#2e7d32',      'inventory')
+        + _skKpi('⚠️', 'Low Stock',      lowStock.length,              '#fff3e0', '#e65100',      'inventory')
+        + _skKpi('🚨', 'Critical ≤7d',   critical.length,              '#ffebee', 'var(--danger)', 'inventory')
         + '</div>';
 
     // Department-wise
