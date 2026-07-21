@@ -48,6 +48,7 @@ function _isThisWeek(dateStr) {
         '.work-item{padding:10px 14px;border-radius:8px;background:var(--card);border:1px solid var(--border);margin-bottom:8px;display:flex;align-items:center;gap:12px;}',
         '.work-item.overdue{border-left:4px solid var(--danger);}',
         '.work-item.urgent{border-left:4px solid var(--warning);}',
+        '.work-item.in-progress{border-left:4px solid var(--primary);background:var(--primary-light,#f0f4ff);}',
         '.work-item.done{opacity:0.6;}',
         '.hod-tag{background:#e3f2fd;color:#1565c0;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600;}',
     ].join('');
@@ -226,9 +227,11 @@ function renderEmployeeDashboard(container) {
     };
 
     // Quarter-scoped tasks
-    var qTasks = _empData.myTasks.filter(function(t) { return _inRange(t.deadline, q.start, q.end); });
-    var qDone  = qTasks.filter(function(t) { return t.status === 'completed'; });
-    var qPct   = qTasks.length > 0 ? Math.round((qDone.length / qTasks.length) * 100) : 0;
+    var qTasks    = _empData.myTasks.filter(function(t) { return _inRange(t.deadline, q.start, q.end); });
+    var qDone     = qTasks.filter(function(t) { return t.status === 'completed'; });
+    var qInProg   = qTasks.filter(function(t) { return t.status === 'in-progress'; });
+    var qPct      = qTasks.length > 0 ? Math.round((qDone.length / qTasks.length) * 100) : 0;
+    var qInProgPct= qTasks.length > 0 ? Math.round((qInProg.length / qTasks.length) * 100) : 0;
     // Quarter progress (how far into the quarter are we)
     var qElapsed = Math.max(0, Math.min(100, Math.round(((new Date() - q.start) / (q.end - q.start)) * 100)));
 
@@ -276,16 +279,24 @@ function renderEmployeeDashboard(container) {
         + '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:18px;">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">'
         + '<div style="font-weight:700;font-size:15px;">📅 ' + q.name + ' Work Progress</div>'
-        + '<div style="font-size:13px;color:var(--gray);">' + qDone.length + ' / ' + qTasks.length + ' tasks completed this quarter</div>'
+        + '<div style="font-size:13px;color:var(--gray);">' + qDone.length + ' done · ' + qInProg.length + ' in progress · ' + qTasks.length + ' total</div>'
         + '</div>'
         + '<div style="margin-bottom:6px;">'
-        // Task completion bar
-        + '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray);margin-bottom:3px;"><span>Task completion</span><span style="font-weight:600;color:' + (qPct >= 80 ? 'var(--success)' : qPct >= 50 ? 'var(--warning)' : 'var(--danger)') + ';">' + qPct + '%</span></div>'
-        + '<div class="q-progress-track"><div class="q-progress-fill" style="width:' + qPct + '%;background:' + (qPct >= 80 ? 'var(--success)' : qPct >= 50 ? 'var(--warning)' : 'var(--danger)') + ';"></div></div>'
+        // Stacked bar: green = done, blue = in-progress
+        + '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray);margin-bottom:3px;">'
+        + '<span>Task completion</span>'
+        + '<span style="font-weight:600;color:' + (qPct >= 80 ? 'var(--success)' : qPct >= 50 ? 'var(--warning)' : (qInProgPct > 0 ? 'var(--primary)' : 'var(--danger)')) + ';">'
+        + qPct + '% done' + (qInProgPct > 0 ? ' · ' + qInProgPct + '% in progress' : '') + '</span></div>'
+        + '<div class="q-progress-track" style="position:relative;">'
+        + '<div style="position:absolute;left:0;top:0;height:100%;width:' + Math.min(100, qPct + qInProgPct) + '%;background:var(--primary);opacity:0.35;border-radius:8px;"></div>'
+        + '<div class="q-progress-fill" style="width:' + qPct + '%;background:' + (qPct >= 80 ? 'var(--success)' : qPct >= 50 ? 'var(--warning)' : 'var(--secondary)') + ';position:relative;z-index:1;"></div>'
         + '</div>'
-        + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gray);margin-top:6px;">'
-        + '<span>' + q.start.toLocaleDateString('en-IN',{month:'short',day:'numeric'}) + '</span>'
-        + '<span>' + q.end.toLocaleDateString('en-IN',{month:'short',day:'numeric'}) + '</span></div>'
+        + '</div>'
+        + '<div style="display:flex;gap:12px;font-size:11px;color:var(--gray);margin-top:6px;flex-wrap:wrap;">'
+        + '<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--secondary);display:inline-block;"></span>Completed (' + qDone.length + ')</span>'
+        + (qInProg.length > 0 ? '<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--primary);opacity:0.5;display:inline-block;"></span>In Progress (' + qInProg.length + ')</span>' : '')
+        + '<span style="margin-left:auto;">' + q.start.toLocaleDateString('en-IN',{month:'short',day:'numeric'}) + ' – ' + q.end.toLocaleDateString('en-IN',{month:'short',day:'numeric'}) + '</span>'
+        + '</div>'
         + '</div>'
 
         // ── Cleaning alert ──
@@ -499,7 +510,7 @@ function renderEmpWorkTab(el) {
                 var fromAdmin = t.createdBy && d.adminNames[t.createdBy];
                 var roleLabel = fromAdmin === 'hod' ? 'HOD' : (fromAdmin === 'admin' || fromAdmin === 'super_admin') ? 'Admin' : null;
                 var isOverdue = t.deadline && new Date(t.deadline) < new Date() && t.status !== 'completed';
-                html += '<div class="work-item ' + (t.status==='completed'?'done':isOverdue?'overdue':t.priority==='high'?'urgent':'') + '" style="flex-wrap:wrap;gap:6px;">'
+                html += '<div class="work-item ' + (t.status==='completed'?'done':isOverdue?'overdue':t.status==='in-progress'?'in-progress':t.priority==='high'?'urgent':'') + '" style="flex-wrap:wrap;gap:6px;">'
                     + '<div style="flex:1;min-width:200px;">'
                     + '<div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
                     + '<span>' + (t.title||'') + '</span>'
