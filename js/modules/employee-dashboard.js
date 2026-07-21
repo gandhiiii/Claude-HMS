@@ -246,13 +246,13 @@ function renderEmployeeDashboard(container) {
     var clPct      = clTotal > 0 ? Math.round((clDone / clTotal) * 100) : 100;
 
     var tabs = [
-        { id: 'overview',    label: '📊 Overview' },
-        { id: 'work',        label: '📝 My Work', badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
-        { id: 'checklists',  label: '✅ Checklists' },
-        { id: 'reports',     label: '📋 Reports' },
-        { id: 'cleaning',    label: '🧹 Cleaning', badge: _empData.pendingCleaning.length, badgeClass: 'badge-danger' },
-        { id: 'performance', label: '📊 Performance' },
-        { id: 'qgoals',      label: '🎯 Q Goals' }
+        { id: 'overview',    label: T('tab_overview') },
+        { id: 'work',        label: T('tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
+        { id: 'checklists',  label: T('tab_checklists') },
+        { id: 'reports',     label: T('tab_reports') },
+        { id: 'cleaning',    label: T('tab_cleaning'), badge: _empData.pendingCleaning.length, badgeClass: 'badge-danger' },
+        { id: 'performance', label: T('tab_performance') },
+        { id: 'qgoals',      label: T('tab_qgoals') }
     ];
 
     var html = ''
@@ -262,39 +262,40 @@ function renderEmployeeDashboard(container) {
         + '<div style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;font-size:24px;">👤</div>'
         + '<div><div style="font-size:20px;font-weight:700;">' + u + '</div>'
         + '<div style="font-size:13px;opacity:0.85;">' + (dept || 'No Department') + ' &nbsp;·&nbsp; ' + (user.role || 'employee').replace(/_/g,' ') + '</div></div></div>'
-        + '<div style="text-align:right;opacity:0.85;font-size:13px;">'
-        + new Date().toLocaleDateString('en-IN', {weekday:'long',day:'numeric',month:'long',year:'numeric'})
+        + '<div style="text-align:right;font-size:13px;display:flex;flex-direction:column;align-items:flex-end;gap:6px;">'
+        + '<span style="opacity:0.85;">' + new Date().toLocaleDateString('en-IN', {weekday:'long',day:'numeric',month:'long',year:'numeric'}) + '</span>'
+        + (typeof LANG !== 'undefined' ? LANG.switcher() : '')
         + '</div></div>'
 
         // ── KPI strip ──
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px;">'
-        + _kpiCard('📅', 'Due Today',    todayTasks.length, '#fff3e0', '#e65100', 'work')
-        + _kpiCard('📆', 'Due This Week', weekTasks.length,  '#e3f2fd', 'var(--primary)', 'work')
-        + _kpiCard('✅', 'Checklist Rate', clPct + '%',       '#e8f5e9', 'var(--secondary)', 'checklists')
-        + _kpiCard('🔧', 'Open Issues',   openProbs.length,   '#fce4ec', 'var(--danger)', 'reports')
-        + _kpiCard('📋', 'My Projects',   _empData.myProjects.length, '#f3e5f5', '#7b1fa2', 'work')
+        + _kpiCard('📅', T('kpi_due_today'),  todayTasks.length, '#fff3e0', '#e65100', 'work')
+        + _kpiCard('📆', T('kpi_due_week'),   weekTasks.length,  '#e3f2fd', 'var(--primary)', 'work')
+        + _kpiCard('✅', T('kpi_checklist'),  clPct + '%',       '#e8f5e9', 'var(--secondary)', 'checklists')
+        + _kpiCard('🔧', T('kpi_issues'),     openProbs.length,  '#fce4ec', 'var(--danger)', 'reports')
+        + _kpiCard('📋', T('kpi_projects'),   _empData.myProjects.length, '#f3e5f5', '#7b1fa2', 'work')
         + '</div>'
 
         // ── Quarterly strip ──
         + '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:18px;">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">'
-        + '<div style="font-weight:700;font-size:15px;">📅 ' + q.name + ' Work Progress</div>'
-        + '<div style="font-size:13px;color:var(--gray);">' + qDone.length + ' done · ' + qInProg.length + ' in progress · ' + qTasks.length + ' total</div>'
+        + '<div style="font-weight:700;font-size:15px;">📅 ' + q.name + ' ' + T('qprogress') + '</div>'
+        + '<div style="font-size:13px;color:var(--gray);">' + qDone.length + ' ' + T('done_lbl') + ' · ' + qInProg.length + ' ' + T('in_progress_lbl') + ' · ' + qTasks.length + ' ' + T('total_lbl') + '</div>'
         + '</div>'
         + '<div style="margin-bottom:6px;">'
         // Stacked bar: green = done, blue = in-progress
         + '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray);margin-bottom:3px;">'
-        + '<span>Task completion</span>'
+        + '<span>' + T('task_completion') + '</span>'
         + '<span style="font-weight:600;color:' + (qPct >= 80 ? 'var(--success)' : qPct >= 50 ? 'var(--warning)' : (qInProgPct > 0 ? 'var(--primary)' : 'var(--danger)')) + ';">'
-        + qPct + '% done' + (qInProgPct > 0 ? ' · ' + qInProgPct + '% in progress' : '') + '</span></div>'
+        + qPct + '% ' + T('done_lbl') + (qInProgPct > 0 ? ' · ' + qInProgPct + '% ' + T('in_progress_lbl') : '') + '</span></div>'
         + '<div class="q-progress-track" style="position:relative;">'
         + '<div style="position:absolute;left:0;top:0;height:100%;width:' + Math.min(100, qPct + qInProgPct) + '%;background:var(--primary);opacity:0.35;border-radius:8px;"></div>'
         + '<div class="q-progress-fill" style="width:' + qPct + '%;background:' + (qPct >= 80 ? 'var(--success)' : qPct >= 50 ? 'var(--warning)' : 'var(--secondary)') + ';position:relative;z-index:1;"></div>'
         + '</div>'
         + '</div>'
         + '<div style="display:flex;gap:12px;font-size:11px;color:var(--gray);margin-top:6px;flex-wrap:wrap;">'
-        + '<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--secondary);display:inline-block;"></span>Completed (' + qDone.length + ')</span>'
-        + (qInProg.length > 0 ? '<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--primary);opacity:0.5;display:inline-block;"></span>In Progress (' + qInProg.length + ')</span>' : '')
+        + '<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--secondary);display:inline-block;"></span>' + T('grp_completed') + ' (' + qDone.length + ')</span>'
+        + (qInProg.length > 0 ? '<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--primary);opacity:0.5;display:inline-block;"></span>' + T('status_inprogress') + ' (' + qInProg.length + ')</span>' : '')
         + '<span style="margin-left:auto;">' + q.start.toLocaleDateString('en-IN',{month:'short',day:'numeric'}) + ' – ' + q.end.toLocaleDateString('en-IN',{month:'short',day:'numeric'}) + '</span>'
         + '</div>'
         + '</div>'
@@ -302,8 +303,8 @@ function renderEmployeeDashboard(container) {
         // ── Cleaning alert ──
         + (_empData.pendingCleaning.length > 0
             ? '<div style="background:#fff3e0;border:2px solid var(--warning);border-radius:10px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="empTabSwitch(\'cleaning\',this)">'
-              + '<span style="font-size:24px;">🧹</span><div style="flex:1;"><div style="font-weight:700;color:#e65100;">' + _empData.pendingCleaning.length + ' room(s) need cleaning</div>'
-              + '<div style="font-size:12px;color:var(--gray);">Tap to view tasks</div></div><span style="color:#e65100;">›</span></div>'
+              + '<span style="font-size:24px;">🧹</span><div style="flex:1;"><div style="font-weight:700;color:#e65100;">' + _empData.pendingCleaning.length + ' ' + T('rooms_cleaning') + '</div>'
+              + '<div style="font-size:12px;color:var(--gray);">' + T('tap_view') + '</div></div><span style="color:#e65100;">›</span></div>'
             : '')
 
         // ── Tab bar ──
@@ -392,26 +393,26 @@ function renderEmpOverview(el) {
     // Overdue alert
     if (overdueTasks.length > 0) {
         html += '<div style="background:#ffebee;border:1px solid var(--danger);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;">'
-            + '<strong style="color:var(--danger);">⚠️ ' + overdueTasks.length + ' overdue task(s)</strong> &nbsp;'
+            + '<strong style="color:var(--danger);">⚠️ ' + overdueTasks.length + ' ' + T('overdue_alert') + '</strong> &nbsp;'
             + overdueTasks.slice(0,2).map(function(t){ return '<span style="color:var(--danger);">' + t.title + '</span>'; }).join(', ')
             + (overdueTasks.length > 2 ? ' +' + (overdueTasks.length - 2) + ' more' : '')
-            + ' &nbsp;<button class="btn btn-sm btn-danger" onclick="empTabSwitch(\'work\')">View All</button></div>';
+            + ' &nbsp;<button class="btn btn-sm btn-danger" onclick="empTabSwitch(\'work\')">' + T('btn_view_all') + '</button></div>';
     }
 
     // Today's focus
     html += '<div style="margin-bottom:18px;">'
-        + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">🎯 Today\'s Focus</div>';
+        + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">🎯 ' + T('todays_focus') + '</div>';
     if (todayTasks.length === 0 && recentCl.length === 0) {
-        html += '<div style="color:var(--gray);font-size:13px;padding:16px;text-align:center;background:var(--light-gray);border-radius:8px;">Nothing due today — you\'re all caught up! 🎉</div>';
+        html += '<div style="color:var(--gray);font-size:13px;padding:16px;text-align:center;background:var(--light-gray);border-radius:8px;">' + T('nothing_today') + '</div>';
     } else {
         if (todayTasks.length > 0) {
-            html += '<div style="font-size:12px;font-weight:600;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Tasks Due Today</div>';
+            html += '<div style="font-size:12px;font-weight:600;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">' + T('tasks_due_today') + '</div>';
             todayTasks.slice(0, 5).forEach(function(t) {
                 html += _workItem(t, d.adminNames, true);
             });
         }
         if (recentCl.length > 0) {
-            html += '<div style="font-size:12px;font-weight:600;color:var(--gray);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.5px;">Open Checklists</div>';
+            html += '<div style="font-size:12px;font-weight:600;color:var(--gray);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.5px;">' + T('open_checklists') + '</div>';
             recentCl.slice(0, 3).forEach(function(cl) {
                 var total = cl.items ? cl.items.length : 0;
                 var done  = cl.items ? cl.items.filter(function(i){ return i.status === 'ok'; }).length : 0;
@@ -421,7 +422,7 @@ function renderEmpOverview(el) {
                     + '<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">'
                     + '<div style="flex:1;max-width:180px;height:5px;background:var(--light-gray);border-radius:3px;"><div style="height:100%;width:' + pct + '%;background:var(--success);border-radius:3px;"></div></div>'
                     + '<span style="font-size:11px;color:var(--gray);">' + done + '/' + total + '</span></div></div>'
-                    + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'checklists\')">Open</button></div>';
+                    + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'checklists\')">' + T('btn_open') + '</button></div>';
             });
         }
     }
@@ -430,26 +431,26 @@ function renderEmpOverview(el) {
     // Two-column: recent tasks + quick actions
     html += '<div class="grid-2" style="gap:16px;">'
         + '<div>'
-        + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">📝 Recent Tasks</div>';
+        + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">📝 ' + T('recent_tasks') + '</div>';
     if (recentTasks.length === 0) {
-        html += '<div style="color:var(--gray);font-size:13px;">No tasks yet</div>';
+        html += '<div style="color:var(--gray);font-size:13px;">' + T('no_tasks_yet') + '</div>';
     } else {
         recentTasks.forEach(function(t) { html += _workItem(t, d.adminNames, false); });
     }
     html += '</div>'
         + '<div>'
-        + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">⚡ Quick Actions</div>'
+        + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">⚡ ' + T('quick_actions') + '</div>'
         + '<div style="display:flex;flex-direction:column;gap:8px;">'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'work\')">📝 View All My Tasks</button>'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'checklists\')">✅ Open Checklists</button>'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="Router.navigate(\'problems\')">🔧 Report a Problem</button>'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="Router.navigate(\'material-requests\')">📦 New Material Request</button>'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empCreateReturn()">↩️ Return Materials</button>'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="showReportForm()">📋 Submit Report</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'work\')">' + T('btn_view_tasks') + '</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'checklists\')">' + T('btn_open_cl') + '</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="Router.navigate(\'problems\')">' + T('btn_report_prob') + '</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="Router.navigate(\'material-requests\')">' + T('btn_mat_request') + '</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empCreateReturn()">' + T('btn_return_mat') + '</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="showReportForm()">' + T('btn_submit_rep') + '</button>'
         + '</div>'
         + (pendingReqs.length > 0
-            ? '<div style="margin-top:14px;"><div style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--gray);">Pending Requests</div>'
-              + pendingReqs.map(function(r){ return '<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--light-gray);">' + (r.title||'Request') + ' <span class="badge badge-warning" style="font-size:10px;">pending</span></div>'; }).join('')
+            ? '<div style="margin-top:14px;"><div style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--gray);">' + T('pending_requests') + '</div>'
+              + pendingReqs.map(function(r){ return '<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--light-gray);">' + (r.title||'Request') + ' <span class="badge badge-warning" style="font-size:10px;">' + T('pending_lbl') + '</span></div>'; }).join('')
               + '</div>'
             : '')
         + '</div></div>';
@@ -484,22 +485,21 @@ function renderEmpWorkTab(el) {
     var completed = d.myTasks.filter(function(t){ return t.status === 'completed'; });
 
     var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
-        + '<div style="font-weight:700;font-size:16px;">📝 My Tasks (' + d.myTasks.length + ')</div>'
+        + '<div style="font-weight:700;font-size:16px;">📝 ' + T('my_tasks') + ' (' + d.myTasks.length + ')</div>'
         + '<div style="display:flex;gap:8px;">'
-        + '<span class="badge badge-warning" style="padding:5px 10px;">' + pending.length + ' pending</span>'
-        + '<span class="badge badge-success" style="padding:5px 10px;">' + completed.length + ' done</span>'
+        + '<span class="badge badge-warning" style="padding:5px 10px;">' + pending.length + ' ' + T('pending_lbl') + '</span>'
+        + '<span class="badge badge-success" style="padding:5px 10px;">' + completed.length + ' ' + T('done_lbl') + '</span>'
         + '</div></div>';
 
     if (d.myTasks.length === 0) {
-        html += '<div style="text-align:center;padding:32px;color:var(--gray);font-size:13px;">No tasks assigned to you</div>';
+        html += '<div style="text-align:center;padding:32px;color:var(--gray);font-size:13px;">' + T('no_tasks') + '</div>';
     } else {
-        // Group: due today, this week, later, completed
         var groups = [
-            { label: '🔴 Overdue',      items: pending.filter(function(t){ return t.deadline && new Date(t.deadline) < new Date(); }) },
-            { label: '📅 Due Today',    items: pending.filter(function(t){ return _isToday(t.deadline) && !(t.deadline && new Date(t.deadline) < new Date()); }) },
-            { label: '📆 Due This Week',items: pending.filter(function(t){ return _isThisWeek(t.deadline) && !_isToday(t.deadline) && !(t.deadline && new Date(t.deadline) < new Date()); }) },
-            { label: '📋 Later',        items: pending.filter(function(t){ return !t.deadline || (!_isThisWeek(t.deadline) && !(t.deadline && new Date(t.deadline) < new Date())); }) },
-            { label: '✅ Completed',    items: completed }
+            { label: T('grp_overdue'),  items: pending.filter(function(t){ return t.deadline && new Date(t.deadline) < new Date(); }) },
+            { label: T('grp_today'),    items: pending.filter(function(t){ return _isToday(t.deadline) && !(t.deadline && new Date(t.deadline) < new Date()); }) },
+            { label: T('grp_week'),     items: pending.filter(function(t){ return _isThisWeek(t.deadline) && !_isToday(t.deadline) && !(t.deadline && new Date(t.deadline) < new Date()); }) },
+            { label: T('grp_later'),    items: pending.filter(function(t){ return !t.deadline || (!_isThisWeek(t.deadline) && !(t.deadline && new Date(t.deadline) < new Date())); }) },
+            { label: T('grp_completed'),items: completed }
         ];
 
         groups.forEach(function(g) {
@@ -515,18 +515,18 @@ function renderEmpWorkTab(el) {
                     + '<div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
                     + '<span>' + (t.title||'') + '</span>'
                     + (roleLabel ? '<span class="hod-tag">' + roleLabel + '</span>' : '')
-                    + (t.priority === 'high' ? '<span class="badge badge-danger" style="font-size:10px;">High</span>' : t.priority === 'medium' ? '<span class="badge badge-warning" style="font-size:10px;">Med</span>' : '')
+                    + (t.priority === 'high' ? '<span class="badge badge-danger" style="font-size:10px;">' + T('status_high') + '</span>' : t.priority === 'medium' ? '<span class="badge badge-warning" style="font-size:10px;">' + T('status_med') + '</span>' : '')
                     + '</div>'
                     + (t.description ? '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + t.description.substring(0,80) + (t.description.length>80?'…':'') + '</div>' : '')
                     + '<div style="font-size:11px;color:var(--gray);margin-top:3px;">'
-                    + (t.deadline ? (isOverdue ? '<span style="color:var(--danger);">⚠️ Due: ' : '📅 Due: ') + APP.formatDate(t.deadline) + (isOverdue?'</span>':'') : '')
-                    + (t.createdBy ? ' &nbsp;·&nbsp; From: ' + t.createdBy : '')
+                    + (t.deadline ? (isOverdue ? '<span style="color:var(--danger);">⚠️ ' + T('due_lbl') + ' ' : '📅 ' + T('due_lbl') + ' ') + APP.formatDate(t.deadline) + (isOverdue?'</span>':'') : '')
+                    + (t.createdBy ? ' &nbsp;·&nbsp; ' + T('from_lbl') + ' ' + t.createdBy : '')
                     + '</div></div>'
                     + '<span class="badge ' + APP.getStatusBadge(t.status) + '" style="font-size:11px;">' + (t.status||'pending') + '</span>'
                     + (t.status !== 'completed'
                         ? '<button class="btn btn-sm btn-success" onclick="empUpdateTaskStatus(\'' + t.id + '\',\'' + (t._store||'tasks') + '\')" style="white-space:nowrap;">'
-                          + (t.status === 'in-progress' ? 'Mark Done' : 'Start') + '</button>'
-                        : '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'tasks\')">View</button>')
+                          + (t.status === 'in-progress' ? T('status_mark_done') : T('status_start')) + '</button>'
+                        : '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'tasks\')">' + T('btn_view') + '</button>')
                     + '</div>';
             });
             html += '</div>';
@@ -536,7 +536,7 @@ function renderEmpWorkTab(el) {
     // Projects
     if (d.myProjects.length > 0) {
         html += '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">'
-            + '<div style="font-weight:700;font-size:15px;margin-bottom:12px;">📋 My Projects (' + d.myProjects.length + ')</div>';
+            + '<div style="font-weight:700;font-size:15px;margin-bottom:12px;">📋 ' + T('my_projects') + ' (' + d.myProjects.length + ')</div>';
         d.myProjects.forEach(function(p) {
             var pct = p.budget > 0 ? Math.round((p.spent / p.budget) * 100) : 0;
             html += '<div class="work-item" style="flex-wrap:wrap;gap:10px;">'
@@ -553,39 +553,39 @@ function renderEmpWorkTab(el) {
 
     // Material requests with new multi-stage status display
     var empMatStatusMap = {
-        'pending':           { label: 'Waiting HOD',      badge: 'badge-warning' },
-        'hod_approved':      { label: 'HOD Approved',     badge: 'badge-info' },
-        'hod_rejected':      { label: 'HOD Rejected',     badge: 'badge-danger' },
-        'facility_approved': { label: 'Facility Approved',badge: 'badge-info' },
-        'facility_rejected': { label: 'Facility Rejected',badge: 'badge-danger' },
-        'store_fulfilled':   { label: 'Ready to Collect', badge: 'badge-success' },
-        'confirmed':         { label: 'Confirmed',        badge: 'badge-success' },
-        'partial':           { label: 'Partial',          badge: 'badge-warning' },
-        'approved':          { label: 'Approved',         badge: 'badge-success' },
-        'rejected':          { label: 'Rejected',         badge: 'badge-danger' }
+        'pending':           { label: T('mr_waiting_hod'),  badge: 'badge-warning' },
+        'hod_approved':      { label: T('mr_hod_approved'), badge: 'badge-info' },
+        'hod_rejected':      { label: T('mr_hod_rejected'), badge: 'badge-danger' },
+        'facility_approved': { label: T('mr_fac_approved'), badge: 'badge-info' },
+        'facility_rejected': { label: T('mr_fac_rejected'), badge: 'badge-danger' },
+        'store_fulfilled':   { label: T('mr_ready'),        badge: 'badge-success' },
+        'confirmed':         { label: T('mr_confirmed'),    badge: 'badge-success' },
+        'partial':           { label: T('mr_partial'),      badge: 'badge-warning' },
+        'approved':          { label: T('mr_approved'),     badge: 'badge-success' },
+        'rejected':          { label: T('mr_rejected'),     badge: 'badge-danger' }
     };
     if (d.myRequests.length > 0) {
         var storeFulfilledReqs = d.myRequests.filter(function(r){ return r.status === 'store_fulfilled'; });
         html += '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
-            + '<div style="font-weight:700;font-size:15px;">&#128230; My Material Requests (' + d.myRequests.length + ')</div>'
-            + '<button class="btn btn-sm btn-primary" onclick="Router.navigate(\'material-requests\')">+ New Request</button></div>';
+            + '<div style="font-weight:700;font-size:15px;">&#128230; ' + T('my_mat_requests') + ' (' + d.myRequests.length + ')</div>'
+            + '<button class="btn btn-sm btn-primary" onclick="Router.navigate(\'material-requests\')">' + T('btn_new_request') + '</button></div>';
         if (storeFulfilledReqs.length > 0) {
             html += '<div style="background:#e8f5e9;border:2px solid var(--success);border-radius:8px;padding:10px 14px;margin-bottom:10px;">'
-                + '<strong style="color:var(--success);">&#128230; ' + storeFulfilledReqs.length + ' request(s) ready to collect — please confirm receipt!</strong></div>';
+                + '<strong style="color:var(--success);">&#128230; ' + storeFulfilledReqs.length + ' ' + T('ready_collect') + '</strong></div>';
         }
         d.myRequests.slice().reverse().slice(0, 6).forEach(function(r) {
-            var stInfo = empMatStatusMap[r.status] || { label: r.status || 'pending', badge: 'badge-warning' };
+            var stInfo = empMatStatusMap[r.status] || { label: r.status || T('mr_waiting_hod'), badge: 'badge-warning' };
             var canConfirm = r.status === 'store_fulfilled';
             html += '<div class="work-item" style="flex-wrap:wrap;gap:6px;">'
                 + '<div style="flex:1;min-width:180px;">'
-                + '<div style="font-size:13px;font-weight:600;">' + (r.title || 'Request') + '</div>'
+                + '<div style="font-size:13px;font-weight:600;">' + (r.title || T('mr_request')) + '</div>'
                 + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + APP.formatDate(r.createdAt) + '</div>'
                 + '</div>'
                 + '<span class="badge ' + stInfo.badge + '" style="font-size:11px;">' + stInfo.label + '</span>'
                 + (canConfirm
-                    ? '<button class="btn btn-sm btn-success" onclick="empConfirmMatReq(\'' + r.id + '\',false)">Confirm</button>'
-                    + '<button class="btn btn-sm btn-warning" onclick="empConfirmMatReq(\'' + r.id + '\',true)">Partial</button>'
+                    ? '<button class="btn btn-sm btn-success" onclick="empConfirmMatReq(\'' + r.id + '\',false)">' + T('btn_confirm') + '</button>'
+                    + '<button class="btn btn-sm btn-warning" onclick="empConfirmMatReq(\'' + r.id + '\',true)">' + T('btn_partial') + '</button>'
                     : '')
                 + '</div>';
         });
@@ -596,19 +596,19 @@ function renderEmpWorkTab(el) {
     var assignedProbs = d.myProblems.filter(function(p) { return p.assignedTo === d.user.username && p.status !== 'resolved'; });
     if (assignedProbs.length > 0) {
         html += '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">'
-            + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">&#128295; Problems Assigned to Me (' + assignedProbs.length + ')</div>';
+            + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">&#128295; ' + T('prob_assigned') + ' (' + assignedProbs.length + ')</div>';
         assignedProbs.forEach(function(p) {
             var statusBadge = p.status === 'in_progress' ? 'badge-info' : 'badge-warning';
             html += '<div class="work-item" style="flex-wrap:wrap;gap:6px;">'
                 + '<div style="flex:1;min-width:180px;">'
                 + '<div style="font-size:13px;font-weight:600;">' + (p.title || '') + '</div>'
                 + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">'
-                + 'Category: ' + (p.category || '-') + ' &middot; ' + APP.formatDate(p.createdAt)
-                + (p.assignNote ? '<br>Note: ' + p.assignNote : '')
+                + T('prob_category') + ' ' + (p.category || '-') + ' &middot; ' + APP.formatDate(p.createdAt)
+                + (p.assignNote ? '<br>' + T('prob_note') + ' ' + p.assignNote : '')
                 + '</div></div>'
                 + '<span class="badge ' + statusBadge + '" style="font-size:11px;">' + (p.status || 'assigned').replace('_', ' ') + '</span>'
-                + (p.status === 'assigned' ? '<button class="btn btn-sm btn-info" onclick="empMarkProbInProgress(\'' + p.id + '\')">Start</button>' : '')
-                + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'problems\')">View</button>'
+                + (p.status === 'assigned' ? '<button class="btn btn-sm btn-info" onclick="empMarkProbInProgress(\'' + p.id + '\')">' + T('prob_start') + '</button>' : '')
+                + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'problems\')">' + T('prob_view') + '</button>'
                 + '</div>';
         });
         html += '</div>';
