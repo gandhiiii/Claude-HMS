@@ -7,7 +7,7 @@ var SYNC = (function () {
     var SHARED_KEYS = [
         'users', 'departments', 'featureRights',
         'inventory', 'inventory_receipts',
-        'gatesecurity', 'phase2Tasks',
+        'gatesecurity', 'doctorVisits', 'patientVisits', 'phase2Tasks',
         'projects', 'ambulance', 'ambulance_trips',
         'problems', 'tasks', 'complaints',
         'roomchecklists', 'admissions', 'rooms', 'roomStatus',

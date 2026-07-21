@@ -122,6 +122,17 @@ function renderHodDashboard(container) {
         return r.status === 'pending' && (r.department || '').trim().toLowerCase() === (dept || '').trim().toLowerCase();
     });
 
+    // Gate security pending approvals for this HOD's dept (goods in/out + doctor visits)
+    var _deptLow = (dept || '').trim().toLowerCase();
+    var pendingGoodsApprovals = (DB.get('gatesecurity') || []).filter(function (g) {
+        return g.status === 'pending' && (g.department || '').trim().toLowerCase() === _deptLow;
+    });
+    var pendingDoctorApprovals = (DB.get('doctorVisits') || []).filter(function (d) {
+        return d.status === 'pending' && (d.department || '').trim().toLowerCase() === _deptLow;
+    });
+    var pendingGateApprovals = pendingGoodsApprovals.map(function(g){ return Object.assign({}, g, {_gateType:'goods'}); })
+        .concat(pendingDoctorApprovals.map(function(d){ return Object.assign({}, d, {_gateType:'doctor'}); }));
+
     // Problems routed to this department
     var routedProblems = (DB.get('problems') || []).filter(function (p) {
         return (p.routedTo === dept || (!p.routedTo && p.department === dept)) && p.status !== 'resolved';
@@ -158,6 +169,7 @@ function renderHodDashboard(container) {
         myCl: myCl,
         myReqs: myReqs,
         pendingMatApprovals: pendingMatApprovals,
+        pendingGateApprovals: pendingGateApprovals,
         routedProblems: routedProblems,
         cleaning: cleaning,
         allAdm: allAdm,
@@ -165,7 +177,7 @@ function renderHodDashboard(container) {
     };
 
     var pendingCl  = myCl.filter(function (c) { return c.status !== 'completed'; }).length;
-    var pendingReq = myReqs.filter(function (r) { return r.status === 'pending'; }).length + pendingMatApprovals.length;
+    var pendingReq = myReqs.filter(function (r) { return r.status === 'pending'; }).length + pendingMatApprovals.length + pendingGateApprovals.length;
     var openProblems = routedProblems.length;
 
     var tabs = [
@@ -949,12 +961,23 @@ function _hodRequests(el) {
     var isFacHod = typeof _matProcurementDept === 'function' && dept === _matProcurementDept();
 
     // Always re-read fresh from DB so requests submitted after page load are visible
+    var deptLow = (dept || '').trim().toLowerCase();
+
     var matApprovals = (DB.get('material_requests') || []).filter(function (r) {
         if (isFacHod) return r.status === 'hod_approved';
-        // Case-insensitive department match to handle any naming inconsistencies
-        return r.status === 'pending' && (r.department || '').trim().toLowerCase() === (dept || '').trim().toLowerCase();
+        return r.status === 'pending' && (r.department || '').trim().toLowerCase() === deptLow;
     });
     d.pendingMatApprovals = matApprovals;
+
+    // Gate security: goods in/out + doctor visits pending for this dept
+    var gateGoods = (DB.get('gatesecurity') || []).filter(function (g) {
+        return g.status === 'pending' && (g.department || '').trim().toLowerCase() === deptLow;
+    }).map(function(g){ return Object.assign({}, g, {_gateType:'goods'}); });
+    var gateDoctors = (DB.get('doctorVisits') || []).filter(function (dv) {
+        return dv.status === 'pending' && (dv.department || '').trim().toLowerCase() === deptLow;
+    }).map(function(dv){ return Object.assign({}, dv, {_gateType:'doctor'}); });
+    var gateApprovals = gateGoods.concat(gateDoctors);
+    d.pendingGateApprovals = gateApprovals;
 
     var routedProbs = (DB.get('problems') || []).filter(function (p) {
         return (p.routedTo === dept || (!p.routedTo && p.department === dept)) && p.status !== 'resolved';
@@ -994,6 +1017,38 @@ function _hodRequests(el) {
                     + '<button class="btn btn-sm btn-danger" onclick="facilityRejectMatReq(\'' + r.id + '\');_hodRefreshAndShow()">&#10007; Reject</button>'
                     : '<button class="btn btn-sm btn-success" onclick="hodApproveMatReq(\'' + r.id + '\');_hodRefreshAndShow()">&#10003; Approve</button>'
                     + '<button class="btn btn-sm btn-danger" onclick="hodRejectMatReq(\'' + r.id + '\');_hodRefreshAndShow()">&#10007; Reject</button>')
+                + '</div></div></div>';
+        });
+        html += '</div>';
+    }
+
+    // ── Gate security pending approvals (goods in/out + doctor visits) ──
+    if (gateApprovals.length > 0) {
+        html += '<div style="background:#e3f2fd;border:2px solid #1976d2;border-radius:10px;padding:14px;margin-bottom:16px;">'
+            + '<div style="font-weight:700;font-size:14px;color:#1565c0;margin-bottom:10px;">🔐 ' + gateApprovals.length + ' Gate Security Request(s) Awaiting Your Approval</div>';
+        gateApprovals.forEach(function (g) {
+            var isGoods  = g._gateType === 'goods';
+            var title    = isGoods ? ('🚚 Goods ' + (g.direction === 'in' ? 'IN' : 'OUT') + ': ' + (g.itemName || '-')) : ('🩺 Doctor Visit: ' + (g.doctorName || '-'));
+            var detail   = isGoods
+                ? 'Vehicle: ' + (g.vehicleNo || '-') + (g.vendor ? ' · Vendor: ' + g.vendor : '') + (g.quantity ? ' · Qty: ' + g.quantity : '')
+                : (g.specialization || '') + (g.hospital ? ' · ' + g.hospital : '') + ' · Purpose: ' + (g.purpose || '-');
+            var submittedBy = g.submittedBy || '-';
+            var store    = isGoods ? 'gatesecurity' : 'doctorVisits';
+            var approveCmd = isGoods
+                ? 'hodApproveGateEntry(\'' + store + '\',\'' + g.id + '\');_hodRefreshAndShow()'
+                : 'hodApproveGateEntry(\'' + store + '\',\'' + g.id + '\');_hodRefreshAndShow()';
+            var rejectCmd  = 'hodRejectGateEntry(\'' + store + '\',\'' + g.id + '\');_hodRefreshAndShow()';
+            html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">'
+                + '<div style="flex:1;min-width:0;">'
+                + '<div style="font-size:13px;font-weight:700;">' + title + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + detail + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">Submitted by: <strong>' + submittedBy + '</strong> &middot; ' + APP.formatDate(g.createdAt || g.entryTime) + '</div>'
+                + (g.purpose && isGoods ? '<div style="font-size:11px;color:var(--gray);">Purpose: ' + g.purpose + '</div>' : '')
+                + '</div>'
+                + '<div style="display:flex;gap:6px;flex-shrink:0;">'
+                + '<button class="btn btn-sm btn-success" onclick="' + approveCmd + '">&#10003; Approve</button>'
+                + '<button class="btn btn-sm btn-danger" onclick="' + rejectCmd + '">&#10007; Reject</button>'
                 + '</div></div></div>';
         });
         html += '</div>';
@@ -1123,16 +1178,52 @@ function _hodRefreshAndShow() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = _hodData.dept;
+    var deptLow = (dept || '').trim().toLowerCase();
     var isFacHod = typeof _matProcurementDept === 'function' && dept === _matProcurementDept();
     _hodData.pendingMatApprovals = (DB.get('material_requests') || []).filter(function (r) {
         if (isFacHod) return r.status === 'hod_approved';
-        return r.status === 'pending' && (r.department || '').trim().toLowerCase() === (dept || '').trim().toLowerCase();
+        return r.status === 'pending' && (r.department || '').trim().toLowerCase() === deptLow;
     });
+    var rg = (DB.get('gatesecurity') || []).filter(function (g) {
+        return g.status === 'pending' && (g.department || '').trim().toLowerCase() === deptLow;
+    }).map(function(g){ return Object.assign({}, g, {_gateType:'goods'}); });
+    var rd = (DB.get('doctorVisits') || []).filter(function (dv) {
+        return dv.status === 'pending' && (dv.department || '').trim().toLowerCase() === deptLow;
+    }).map(function(dv){ return Object.assign({}, dv, {_gateType:'doctor'}); });
+    _hodData.pendingGateApprovals = rg.concat(rd);
     _hodData.routedProblems = (DB.get('problems') || []).filter(function (p) {
         return (p.routedTo === dept || (!p.routedTo && p.department === dept)) && p.status !== 'resolved';
     });
     _hodData.myReqs = (DB.get('hodRequests') || []).filter(function (r) { return r.department === dept; });
     _renderHodTab('requests');
+}
+
+function hodApproveGateEntry(store, id) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var entry = DB.getById(store, id);
+    if (!entry) { APP.notify('Entry not found', 'error'); return; }
+    if (store === 'gatesecurity') {
+        DB.update(store, id, { status: 'approved', approvedBy: user.fullName, approvedAt: new Date().toISOString() });
+        APP.notify('Goods entry approved', 'success');
+    } else {
+        DB.update(store, id, { status: 'active', approvedBy: user.fullName, approvedAt: new Date().toISOString() });
+        APP.notify('Doctor visit approved — pass is now active', 'success');
+    }
+}
+
+function hodRejectGateEntry(store, id) {
+    var reason = prompt('Reason for rejection (optional):');
+    if (reason === null) return;
+    var user = AUTH.currentUser();
+    if (!user) return;
+    DB.update(store, id, {
+        status: 'rejected',
+        rejectionReason: reason || 'Rejected by HOD',
+        rejectedBy: user.fullName,
+        rejectedAt: new Date().toISOString()
+    });
+    APP.notify('Entry rejected', 'info');
 }
 
 function hodSaveRequest() {
