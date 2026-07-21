@@ -40,10 +40,14 @@ const Router = {
         const user = AUTH.currentUser();
         const header = document.getElementById('mainHeader');
         if (!header) return;
+        const hs = getHospitalSettings();
         header.innerHTML = `
             <div class="header-left">
                 <button id="menuToggle" class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
-                <h3 id="pageTitle" style="font-size:18px;font-weight:600;">Dashboard</h3>
+                <div style="display:flex;flex-direction:column;gap:1px;">
+                    <span id="headerHospitalName" style="font-size:11px;color:var(--primary);font-weight:700;letter-spacing:0.3px;line-height:1;">${hs.name || 'Stavya Spine Hospital'}</span>
+                    <h3 id="pageTitle" style="font-size:17px;font-weight:600;margin:0;">Dashboard</h3>
+                </div>
             </div>
             <div class="header-right">
                 <span id="liveIndicator" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--success);padding:3px 8px;border-radius:12px;background:rgba(52,168,83,0.1);border:1px solid rgba(52,168,83,0.3);"><span style="width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 1.5s infinite;"></span>LIVE</span>
@@ -438,13 +442,17 @@ function hsResetLogo() {
 }
 
 function hsApplyBranding(s) {
-    /* Update sidebar */
+    var name = s.name || 'Stavya Spine Hospital';
+    /* Sidebar */
     var sidebarLogo = document.getElementById('sidebarLogoImg');
     var sidebarName = document.getElementById('sidebarHospitalName');
     if (sidebarLogo && s.logo) sidebarLogo.src = s.logo;
-    if (sidebarName && s.name) sidebarName.textContent = s.name;
-    /* Update page title */
-    document.title = (s.name || 'HMS') + ' - Management System';
+    if (sidebarName) sidebarName.textContent = name;
+    /* Top header (rebuilt on every navigate, so also update live element) */
+    var headerName = document.getElementById('headerHospitalName');
+    if (headerName) headerName.textContent = name;
+    /* Browser tab title */
+    document.title = name + ' - Management System';
 }
 
 function deptDropdown(name, selected) {

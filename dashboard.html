@@ -78,16 +78,17 @@
         window.addEventListener('DOMContentLoaded', function() {
             Router.init();
             setTimeout(function() { try { SYNC.init(); } catch(e) {} }, 300);
-            /* Apply saved hospital branding */
+            /* Apply saved hospital branding (falls back to default if not yet set) */
             try {
-                var hs = (function(){ try { var r=localStorage.getItem('hms_hospital_settings'); return r?JSON.parse(r):null; } catch(e){return null;} })();
-                if (hs) {
-                    var img = document.getElementById('sidebarLogoImg');
-                    var nm  = document.getElementById('sidebarHospitalName');
-                    if (img && hs.logo) img.src = hs.logo;
-                    if (nm  && hs.name) nm.textContent = hs.name;
-                    if (hs.name) document.title = hs.name + ' - Management System';
-                }
+                var _raw = localStorage.getItem('hms_hospital_settings');
+                var _hs  = _raw ? JSON.parse(_raw) : {};
+                var _name = _hs.name || 'Stavya Spine Hospital';
+                var _logo = _hs.logo || 'assets/stavya-logo.png';
+                var _img = document.getElementById('sidebarLogoImg');
+                var _nm  = document.getElementById('sidebarHospitalName');
+                if (_img) _img.src = _logo;
+                if (_nm)  _nm.textContent = _name;
+                document.title = _name + ' - Management System';
             } catch(e) {}
         });
     </script>
