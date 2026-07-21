@@ -45,7 +45,7 @@ const Router = {
             <div class="header-left">
                 <button id="menuToggle" class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
                 <div style="display:flex;flex-direction:column;gap:1px;">
-                    <span id="headerHospitalName" style="font-size:11px;color:var(--primary);font-weight:700;letter-spacing:0.3px;line-height:1;">${hs.name || 'Stavya Spine Hospital'}</span>
+                    <span id="headerHospitalName" style="font-size:11px;color:var(--primary);font-weight:700;letter-spacing:0.3px;line-height:1;">${hs.name || 'Stavya Intelligence'}</span>
                     <h3 id="pageTitle" style="font-size:17px;font-weight:600;margin:0;">Dashboard</h3>
                 </div>
             </div>
@@ -367,7 +367,7 @@ function confirmAction(msg, cb) {
 /* ── Hospital Settings helpers ── */
 function getHospitalSettings() {
     var s = DB.get('hospital_settings');
-    return s || { name: 'Stavya Spine Hospital', logo: 'assets/stavya-logo.png' };
+    return s || { name: 'Stavya Intelligence', logo: 'assets/stavya-logo.png' };
 }
 
 function renderHospitalSettings(container) {
@@ -442,7 +442,7 @@ function hsResetLogo() {
 }
 
 function hsApplyBranding(s) {
-    var name = s.name || 'Stavya Spine Hospital';
+    var name = s.name || 'Stavya Intelligence';
     /* Sidebar */
     var sidebarLogo = document.getElementById('sidebarLogoImg');
     var sidebarName = document.getElementById('sidebarHospitalName');
