@@ -5,6 +5,7 @@ function renderInventory(container) {
         <div class="tabs" style="margin-bottom:16px;">
             <button class="tab-btn active" onclick="switchInvView('items',this)">📦 All Items</button>
             <button class="tab-btn" onclick="switchInvView('dept',this)">🏢 By Department</button>
+            <button class="tab-btn" onclick="switchInvView('movements',this)">📊 Movements</button>
         </div>
         <div id="invContent">
             ${renderInvItemsTab()}
@@ -25,6 +26,9 @@ function switchInvView(view, btn) {
     } else if (view === 'dept') {
         content.innerHTML = renderInvDeptTab();
         setTimeout(() => renderInvDeptView(), 50);
+    } else if (view === 'movements') {
+        content.innerHTML = renderInvMovementsTab();
+        setTimeout(() => renderInvMovementsView(), 50);
     }
 }
 
@@ -175,7 +179,8 @@ function renderInvList() {
             </td>
             <td><span class="badge ${status === 'in-stock' ? 'badge-success' : status === 'low-stock' ? 'badge-warning' : 'badge-danger'}">${status.replace('-', ' ')}</span></td>
             <td>
-                <button class="btn btn-sm btn-success" onclick="receiveInvStock('${i.id}')">Receive</button>
+                <button class="btn btn-sm btn-success" onclick="receiveInvStock('${i.id}')">📥 In</button>
+                <button class="btn btn-sm btn-warning" onclick="issueInvStock('${i.id}')" style="color:#fff;">📤 Out</button>
                 <button class="btn btn-sm btn-primary" onclick="editInv('${i.id}')">Edit</button>
                 <button class="btn btn-sm btn-info" onclick="printBarcode('${i.id}')">🏷️</button>
                 <button class="btn btn-sm btn-danger" onclick="deleteInv('${i.id}')">Del</button>
@@ -261,7 +266,7 @@ function renderInvDeptView() {
                             <td>${price ? '₹' + price.toFixed(2) : '-'}</td>
                             <td style="font-weight:600;">${value ? '₹' + value.toFixed(2) : '-'}</td>
                             <td><span class="badge ${status === 'in-stock' ? 'badge-success' : status === 'low-stock' ? 'badge-warning' : 'badge-danger'}">${status.replace('-', ' ')}</span></td>
-                            <td><button class="btn btn-sm btn-success" onclick="receiveInvStock('${i.id}')">Receive</button> <button class="btn btn-sm btn-primary" onclick="editInv('${i.id}')">Edit</button></td>
+                            <td><button class="btn btn-sm btn-success" onclick="receiveInvStock('${i.id}')">📥 In</button> <button class="btn btn-sm btn-warning" onclick="issueInvStock('${i.id}')" style="color:#fff;">📤 Out</button> <button class="btn btn-sm btn-primary" onclick="editInv('${i.id}')">Edit</button></td>
                         </tr>`;
                     }).join('')}</tbody>
                 </table>
@@ -326,10 +331,150 @@ function saveReceiveStock(id) {
         itemId: id, itemName: item.name, quantity: qty, unitPrice: price, total: qty * price, source,
         department: item.department || ''
     });
+    // Record in movement log for history and prediction
+    const rcvUser = AUTH.currentUser();
+    DB.add('inventory_movements', {
+        itemId: id, itemName: item.name, type: 'in',
+        qty: qty, unit: item.unit || 'pcs',
+        unitPrice: price, totalValue: qty * price,
+        dept: item.department || '', by: rcvUser ? rcvUser.fullName : 'Admin',
+        notes: source ? 'Source: ' + source : '', date: new Date().toISOString()
+    });
 
     APP.notify(`Received ${qty} ${item.unit || 'pcs'} of ${item.name} (₹${(qty * price).toFixed(2)})`, 'success');
     renderInvList();
     document.querySelector('.modal.active')?.remove();
+}
+
+/* ═══ STOCK OUT (ISSUE) ═══ */
+function issueInvStock(id) {
+    const item = DB.getById('inventory', id);
+    if (!item) return;
+    const depts = DB.get('departments') || [];
+    const deptOpts = depts.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
+    showModal(`
+        <div class="modal-header"><h3>📤 Issue Stock — ${item.name}</h3></div>
+        <div class="modal-body">
+            <p style="font-size:13px;color:var(--gray);margin-bottom:12px;">Current stock: <strong>${item.quantity || 0} ${item.unit || 'pcs'}</strong> · Unit price: <strong>₹${parseFloat(item.price || 0).toFixed(2)}</strong></p>
+            <div class="form-group">
+                <label>Quantity to Issue *</label>
+                <input type="number" id="issueQty" class="form-control" placeholder="e.g. 10" min="1" max="${item.quantity || 0}">
+            </div>
+            <div class="form-group">
+                <label>Issue To (Department)</label>
+                <select id="issueDept" class="form-control"><option value="">-- Select Department --</option>${deptOpts}</select>
+            </div>
+            <div class="form-group">
+                <label>Notes / Purpose</label>
+                <input type="text" id="issueNotes" class="form-control" placeholder="e.g. Monthly supply for ICU">
+            </div>
+            <button class="btn btn-warning btn-lg" style="width:100%;margin-top:8px;color:#fff;" onclick="saveIssueStock('${id}')">📤 Confirm Issue</button>
+        </div>
+    `, false);
+}
+
+function saveIssueStock(id) {
+    const item = DB.getById('inventory', id);
+    if (!item) return;
+    const qty = parseInt(document.getElementById('issueQty').value);
+    const dept = (document.getElementById('issueDept').value || '').trim();
+    const notes = document.getElementById('issueNotes').value || '';
+    if (!qty || qty < 1) { APP.notify('Enter valid quantity', 'error'); return; }
+    const currentQty = parseInt(item.quantity) || 0;
+    if (qty > currentQty) { APP.notify(`Only ${currentQty} ${item.unit || 'pcs'} available`, 'error'); return; }
+    const user = AUTH.currentUser();
+    const unitPrice = parseFloat(item.price) || 0;
+    DB.update('inventory', id, { quantity: currentQty - qty });
+    DB.add('inventory_movements', {
+        itemId: id, itemName: item.name, type: 'out',
+        qty: qty, unit: item.unit || 'pcs',
+        unitPrice: unitPrice, totalValue: qty * unitPrice,
+        dept: dept, by: user ? user.fullName : 'Admin',
+        notes: notes, date: new Date().toISOString()
+    });
+    APP.notify(`Issued ${qty} ${item.unit || 'pcs'} of ${item.name}` + (dept ? ` to ${dept}` : ''), 'success');
+    renderInvList();
+    document.querySelector('.modal.active')?.remove();
+}
+
+/* ═══ MOVEMENTS TAB ═══ */
+function renderInvMovementsTab() {
+    return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <div>
+            <div style="font-weight:700;font-size:15px;">📊 Stock Movements</div>
+            <div style="font-size:12px;color:var(--gray);">All stock IN and OUT transactions with prices</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select id="movTypeFilter" class="form-control" style="width:110px;" onchange="renderInvMovementsView()">
+                <option value="">All Types</option>
+                <option value="in">📥 IN only</option>
+                <option value="out">📤 OUT only</option>
+            </select>
+            <input type="text" id="movSearch" class="form-control" style="width:180px;" placeholder="Search item or dept..." oninput="renderInvMovementsView()">
+        </div>
+    </div>
+    <div id="movContent"></div>`;
+}
+
+function renderInvMovementsView() {
+    const movements = (DB.get('inventory_movements') || []).slice().reverse();
+    const typeF = (document.getElementById('movTypeFilter') || {}).value || '';
+    const search = ((document.getElementById('movSearch') || {}).value || '').toLowerCase();
+    const filtered = movements.filter(m => {
+        if (typeF && m.type !== typeF) return false;
+        if (search) {
+            const hay = ((m.itemName || '') + (m.dept || '') + (m.by || '')).toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+    const el = document.getElementById('movContent');
+    if (!el) return;
+    if (filtered.length === 0) {
+        el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--gray);">No movements recorded yet. Use 📥 In / 📤 Out buttons on inventory items.</div>';
+        return;
+    }
+    const totalIn  = filtered.filter(m => m.type === 'in').reduce((s,m) => s + (m.totalValue||0), 0);
+    const totalOut = filtered.filter(m => m.type === 'out').reduce((s,m) => s + (m.totalValue||0), 0);
+    let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;">
+        <div style="background:#e8f5e9;border-radius:10px;padding:12px;text-align:center;">
+            <div style="font-size:20px;">📥</div>
+            <div style="font-size:16px;font-weight:700;color:#2e7d32;">${filtered.filter(m=>m.type==='in').length}</div>
+            <div style="font-size:11px;color:var(--gray);">IN movements</div>
+            <div style="font-size:13px;font-weight:600;color:#2e7d32;">₹${totalIn.toFixed(2)}</div>
+        </div>
+        <div style="background:#fff3e0;border-radius:10px;padding:12px;text-align:center;">
+            <div style="font-size:20px;">📤</div>
+            <div style="font-size:16px;font-weight:700;color:#e65100;">${filtered.filter(m=>m.type==='out').length}</div>
+            <div style="font-size:11px;color:var(--gray);">OUT movements</div>
+            <div style="font-size:13px;font-weight:600;color:#e65100;">₹${totalOut.toFixed(2)}</div>
+        </div>
+        <div style="background:#e3f2fd;border-radius:10px;padding:12px;text-align:center;">
+            <div style="font-size:20px;">📊</div>
+            <div style="font-size:16px;font-weight:700;color:#1565c0;">${filtered.length}</div>
+            <div style="font-size:11px;color:var(--gray);">Total transactions</div>
+            <div style="font-size:13px;font-weight:600;color:#1565c0;">₹${Math.abs(totalIn - totalOut).toFixed(2)} net</div>
+        </div>
+    </div>
+    <div class="table-responsive"><table class="data-table" style="font-size:13px;">
+        <thead><tr><th>Date</th><th>Type</th><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total Value</th><th>Dept / To</th><th>By</th><th>Notes</th></tr></thead>
+        <tbody>`;
+    filtered.forEach(m => {
+        const isIn = m.type === 'in';
+        html += `<tr>
+            <td style="white-space:nowrap;">${APP.formatDate(m.date)}</td>
+            <td><span class="badge ${isIn ? 'badge-success' : 'badge-warning'}" style="${isIn ? '' : 'color:#fff;background:#e65100;'}">${isIn ? '📥 IN' : '📤 OUT'}</span></td>
+            <td style="font-weight:600;">${m.itemName || '-'}</td>
+            <td>${m.qty || 0} ${m.unit || ''}</td>
+            <td>₹${parseFloat(m.unitPrice || 0).toFixed(2)}</td>
+            <td style="font-weight:600;color:${isIn ? '#2e7d32' : '#e65100'};">${isIn ? '+' : '-'}₹${parseFloat(m.totalValue || 0).toFixed(2)}</td>
+            <td>${m.dept || '-'}</td>
+            <td>${m.by || '-'}</td>
+            <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;">${m.notes || '-'}</td>
+        </tr>`;
+    });
+    html += '</tbody></table></div>';
+    el.innerHTML = html;
 }
 
 function generateBarcodeSvgs() {

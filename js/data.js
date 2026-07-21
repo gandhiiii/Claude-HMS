@@ -373,6 +373,9 @@ const AUTH = {
         // Role-based auto-grants (no manual permission config needed)
         if (permission === 'hod-dashboard' && user.role === 'hod') return true;
         if (permission === 'employee-dashboard' && (user.role === 'employee' || user.role === 'hod')) return true;
+        if (permission === 'storekeeper-dashboard' && user.role === 'storekeeper') return true;
+        // Storekeeper auto-gets inventory and material-requests access
+        if (user.role === 'storekeeper' && ['inventory','material-requests','problems'].indexOf(permission) !== -1) return true;
         // HOD auto-gets admissions, checklists, material-requests so they can manage their dept
         if (user.role === 'hod' && ['admissions','checklists','material-requests','problems','tasks'].indexOf(permission) !== -1) return true;
         return user.permissions && user.permissions.includes(permission);
@@ -731,7 +734,7 @@ APP_SYNC = {
 
 const APP = {
     currentModule: null,
-    _APP_VERSION: 'v76',
+    _APP_VERSION: 'v78',
 
     init() {
         try {
@@ -802,7 +805,9 @@ const APP = {
             budget: renderBudget,
             'quarterly-priorities': renderQPriorities,
             reports: renderReports,
-            'employee-dashboard': renderEmployeeDashboard
+            'employee-dashboard': renderEmployeeDashboard,
+            'hod-dashboard': renderHodDashboard,
+            'storekeeper-dashboard': renderStorekeeperDashboard
         };
         if (renderers[mod]) {
             renderers[mod](content);

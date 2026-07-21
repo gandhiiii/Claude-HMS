@@ -1240,6 +1240,7 @@ function hodSaveRequest() {
         if (n) items.push({ name: n, qty: q || 1 });
     }
 
+    var now = new Date().toISOString();
     DB.add('hodRequests', {
         title:       data.title,
         reason:      data.reason || '',
@@ -1247,10 +1248,27 @@ function hodSaveRequest() {
         items:       items,
         department:  user.department,
         createdBy:   user.fullName,
-        createdAt:   new Date().toISOString(),
+        createdAt:   now,
         status:      'pending'
     });
-    APP.notify('Request submitted to Admin', 'success');
+    // HOD requests skip both approval stages → go directly to storekeeper for fulfillment
+    DB.add('material_requests', {
+        title:              data.title,
+        reason:             data.reason || '',
+        priority:           data.priority || 'normal',
+        items:              items,
+        department:         user.department,
+        status:             'facility_approved',
+        _source:            'hod',
+        createdBy:          user.username,
+        createdByName:      user.fullName,
+        createdAt:          now,
+        hodApprovedBy:      user.fullName,
+        hodApprovedAt:      now,
+        facilityApprovedBy: user.fullName,
+        facilityApprovedAt: now
+    });
+    APP.notify('Request sent directly to Storekeeper for fulfillment', 'success');
     _hodData.myReqs = (DB.get('hodRequests') || []).filter(function (r) { return r.department === user.department; });
     _renderHodTab('requests');
     return true;

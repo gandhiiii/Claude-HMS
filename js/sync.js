@@ -6,7 +6,7 @@ var SYNC = (function () {
     // Only these keys are shared across devices — session/auth keys are excluded
     var SHARED_KEYS = [
         'users', 'departments', 'featureRights',
-        'inventory', 'inventory_receipts',
+        'inventory', 'inventory_receipts', 'inventory_movements',
         'gatesecurity', 'doctorVisits', 'patientVisits', 'phase2Tasks',
         'projects', 'ambulance', 'ambulance_trips',
         'problems', 'tasks', 'complaints',

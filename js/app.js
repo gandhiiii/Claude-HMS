@@ -10,6 +10,7 @@ const Router = {
         const defaultModule = user.role === 'ambulance_employee' ? 'ambulance'
             : user.role === 'employee' ? 'employee-dashboard'
             : user.role === 'hod' ? 'hod-dashboard'
+            : user.role === 'storekeeper' ? 'storekeeper-dashboard'
             : 'dashboard';
         const saved = localStorage.getItem('hms_lastModule');
         const startModule = saved || defaultModule;
@@ -85,6 +86,7 @@ const Router = {
             { id: 'reports', label: 'Reports & Analytics', icon: '📈', permission: 'reports' },
             { id: 'hod-dashboard', label: 'In-Charge Dashboard', icon: '👔', permission: 'hod-dashboard' },
             { id: 'employee-dashboard', label: 'My Dashboard', icon: '📊', permission: 'employee-dashboard' },
+            { id: 'storekeeper-dashboard', label: 'Storekeeper Dashboard', icon: '🏪', permission: 'storekeeper-dashboard' },
             { id: 'checklists', label: 'Checklists', icon: '✅', permission: 'checklists' }
         ];
         let html = '';
@@ -103,10 +105,12 @@ const Router = {
         if (!u) { window.location.href = 'index.html'; return; }
         if (module === 'dashboard' && u && u.role === 'employee') module = 'employee-dashboard';
         if (module === 'dashboard' && u && u.role === 'hod') module = 'hod-dashboard';
+        if (module === 'dashboard' && u && u.role === 'storekeeper') module = 'storekeeper-dashboard';
         // HOD and employees must not access admin-only modules directly
         var _adminOnly = ['reports', 'data-history', 'budget', 'quarterly-priorities', 'feature-rights'];
         if (_adminOnly.indexOf(module) !== -1 && u.role !== 'admin' && !u.isSuperAdmin) {
             if (u.role === 'hod') { module = 'hod-dashboard'; }
+            else if (u.role === 'storekeeper') { module = 'storekeeper-dashboard'; }
             else { module = 'employee-dashboard'; }
         }
 
@@ -152,7 +156,8 @@ const Router = {
             reports: 'Reports & Analytics',
             'data-history': 'Data History & Backups',
             'employee-dashboard': 'My Dashboard',
-            'hod-dashboard': 'In-Charge Dashboard'
+            'hod-dashboard': 'In-Charge Dashboard',
+            'storekeeper-dashboard': 'Storekeeper Dashboard'
         };
         const titleEl = document.getElementById('pageTitle');
         if (titleEl) titleEl.textContent = titles[module] || module;
@@ -185,7 +190,8 @@ const Router = {
             reports: renderReports,
             'data-history': renderDataHistory,
             'employee-dashboard': renderEmployeeDashboard,
-            'hod-dashboard': renderHodDashboard
+            'hod-dashboard': renderHodDashboard,
+            'storekeeper-dashboard': renderStorekeeperDashboard
         };
         if (renderers[module]) {
             content.innerHTML = '<div style="text-align:center;padding:40px;"><div class="spinner"></div><p style="color:var(--gray);margin-top:8px;">Loading...</p></div>';

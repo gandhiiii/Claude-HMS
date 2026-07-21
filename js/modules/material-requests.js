@@ -326,17 +326,22 @@ function saveMatReq() {
     if (!items.length) { APP.notify('Add at least one item', 'error'); return false; }
 
     var user = AUTH.currentUser();
+    // Storekeeper requests bypass dept HOD and go directly to Facility HOD
+    var isStorekeeper = user && user.role === 'storekeeper';
     DB.add('material_requests', {
         title: title,
         department: department || (user ? user.department : '') || '',
         reason: reason,
         items: items,
-        status: 'pending',
+        status: isStorekeeper ? 'hod_approved' : 'pending',
+        _source: isStorekeeper ? 'storekeeper' : 'employee',
         createdBy: user ? user.username : '',
-        createdByName: user ? user.fullName : ''
+        createdByName: user ? user.fullName : '',
+        hodApprovedBy: isStorekeeper ? (user ? user.fullName : '') : undefined,
+        hodApprovedAt: isStorekeeper ? new Date().toISOString() : undefined
     });
     matCustomItems = [];
-    APP.notify('Request submitted — waiting for HOD approval', 'success');
+    APP.notify(isStorekeeper ? 'Request sent to Facility HOD for approval' : 'Request submitted — waiting for HOD approval', 'success');
     renderMatList();
     return true;
 }
