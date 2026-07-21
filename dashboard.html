@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Hospital Management System</title>
-    <link rel="stylesheet" href="css/style.css?v=85">
+    <link rel="stylesheet" href="css/style.css?v=86">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
@@ -32,7 +32,7 @@
     <div class="app-layout">
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-logo" onclick="(function(){var r=AUTH.currentUser()&&AUTH.currentUser().role;Router.navigate(r==='employee'?'employee-dashboard':r==='hod'?'hod-dashboard':r==='storekeeper'?'storekeeper-dashboard':'dashboard');})()">
-                <span>ðŸ¥</span> HMS
+                <img id="sidebarLogoImg" src="assets/stavya-logo.png" alt="Logo" style="max-height:44px;max-width:140px;object-fit:contain;display:block;margin:0 auto 2px;"><span id="sidebarHospitalName" style="font-size:11px;font-weight:600;text-align:center;display:block;line-height:1.2;"></span>
             </div>
             <nav class="sidebar-nav" id="sidebarNav"></nav>
         </aside>
@@ -43,41 +43,52 @@
         </main>
     </div>
 
-    <script src="js/data.js?v=85"></script>
-    <script src="js/firebase-config.js?v=85"></script>
-    <script src="js/sync.js?v=85"></script>
-    <script src="js/app.js?v=85"></script>
-    <script src="js/modules/dashboard-module.js?v=85"></script>
-    <script src="js/modules/users.js?v=85"></script>
-    <script src="js/modules/departments.js?v=85"></script>
-    <script src="js/modules/feature-rights.js?v=85"></script>
-    <script src="js/modules/inventory.js?v=85"></script>
-    <script src="js/modules/gate-security.js?v=85"></script>
-    <script src="js/modules/phase2.js?v=85"></script>
-    <script src="js/modules/projects.js?v=85"></script>
-    <script src="js/modules/ambulance.js?v=85"></script>
-    <script src="js/modules/problems.js?v=85"></script>
-    <script src="js/modules/tasks.js?v=85"></script>
-    <script src="js/modules/complaints.js?v=85"></script>
-    <script src="js/modules/room-checklist.js?v=85"></script>
-    <script src="js/modules/admissions.js?v=85"></script>
-    <script src="js/modules/lost-found.js?v=85"></script>
-    <script src="js/modules/admin-checklist.js?v=85"></script>
-    <script src="js/modules/checklists.js?v=85"></script>
-    <script src="js/modules/material-requests.js?v=85"></script>
-    <script src="js/modules/suggestions.js?v=85"></script>
-    <script src="js/modules/budget.js?v=85"></script>
-    <script src="js/modules/quarterly-priorities.js?v=85"></script>
-    <script src="js/modules/reports.js?v=85"></script>
-    <script src="js/modules/data-history.js?v=85"></script>
-    <script src="js/modules/reminders.js?v=85"></script>
-    <script src="js/modules/employee-dashboard.js?v=85"></script>
-    <script src="js/modules/hod-dashboard.js?v=85"></script>
-    <script src="js/modules/storekeeper-dashboard.js?v=85"></script>
+    <script src="js/data.js?v=86"></script>
+    <script src="js/firebase-config.js?v=86"></script>
+    <script src="js/sync.js?v=86"></script>
+    <script src="js/app.js?v=86"></script>
+    <script src="js/modules/dashboard-module.js?v=86"></script>
+    <script src="js/modules/users.js?v=86"></script>
+    <script src="js/modules/departments.js?v=86"></script>
+    <script src="js/modules/feature-rights.js?v=86"></script>
+    <script src="js/modules/inventory.js?v=86"></script>
+    <script src="js/modules/gate-security.js?v=86"></script>
+    <script src="js/modules/phase2.js?v=86"></script>
+    <script src="js/modules/projects.js?v=86"></script>
+    <script src="js/modules/ambulance.js?v=86"></script>
+    <script src="js/modules/problems.js?v=86"></script>
+    <script src="js/modules/tasks.js?v=86"></script>
+    <script src="js/modules/complaints.js?v=86"></script>
+    <script src="js/modules/room-checklist.js?v=86"></script>
+    <script src="js/modules/admissions.js?v=86"></script>
+    <script src="js/modules/lost-found.js?v=86"></script>
+    <script src="js/modules/admin-checklist.js?v=86"></script>
+    <script src="js/modules/checklists.js?v=86"></script>
+    <script src="js/modules/material-requests.js?v=86"></script>
+    <script src="js/modules/suggestions.js?v=86"></script>
+    <script src="js/modules/budget.js?v=86"></script>
+    <script src="js/modules/quarterly-priorities.js?v=86"></script>
+    <script src="js/modules/reports.js?v=86"></script>
+    <script src="js/modules/data-history.js?v=86"></script>
+    <script src="js/modules/reminders.js?v=86"></script>
+    <script src="js/modules/employee-dashboard.js?v=86"></script>
+    <script src="js/modules/hod-dashboard.js?v=86"></script>
+    <script src="js/modules/storekeeper-dashboard.js?v=86"></script>
     <script>
         window.addEventListener('DOMContentLoaded', function() {
             Router.init();
             setTimeout(function() { try { SYNC.init(); } catch(e) {} }, 300);
+            /* Apply saved hospital branding */
+            try {
+                var hs = (function(){ try { var r=localStorage.getItem('hms_hospital_settings'); return r?JSON.parse(r):null; } catch(e){return null;} })();
+                if (hs) {
+                    var img = document.getElementById('sidebarLogoImg');
+                    var nm  = document.getElementById('sidebarHospitalName');
+                    if (img && hs.logo) img.src = hs.logo;
+                    if (nm  && hs.name) nm.textContent = hs.name;
+                    if (hs.name) document.title = hs.name + ' - Management System';
+                }
+            } catch(e) {}
         });
     </script>
 </body>

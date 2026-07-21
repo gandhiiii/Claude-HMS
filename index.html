@@ -24,10 +24,10 @@
     <div class="login-page">
         <div class="login-card">
             <div class="login-logo">
-                <img src="assets/stavya-logo.png" alt="Stavya Spine Hospital">
+                <img id="loginLogo" src="assets/stavya-logo.png" alt="Hospital Logo">
             </div>
-            <h1>Hospital Management</h1>
-            <p class="subtitle">Admin Login Portal</p>
+            <h1 id="loginHospitalName">Hospital Management</h1>
+            <p class="subtitle">Login Portal</p>
 
             <!-- Login Form — always visible immediately -->
             <div id="loginForm">
@@ -296,6 +296,17 @@
             document.getElementById('resetResult').textContent = result.message;
             if (result.success) { setTimeout(showLogin, 2000); }
         }
+
+        /* Apply saved hospital branding on login page */
+        (function() {
+            try {
+                var raw = localStorage.getItem('hms_hospital_settings');
+                if (!raw) return;
+                var hs = JSON.parse(raw);
+                if (hs.logo) { var img = document.getElementById('loginLogo'); if (img) img.src = hs.logo; }
+                if (hs.name) { var nm = document.getElementById('loginHospitalName'); if (nm) nm.textContent = hs.name; document.title = hs.name + ' - Login'; }
+            } catch(e) {}
+        })();
 
         window.addEventListener('load', function() {
             var params = new URLSearchParams(window.location.search);

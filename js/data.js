@@ -72,7 +72,8 @@ const DB = {
         'material_requests', 'suggestions', 'reports',
         'roomCleaningTasks', 'floorItems',
         'budgets', 'budget_expenses', 'quarterly_priorities',
-        'inventory_movements', 'material_returns', 'sk_reports'
+        'inventory_movements', 'material_returns', 'sk_reports',
+        'hospital_settings'
     ],
 
     /* Export all app data as a downloadable JSON file */
@@ -735,7 +736,7 @@ APP_SYNC = {
 
 const APP = {
     currentModule: null,
-    _APP_VERSION: 'v85',
+    _APP_VERSION: 'v86',
 
     init() {
         try {

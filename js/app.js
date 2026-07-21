@@ -83,6 +83,7 @@ const Router = {
             { id: 'budget', label: 'Budget', icon: '💰', permission: 'budget', adminOnly: true },
             { id: 'quarterly-priorities', label: 'Quarterly Priorities', icon: '🎯', permission: 'quarterly-priorities', adminOnly: true },
             { id: 'data-history', label: 'Data History', icon: '🕐', permission: 'dashboard', adminOnly: true },
+            { id: 'hospital-settings', label: 'Hospital Settings', icon: '⚙️', permission: 'dashboard', adminOnly: true },
             { id: 'reports', label: 'Reports & Analytics', icon: '📈', permission: 'reports' },
             { id: 'hod-dashboard', label: 'In-Charge Dashboard', icon: '👔', permission: 'hod-dashboard' },
             { id: 'employee-dashboard', label: 'My Dashboard', icon: '📊', permission: 'employee-dashboard' },
@@ -191,7 +192,8 @@ const Router = {
             'data-history': renderDataHistory,
             'employee-dashboard': renderEmployeeDashboard,
             'hod-dashboard': renderHodDashboard,
-            'storekeeper-dashboard': renderStorekeeperDashboard
+            'storekeeper-dashboard': renderStorekeeperDashboard,
+            'hospital-settings': renderHospitalSettings
         };
         if (renderers[module]) {
             content.innerHTML = '<div style="text-align:center;padding:40px;"><div class="spinner"></div><p style="color:var(--gray);margin-top:8px;">Loading...</p></div>';
@@ -356,6 +358,93 @@ function getFormData(id) {
 
 function confirmAction(msg, cb) {
     if (confirm(msg)) cb();
+}
+
+/* ── Hospital Settings helpers ── */
+function getHospitalSettings() {
+    var s = DB.get('hospital_settings');
+    return s || { name: 'Stavya Spine Hospital', logo: 'assets/stavya-logo.png' };
+}
+
+function renderHospitalSettings(container) {
+    var s = getHospitalSettings();
+    var logoPreview = s.logo
+        ? (s.logo.startsWith('data:') ? s.logo : s.logo)
+        : 'assets/stavya-logo.png';
+    container.innerHTML = `
+    <div style="max-width:560px;margin:0 auto;padding:24px 0;">
+        <h2 style="margin-bottom:20px;">⚙️ Hospital Settings</h2>
+        <div class="card" style="padding:28px;">
+            <div class="form-group">
+                <label style="font-weight:600;">Hospital Name</label>
+                <input id="hsName" class="form-control" value="${(s.name||'').replace(/"/g,'&quot;')}" placeholder="Enter hospital name">
+            </div>
+            <div class="form-group" style="margin-top:18px;">
+                <label style="font-weight:600;">Logo</label>
+                <div style="margin:10px 0;background:#f9f9f9;border:1px dashed #ccc;border-radius:10px;padding:16px;text-align:center;">
+                    <img id="hsLogoPreview" src="${logoPreview}" alt="Logo" style="max-height:90px;max-width:220px;object-fit:contain;">
+                </div>
+                <label class="btn btn-sm" style="cursor:pointer;background:var(--primary);color:#fff;display:inline-block;margin-top:6px;">
+                    📁 Choose New Logo
+                    <input type="file" id="hsLogoFile" accept="image/*" style="display:none;" onchange="hsPreviewLogo(this)">
+                </label>
+                <span id="hsLogoStatus" style="font-size:12px;color:var(--gray);margin-left:10px;"></span>
+            </div>
+            <div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="hsSave()">💾 Save Changes</button>
+                <button class="btn" onclick="hsResetLogo()" style="background:#fff3e0;color:#e65100;">↩️ Reset to Default Logo</button>
+            </div>
+        </div>
+        <p style="font-size:12px;color:var(--gray);margin-top:12px;">Changes appear on the login page and sidebar immediately after saving.</p>
+    </div>`;
+}
+
+function hsPreviewLogo(input) {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    if (file.size > 500 * 1024) {
+        APP.notify('Logo must be under 500 KB', 'error'); return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        document.getElementById('hsLogoPreview').src = e.target.result;
+        document.getElementById('hsLogoStatus').textContent = file.name;
+        window._hsPendingLogo = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function hsSave() {
+    var name = (document.getElementById('hsName').value || '').trim();
+    if (!name) { APP.notify('Hospital name cannot be empty', 'error'); return; }
+    var s = getHospitalSettings();
+    s.name = name;
+    if (window._hsPendingLogo) { s.logo = window._hsPendingLogo; window._hsPendingLogo = null; }
+    DB.set('hospital_settings', s);
+    hsApplyBranding(s);
+    APP.notify('Settings saved!', 'success');
+}
+
+function hsResetLogo() {
+    var s = getHospitalSettings();
+    s.logo = 'assets/stavya-logo.png';
+    delete s._logoIsBase64;
+    DB.set('hospital_settings', s);
+    document.getElementById('hsLogoPreview').src = s.logo;
+    document.getElementById('hsLogoStatus').textContent = 'Reset to default';
+    window._hsPendingLogo = null;
+    hsApplyBranding(s);
+    APP.notify('Logo reset to default', 'success');
+}
+
+function hsApplyBranding(s) {
+    /* Update sidebar */
+    var sidebarLogo = document.getElementById('sidebarLogoImg');
+    var sidebarName = document.getElementById('sidebarHospitalName');
+    if (sidebarLogo && s.logo) sidebarLogo.src = s.logo;
+    if (sidebarName && s.name) sidebarName.textContent = s.name;
+    /* Update page title */
+    document.title = (s.name || 'HMS') + ' - Management System';
 }
 
 function deptDropdown(name, selected) {
