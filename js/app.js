@@ -50,7 +50,7 @@ const Router = {
                 </div>
             </div>
             <div class="header-right">
-                <span id="liveIndicator" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--success);padding:3px 8px;border-radius:12px;background:rgba(52,168,83,0.1);border:1px solid rgba(52,168,83,0.3);"><span style="width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 1.5s infinite;"></span>LIVE</span>
+                <span id="liveIndicator" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--success);padding:3px 8px;border-radius:12px;background:rgba(52,168,83,0.1);border:1px solid rgba(52,168,83,0.3);"><span style="width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 1.5s infinite;"></span>${typeof T === 'function' ? T('ui_live') : 'LIVE'}</span>
                 ${(user.role === 'admin' || user.isSuperAdmin) ? `<button id="syncNowBtn" class="btn btn-sm" style="font-size:11px;padding:4px 10px;background:rgba(52,168,83,0.1);border:1px solid rgba(52,168,83,0.4);color:var(--secondary);" onclick="APP._syncNow()" title="Upload all local data to cloud database">☁ Sync</button><button class="btn btn-sm" style="font-size:11px;padding:4px 10px;" onclick="APP._mobileSetup()" title="Get QR code to set up login on mobile">📱 Mobile</button>` : ''}
                 ${typeof LANG !== 'undefined' ? LANG.switcher() : ''}
                 <span class="role-badge" style="font-size:13px;color:var(--gray);">${user.role.toUpperCase()}</span>
@@ -58,7 +58,7 @@ const Router = {
                     <div class="avatar">${user.fullName.charAt(0).toUpperCase()}</div>
                     <span class="user-name" style="font-size:14px;">${user.fullName}</span>
                 </div>
-                <button class="btn btn-sm btn-danger" onclick="Router.logout()">Logout</button>
+                <button class="btn btn-sm btn-danger" onclick="Router.logout()">${typeof T === 'function' ? T('ui_logout') : 'Logout'}</button>
             </div>
         `;
     },
@@ -148,26 +148,31 @@ const Router = {
         const overlay = document.getElementById('sidebarOverlay');
         if (overlay) overlay.classList.remove('active');
 
-        const titles = {
-            dashboard: 'Dashboard', users: 'User Management', departments: 'Departments',
-            'feature-rights': 'Feature Rights', inventory: 'Inventory Management',
-            'gate-security': 'Gate Security', phase2: 'Phase 2 Infra & Development',
-            projects: 'Projects & Plans', ambulance: 'Ambulance Tracking',
-            problems: 'Problems & Solutions', tasks: 'Task Management',
-            complaints: 'Complaints', 'room-checklist': 'Room Checklist',
-            admissions: 'Admissions & Discharges', 'lost-found': 'Lost & Found',
-            'admin-checklists': 'Admin Checklists', checklists: 'Checklists',
-            'material-requests': 'Material Requests', suggestions: 'Suggestions',
-            budget: 'Budget Management',
-            'quarterly-priorities': 'Quarterly Priorities',
-            reports: 'Reports & Analytics',
-            'data-history': 'Data History & Backups',
-            'employee-dashboard': 'My Dashboard',
-            'hod-dashboard': 'In-Charge Dashboard',
-            'storekeeper-dashboard': 'Storekeeper Dashboard'
+        const navKeyMap = {
+            dashboard: 'nav_dashboard', users: 'nav_users', departments: 'nav_departments',
+            'feature-rights': 'nav_feature_rights', inventory: 'nav_inventory',
+            'gate-security': 'nav_gate_security', phase2: 'nav_phase2',
+            projects: 'nav_projects', ambulance: 'nav_ambulance',
+            problems: 'nav_problems', tasks: 'nav_tasks',
+            complaints: 'nav_complaints', 'room-checklist': 'nav_room_checklist',
+            admissions: 'nav_admissions', 'lost-found': 'nav_lost_found',
+            'admin-checklists': 'nav_admin_checklists', checklists: 'nav_checklists',
+            'material-requests': 'nav_material_requests', suggestions: 'nav_suggestions',
+            budget: 'nav_budget',
+            'quarterly-priorities': 'nav_quarterly',
+            reports: 'nav_reports',
+            'data-history': 'nav_data_history',
+            'hospital-settings': 'nav_hospital_settings',
+            'employee-dashboard': 'nav_employee_dashboard',
+            'hod-dashboard': 'nav_hod_dashboard',
+            'storekeeper-dashboard': 'nav_storekeeper_dashboard'
         };
         const titleEl = document.getElementById('pageTitle');
-        if (titleEl) titleEl.textContent = titles[module] || module;
+        if (titleEl) {
+            const _tt = typeof T === 'function' ? T : function(k){ return k; };
+            const navKey = navKeyMap[module];
+            titleEl.textContent = navKey ? _tt(navKey) : module;
+        }
 
         const content = document.getElementById('pageContent');
         if (!content) return;

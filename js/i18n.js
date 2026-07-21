@@ -138,6 +138,10 @@ var LANG = (function () {
             nav_employee_dashboard:'My Dashboard',
             nav_storekeeper_dashboard:'Storekeeper Dashboard',
             nav_checklists:       'Checklists',
+
+            /* Header chrome */
+            ui_logout: 'Logout',
+            ui_live:   'LIVE',
         },
 
         hi: {
@@ -261,6 +265,9 @@ var LANG = (function () {
             nav_employee_dashboard:'मेरा डैशबोर्ड',
             nav_storekeeper_dashboard:'स्टोरकीपर डैशबोर्ड',
             nav_checklists:       'चेकलिस्ट',
+
+            ui_logout: 'लॉगआउट',
+            ui_live:   'लाइव',
         },
 
         gu: {
@@ -384,6 +391,9 @@ var LANG = (function () {
             nav_employee_dashboard:'મારું ડેશબોર્ડ',
             nav_storekeeper_dashboard:'સ્ટોરકીપર ડેશબોર્ડ',
             nav_checklists:       'ચેકલિસ્ટ',
+
+            ui_logout: 'લૉગઆઉટ',
+            ui_live:   'લાઇવ',
         }
     };
 
