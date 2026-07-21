@@ -48,7 +48,7 @@ function renderProbList() {
             // HOD sees problems routed to their department
             return p.routedTo === user.department || (!p.routedTo && p.department === user.department);
         }
-        // Employee sees own reports + problems assigned to them
+        // Storekeeper and employees see only their own reports + problems assigned to them
         return p.createdBy === user.username || p.assignedTo === user.username;
     });
 

@@ -984,7 +984,11 @@ function _hodRequests(el) {
     });
     d.routedProblems = routedProbs;
 
-    var reqs = (DB.get('hodRequests') || []).filter(function (r) { return r.department === dept; });
+    // HOD's own material requests — read from material_requests (single source of truth)
+    var hodUser = d.user || AUTH.currentUser();
+    var reqs = (DB.get('material_requests') || []).filter(function (r) {
+        return r._source === 'hod' && r.createdBy === (hodUser ? hodUser.username : '');
+    });
     d.myReqs = reqs;
 
     var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
@@ -1089,21 +1093,29 @@ function _hodRequests(el) {
             + '<div style="font-size:13px;color:var(--gray);margin-bottom:10px;">No requests yet. Click + New Request to submit one.</div>'
             + '<button class="btn btn-primary" onclick="hodCreateRequest()">+ New Request</button></div>';
     } else {
+        var _reqStatMap = {
+            'facility_approved': { label: 'Sent to Storekeeper', badge: 'badge-info' },
+            'store_fulfilled':   { label: 'Ready to Collect ✓', badge: 'badge-success' },
+            'confirmed':         { label: 'Confirmed & Closed', badge: 'badge-success' },
+            'partial':           { label: 'Partially Fulfilled', badge: 'badge-warning' },
+            'facility_rejected': { label: 'Rejected', badge: 'badge-danger' }
+        };
         reqs.slice().reverse().forEach(function (r) {
-            var badge = r.status === 'approved' ? 'badge-success' : r.status === 'rejected' ? 'badge-danger' : 'badge-warning';
+            var st = _reqStatMap[r.status] || { label: r.status || 'Sent to Storekeeper', badge: 'badge-info' };
             var items = '';
-            if (r.items) r.items.forEach(function (i) { items += i.name + ' ×' + i.qty + ', '; });
+            if (r.items) r.items.forEach(function (i) { items += i.name + ' \xd7' + i.qty + ', '; });
             html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;">'
-                + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:6px;">'
                 + '<div><div style="font-size:14px;font-weight:700;">' + (r.title || 'Request') + '</div>'
                 + (items ? '<div style="font-size:12px;color:var(--gray);margin-top:2px;">' + items.replace(/,\s*$/, '') + '</div>' : '')
-                + '<div style="font-size:11px;color:var(--gray);margin-top:4px;">'
-                + APP.formatDate(r.createdAt)
-                + (r.approvedBy ? ' · Reviewed by: ' + r.approvedBy : '')
-                + (r.notes ? ' · Note: ' + r.notes : '') + '</div>'
-                + (r.reason ? '<div style="font-size:12px;margin-top:4px;color:var(--text);">Reason: ' + r.reason + '</div>' : '')
+                + '<div style="font-size:11px;color:var(--gray);margin-top:4px;">' + APP.formatDate(r.createdAt)
+                + (r.reason ? ' · ' + r.reason : '') + '</div>'
                 + '</div>'
-                + '<span class="badge ' + badge + '" style="font-size:12px;padding:6px 10px;">' + (r.status || 'pending') + '</span></div></div>';
+                + '<span class="badge ' + st.badge + '" style="font-size:12px;padding:6px 10px;">' + st.label + '</span></div>'
+                + (r.status === 'store_fulfilled'
+                    ? '<button class="btn btn-sm btn-success" onclick="hodConfirmReceipt(\'' + r.id + '\')">✅ Confirm Receipt</button>'
+                    : '')
+                + '</div>';
         });
     }
     el.innerHTML = html;
@@ -1241,17 +1253,7 @@ function hodSaveRequest() {
     }
 
     var now = new Date().toISOString();
-    DB.add('hodRequests', {
-        title:       data.title,
-        reason:      data.reason || '',
-        priority:    data.priority || 'normal',
-        items:       items,
-        department:  user.department,
-        createdBy:   user.fullName,
-        createdAt:   now,
-        status:      'pending'
-    });
-    // HOD requests skip both approval stages → go directly to storekeeper for fulfillment
+    // HOD requests skip all approval stages → go directly to storekeeper for fulfillment
     DB.add('material_requests', {
         title:              data.title,
         reason:             data.reason || '',
@@ -1269,9 +1271,31 @@ function hodSaveRequest() {
         facilityApprovedAt: now
     });
     APP.notify('Request sent directly to Storekeeper for fulfillment', 'success');
-    _hodData.myReqs = (DB.get('hodRequests') || []).filter(function (r) { return r.department === user.department; });
+    _hodData.myReqs = (DB.get('material_requests') || []).filter(function (r) {
+        return r._source === 'hod' && r.createdBy === user.username;
+    });
     _renderHodTab('requests');
     return true;
+}
+
+function hodConfirmReceipt(id) {
+    var note = prompt('Any notes about the receipt? (optional):');
+    if (note === null) return;
+    var user = AUTH.currentUser();
+    DB.update('material_requests', id, {
+        status: 'confirmed',
+        confirmedBy: user ? user.username : '',
+        confirmedByName: user ? user.fullName : '',
+        confirmedAt: new Date().toISOString(),
+        confirmationNote: note || ''
+    });
+    APP.notify('Receipt confirmed!', 'success');
+    if (user) {
+        _hodData.myReqs = (DB.get('material_requests') || []).filter(function (r) {
+            return r._source === 'hod' && r.createdBy === user.username;
+        });
+    }
+    _renderHodTab('requests');
 }
 
 /* ═══════════════════════════════════════════════
