@@ -8,14 +8,14 @@ function renderDepartments(container) {
     container.innerHTML = `
         <div class="flex-between mb-4">
             <div class="search-box">
-                <input type="text" class="form-control" id="deptSearch" placeholder="Search departments..." oninput="renderDeptList()">
+                <input type="text" class="form-control" id="deptSearch" placeholder="${T('deptmod_search_placeholder')}" oninput="renderDeptList()">
             </div>
-            <button class="btn btn-primary" id="addDeptBtn">+ Add Department</button>
+            <button class="btn btn-primary" id="addDeptBtn">${T('deptmod_add_btn')}</button>
         </div>
         <div class="card">
             <div class="table-responsive">
                 <table>
-                    <thead><tr><th>Code</th><th>Name</th><th>Head</th><th>Feature Rights</th><th>Status</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>${T('deptmod_th_code')}</th><th>${T('deptmod_th_name')}</th><th>${T('deptmod_th_head')}</th><th>${T('deptmod_th_feature_rights')}</th><th>${T('deptmod_th_status')}</th><th>${T('deptmod_th_actions')}</th></tr></thead>
                     <tbody id="deptTableBody"></tbody>
                 </table>
             </div>
@@ -62,14 +62,14 @@ function renderDeptList() {
                 <span class="badge ${allEnabled ? 'badge-success' : count > 0 ? 'badge-info' : 'badge-danger'}">${count}/${ALL_FEATURES.length}</span>
                 ${count > 0 ? `<span style="font-size:11px;color:var(--gray);display:block;">${features.map(f => f.replace('-',' ')).join(', ')}</span>` : ''}
             </td>
-            <td><span class="badge ${d.active ? 'badge-success' : 'badge-danger'}">${d.active ? 'Active' : 'Inactive'}</span></td>
+            <td><span class="badge ${d.active ? 'badge-success' : 'badge-danger'}">${d.active ? T('deptmod_active') : T('deptmod_inactive')}</span></td>
             <td class="dept-actions">
-                <button class="btn btn-sm btn-primary" data-action="edit">Edit</button>
-                <button class="btn btn-sm ${d.active ? 'btn-warning' : 'btn-success'}" data-action="toggle">${d.active ? 'Deactivate' : 'Activate'}</button>
-                <button class="btn btn-sm btn-danger" data-action="delete" ${d.system ? 'disabled title="Pre-generated department cannot be deleted"' : ''}>Delete</button>
+                <button class="btn btn-sm btn-primary" data-action="edit">${T('deptmod_edit_btn')}</button>
+                <button class="btn btn-sm ${d.active ? 'btn-warning' : 'btn-success'}" data-action="toggle">${d.active ? T('deptmod_deactivate_btn') : T('deptmod_activate_btn')}</button>
+                <button class="btn btn-sm btn-danger" data-action="delete" ${d.system ? `disabled title="${T('deptmod_delete_disabled_title')}"` : ''}>${T('deptmod_delete_btn')}</button>
             </td>
         </tr>`;
-    }).join('') || '<tr><td colspan="6" class="empty-state">No departments</td></tr>';
+    }).join('') || `<tr><td colspan="6" class="empty-state">${T('deptmod_no_items')}</td></tr>`;
 }
 
 function showDeptForm(dept) {
@@ -80,40 +80,40 @@ function showDeptForm(dept) {
             <input type="hidden" name="id" value="${dept?.id || ''}">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                 <div class="form-group">
-                    <label>Department Name *</label>
+                    <label>${T('deptmod_form_name')}</label>
                     <input type="text" name="name" class="form-control" value="${dept?.name || ''}" required>
                 </div>
                 <div class="form-group">
-                    <label>Department Code *</label>
+                    <label>${T('deptmod_form_code')}</label>
                     <input type="text" name="code" class="form-control" value="${dept?.code || ''}" required>
                 </div>
                 <div class="form-group">
-                    <label>Head of Department</label>
+                    <label>${T('deptmod_form_head')}</label>
                     <input type="text" name="head" class="form-control" value="${dept?.head || ''}">
                 </div>
                 <div class="form-group">
-                    <label>Status</label>
+                    <label>${T('deptmod_th_status')}</label>
                     <select name="active" class="form-control">
-                        <option value="true" ${dept?.active !== false ? 'selected' : ''}>Active</option>
-                        <option value="false" ${dept?.active === false ? 'selected' : ''}>Inactive</option>
+                        <option value="true" ${dept?.active !== false ? 'selected' : ''}>${T('deptmod_active')}</option>
+                        <option value="false" ${dept?.active === false ? 'selected' : ''}>${T('deptmod_inactive')}</option>
                     </select>
                 </div>
             </div>
             <div class="form-group">
-                <label>Description</label>
+                <label>${T('deptmod_form_description')}</label>
                 <textarea name="description" class="form-control" rows="2">${dept?.description || ''}</textarea>
             </div>
 
             <div style="border:2px solid var(--primary);border-radius:var(--radius-lg);padding:16px;background:#f0f6ff;margin-top:12px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <label style="font-size:15px;font-weight:700;color:var(--primary-dark);">🔐 Feature Rights (Module Access)</label>
+                    <label style="font-size:15px;font-weight:700;color:var(--primary-dark);">${T('deptmod_feature_rights_title')}</label>
                     <label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;">
                         <input type="checkbox" onchange="document.querySelectorAll('[name=features]').forEach(c=>c.checked=this.checked)" ${allChecked ? 'checked' : ''}>
-                        Select All
+                        ${T('deptmod_select_all')}
                     </label>
                 </div>
                 <p style="font-size:12px;color:var(--gray);margin-bottom:10px;">
-                    Users assigned to this department will <strong>inherit</strong> these module rights. Check which modules this department can use.
+                    ${T('deptmod_feature_rights_desc')}
                 </p>
                 <div class="permission-grid" id="deptFeaturesGrid">
                     ${ALL_FEATURES.map(f => `
@@ -126,7 +126,7 @@ function showDeptForm(dept) {
             </div>
         </form>
     `;
-    openFormModal(dept ? 'Edit Department' : 'Add Department', form, `saveDept()`, true);
+    openFormModal(dept ? T('deptmod_modal_edit') : T('deptmod_modal_add'), form, `saveDept()`, true);
 }
 
 function saveDept() {
@@ -138,14 +138,14 @@ function saveDept() {
     data.features = Array.from(form.querySelectorAll('[name="features"]:checked')).map(cb => cb.value);
     data.active = data.active === 'true';
 
-    if (!data.name || !data.code) { APP.notify('Name and Code are required', 'error'); return; }
+    if (!data.name || !data.code) { APP.notify(T('deptmod_fill_required'), 'error'); return; }
 
     if (data.id) {
         DB.update('departments', data.id, data);
-        APP.notify('Department updated with ' + data.features.length + ' feature rights', 'success');
+        APP.notify(T('deptmod_updated_with') + ' ' + data.features.length + ' ' + T('deptmod_feature_rights_suffix'), 'success');
     } else {
         DB.add('departments', data);
-        APP.notify('Department added with ' + data.features.length + ' feature rights', 'success');
+        APP.notify(T('deptmod_added_with') + ' ' + data.features.length + ' ' + T('deptmod_feature_rights_suffix'), 'success');
     }
     renderDeptList();
 }
@@ -154,7 +154,7 @@ function editDept(id) {
     let dept = DB.getById('departments', id);
     if (!dept) {
         const all = DB.get('departments');
-        APP.notify('Department not found. Searched ID: "' + id + '", Available: ' + JSON.stringify(all.map(d => ({ id: d.id, name: d.name }))), 'error');
+        APP.notify(T('deptmod_not_found') + ' "' + id + '", ' + T('deptmod_available') + ' ' + JSON.stringify(all.map(d => ({ id: d.id, name: d.name }))), 'error');
         return;
     }
     showDeptForm(dept);
@@ -171,16 +171,16 @@ function toggleDept(id) {
 function deleteDept(id) {
     const dept = DB.getById('departments', id);
     if (!dept) return;
-    if (dept.system) { APP.notify('Pre-generated departments cannot be deleted', 'error'); return; }
+    if (dept.system) { APP.notify(T('deptmod_predefined_no_delete'), 'error'); return; }
     const users = DB.get('users').filter(u => u.department === dept.name);
     const items = DB.get('inventory').filter(i => i.department === dept.name);
-    let msg = `Delete department "${dept.name}"?`;
-    if (users.length > 0) msg += `\n⚠️ ${users.length} user(s) assigned to this dept will be unlinked.`;
-    if (items.length > 0) msg += `\n⚠️ ${items.length} inventory item(s) linked to this dept.`;
+    let msg = `${T('deptmod_confirm_delete')} "${dept.name}"?`;
+    if (users.length > 0) msg += `\n⚠️ ${users.length} ${T('deptmod_users_unlink_suffix')}`;
+    if (items.length > 0) msg += `\n⚠️ ${items.length} ${T('deptmod_items_linked_suffix')}`;
     confirmAction(msg, () => {
         users.forEach(u => DB.update('users', u.id, { department: '' }));
         DB.delete('departments', id);
-        APP.notify(`Department "${dept.name}" deleted`, 'success');
+        APP.notify(`${T('deptmod_deptword')} "${dept.name}" ${T('deptmod_deleted_suffix')}`, 'success');
         renderDeptList();
     });
 }
