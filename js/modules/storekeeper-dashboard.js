@@ -21,15 +21,21 @@ function renderStorekeeperDashboard(container) {
     var inventory = DB.get('inventory') || [];
     var lowStock   = inventory.filter(function(i) { return parseInt(i.quantity) > 0 && parseInt(i.quantity) < 10; });
     var outOfStock = inventory.filter(function(i) { return parseInt(i.quantity) === 0; });
+    var pendingReturns = (DB.get('material_returns') || []).filter(function(r) {
+        return r.status === 'pending';
+    });
 
     _skData = { user: user, pendingFulfill: pendingFulfill, myRequests: myRequests,
-                inventory: inventory, lowStock: lowStock, outOfStock: outOfStock };
+                inventory: inventory, lowStock: lowStock, outOfStock: outOfStock,
+                pendingReturns: pendingReturns };
 
     var tabs = [
         { id: 'overview',    label: '📊 Overview' },
         { id: 'fulfill',     label: '✅ Fulfill Requests', badge: pendingFulfill.length, bc: 'badge-warning' },
         { id: 'myrequests',  label: '📦 My Requests', badge: myRequests.filter(function(r){ return r.status !== 'confirmed' && r.status !== 'partial'; }).length, bc: 'badge-info' },
-        { id: 'inventory',   label: '🏪 Inventory Status', badge: outOfStock.length, bc: 'badge-danger' }
+        { id: 'inventory',   label: '🏪 Inventory Status', badge: outOfStock.length, bc: 'badge-danger' },
+        { id: 'returns',     label: '↩️ Returns', badge: pendingReturns.length, bc: 'badge-warning' },
+        { id: 'reports',     label: '📈 Reports' }
     ];
 
     var html = '<div style="background:linear-gradient(135deg,#1a6b3c,#2e7d32);border-radius:14px;padding:20px 24px;color:#fff;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
@@ -56,6 +62,10 @@ function renderStorekeeperDashboard(container) {
             ? '<div style="background:#ffebee;border:1px solid var(--danger);border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">'
               + '<span style="font-size:13px;font-weight:600;color:var(--danger);">🚨 ' + outOfStock.length + ' item(s) completely out of stock</span>'
               + '<button class="btn btn-sm btn-danger" onclick="skTabSwitch(\'inventory\')">View</button></div>' : '')
+        + (pendingReturns.length > 0
+            ? '<div style="background:#e8f5e9;border:1px solid var(--secondary);border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+              + '<span style="font-size:13px;font-weight:600;color:#2e7d32;">↩️ ' + pendingReturns.length + ' material return(s) awaiting your processing</span>'
+              + '<button class="btn btn-sm btn-success" onclick="skTabSwitch(\'returns\')">Process</button></div>' : '')
 
         + '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:4px 4px 0;display:flex;flex-wrap:wrap;gap:2px;border-bottom:none;">'
         + tabs.map(function(t) {
@@ -88,7 +98,8 @@ function skTabSwitch(tab) {
 function _renderSkTab(tab) {
     var el = document.getElementById('skTabContent');
     if (!el) return;
-    var map = { overview: _skOverview, fulfill: _skFulfill, myrequests: _skMyRequests, inventory: _skInventory };
+    var map = { overview: _skOverview, fulfill: _skFulfill, myrequests: _skMyRequests, inventory: _skInventory,
+                returns: _skReturns, reports: _skReports };
     if (map[tab]) map[tab](el);
 }
 
@@ -137,6 +148,8 @@ function _skOverview(el) {
         + '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
         + '<button class="btn btn-primary" onclick="skCreateRequest()">📦 Request Materials</button>'
         + '<button class="btn btn-outline" onclick="skTabSwitch(\'fulfill\')">✅ Fulfill Requests</button>'
+        + '<button class="btn btn-outline" onclick="skTabSwitch(\'returns\')">↩️ Process Returns</button>'
+        + '<button class="btn btn-outline" onclick="skTabSwitch(\'reports\')">📈 Send Report</button>'
         + '<button class="btn btn-outline" onclick="Router.navigate(\'inventory\')">📦 Full Inventory</button>'
         + '<button class="btn btn-outline" onclick="Router.navigate(\'problems\')">🔧 Report Problem</button>'
         + '</div></div>';
@@ -439,4 +452,386 @@ function skSaveRequest() {
     _skData.myRequests = (DB.get('material_requests') || []).filter(function(r) { return r.createdBy === user.username; });
     _renderSkTab('myrequests');
     return true;
+}
+
+/* ═══ RETURNS TAB ═══ */
+function _skReturns(el) {
+    var returns = (DB.get('material_returns') || []).slice().reverse();
+    _skData.pendingReturns = returns.filter(function(r){ return r.status === 'pending'; });
+
+    var stMap = {
+        'pending':   { label: 'Awaiting Processing', badge: 'badge-warning' },
+        'received':  { label: 'Processed', badge: 'badge-success' }
+    };
+
+    var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
+        + '<div><div style="font-weight:700;font-size:16px;">↩️ Material Returns</div>'
+        + '<div style="font-size:12px;color:var(--gray);">Returns submitted by employees and HODs — process each to update inventory</div></div>'
+        + '<span style="font-size:13px;color:var(--gray);">' + _skData.pendingReturns.length + ' pending</span></div>';
+
+    if (returns.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
+            + '<div style="font-size:32px;margin-bottom:8px;">↩️</div>'
+            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No returns yet</div>'
+            + '<div style="font-size:13px;color:var(--gray);">Employees and HODs can submit material return requests from their dashboards.</div></div>';
+    } else {
+        returns.forEach(function(r) {
+            var st = stMap[r.status] || { label: r.status, badge: 'badge-warning' };
+            var itemsHtml = (r.items || []).map(function(i) {
+                return '<span style="background:var(--light-gray);border-radius:4px;padding:2px 7px;font-size:11px;margin-right:4px;display:inline-block;">'
+                    + i.name + ' ×' + i.qty + (i.unit ? ' ' + i.unit : '') + '</span>';
+            }).join('');
+
+            html += '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid '
+                + (r.status === 'pending' ? 'var(--warning)' : 'var(--secondary)') + ';border-radius:10px;padding:14px;margin-bottom:10px;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'
+                + '<div><div style="font-size:14px;font-weight:700;">' + (r.title || 'Return') + '</div>'
+                + '<div style="font-size:12px;color:var(--gray);margin-top:2px;">From: <strong>' + (r.createdByName || r.createdBy) + '</strong>'
+                + ' · ' + (r.department || '-') + ' · ' + APP.formatDate(r.createdAt) + '</div>'
+                + (r.reason ? '<div style="font-size:12px;color:var(--gray);margin-top:2px;">Reason: ' + r.reason + '</div>' : '')
+                + '</div><span class="badge ' + st.badge + '">' + st.label + '</span></div>'
+                + '<div style="margin-bottom:8px;flex-wrap:wrap;">' + (itemsHtml || '-') + '</div>';
+
+            if (r.status === 'pending') {
+                html += '<button class="btn btn-sm btn-success" onclick="skReceiveReturn(\'' + r.id + '\')">↩️ Receive &amp; Process</button>';
+            } else {
+                // Show processed details
+                var detailHtml = (r.itemDetails || []).map(function(d) {
+                    var condColor = d.condition === 'good' ? '#2e7d32' : d.condition === 'damaged' ? 'var(--danger)' : '#e65100';
+                    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--light-gray);border-radius:6px;margin-bottom:4px;font-size:12px;">'
+                        + '<span>' + d.name + '</span>'
+                        + '<span>Returned: ' + d.returnedQty + (d.unit ? ' ' + d.unit : '') + '</span>'
+                        + '<span style="color:' + condColor + ';font-weight:700;">' + (d.condition || '-') + '</span>'
+                        + (d.addedBackToInventory ? '<span style="background:#e8f5e9;color:#2e7d32;padding:1px 6px;border-radius:4px;font-size:10px;">Back in stock ✓</span>' : '')
+                        + '</div>';
+                }).join('');
+                html += '<div style="margin-top:6px;">'
+                    + '<div style="font-size:12px;font-weight:600;color:var(--gray);margin-bottom:4px;">Processed by ' + (r.receivedByName || r.receivedBy) + ' on ' + APP.formatDate(r.receivedAt) + '</div>'
+                    + detailHtml
+                    + (r.generalNotes ? '<div style="font-size:11px;color:var(--gray);margin-top:4px;">Notes: ' + r.generalNotes + '</div>' : '')
+                    + '</div>';
+            }
+            html += '</div>';
+        });
+    }
+    el.innerHTML = html;
+}
+
+var _skReturnId = null;
+
+function skReceiveReturn(id) {
+    _skReturnId = id;
+    var ret = DB.getById('material_returns', id);
+    if (!ret) { APP.notify('Return not found', 'error'); return; }
+
+    var condOpts = ['good', 'damaged', 'partial', 'expired'].map(function(c) {
+        return '<option value="' + c + '">' + c.charAt(0).toUpperCase() + c.slice(1) + '</option>';
+    }).join('');
+
+    var itemRows = (ret.items || []).map(function(item, i) {
+        return '<div style="background:var(--light-gray);border-radius:8px;padding:12px;margin-bottom:8px;">'
+            + '<div style="font-size:13px;font-weight:700;margin-bottom:8px;">📦 ' + item.name + ' (requested: ' + item.qty + ' ' + (item.unit || 'pcs') + ')</div>'
+            + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+            + '<div class="form-group" style="margin:0;">'
+            + '<label style="font-size:11px;">Qty Actually Returned</label>'
+            + '<input type="number" class="form-control sk-ret-qty" data-idx="' + i + '" data-name="' + item.name + '" data-unit="' + (item.unit || 'pcs') + '" min="0" value="' + item.qty + '" style="margin-top:2px;">'
+            + '</div>'
+            + '<div class="form-group" style="margin:0;">'
+            + '<label style="font-size:11px;">Condition</label>'
+            + '<select class="form-control sk-ret-cond" data-idx="' + i + '">' + condOpts + '</select>'
+            + '</div></div>'
+            + '<div class="form-group" style="margin-top:6px;margin-bottom:0;">'
+            + '<label style="font-size:11px;">Notes (optional)</label>'
+            + '<input type="text" class="form-control sk-ret-notes" data-idx="' + i + '" placeholder="e.g. slightly torn packaging">'
+            + '</div></div>';
+    }).join('');
+
+    var html = '<div><p style="font-size:13px;color:var(--gray);margin-bottom:12px;">Returned by: <strong>' + (ret.createdByName || ret.createdBy) + '</strong> · ' + (ret.department || '-') + '</p>'
+        + (ret.reason ? '<p style="font-size:12px;color:var(--gray);margin-bottom:10px;">Reason: ' + ret.reason + '</p>' : '')
+        + itemRows
+        + '<div class="form-group"><label>General Notes (optional)</label><textarea id="skRetGeneralNotes" class="form-control" rows="2" placeholder="Overall notes about this return batch"></textarea></div>'
+        + '<p style="font-size:11px;color:var(--gray);margin-top:4px;">Items with <strong>Good</strong> condition will be automatically added back to inventory.</p>'
+        + '</div>';
+
+    openFormModal('↩️ Receive Return: ' + (ret.title || 'Return'), html, 'skSaveReturnDetails()', false);
+}
+
+function skSaveReturnDetails() {
+    var ret = DB.getById('material_returns', _skReturnId);
+    if (!ret) { APP.notify('Return not found', 'error'); return false; }
+    var user = AUTH.currentUser();
+    var now  = new Date().toISOString();
+
+    var itemDetails = [];
+    var qtyInputs   = document.querySelectorAll('.sk-ret-qty');
+    var condInputs  = document.querySelectorAll('.sk-ret-cond');
+    var notesInputs = document.querySelectorAll('.sk-ret-notes');
+    var addedBack   = 0;
+
+    qtyInputs.forEach(function(inp, i) {
+        var name      = inp.dataset.name;
+        var unit      = inp.dataset.unit || 'pcs';
+        var qty       = parseInt(inp.value) || 0;
+        var condition = (condInputs[i] || {}).value || 'good';
+        var notes     = (notesInputs[i] || {}).value || '';
+        var addBack   = (condition === 'good' && qty > 0);
+
+        if (addBack) {
+            var nameLow = name.trim().toLowerCase();
+            var inv = (DB.get('inventory') || []).find(function(i) {
+                return (i.name || '').trim().toLowerCase() === nameLow;
+            });
+            if (inv) {
+                var newQty = (parseInt(inv.quantity) || 0) + qty;
+                DB.update('inventory', inv.id, { quantity: newQty });
+                DB.add('inventory_movements', {
+                    itemId: inv.id, itemName: inv.name, type: 'in',
+                    qty: qty, unit: unit,
+                    unitPrice: parseFloat(inv.price) || 0,
+                    totalValue: qty * (parseFloat(inv.price) || 0),
+                    dept: ret.department || '', by: user.fullName,
+                    notes: 'Return received — condition: good (from ' + (ret.createdByName || ret.createdBy) + ')', date: now
+                });
+                addedBack++;
+            }
+        }
+        itemDetails.push({ name: name, returnedQty: qty, unit: unit, condition: condition,
+                           addedBackToInventory: addBack, notes: notes });
+    });
+
+    var generalNotes = (document.getElementById('skRetGeneralNotes') || {}).value || '';
+
+    DB.update('material_returns', _skReturnId, {
+        status: 'received',
+        receivedBy: user.username,
+        receivedByName: user.fullName,
+        receivedAt: now,
+        itemDetails: itemDetails,
+        generalNotes: generalNotes
+    });
+
+    APP.notify('Return processed! ' + addedBack + ' item(s) added back to inventory.', 'success');
+    _skData.pendingReturns = (DB.get('material_returns') || []).filter(function(r){ return r.status === 'pending'; });
+    _renderSkTab('returns');
+    return true;
+}
+
+/* ═══ REPORTS TAB ═══ */
+function _skReports(el) {
+    var today    = new Date();
+    var fromDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    var toDate   = today.toISOString().split('T')[0];
+    var sentList = (DB.get('sk_reports') || []).filter(function(r) {
+        return r.createdBy === (_skData.user || {}).username;
+    }).slice().reverse();
+
+    var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">'
+        + '<div><div style="font-weight:700;font-size:16px;">📈 Storekeeper Reports</div>'
+        + '<div style="font-size:12px;color:var(--gray);">Generate and send detailed reports to your HOD</div></div>'
+        + '</div>'
+
+        + '<div style="background:var(--light-gray);border-radius:10px;padding:16px;margin-bottom:18px;">'
+        + '<div style="font-weight:600;font-size:14px;margin-bottom:12px;">📋 Generate New Report</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">'
+        + '<div class="form-group" style="margin:0;"><label style="font-size:11px;">From Date</label>'
+        + '<input type="date" id="skRptFrom" class="form-control" value="' + fromDate + '" style="margin-top:3px;"></div>'
+        + '<div class="form-group" style="margin:0;"><label style="font-size:11px;">To Date</label>'
+        + '<input type="date" id="skRptTo" class="form-control" value="' + toDate + '" style="margin-top:3px;"></div>'
+        + '</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-primary" onclick="skPreviewReport()">📊 Preview Summary</button>'
+        + '<button class="btn btn-success" onclick="skSendReportToHOD()">📤 Send to HOD</button>'
+        + '<button class="btn btn-outline" onclick="skExportExcel()">📥 Export Excel</button>'
+        + '</div></div>'
+
+        + '<div id="skRptPreview"></div>'
+
+        + '<div style="font-weight:600;font-size:14px;margin-bottom:10px;margin-top:4px;">📬 Sent Reports History</div>';
+
+    if (sentList.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:8px;padding:20px;text-align:center;font-size:13px;color:var(--gray);">No reports sent yet.</div>';
+    } else {
+        sentList.forEach(function(rpt) {
+            html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
+                + '<div><div style="font-size:13px;font-weight:700;">' + (rpt.title || 'Report') + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);">Sent on ' + APP.formatDate(rpt.createdAt)
+                + ' · Period: ' + (rpt.fromDate || '-') + ' → ' + (rpt.toDate || '-') + '</div></div>'
+                + '<span class="badge badge-success">Sent to HOD</span></div>'
+                + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:10px;">'
+                + _skRptStat('✅', 'Fulfilled', rpt.summary.fulfilled, '#e8f5e9', '#2e7d32')
+                + _skRptStat('↩️', 'Returns', rpt.summary.returns, '#fff3e0', '#e65100')
+                + _skRptStat('📥', 'Stock IN', rpt.summary.stockIn, '#e3f2fd', '#1565c0')
+                + _skRptStat('📤', 'Stock OUT', rpt.summary.stockOut, '#fce4ec', 'var(--danger)')
+                + '</div></div>';
+        });
+    }
+
+    el.innerHTML = html;
+}
+
+function _skRptStat(icon, label, val, bg, color) {
+    return '<div style="background:' + bg + ';border-radius:8px;padding:10px;text-align:center;">'
+        + '<div style="font-size:18px;">' + icon + '</div>'
+        + '<div style="font-size:16px;font-weight:700;color:' + color + ';">' + (val || 0) + '</div>'
+        + '<div style="font-size:10px;color:var(--gray);">' + label + '</div>'
+        + '</div>';
+}
+
+function _skBuildReportData() {
+    var from = (document.getElementById('skRptFrom') || {}).value || '';
+    var to   = (document.getElementById('skRptTo')   || {}).value || '';
+    if (!from || !to) { APP.notify('Select date range first', 'error'); return null; }
+    var fromDT = from + 'T00:00:00.000Z';
+    var toDT   = to   + 'T23:59:59.999Z';
+
+    var fulfilled = (DB.get('material_requests') || []).filter(function(r) {
+        return r.status === 'store_fulfilled' || r.status === 'confirmed' || r.status === 'partial';
+    }).filter(function(r) { return r.fulfilledAt >= fromDT && r.fulfilledAt <= toDT; });
+
+    var returns = (DB.get('material_returns') || []).filter(function(r) {
+        return r.status === 'received';
+    }).filter(function(r) { return r.receivedAt >= fromDT && r.receivedAt <= toDT; });
+
+    var movements = (DB.get('inventory_movements') || []).filter(function(m) {
+        return m.date >= fromDT && m.date <= toDT;
+    });
+    var stockIn  = movements.filter(function(m){ return m.type === 'in'; });
+    var stockOut = movements.filter(function(m){ return m.type === 'out'; });
+
+    return { from: from, to: to, fulfilled: fulfilled, returns: returns,
+             movements: movements, stockIn: stockIn, stockOut: stockOut };
+}
+
+function skPreviewReport() {
+    var data = _skBuildReportData();
+    if (!data) return;
+    var el = document.getElementById('skRptPreview');
+    if (!el) return;
+
+    var totalInQty  = data.stockIn.reduce(function(s,m){ return s + (parseInt(m.qty)||0); }, 0);
+    var totalOutQty = data.stockOut.reduce(function(s,m){ return s + (parseInt(m.qty)||0); }, 0);
+    var totalInVal  = data.stockIn.reduce(function(s,m){ return s + (parseFloat(m.totalValue)||0); }, 0);
+    var totalOutVal = data.stockOut.reduce(function(s,m){ return s + (parseFloat(m.totalValue)||0); }, 0);
+    var addedBack   = 0;
+    data.returns.forEach(function(r) {
+        (r.itemDetails || []).forEach(function(d){ if (d.addedBackToInventory) addedBack++; });
+    });
+
+    el.innerHTML = '<div style="background:var(--card);border:1px solid var(--secondary);border-radius:10px;padding:16px;margin-bottom:16px;">'
+        + '<div style="font-weight:700;font-size:14px;margin-bottom:12px;">📊 Report Preview — ' + data.from + ' to ' + data.to + '</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;">'
+        + _skRptStat('✅', 'Fulfilled Requests', data.fulfilled.length, '#e8f5e9', '#2e7d32')
+        + _skRptStat('↩️', 'Returns Received', data.returns.length, '#fff3e0', '#e65100')
+        + _skRptStat('📥', 'Items Back to Stock', addedBack, '#e3f2fd', '#1565c0')
+        + _skRptStat('📤', 'Stock OUT Qty', totalOutQty, '#fce4ec', 'var(--danger)')
+        + _skRptStat('📥', 'Stock IN Qty', totalInQty, '#e8f5e9', '#2e7d32')
+        + _skRptStat('💰', 'OUT Value', '₹' + totalOutVal.toFixed(0), '#fff3e0', '#e65100')
+        + '</div></div>';
+}
+
+function skSendReportToHOD() {
+    var data = _skBuildReportData();
+    if (!data) return;
+    var user = AUTH.currentUser();
+    var totalInQty  = data.stockIn.reduce(function(s,m){ return s + (parseInt(m.qty)||0); }, 0);
+    var totalOutQty = data.stockOut.reduce(function(s,m){ return s + (parseInt(m.qty)||0); }, 0);
+    var totalInVal  = data.stockIn.reduce(function(s,m){ return s + (parseFloat(m.totalValue)||0); }, 0);
+    var totalOutVal = data.stockOut.reduce(function(s,m){ return s + (parseFloat(m.totalValue)||0); }, 0);
+    var addedBack   = 0;
+    data.returns.forEach(function(r) {
+        (r.itemDetails || []).forEach(function(d){ if (d.addedBackToInventory) addedBack++; });
+    });
+
+    DB.add('sk_reports', {
+        title: 'Storekeeper Report: ' + data.from + ' to ' + data.to,
+        fromDate: data.from,
+        toDate:   data.to,
+        createdBy: user.username,
+        createdByName: user.fullName,
+        department: user.department || 'Store',
+        createdAt: new Date().toISOString(),
+        summary: {
+            fulfilled: data.fulfilled.length,
+            returns:   data.returns.length,
+            addedBack: addedBack,
+            stockIn:   totalInQty,
+            stockOut:  totalOutQty,
+            valueIn:   totalInVal,
+            valueOut:  totalOutVal
+        },
+        fulfilledIds:  data.fulfilled.map(function(r){ return r.id; }),
+        returnIds:     data.returns.map(function(r){ return r.id; }),
+        movementCount: data.movements.length
+    });
+
+    APP.notify('Report sent to HOD successfully!', 'success');
+    _renderSkTab('reports');
+}
+
+function skExportExcel() {
+    var data = _skBuildReportData();
+    if (!data) return;
+    var user = AUTH.currentUser();
+
+    if (typeof XLSX === 'undefined') { APP.notify('Excel library not loaded', 'error'); return; }
+
+    var wb = XLSX.utils.book_new();
+
+    // Sheet 1: Summary
+    var summaryRows = [
+        ['Storekeeper Report', data.from + ' to ' + data.to],
+        ['Generated By', user.fullName || user.username],
+        ['Generated At', new Date().toLocaleString('en-IN')],
+        [],
+        ['Metric', 'Count / Value'],
+        ['Fulfilled Requests', data.fulfilled.length],
+        ['Returns Received', data.returns.length],
+        ['Stock IN Movements', data.stockIn.length],
+        ['Stock OUT Movements', data.stockOut.length],
+        ['Total IN Qty', data.stockIn.reduce(function(s,m){ return s+(parseInt(m.qty)||0); }, 0)],
+        ['Total OUT Qty', data.stockOut.reduce(function(s,m){ return s+(parseInt(m.qty)||0); }, 0)],
+        ['Total IN Value (₹)', data.stockIn.reduce(function(s,m){ return s+(parseFloat(m.totalValue)||0); }, 0).toFixed(2)],
+        ['Total OUT Value (₹)', data.stockOut.reduce(function(s,m){ return s+(parseFloat(m.totalValue)||0); }, 0).toFixed(2)]
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), 'Summary');
+
+    // Sheet 2: Fulfilled Requests
+    var fulfRows = [['Title', 'Department', 'Requested By', 'Items', 'Fulfilled At', 'Status']];
+    data.fulfilled.forEach(function(r) {
+        var items = (r.items || []).map(function(i){ return i.name + ' x' + i.qty; }).join(', ');
+        fulfRows.push([r.title||'-', r.department||'-', r.createdByName||r.createdBy||'-', items, r.fulfilledAt||'-', r.status||'-']);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(fulfRows), 'Fulfilled Requests');
+
+    // Sheet 3: Material Returns
+    var retRows = [['Title', 'From', 'Department', 'Items Returned', 'Received At', 'Items Back to Stock']];
+    data.returns.forEach(function(r) {
+        var items = (r.itemDetails || []).map(function(d){ return d.name + ' x' + d.returnedQty + ' (' + (d.condition||'-') + ')'; }).join(', ');
+        var addedBack = (r.itemDetails || []).filter(function(d){ return d.addedBackToInventory; }).map(function(d){ return d.name; }).join(', ');
+        retRows.push([r.title||'-', r.createdByName||r.createdBy||'-', r.department||'-', items, r.receivedAt||'-', addedBack||'None']);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(retRows), 'Material Returns');
+
+    // Sheet 4: Stock Movements
+    var movRows = [['Date', 'Type', 'Item', 'Qty', 'Unit', 'Dept', 'Unit Price (₹)', 'Total Value (₹)', 'By', 'Notes']];
+    data.movements.forEach(function(m) {
+        movRows.push([m.date||'-', (m.type||'').toUpperCase(), m.itemName||'-', m.qty||0,
+                      m.unit||'-', m.dept||'-', parseFloat(m.unitPrice||0).toFixed(2),
+                      parseFloat(m.totalValue||0).toFixed(2), m.by||'-', m.notes||'-']);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(movRows), 'Stock Movements');
+
+    // Sheet 5: Current Inventory
+    var inv = DB.get('inventory') || [];
+    var invRows = [['Item Name', 'Category', 'Department', 'Quantity', 'Unit', 'Price (₹)', 'Total Value (₹)']];
+    inv.forEach(function(i) {
+        var qty = parseInt(i.quantity) || 0;
+        var price = parseFloat(i.price) || 0;
+        invRows.push([i.name||'-', i.category||'-', i.department||'-', qty, i.unit||'pcs', price.toFixed(2), (qty*price).toFixed(2)]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(invRows), 'Current Inventory');
+
+    XLSX.writeFile(wb, 'SK_Report_' + data.from + '_to_' + data.to + '.xlsx');
+    APP.notify('Excel report downloaded!', 'success');
 }

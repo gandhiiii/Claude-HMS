@@ -991,10 +991,23 @@ function _hodRequests(el) {
     });
     d.myReqs = reqs;
 
+    var hodReturns = (DB.get('material_returns') || []).filter(function(r) {
+        return r.createdBy === (hodUser ? hodUser.username : '');
+    }).slice().reverse();
+    d.myReturns = hodReturns;
+
+    var skReports = (DB.get('sk_reports') || []).filter(function(rpt) {
+        return (rpt.department || '') === dept;
+    }).slice().reverse();
+    d.skReports = skReports;
+
     var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
         + '<div><div style="font-weight:700;font-size:16px;">📦 Requests &amp; Approvals</div>'
         + '<div style="font-size:12px;color:var(--gray);">Your dept requests + pending approvals for ' + d.dept + '</div></div>'
-        + '<button class="btn btn-primary btn-sm" onclick="hodCreateRequest()">+ New Request</button></div>';
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+        + '<button class="btn btn-primary btn-sm" onclick="hodCreateRequest()">+ New Request</button>'
+        + '<button class="btn btn-outline btn-sm" onclick="hodCreateReturn()">↩️ Return Materials</button>'
+        + '</div></div>';
 
     // ── Pending material request approvals ──
     if (matApprovals.length > 0) {
@@ -1118,6 +1131,68 @@ function _hodRequests(el) {
                 + '</div>';
         });
     }
+
+    // ── HOD's own material returns ──
+    html += '<div style="border-top:1px solid var(--border);margin-top:18px;padding-top:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:15px;">↩️ My Material Returns</div>'
+        + '<button class="btn btn-outline btn-sm" onclick="hodCreateReturn()">+ New Return</button></div>';
+
+    var retStMap = {
+        'pending':  { label: 'Awaiting Storekeeper', badge: 'badge-warning' },
+        'received': { label: 'Processed', badge: 'badge-success' }
+    };
+    if (!hodReturns || hodReturns.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:8px;padding:16px;text-align:center;font-size:13px;color:var(--gray);">No returns submitted yet.</div>';
+    } else {
+        hodReturns.forEach(function(r) {
+            var rst = retStMap[r.status] || { label: r.status, badge: 'badge-warning' };
+            var items = (r.items || []).map(function(i){ return i.name + ' ×' + i.qty; }).join(', ');
+            html += '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid '
+                + (r.status === 'pending' ? 'var(--warning)' : 'var(--secondary)') + ';border-radius:8px;padding:12px;margin-bottom:8px;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">'
+                + '<div><div style="font-size:13px;font-weight:700;">' + (r.title || 'Return') + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);">' + APP.formatDate(r.createdAt) + (items ? ' · ' + items : '') + '</div>'
+                + (r.reason ? '<div style="font-size:11px;color:var(--gray);">Reason: ' + r.reason + '</div>' : '')
+                + '</div><span class="badge ' + rst.badge + '">' + rst.label + '</span></div>'
+                + (r.status === 'received' && r.itemDetails && r.itemDetails.length > 0
+                    ? '<div style="margin-top:8px;">'
+                      + (r.itemDetails || []).map(function(d) {
+                          var condColor = d.condition === 'good' ? '#2e7d32' : 'var(--danger)';
+                          return '<span style="display:inline-block;background:var(--light-gray);border-radius:4px;padding:2px 7px;font-size:11px;margin:2px;">'
+                              + d.name + ' — <span style="color:' + condColor + ';font-weight:600;">' + (d.condition||'-') + '</span>'
+                              + (d.addedBackToInventory ? ' ✓ restocked' : '') + '</span>';
+                      }).join('')
+                      + '</div>'
+                    : '')
+                + '</div>';
+        });
+    }
+
+    // ── Storekeeper reports received ──
+    html += '</div><div style="border-top:1px solid var(--border);margin-top:18px;padding-top:16px;">'
+        + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">📈 Storekeeper Reports Received</div>';
+    if (!skReports || skReports.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:8px;padding:16px;text-align:center;font-size:13px;color:var(--gray);">No storekeeper reports received yet.</div>';
+    } else {
+        skReports.forEach(function(rpt) {
+            var s = rpt.summary || {};
+            html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">'
+                + '<div><div style="font-size:13px;font-weight:700;">' + (rpt.title || 'Report') + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);">Sent by ' + (rpt.createdByName || rpt.createdBy) + ' · ' + APP.formatDate(rpt.createdAt) + '</div>'
+                + '</div><span class="badge badge-info">Received</span></div>'
+                + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;font-size:12px;">'
+                + '<div style="background:#e8f5e9;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:700;color:#2e7d32;">' + (s.fulfilled||0) + '</div><div style="color:var(--gray);font-size:10px;">Fulfilled</div></div>'
+                + '<div style="background:#fff3e0;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:700;color:#e65100;">' + (s.returns||0) + '</div><div style="color:var(--gray);font-size:10px;">Returns</div></div>'
+                + '<div style="background:#e3f2fd;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:700;color:#1565c0;">' + (s.stockIn||0) + '</div><div style="color:var(--gray);font-size:10px;">IN Qty</div></div>'
+                + '<div style="background:#fce4ec;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:16px;font-weight:700;color:var(--danger);">' + (s.stockOut||0) + '</div><div style="color:var(--gray);font-size:10px;">OUT Qty</div></div>'
+                + '<div style="background:#fff3e0;border-radius:6px;padding:8px;text-align:center;"><div style="font-size:14px;font-weight:700;color:#e65100;">₹' + parseFloat(s.valueOut||0).toFixed(0) + '</div><div style="color:var(--gray);font-size:10px;">OUT Value</div></div>'
+                + '</div></div>';
+        });
+    }
+    html += '</div>';
+
     el.innerHTML = html;
 }
 
@@ -1808,4 +1883,90 @@ function _hodQP(el) {
     } else {
         el.innerHTML = '<div class="empty-state">Quarterly Priorities module not loaded.</div>';
     }
+}
+
+/* ═══════════════════════════════════════════════
+   HOD MATERIAL RETURN
+═══════════════════════════════════════════════ */
+var _hodReturnItems = [];
+
+function hodCreateReturn() {
+    _hodReturnItems = [];
+    var user = AUTH.currentUser();
+    var myReqs = (DB.get('material_requests') || []).filter(function(r) {
+        return r._source === 'hod' && r.createdBy === user.username
+            && (r.status === 'store_fulfilled' || r.status === 'confirmed');
+    });
+
+    var reqOpts = '<option value="">-- None --</option>'
+        + myReqs.map(function(r) {
+            return '<option value="' + r.id + '">' + (r.title || 'Request') + ' (' + APP.formatDate(r.createdAt) + ')</option>';
+        }).join('');
+
+    var form = '<form id="hodReturnForm">'
+        + '<div class="form-group"><label>Return Title *</label><input type="text" name="title" class="form-control" required placeholder="e.g. Returning unused masks"></div>'
+        + '<div class="form-group"><label>Reason for Return</label><textarea name="reason" class="form-control" rows="2"></textarea></div>'
+        + '<div class="form-group"><label>Linked Request (optional)</label><select name="linkedReqId" class="form-control">' + reqOpts + '</select></div>'
+        + '<div class="form-group"><label>Items to Return</label>'
+        + '<div id="hodRetItemsContainer">'
+        + '<div class="hod-ret-row" style="display:flex;gap:6px;margin-bottom:4px;">'
+        + '<input type="text" class="form-control hod-ret-name" placeholder="Item name" style="flex:2;">'
+        + '<input type="number" class="form-control hod-ret-qty" placeholder="Qty" style="width:80px;" min="1" value="1">'
+        + '<input type="text" class="form-control hod-ret-unit" placeholder="Unit" style="width:70px;" value="pcs">'
+        + '<button type="button" class="btn btn-sm btn-success" onclick="hodAddReturnRow()">+</button>'
+        + '</div></div></div>'
+        + '</form>';
+
+    openFormModal('↩️ Return Materials to Storekeeper', form, 'hodSaveReturn()', false);
+}
+
+function hodAddReturnRow() {
+    var container = document.getElementById('hodRetItemsContainer');
+    if (!container) return;
+    var row = document.createElement('div');
+    row.className = 'hod-ret-row';
+    row.style.cssText = 'display:flex;gap:6px;margin-bottom:4px;';
+    row.innerHTML = '<input type="text" class="form-control hod-ret-name" placeholder="Item name" style="flex:2;">'
+        + '<input type="number" class="form-control hod-ret-qty" placeholder="Qty" style="width:80px;" min="1" value="1">'
+        + '<input type="text" class="form-control hod-ret-unit" placeholder="Unit" style="width:70px;" value="pcs">'
+        + '<button type="button" class="btn btn-sm btn-danger" onclick="this.parentElement.remove()">−</button>';
+    container.appendChild(row);
+}
+
+function hodSaveReturn() {
+    var user = AUTH.currentUser();
+    var form = document.getElementById('hodReturnForm');
+    if (!form) return false;
+    var title  = ((form.querySelector('[name="title"]') || {}).value || '').trim();
+    var reason = (form.querySelector('[name="reason"]') || {}).value || '';
+    var linkedReqId = (form.querySelector('[name="linkedReqId"]') || {}).value || '';
+    if (!title) { APP.notify('Enter a return title', 'error'); return false; }
+
+    var items = [];
+    document.querySelectorAll('.hod-ret-row').forEach(function(row) {
+        var name = ((row.querySelector('.hod-ret-name') || {}).value || '').trim();
+        var qty  = parseInt((row.querySelector('.hod-ret-qty') || {}).value) || 1;
+        var unit = ((row.querySelector('.hod-ret-unit') || {}).value || '').trim() || 'pcs';
+        if (name) items.push({ name: name, qty: qty, unit: unit });
+    });
+    if (!items.length) { APP.notify('Add at least one item to return', 'error'); return false; }
+
+    DB.add('material_returns', {
+        title: title,
+        reason: reason,
+        linkedReqId: linkedReqId || null,
+        department: user.department || '',
+        createdBy: user.username,
+        createdByName: user.fullName,
+        createdAt: new Date().toISOString(),
+        items: items,
+        status: 'pending'
+    });
+
+    APP.notify('Return request submitted to Storekeeper!', 'success');
+    _hodData.myReturns = (DB.get('material_returns') || []).filter(function(r) {
+        return r.createdBy === user.username;
+    }).slice().reverse();
+    _renderHodTab('requests');
+    return true;
 }

@@ -71,7 +71,8 @@ const DB = {
         'lostfound', 'adminChecklist', 'checklists',
         'material_requests', 'suggestions', 'reports',
         'roomCleaningTasks', 'floorItems',
-        'budgets', 'budget_expenses', 'quarterly_priorities'
+        'budgets', 'budget_expenses', 'quarterly_priorities',
+        'inventory_movements', 'material_returns', 'sk_reports'
     ],
 
     /* Export all app data as a downloadable JSON file */
@@ -734,7 +735,7 @@ APP_SYNC = {
 
 const APP = {
     currentModule: null,
-    _APP_VERSION: 'v80',
+    _APP_VERSION: 'v81',
 
     init() {
         try {

@@ -433,6 +433,7 @@ function renderEmpOverview(el) {
         + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'checklists\')">✅ Open Checklists</button>'
         + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="Router.navigate(\'problems\')">🔧 Report a Problem</button>'
         + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="Router.navigate(\'material-requests\')">📦 New Material Request</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empCreateReturn()">↩️ Return Materials</button>'
         + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="showReportForm()">📋 Submit Report</button>'
         + '</div>'
         + (pendingReqs.length > 0
@@ -1250,4 +1251,83 @@ function empUpdateTaskStatus(id, store) {
         if (idx !== -1) _empData.myTasks[idx].status = newStatus;
         _renderEmpTab('work');
     }
+}
+
+/* ═══ MATERIAL RETURN ═══ */
+var _empReturnItems = [];
+
+function empCreateReturn() {
+    _empReturnItems = [];
+    var user = AUTH.currentUser();
+    var myReqs = (DB.get('material_requests') || []).filter(function(r) {
+        return (r.createdBy === user.username) && (r.status === 'store_fulfilled' || r.status === 'confirmed');
+    });
+
+    var reqOpts = '<option value="">-- None --</option>'
+        + myReqs.map(function(r) {
+            return '<option value="' + r.id + '">' + (r.title || 'Request') + ' (' + APP.formatDate(r.createdAt) + ')</option>';
+        }).join('');
+
+    var form = '<form id="empReturnForm">'
+        + '<div class="form-group"><label>Return Title *</label><input type="text" name="title" class="form-control" required placeholder="e.g. Returning unused gloves from Ward A"></div>'
+        + '<div class="form-group"><label>Reason for Return</label><textarea name="reason" class="form-control" rows="2" placeholder="Why are you returning these items?"></textarea></div>'
+        + '<div class="form-group"><label>Linked Request (optional)</label><select name="linkedReqId" class="form-control">' + reqOpts + '</select></div>'
+        + '<div class="form-group"><label>Items to Return</label>'
+        + '<div id="empRetItemsContainer">'
+        + '<div class="emp-ret-row" style="display:flex;gap:6px;margin-bottom:4px;">'
+        + '<input type="text" class="form-control emp-ret-name" placeholder="Item name" style="flex:2;">'
+        + '<input type="number" class="form-control emp-ret-qty" placeholder="Qty" style="width:80px;" min="1" value="1">'
+        + '<input type="text" class="form-control emp-ret-unit" placeholder="Unit" style="width:70px;" value="pcs">'
+        + '<button type="button" class="btn btn-sm btn-success" onclick="empAddReturnRow()">+</button>'
+        + '</div></div></div>'
+        + '</form>';
+
+    openFormModal('↩️ Return Materials to Storekeeper', form, 'empSaveReturn()', false);
+}
+
+function empAddReturnRow() {
+    var container = document.getElementById('empRetItemsContainer');
+    if (!container) return;
+    var row = document.createElement('div');
+    row.className = 'emp-ret-row';
+    row.style.cssText = 'display:flex;gap:6px;margin-bottom:4px;';
+    row.innerHTML = '<input type="text" class="form-control emp-ret-name" placeholder="Item name" style="flex:2;">'
+        + '<input type="number" class="form-control emp-ret-qty" placeholder="Qty" style="width:80px;" min="1" value="1">'
+        + '<input type="text" class="form-control emp-ret-unit" placeholder="Unit" style="width:70px;" value="pcs">'
+        + '<button type="button" class="btn btn-sm btn-danger" onclick="this.parentElement.remove()">−</button>';
+    container.appendChild(row);
+}
+
+function empSaveReturn() {
+    var user = AUTH.currentUser();
+    var form = document.getElementById('empReturnForm');
+    if (!form) return false;
+    var title  = ((form.querySelector('[name="title"]') || {}).value || '').trim();
+    var reason = (form.querySelector('[name="reason"]') || {}).value || '';
+    var linkedReqId = (form.querySelector('[name="linkedReqId"]') || {}).value || '';
+    if (!title) { APP.notify('Enter a return title', 'error'); return false; }
+
+    var items = [];
+    document.querySelectorAll('.emp-ret-row').forEach(function(row) {
+        var name = ((row.querySelector('.emp-ret-name') || {}).value || '').trim();
+        var qty  = parseInt((row.querySelector('.emp-ret-qty') || {}).value) || 1;
+        var unit = ((row.querySelector('.emp-ret-unit') || {}).value || '').trim() || 'pcs';
+        if (name) items.push({ name: name, qty: qty, unit: unit });
+    });
+    if (!items.length) { APP.notify('Add at least one item to return', 'error'); return false; }
+
+    DB.add('material_returns', {
+        title: title,
+        reason: reason,
+        linkedReqId: linkedReqId || null,
+        department: user.department || '',
+        createdBy: user.username,
+        createdByName: user.fullName,
+        createdAt: new Date().toISOString(),
+        items: items,
+        status: 'pending'
+    });
+
+    APP.notify('Return request submitted to Storekeeper!', 'success');
+    return true;
 }
