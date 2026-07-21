@@ -422,6 +422,18 @@ var LANG = (function () {
         return dict[key] !== undefined ? dict[key] : (_dict.en[key] || key);
     }
 
+    /* Let per-module i18n files register their own keys without editing this file.
+       extraDict = { en: {k:v,...}, hi: {...}, gu: {...} } */
+    function extend(extraDict) {
+        if (!extraDict) return;
+        _supported.forEach(function(lang) {
+            if (!extraDict[lang]) return;
+            if (!_dict[lang]) _dict[lang] = {};
+            var src = extraDict[lang], dst = _dict[lang];
+            for (var k in src) { if (src.hasOwnProperty(k)) dst[k] = src[k]; }
+        });
+    }
+
     /* Render language switcher HTML */
     function switcher() {
         var cur = getCurrent();
@@ -452,7 +464,7 @@ var LANG = (function () {
         } catch(e) {}
     }
 
-    return { t: t, getCurrent: getCurrent, set: set, switcher: switcher, switchTo: switchTo };
+    return { t: t, getCurrent: getCurrent, set: set, switcher: switcher, switchTo: switchTo, extend: extend };
 })();
 
 /* Global shorthand */
