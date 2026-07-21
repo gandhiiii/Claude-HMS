@@ -1397,7 +1397,7 @@ function _rExportPDF(title, headers, rows) {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(14);
     doc.setFont(undefined, 'bold');
-    doc.text('Hospital Management System', 14, 10);
+    doc.text('Stavya Intelligence', 14, 10);
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
     doc.text(title + ' Report', 14, 17);

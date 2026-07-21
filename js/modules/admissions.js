@@ -910,7 +910,7 @@ function exportAdmPDF() {
         '@media print{body{padding:10px;}button{display:none;}}' +
         '</style></head><body>' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
-        '<div><h1>🏥 Hospital Management System</h1><div class="meta">Admission Report &nbsp;|&nbsp; Period: ' + (from||'All')+' to '+(to||'All') + ' &nbsp;|&nbsp; Generated: '+new Date().toLocaleString('en-IN')+'</div></div>' +
+        '<div><h1>🏥 Stavya Intelligence</h1><div class="meta">Admission Report &nbsp;|&nbsp; Period: ' + (from||'All')+' to '+(to||'All') + ' &nbsp;|&nbsp; Generated: '+new Date().toLocaleString('en-IN')+'</div></div>' +
         '<button onclick="window.print()" style="padding:8px 20px;background:#1a73e8;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;margin-top:4px;">🖨️ Print / Save PDF</button>' +
         '</div>' +
         '<div class="summary">' +
@@ -921,7 +921,7 @@ function exportAdmPDF() {
         '<div class="sum-card"><div class="sum-val">₹'+totalBill.toLocaleString('en-IN')+'</div><div class="sum-lbl">Total Revenue</div></div>' +
         '</div>' +
         '<table><thead><tr><th>#</th><th>Patient</th><th>ID</th><th>Age/Gen</th><th>Room</th><th>Doctor</th><th>Type</th><th>Admitted</th><th>Discharged</th><th>Stay</th><th>Bill</th><th>Payment</th><th>Status</th></tr></thead><tbody>' + tableRows + '</tbody></table>' +
-        '<div class="footer">Hospital Management System &nbsp;|&nbsp; Total: '+rows.length+' records &nbsp;|&nbsp; Printed: '+new Date().toLocaleString('en-IN')+'</div>' +
+        '<div class="footer">Stavya Intelligence &nbsp;|&nbsp; Total: '+rows.length+' records &nbsp;|&nbsp; Printed: '+new Date().toLocaleString('en-IN')+'</div>' +
         '</body></html>';
 
     var win = window.open('', '_blank');
