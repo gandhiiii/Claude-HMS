@@ -81,7 +81,7 @@ var HMS_REM = {
             + '<div style="font-size:12px;color:' + s.text + ';margin-top:3px;line-height:1.5;">' + body + '</div>'
             + (actions ? '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">' + actions + '</div>' : '')
             + '</div>'
-            + '<button onclick="HMS_REM.dismiss(\'' + key + '\')" title="Dismiss for today" '
+            + '<button onclick="HMS_REM.dismiss(\'' + key + '\')" title="' + T('remmod_dismiss_title') + '" '
             + 'style="border:none;background:rgba(0,0,0,.07);border-radius:4px;cursor:pointer;font-size:12px;padding:2px 7px;color:' + s.text + ';flex-shrink:0;">✕</button>'
             + '</div>';
     },
@@ -98,10 +98,10 @@ var HMS_REM = {
         // 1. Browser notification permission nag (show once per session)
         if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
             html += self._banner('notif_perm', '🔔',
-                'Enable reminders?',
-                'Allow browser notifications to get reminders about weekly/monthly checklists even when this tab is in the background.',
+                T('remmod_notif_title'),
+                T('remmod_notif_body_emp'),
                 'low',
-                '<button class="btn btn-sm btn-primary" onclick="HMS_REM.enableNotif()" style="font-size:11px;padding:3px 8px;">Enable Notifications</button>'
+                '<button class="btn btn-sm btn-primary" onclick="HMS_REM.enableNotif()" style="font-size:11px;padding:3px 8px;">' + T('remmod_btn_enable_notifications') + '</button>'
             );
         }
 
@@ -116,13 +116,13 @@ var HMS_REM = {
             var total = (cl.items || []).length;
             var key   = 'emp_wcl_' + cl.id + '_' + self._weekKey();
             var urg   = daysLeft <= 1 ? 'high' : daysLeft <= 2 ? 'medium' : 'low';
-            var when  = daysLeft <= 1 ? 'Resets TOMORROW at 5 AM' : 'Resets in ' + daysLeft + ' days';
+            var when  = daysLeft <= 1 ? T('remmod_reset_tomorrow_5am') : T('remmod_resets_in_prefix') + daysLeft + T('remmod_days_suffix');
             html += self._banner(key, '📅',
-                'Weekly Checklist: ' + cl.title,
-                done + '/' + total + ' items done. ' + when + ' — submit your report to HOD before then.',
+                T('remmod_weekly_checklist_prefix') + cl.title,
+                done + '/' + total + T('remmod_items_done_suffix') + when + T('remmod_submit_report_hod_suffix'),
                 urg,
-                '<button class="btn btn-sm btn-primary" onclick="empTabSwitch(\'checklists\')" style="font-size:11px;padding:3px 8px;">Go to Checklists</button>'
-                + '<button class="btn btn-sm btn-success" onclick="empSubmitClPeriod(\'' + cl.id + '\')" style="font-size:11px;padding:3px 8px;">📤 Submit Now</button>'
+                '<button class="btn btn-sm btn-primary" onclick="empTabSwitch(\'checklists\')" style="font-size:11px;padding:3px 8px;">' + T('remmod_btn_go_to_checklists') + '</button>'
+                + '<button class="btn btn-sm btn-success" onclick="empSubmitClPeriod(\'' + cl.id + '\')" style="font-size:11px;padding:3px 8px;">' + T('remmod_btn_submit_now') + '</button>'
             );
         });
 
@@ -137,13 +137,13 @@ var HMS_REM = {
             var total = (cl.items || []).length;
             var key   = 'emp_mcl_' + cl.id + '_' + self._monthKey();
             var urg   = daysLeft <= 2 ? 'high' : daysLeft <= 3 ? 'medium' : 'low';
-            var when  = daysLeft <= 1 ? 'Resets TOMORROW' : 'Resets in ' + daysLeft + ' days (1st of next month)';
+            var when  = daysLeft <= 1 ? T('remmod_reset_tomorrow') : T('remmod_resets_in_prefix') + daysLeft + T('remmod_days_month_suffix');
             html += self._banner(key, '🗓️',
-                'Monthly Checklist: ' + cl.title,
-                done + '/' + total + ' items done. ' + when + ' at 5 AM — submit your monthly report!',
+                T('remmod_monthly_checklist_prefix') + cl.title,
+                done + '/' + total + T('remmod_items_done_suffix') + when + T('remmod_submit_monthly_report_suffix'),
                 urg,
-                '<button class="btn btn-sm btn-primary" onclick="empTabSwitch(\'checklists\')" style="font-size:11px;padding:3px 8px;">Go to Checklists</button>'
-                + '<button class="btn btn-sm btn-success" onclick="empSubmitClPeriod(\'' + cl.id + '\')" style="font-size:11px;padding:3px 8px;">📤 Submit Now</button>'
+                '<button class="btn btn-sm btn-primary" onclick="empTabSwitch(\'checklists\')" style="font-size:11px;padding:3px 8px;">' + T('remmod_btn_go_to_checklists') + '</button>'
+                + '<button class="btn btn-sm btn-success" onclick="empSubmitClPeriod(\'' + cl.id + '\')" style="font-size:11px;padding:3px 8px;">' + T('remmod_btn_submit_now') + '</button>'
             );
         });
 
@@ -157,13 +157,13 @@ var HMS_REM = {
         if (urgentTasks.length > 0) {
             var key2 = 'emp_tasks_' + today;
             html += self._banner(key2, '⏰',
-                urgentTasks.length + ' task(s) due very soon',
+                urgentTasks.length + T('remmod_tasks_due_soon_suffix'),
                 urgentTasks.map(function (t) {
                     var d = Math.ceil((new Date(t.deadline) - now) / 86400000);
-                    return '• ' + t.title + (d === 0 ? ' <strong>(TODAY)</strong>' : ' (tomorrow)');
+                    return '• ' + t.title + (d === 0 ? ' <strong>(' + T('remmod_today_label') + ')</strong>' : ' (' + T('remmod_tomorrow_label') + ')');
                 }).join('<br>'),
                 'high',
-                '<button class="btn btn-sm btn-primary" onclick="empTabSwitch(\'work\')" style="font-size:11px;padding:3px 8px;">View My Work</button>'
+                '<button class="btn btn-sm btn-primary" onclick="empTabSwitch(\'work\')" style="font-size:11px;padding:3px 8px;">' + T('remmod_btn_view_my_work') + '</button>'
             );
         }
 
@@ -182,10 +182,10 @@ var HMS_REM = {
         // 1. Browser notification permission nag
         if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
             html += self._banner('notif_perm_hod', '🔔',
-                'Enable reminders?',
-                'Receive browser notifications for your tasks and checklist deadlines.',
+                T('remmod_notif_title'),
+                T('remmod_notif_body_hod'),
                 'low',
-                '<button class="btn btn-sm btn-primary" onclick="HMS_REM.enableNotif()" style="font-size:11px;padding:3px 8px;">Enable Notifications</button>'
+                '<button class="btn btn-sm btn-primary" onclick="HMS_REM.enableNotif()" style="font-size:11px;padding:3px 8px;">' + T('remmod_btn_enable_notifications') + '</button>'
             );
         }
 
@@ -200,13 +200,13 @@ var HMS_REM = {
             var key1 = 'hod_tasks_' + today;
             var anyToday = urgentTasks.some(function (t) { return Math.ceil((new Date(t.deadline) - now) / 86400000) === 0; });
             html += self._banner(key1, '⏰',
-                urgentTasks.length + ' of your task(s) need attention',
+                urgentTasks.length + T('remmod_tasks_need_attention_suffix'),
                 urgentTasks.map(function (t) {
                     var d = Math.ceil((new Date(t.deadline) - now) / 86400000);
-                    return '• ' + t.title + (d === 0 ? ' <strong>(TODAY)</strong>' : d === 1 ? ' (tomorrow)' : ' (' + d + ' days)');
+                    return '• ' + t.title + (d === 0 ? ' <strong>(' + T('remmod_today_label') + ')</strong>' : d === 1 ? ' (' + T('remmod_tomorrow_label') + ')' : ' (' + d + T('remmod_days_paren_suffix'));
                 }).join('<br>'),
                 anyToday ? 'high' : 'medium',
-                '<button class="btn btn-sm btn-primary" onclick="hodTabSwitch(\'tasks\')" style="font-size:11px;padding:3px 8px;">View Tasks</button>'
+                '<button class="btn btn-sm btn-primary" onclick="hodTabSwitch(\'tasks\')" style="font-size:11px;padding:3px 8px;">' + T('remmod_btn_view_tasks') + '</button>'
             );
         }
 
@@ -220,13 +220,13 @@ var HMS_REM = {
             var total = (cl.items || []).length;
             var key   = 'hod_wcl_' + cl.id + '_' + self._weekKey();
             var urg   = daysLeft <= 1 ? 'high' : daysLeft <= 2 ? 'medium' : 'low';
-            var when  = daysLeft <= 1 ? 'Resets TOMORROW at 5 AM' : 'Resets in ' + daysLeft + ' days';
+            var when  = daysLeft <= 1 ? T('remmod_reset_tomorrow_5am') : T('remmod_resets_in_prefix') + daysLeft + T('remmod_days_suffix');
             html += self._banner(key, '📅',
-                'Your Weekly Checklist: ' + cl.title,
-                done + '/' + total + ' items done. ' + when + '.',
+                T('remmod_your_weekly_checklist_prefix') + cl.title,
+                done + '/' + total + T('remmod_items_done_suffix') + when + '.',
                 urg,
-                '<button class="btn btn-sm btn-primary" onclick="hodTabSwitch(\'checklists\')" style="font-size:11px;padding:3px 8px;">View Checklists</button>'
-                + '<button class="btn btn-sm btn-success" onclick="empSubmitClPeriod(\'' + cl.id + '\')" style="font-size:11px;padding:3px 8px;">📤 Submit</button>'
+                '<button class="btn btn-sm btn-primary" onclick="hodTabSwitch(\'checklists\')" style="font-size:11px;padding:3px 8px;">' + T('remmod_btn_view_checklists') + '</button>'
+                + '<button class="btn btn-sm btn-success" onclick="empSubmitClPeriod(\'' + cl.id + '\')" style="font-size:11px;padding:3px 8px;">' + T('remmod_btn_submit') + '</button>'
             );
         });
 
@@ -242,11 +242,11 @@ var HMS_REM = {
             var key   = 'hod_mcl_' + cl.id + '_' + self._monthKey();
             var urg   = daysLeft <= 2 ? 'high' : daysLeft <= 3 ? 'medium' : 'low';
             html += self._banner(key, '🗓️',
-                'Your Monthly Checklist: ' + cl.title,
-                done + '/' + total + ' items done. Resets in ' + daysLeft + ' day(s).',
+                T('remmod_your_monthly_checklist_prefix') + cl.title,
+                done + '/' + total + T('remmod_items_done_suffix') + T('remmod_resets_in_prefix') + daysLeft + T('remmod_days_paren2_suffix'),
                 urg,
-                '<button class="btn btn-sm btn-primary" onclick="hodTabSwitch(\'checklists\')" style="font-size:11px;padding:3px 8px;">View Checklists</button>'
-                + '<button class="btn btn-sm btn-success" onclick="empSubmitClPeriod(\'' + cl.id + '\')" style="font-size:11px;padding:3px 8px;">📤 Submit</button>'
+                '<button class="btn btn-sm btn-primary" onclick="hodTabSwitch(\'checklists\')" style="font-size:11px;padding:3px 8px;">' + T('remmod_btn_view_checklists') + '</button>'
+                + '<button class="btn btn-sm btn-success" onclick="empSubmitClPeriod(\'' + cl.id + '\')" style="font-size:11px;padding:3px 8px;">' + T('remmod_btn_submit') + '</button>'
             );
         });
 
@@ -260,22 +260,22 @@ var HMS_REM = {
         this.dismiss('notif_perm');
         this.dismiss('notif_perm_hod');
         if (typeof Notification === 'undefined') {
-            APP.notify('Browser notifications not supported', 'error');
+            APP.notify(T('remmod_msg_notif_not_supported'), 'error');
             return;
         }
         Notification.requestPermission().then(function (perm) {
             if (perm === 'granted') {
-                APP.notify('Notifications enabled! You will be reminded about checklist deadlines.', 'success');
-                try { new Notification('🏥 HMS Reminders enabled', { body: 'You will receive alerts for weekly/monthly checklist deadlines.' }); } catch (e) {}
+                APP.notify(T('remmod_msg_notif_enabled'), 'success');
+                try { new Notification(T('remmod_notif_enabled_title'), { body: T('remmod_notif_enabled_body') }); } catch (e) {}
             } else {
-                APP.notify('Notification permission denied. In-app banners will still show.', 'warning');
+                APP.notify(T('remmod_msg_notif_denied'), 'warning');
             }
         });
     },
 
     push: function (title, body) {
         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            try { new Notification('🏥 HMS — ' + title, { body: body }); } catch (e) {}
+            try { new Notification(T('remmod_push_title_prefix') + title, { body: body }); } catch (e) {}
         }
     },
 
@@ -307,8 +307,8 @@ var HMS_REM = {
             if (pushed[pushKey]) return;
             pushed[pushKey] = true;
             self.push(
-                (freq === 'weekly' ? '📅 Weekly' : '🗓️ Monthly') + ' Checklist Reminder',
-                cl.title + ' — ' + daysLeft + ' day(s) left. Open HMS to submit your report!'
+                (freq === 'weekly' ? T('remmod_freq_weekly') : T('remmod_freq_monthly')) + T('remmod_checklist_reminder_suffix'),
+                cl.title + ' — ' + daysLeft + T('remmod_days_left_suffix')
             );
         });
 

@@ -6,17 +6,17 @@ function renderChecklists(container) {
     container.innerHTML = `
         <div class="flex-between mb-4">
             <div class="search-box">
-                <input type="text" class="form-control" id="clSearch" placeholder="Search checklists..." oninput="renderClList()">
+                <input type="text" class="form-control" id="clSearch" placeholder="${T('chkmod_search_placeholder')}" oninput="renderClList()">
             </div>
             <div>
-                ${user.role === 'admin' || user.isSuperAdmin ? `<button class="btn btn-primary" onclick="showClForm()">+ New Checklist</button>` : ''}
+                ${user.role === 'admin' || user.isSuperAdmin ? `<button class="btn btn-primary" onclick="showClForm()">${T('chkmod_new_checklist_btn')}</button>` : ''}
             </div>
         </div>
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchClTab('all',this)">All</button>
-            <button class="tab-btn" onclick="switchClTab('my',this)">${user.role === 'admin' || user.isSuperAdmin ? 'Assigned by Me' : 'My Checklists'}</button>
-            <button class="tab-btn" onclick="switchClTab('common',this)">Common</button>
-            <button class="tab-btn" onclick="switchClTab('completed',this)">Completed</button>
+            <button class="tab-btn active" onclick="switchClTab('all',this)">${T('chkmod_tab_all')}</button>
+            <button class="tab-btn" onclick="switchClTab('my',this)">${user.role === 'admin' || user.isSuperAdmin ? T('chkmod_tab_assigned_by_me') : T('chkmod_tab_my_checklists')}</button>
+            <button class="tab-btn" onclick="switchClTab('common',this)">${T('chkmod_tab_common')}</button>
+            <button class="tab-btn" onclick="switchClTab('completed',this)">${T('chkmod_completed')}</button>
         </div>
         <div id="clGrid" class="grid-2"></div>
     `;
@@ -69,7 +69,7 @@ function renderClList() {
     const grid = document.getElementById('clGrid');
     if (!grid) return;
     if (filtered.length === 0) {
-        grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;">No checklists found</div>';
+        grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;">' + T('chkmod_no_checklists_found') + '</div>';
         return;
     }
     const isAdmin = user.role === 'admin' || user.isSuperAdmin;
@@ -87,22 +87,22 @@ function renderClList() {
                 <div>
                     <strong style="font-size:15px;">${c.title}</strong>
                     <span style="font-size:12px;color:var(--gray);display:block;">
-                        ${c.assignedTo === 'common' ? '👥 Common' : '👤 ' + c.assignedTo}
+                        ${c.assignedTo === 'common' ? T('chkmod_common_badge') : '👤 ' + c.assignedTo}
                         ${c.floor ? ' | 📍 ' + c.floor : ''}
-                        ${c.deadline ? ' | Due: ' + APP.formatDate(c.deadline) : ''}
-                        ${c.deadline && APP.daysBetween(new Date().toISOString(), c.deadline) < 0 && c.status !== 'completed' ? ' ⚠️ Overdue' : ''}
-                        ${c.frequency === 'weekly' ? ' | 📅 Weekly' : c.frequency === 'monthly' ? ' | 🗓️ Monthly' : ' | 🔄 Daily'}
+                        ${c.deadline ? ' | ' + T('chkmod_due_label') + APP.formatDate(c.deadline) : ''}
+                        ${c.deadline && APP.daysBetween(new Date().toISOString(), c.deadline) < 0 && c.status !== 'completed' ? ' ' + T('chkmod_overdue_label') : ''}
+                        ${c.frequency === 'weekly' ? ' | ' + T('chkmod_freq_weekly') : c.frequency === 'monthly' ? ' | ' + T('chkmod_freq_monthly') : ' | ' + T('chkmod_freq_daily')}
                     </span>
                 </div>
                 <div style="text-align:right;">
                     <span class="badge ${c.status === 'completed' ? 'badge-success' : 'badge-info'}">${c.status}</span>
-                    <div style="font-size:11px;color:var(--gray);margin-top:2px;">by ${c.assignedBy}</div>
+                    <div style="font-size:11px;color:var(--gray);margin-top:2px;">${T('chkmod_by_prefix')}${c.assignedBy}</div>
                 </div>
             </div>
             <div class="progress-bar" style="margin-bottom:8px;">
                 <div class="progress-fill ${barColor}" style="width:${pct}%"></div>
             </div>
-            <div style="font-size:12px;color:var(--gray);margin-bottom:8px;">${done}/${total} done (${pct}%)</div>
+            <div style="font-size:12px;color:var(--gray);margin-bottom:8px;">${done}/${total}${T('chkmod_done_suffix')}${pct}%)</div>
             <div style="display:flex;flex-direction:column;gap:4px;">
                 ${items.map((item, idx) => {
                     const st = item.status || 'pending';
@@ -112,13 +112,13 @@ function renderClList() {
                         <span style="display:inline-block;min-width:70px;text-align:center;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;color:white;background:${statusColor(st)};flex-shrink:0;">${statusText(st)}</span>
                         <span style="flex:1;min-width:120px;">${item.task}</span>
                         ${item.unit ? (canFill
-                            ? `<input type="number" step="any" class="form-control" style="width:80px;padding:3px 6px;font-size:12px;text-align:right;" value="${item.value !== undefined && item.value !== '' ? item.value : ''}" placeholder="0" title="Enter reading in ${item.unit}" onchange="updateClItemValue('${c.id}',${idx},this.value)">`
+                            ? `<input type="number" step="any" class="form-control" style="width:80px;padding:3px 6px;font-size:12px;text-align:right;" value="${item.value !== undefined && item.value !== '' ? item.value : ''}" placeholder="0" title="${T('chkmod_enter_reading_prefix')}${item.unit}" onchange="updateClItemValue('${c.id}',${idx},this.value)">`
                             : (item.value !== undefined && item.value !== '' ? `<span style="font-size:12px;font-weight:700;color:var(--text);">${item.value}</span>` : '')
                         ) : ''}
                         ${item.unit ? `<span style="font-size:11px;color:var(--gray);background:var(--card);padding:2px 7px;border-radius:4px;border:1px solid var(--border);font-weight:600;flex-shrink:0;">${item.unit}</span>` : ''}
                         ${canFill ? `
                             <select class="form-control" style="width:auto;padding:3px 4px;font-size:12px;flex-shrink:0;" onchange="updateClItemStatus('${c.id}',${idx},this.value)">
-                                <option value="">-- Status</option>
+                                <option value="">${T('chkmod_opt_status')}</option>
                                 ${CL_STATUSES.map(s => `<option value="${s}" ${item.status === s ? 'selected' : ''}>${s.toUpperCase()}</option>`).join('')}
                             </select>
                         ` : ''}
@@ -127,9 +127,9 @@ function renderClList() {
             </div>
             ${c.description ? '<div style="font-size:12px;color:var(--gray);margin-top:6px;padding:4px 8px;background:var(--bg);border-radius:4px;">📝 ' + c.description + '</div>' : ''}
             ${canEdit(c) ? '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;">' +
-                '<button class="btn btn-sm btn-primary" onclick="editCl(\'' + c.id + '\')">✏️ Edit</button>' +
-                (c.status !== 'completed' ? '<button class="btn btn-sm btn-success" onclick="completeCl(\'' + c.id + '\')">✅ Mark Complete</button>' : '') +
-                '<button class="btn btn-sm btn-danger" onclick="deleteCl(\'' + c.id + '\',\'' + (c.title||'').replace(/'/g,"\\'") + '\')">🗑 Delete</button>' +
+                '<button class="btn btn-sm btn-primary" onclick="editCl(\'' + c.id + '\')">' + T('chkmod_btn_edit') + '</button>' +
+                (c.status !== 'completed' ? '<button class="btn btn-sm btn-success" onclick="completeCl(\'' + c.id + '\')">' + T('chkmod_btn_mark_complete') + '</button>' : '') +
+                '<button class="btn btn-sm btn-danger" onclick="deleteCl(\'' + c.id + '\',\'' + (c.title||'').replace(/'/g,"\\'") + '\')">' + T('chkmod_btn_delete') + '</button>' +
             '</div>' : ''}
         </div>`;
     }).join('');
@@ -151,76 +151,76 @@ function showClForm(cl) {
             <input type="hidden" name="id" value="${cl?.id || ''}">
             <div class="grid-2">
                 <div class="form-group">
-                    <label>Checklist Title *</label>
-                    <input type="text" name="title" class="form-control" value="${cl?.title || ''}" required placeholder="e.g. Morning Round">
+                    <label>${T('chkmod_label_title')}</label>
+                    <input type="text" name="title" class="form-control" value="${cl?.title || ''}" required placeholder="${T('chkmod_placeholder_title_example')}">
                 </div>
                 <div class="form-group" ${user.role === 'hod' ? 'style="display:none;"' : ''}>
-                    <label>Department</label>
+                    <label>${T('chkmod_label_department')}</label>
                     <select name="department" class="form-control">
-                        <option value="">All Departments</option>
+                        <option value="">${T('chkmod_opt_all_departments')}</option>
                         ${depts.map(d => '<option value="' + d.name + '" ' + (cl?.department === d.name || (user.role === 'hod' && d.name === user.department) ? 'selected' : '') + '>' + d.name + '</option>').join('')}
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Assign To *</label>
+                    <label>${T('chkmod_label_assign_to')}</label>
                     <select name="assignedTo" class="form-control" required>
-                        <option value="common" ${cl?.assignedTo === 'common' ? 'selected' : ''}>👥 Common (Everyone)</option>
-                        <optgroup label="Employees">
+                        <option value="common" ${cl?.assignedTo === 'common' ? 'selected' : ''}>${T('chkmod_opt_common_everyone')}</option>
+                        <optgroup label="${T('chkmod_optgroup_employees')}">
                             ${users.map(u => '<option value="' + u.fullName + '" ' + (cl?.assignedTo === u.fullName ? 'selected' : '') + '>' + u.fullName + ' (' + u.role.replace('_',' ') + ')</option>').join('')}
                         </optgroup>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Floor / Area</label>
+                    <label>${T('chkmod_label_floor_area')}</label>
                     <select name="floor" class="form-control" onchange="loadFloorItems(this)" ${isEdit ? 'disabled' : ''}>
-                        <option value="">Select floor to load items...</option>
-                        ${floors.map(f => '<option value="' + f.floor + '" ' + (cl?.floor === f.floor ? 'selected' : '') + '>' + f.floor + ' (' + f.items.length + ' items)</option>').join('')}
+                        <option value="">${T('chkmod_opt_select_floor')}</option>
+                        ${floors.map(f => '<option value="' + f.floor + '" ' + (cl?.floor === f.floor ? 'selected' : '') + '>' + f.floor + ' (' + f.items.length + T('chkmod_items_suffix') + '</option>').join('')}
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Deadline</label>
+                    <label>${T('chkmod_label_deadline')}</label>
                     <input type="date" name="deadline" class="form-control" value="${cl?.deadline ? cl.deadline.split('T')[0] : ''}">
                 </div>
                 <div class="form-group">
-                    <label>Frequency ⏱</label>
+                    <label>${T('chkmod_label_frequency')}</label>
                     <select name="frequency" class="form-control">
-                        <option value="daily"   ${(cl?.frequency||'daily')==='daily'  ?'selected':''}>🔄 Daily — resets every day at 5 AM</option>
-                        <option value="weekly"  ${cl?.frequency==='weekly' ?'selected':''}>📅 Weekly — resets every Monday at 5 AM</option>
-                        <option value="monthly" ${cl?.frequency==='monthly'?'selected':''}>🗓️ Monthly — resets 1st of month at 5 AM</option>
+                        <option value="daily"   ${(cl?.frequency||'daily')==='daily'  ?'selected':''}>${T('chkmod_freq_opt_daily')}</option>
+                        <option value="weekly"  ${cl?.frequency==='weekly' ?'selected':''}>${T('chkmod_freq_opt_weekly')}</option>
+                        <option value="monthly" ${cl?.frequency==='monthly'?'selected':''}>${T('chkmod_freq_opt_monthly')}</option>
                     </select>
                 </div>
             </div>
             <div class="form-group">
-                <label>Description (optional)</label>
+                <label>${T('chkmod_label_description')}</label>
                 <textarea name="description" class="form-control" rows="2">${cl?.description || ''}</textarea>
             </div>
             <div class="form-group" style="${isEdit ? '' : 'display:none;'}" id="clStatusGroup">
-                <label>Status</label>
+                <label>${T('chkmod_label_status')}</label>
                 <select name="status" class="form-control">
-                    <option value="active" ${cl?.status !== 'completed' ? 'selected' : ''}>Active</option>
-                    <option value="completed" ${cl?.status === 'completed' ? 'selected' : ''}>Completed</option>
+                    <option value="active" ${cl?.status !== 'completed' ? 'selected' : ''}>${T('chkmod_active')}</option>
+                    <option value="completed" ${cl?.status === 'completed' ? 'selected' : ''}>${T('chkmod_completed')}</option>
                 </select>
             </div>
             <div class="form-group">
                 <div class="flex-between" style="margin-bottom:8px;">
-                    <label style="font-weight:600;">Checklist Items</label>
-                    <button type="button" class="btn btn-sm btn-primary" onclick="addClItem()">+ Add Item</button>
+                    <label style="font-weight:600;">${T('chkmod_label_checklist_items')}</label>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="addClItem()">${T('chkmod_btn_add_item')}</button>
                 </div>
-                <p style="font-size:12px;color:var(--gray);margin-bottom:8px;">Each item can have a unit (V, °C, %, bar, etc.) and will be filled with OK/Fault/NA/Problem by the assigned employee.</p>
+                <p style="font-size:12px;color:var(--gray);margin-bottom:8px;">${T('chkmod_items_hint')}</p>
                 <div id="clItemsContainer">
                     ${existingItems.map((item, i) => renderClItemRow(i, item.task, item.unit)).join('')}
                 </div>
             </div>
         </form>
     `;
-    openFormModal(isEdit ? 'Edit Checklist' : 'New Checklist', form, 'saveCl()', true);
+    openFormModal(isEdit ? T('chkmod_modal_edit') : T('chkmod_modal_new'), form, 'saveCl()', true);
 }
 
 function renderClItemRow(idx, task, unit) {
     return '<div class="cl-item-row" style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">' +
-        '<input type="text" class="form-control" name="cl_item_' + idx + '" value="' + (task || '') + '" placeholder="Item description" style="flex:1;">' +
+        '<input type="text" class="form-control" name="cl_item_' + idx + '" value="' + (task || '') + '" placeholder="' + T('chkmod_placeholder_item_desc') + '" style="flex:1;">' +
         '<select name="cl_unit_' + idx + '" class="form-control" style="width:80px;font-size:12px;">' +
-        CL_UNITS.map(u => '<option value="' + u + '" ' + (unit === u ? 'selected' : '') + '>' + (u || 'none') + '</option>').join('') +
+        CL_UNITS.map(u => '<option value="' + u + '" ' + (unit === u ? 'selected' : '') + '>' + (u || T('chkmod_opt_none')) + '</option>').join('') +
         '</select>' +
         '<button type="button" class="btn btn-sm btn-danger" onclick="removeClItem(this)" ' + (idx === 0 ? 'disabled' : '') + '>✕</button>' +
     '</div>';
@@ -244,9 +244,9 @@ function addClItem() {
     const row = document.createElement('div');
     row.className = 'cl-item-row';
     row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;';
-    row.innerHTML = '<input type="text" class="form-control" name="cl_item_' + idx + '" value="" placeholder="Item description" style="flex:1;">' +
+    row.innerHTML = '<input type="text" class="form-control" name="cl_item_' + idx + '" value="" placeholder="' + T('chkmod_placeholder_item_desc') + '" style="flex:1;">' +
         '<select name="cl_unit_' + idx + '" class="form-control" style="width:80px;font-size:12px;">' +
-        CL_UNITS.map(u => '<option value="' + u + '">' + (u || 'none') + '</option>').join('') +
+        CL_UNITS.map(u => '<option value="' + u + '">' + (u || T('chkmod_opt_none')) + '</option>').join('') +
         '</select>' +
         '<button type="button" class="btn btn-sm btn-danger" onclick="removeClItem(this)">✕</button>';
     container.appendChild(row);
@@ -277,7 +277,7 @@ function saveCl() {
     const description = form.querySelector('[name="description"]')?.value;
     const department = form.querySelector('[name="department"]')?.value || user.department || '';
     const frequency  = form.querySelector('[name="frequency"]')?.value  || 'daily';
-    if (!title || !assignedTo) { APP.notify('Title and assignment required', 'error'); return; }
+    if (!title || !assignedTo) { APP.notify(T('chkmod_msg_title_assignment_required'), 'error'); return; }
     const items = [];
     const rows = form.querySelectorAll('.cl-item-row');
     rows.forEach((row, i) => {
@@ -285,7 +285,7 @@ function saveCl() {
         const unit = row.querySelector('[name^="cl_unit_"]')?.value || '';
         if (task) items.push({ task, unit, status: 'pending' });
     });
-    if (items.length === 0) { APP.notify('Add at least one checklist item', 'error'); return; }
+    if (items.length === 0) { APP.notify(T('chkmod_msg_add_one_item'), 'error'); return; }
     if (id) {
         const existing = DB.getById('checklists', id);
         const statusMap = {};
@@ -294,13 +294,13 @@ function saveCl() {
             if (statusMap[item.task] !== undefined) item.status = statusMap[item.task];
         });
         DB.update('checklists', id, { title, assignedTo, floor, deadline, description, items, status, department, frequency });
-        APP.notify('Checklist updated', 'success');
+        APP.notify(T('chkmod_msg_updated'), 'success');
     } else {
         DB.add('checklists', {
             title, assignedTo, floor: floor || '', deadline: deadline || '', description: description || '',
             department, items, status: 'active', assignedBy: user.fullName, frequency
         });
-        APP.notify('Checklist created and assigned', 'success');
+        APP.notify(T('chkmod_msg_created'), 'success');
     }
     // Allow caller (e.g. HOD dashboard) to override the post-save refresh
     if (typeof window._clSaveCallback === 'function') {
@@ -318,10 +318,10 @@ function editCl(id) {
 }
 
 function deleteCl(id, title) {
-    var msg = title ? 'Delete checklist "' + title + '"? This cannot be undone.' : 'Delete this checklist? This cannot be undone.';
+    var msg = title ? T('chkmod_confirm_delete_named_prefix') + title + T('chkmod_confirm_delete_named_suffix') : T('chkmod_confirm_delete_generic');
     confirmAction(msg, () => {
         DB.delete('checklists', id);
-        APP.notify('Checklist deleted', 'success');
+        APP.notify(T('chkmod_msg_deleted'), 'success');
         renderClList();
     });
 }
@@ -341,7 +341,7 @@ function updateClItemStatus(id, idx, value) {
     DB.update('checklists', id, { items: cl.items, status: cl.status, completedAt: cl.completedAt });
     // Auto-create a problem ticket when item is flagged as "problem"
     if (value === 'problem') _autoCreateProblemFromCl(id, idx);
-    APP.notify('Item set to ' + value.toUpperCase(), 'success');
+    APP.notify(T('chkmod_msg_item_set_to_prefix') + value.toUpperCase(), 'success');
     renderClList();
 }
 
@@ -356,7 +356,7 @@ function _autoCreateProblemFromCl(clId, idx) {
                p.itemIdx === idx && p.status !== 'resolved';
     });
     if (existing) {
-        APP.notify('Ticket ' + (existing.ticketId || '') + ' already open for this item', 'info');
+        APP.notify(T('chkmod_msg_ticket_prefix') + (existing.ticketId || '') + T('chkmod_msg_ticket_already_open_suffix'), 'info');
         return;
     }
     const dept = cl.department || (user ? user.department : '') || '';
@@ -386,7 +386,7 @@ function _autoCreateProblemFromCl(clId, idx) {
         itemTask: item.task,
         solution: '', resolvedBy: '', resolvedAt: '', assignedTo: '', assignedToName: ''
     });
-    APP.notify('⚠️ Problem ticket ' + ticketId + ' created and sent to HOD', 'warning');
+    APP.notify(T('chkmod_msg_ticket_created_prefix') + ticketId + T('chkmod_msg_ticket_created_suffix'), 'warning');
 }
 
 function updateClItemValue(id, idx, value) {
@@ -404,6 +404,6 @@ function completeCl(id) {
     if (!cl) return;
     const items = (cl.items || []).map(i => ({ ...i, status: i.status || 'ok' }));
     DB.update('checklists', id, { items, status: 'completed', completedAt: new Date().toISOString() });
-    APP.notify('Checklist marked complete', 'success');
+    APP.notify(T('chkmod_msg_marked_complete'), 'success');
     renderClList();
 }

@@ -8,21 +8,40 @@ function _genTicketId() {
     return 'TKT-' + d + '-' + (rand || 'XXXX');
 }
 
+function _probStatusLabel(status) {
+    var map = {
+        open: T('probmod_status_open'),
+        assigned: T('probmod_status_assigned'),
+        in_progress: T('probmod_status_inprogress'),
+        resolved: T('probmod_status_resolved')
+    };
+    return map[status] || map.open;
+}
+
+function _probPriorityLabel(priority) {
+    var map = {
+        low: T('probmod_priority_low'),
+        medium: T('probmod_priority_medium'),
+        high: T('probmod_priority_high')
+    };
+    return map[priority] || map.low;
+}
+
 function renderProblems(container) {
     container.innerHTML = ''
         + '<div class="flex-between mb-4">'
-        + '<div class="search-box"><input type="text" class="form-control" id="probSearch" placeholder="Search problems..." oninput="renderProbList()"></div>'
-        + '<button class="btn btn-primary" onclick="showProbForm()">+ Report Problem</button>'
+        + '<div class="search-box"><input type="text" class="form-control" id="probSearch" placeholder="' + T('probmod_search_placeholder') + '" oninput="renderProbList()"></div>'
+        + '<button class="btn btn-primary" onclick="showProbForm()">' + T('probmod_btn_report_problem') + '</button>'
         + '</div>'
         + '<div class="tabs">'
-        + '<button class="tab-btn active" onclick="switchProbTab(\'all\',this)">All</button>'
-        + '<button class="tab-btn" onclick="switchProbTab(\'open\',this)">Open</button>'
-        + '<button class="tab-btn" onclick="switchProbTab(\'assigned\',this)">Assigned</button>'
-        + '<button class="tab-btn" onclick="switchProbTab(\'in_progress\',this)">In Progress</button>'
-        + '<button class="tab-btn" onclick="switchProbTab(\'resolved\',this)">Resolved</button>'
+        + '<button class="tab-btn active" onclick="switchProbTab(\'all\',this)">' + T('probmod_tab_all') + '</button>'
+        + '<button class="tab-btn" onclick="switchProbTab(\'open\',this)">' + T('probmod_tab_open') + '</button>'
+        + '<button class="tab-btn" onclick="switchProbTab(\'assigned\',this)">' + T('probmod_tab_assigned') + '</button>'
+        + '<button class="tab-btn" onclick="switchProbTab(\'in_progress\',this)">' + T('probmod_tab_in_progress') + '</button>'
+        + '<button class="tab-btn" onclick="switchProbTab(\'resolved\',this)">' + T('probmod_tab_resolved') + '</button>'
         + '</div>'
         + '<div class="card"><div class="table-responsive"><table>'
-        + '<thead><tr><th>Ticket ID</th><th>Title</th><th>Category</th><th>Routed To</th><th>Reported By</th><th>Date</th><th>Priority</th><th>Status</th><th>Actions</th></tr></thead>'
+        + '<thead><tr><th>' + T('probmod_th_ticket_id') + '</th><th>' + T('probmod_th_title') + '</th><th>' + T('probmod_th_category') + '</th><th>' + T('probmod_th_routed_to') + '</th><th>' + T('probmod_th_reported_by') + '</th><th>' + T('probmod_th_date') + '</th><th>' + T('probmod_th_priority') + '</th><th>' + T('probmod_th_status') + '</th><th>' + T('probmod_th_actions') + '</th></tr></thead>'
         + '<tbody id="probTableBody"></tbody></table></div></div>';
     renderProbList();
 }
@@ -69,7 +88,7 @@ function renderProbList() {
     if (!tbody) return;
 
     if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No problems found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-state">' + T('probmod_no_problems_found') + '</td></tr>';
         return;
     }
 
@@ -88,20 +107,20 @@ function renderProbList() {
 
         return '<tr>'
             + '<td><strong style="color:var(--primary);font-size:12px;">' + (p.ticketId || '#' + p.id.slice(-6)) + '</strong>'
-            + (p.source === 'checklist' ? '<br><span style="font-size:10px;color:var(--gray);">📋 Checklist</span>' : '') + '</td>'
+            + (p.source === 'checklist' ? '<br><span style="font-size:10px;color:var(--gray);">' + T('probmod_checklist_badge') + '</span>' : '') + '</td>'
             + '<td>' + (p.title || '') + '</td>'
             + '<td>' + (p.category || '-') + '</td>'
             + '<td><span style="font-size:12px;color:var(--primary);font-weight:600;">' + (p.routedTo || p.department || '-') + '</span></td>'
             + '<td>' + (p.reportedBy || '-') + '</td>'
             + '<td>' + APP.formatDate(p.createdAt) + '</td>'
-            + '<td><span class="badge ' + priBadge + '">' + (p.priority || 'low') + '</span></td>'
-            + '<td><span class="badge ' + statusBadge + '">' + (p.status || 'open').replace('_', ' ') + '</span>'
+            + '<td><span class="badge ' + priBadge + '">' + _probPriorityLabel(p.priority || 'low') + '</span></td>'
+            + '<td><span class="badge ' + statusBadge + '">' + _probStatusLabel(p.status || 'open') + '</span>'
             + (p.assignedToName ? '<br><span style="font-size:10px;color:var(--gray);">→ ' + p.assignedToName + '</span>' : '')
             + '</td>'
             + '<td style="white-space:nowrap;">'
-            + '<button class="btn btn-sm btn-primary" onclick="viewProb(\'' + p.id + '\')">View</button>'
-            + (canAssign ? ' <button class="btn btn-sm btn-warning" onclick="showAssignProbForm(\'' + p.id + '\')">Assign</button>' : '')
-            + (canResolve ? ' <button class="btn btn-sm btn-success" onclick="resolveProb(\'' + p.id + '\')">✓ Solve</button>' : '')
+            + '<button class="btn btn-sm btn-primary" onclick="viewProb(\'' + p.id + '\')">' + T('probmod_btn_view') + '</button>'
+            + (canAssign ? ' <button class="btn btn-sm btn-warning" onclick="showAssignProbForm(\'' + p.id + '\')">' + T('probmod_btn_assign') + '</button>' : '')
+            + (canResolve ? ' <button class="btn btn-sm btn-success" onclick="resolveProb(\'' + p.id + '\')">' + T('probmod_btn_solve') + '</button>' : '')
             + '</td></tr>';
     }).join('');
 }
@@ -117,7 +136,7 @@ function showProbForm() {
         : '<input type="text" name="reportedBy" class="form-control" value="' + (user ? user.fullName : '') + '" readonly style="background:var(--light-gray);">';
 
     var deptField = isAdmin
-        ? '<input type="text" name="department" class="form-control" placeholder="Reporting department">'
+        ? '<input type="text" name="department" class="form-control" placeholder="' + T('probmod_placeholder_reporting_dept') + '">'
         : '<input type="text" name="department" class="form-control" value="' + (user ? (user.department || '') : '') + '" readonly style="background:var(--light-gray);">';
 
     var deptOpts = activeDepts.map(function(d) {
@@ -126,46 +145,46 @@ function showProbForm() {
 
     var form = '<form id="probForm">'
         + '<div class="grid-2">'
-        + '<div class="form-group"><label>Problem Title *</label><input type="text" name="title" class="form-control" required></div>'
-        + '<div class="form-group"><label>Category *</label><select name="category" class="form-control" required>'
-        + '<option value="">Select</option>'
-        + '<option value="Electrical">Electrical</option>'
-        + '<option value="Plumbing">Plumbing</option>'
-        + '<option value="Equipment">Equipment</option>'
-        + '<option value="IT System">IT System</option>'
-        + '<option value="Infrastructure">Infrastructure</option>'
-        + '<option value="Medical">Medical</option>'
-        + '<option value="Security">Security</option>'
-        + '<option value="Housekeeping">Housekeeping</option>'
-        + '<option value="Other">Other</option>'
+        + '<div class="form-group"><label>' + T('probmod_label_problem_title') + '</label><input type="text" name="title" class="form-control" required></div>'
+        + '<div class="form-group"><label>' + T('probmod_label_category') + '</label><select name="category" class="form-control" required>'
+        + '<option value="">' + T('probmod_opt_select') + '</option>'
+        + '<option value="Electrical">' + T('probmod_cat_electrical') + '</option>'
+        + '<option value="Plumbing">' + T('probmod_cat_plumbing') + '</option>'
+        + '<option value="Equipment">' + T('probmod_cat_equipment') + '</option>'
+        + '<option value="IT System">' + T('probmod_cat_it_system') + '</option>'
+        + '<option value="Infrastructure">' + T('probmod_cat_infrastructure') + '</option>'
+        + '<option value="Medical">' + T('probmod_cat_medical') + '</option>'
+        + '<option value="Security">' + T('probmod_cat_security') + '</option>'
+        + '<option value="Housekeeping">' + T('probmod_cat_housekeeping') + '</option>'
+        + '<option value="Other">' + T('probmod_cat_other') + '</option>'
         + '</select></div>'
-        + '<div class="form-group"><label>Route To Department *</label>'
+        + '<div class="form-group"><label>' + T('probmod_label_route_to') + '</label>'
         + '<select name="routedTo" class="form-control" required>'
-        + '<option value="">-- Which dept should handle this? --</option>'
+        + '<option value="">' + T('probmod_opt_which_dept') + '</option>'
         + deptOpts
         + '</select>'
-        + '<div style="font-size:11px;color:var(--gray);margin-top:3px;">The selected department HOD will receive this problem</div></div>'
-        + '<div class="form-group"><label>Priority</label><select name="priority" class="form-control">'
-        + '<option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option>'
+        + '<div style="font-size:11px;color:var(--gray);margin-top:3px;">' + T('probmod_hint_hod_receive') + '</div></div>'
+        + '<div class="form-group"><label>' + T('probmod_label_priority') + '</label><select name="priority" class="form-control">'
+        + '<option value="low">' + T('probmod_priority_low') + '</option><option value="medium" selected>' + T('probmod_priority_medium') + '</option><option value="high">' + T('probmod_priority_high') + '</option>'
         + '</select></div>'
-        + '<div class="form-group"><label>Reported By</label>' + reportedByField + '</div>'
-        + '<div class="form-group"><label>From Department</label>' + deptField + '</div>'
-        + '<div class="form-group"><label>Location</label><input type="text" name="location" class="form-control" placeholder="Ward / Room / Area"></div>'
+        + '<div class="form-group"><label>' + T('probmod_label_reported_by') + '</label>' + reportedByField + '</div>'
+        + '<div class="form-group"><label>' + T('probmod_label_from_department') + '</label>' + deptField + '</div>'
+        + '<div class="form-group"><label>' + T('probmod_label_location') + '</label><input type="text" name="location" class="form-control" placeholder="' + T('probmod_placeholder_location') + '"></div>'
         + '</div>'
-        + '<div class="form-group"><label>Description *</label><textarea name="description" class="form-control" rows="3" required></textarea></div>'
+        + '<div class="form-group"><label>' + T('probmod_label_description') + '</label><textarea name="description" class="form-control" rows="3" required></textarea></div>'
         + '</form>';
 
-    openFormModal('Report Problem', form, 'saveProb()');
+    openFormModal(T('probmod_modal_report_problem'), form, 'saveProb()');
 }
 
 function saveProb() {
     var user = AUTH.currentUser();
     var data = getFormData('probForm');
     if (!data.title || !data.category || !data.reportedBy || !data.description) {
-        APP.notify('Please fill all required fields', 'error'); return false;
+        APP.notify(T('probmod_msg_fill_required'), 'error'); return false;
     }
     if (!data.routedTo) {
-        APP.notify('Please select which department should handle this problem', 'error'); return false;
+        APP.notify(T('probmod_msg_select_dept'), 'error'); return false;
     }
     data.status = 'open';
     data.ticketId = _genTicketId();
@@ -179,7 +198,7 @@ function saveProb() {
     data.assignedTo = '';
     data.assignedToName = '';
     DB.add('problems', data);
-    APP.notify('Problem reported and routed to ' + data.routedTo + ' department', 'success');
+    APP.notify(T('probmod_msg_reported_routed_prefix') + data.routedTo + T('probmod_msg_reported_routed_suffix'), 'success');
     renderProbList();
     return true;
 }
@@ -198,24 +217,24 @@ function showAssignProbForm(id) {
     });
 
     if (!teamMembers.length) {
-        APP.notify('No team members in ' + targetDept + ' to assign', 'error');
+        APP.notify(T('probmod_msg_no_team_members_prefix') + targetDept + T('probmod_msg_no_team_members_suffix'), 'error');
         return;
     }
 
     var form = '<form id="assignProbForm">'
         + '<input type="hidden" id="assignProbId" value="' + id + '">'
-        + '<div class="form-group"><label>Assign To *</label>'
+        + '<div class="form-group"><label>' + T('probmod_label_assign_to') + '</label>'
         + '<select id="assignProbMember" class="form-control" required>'
-        + '<option value="">Select team member</option>'
+        + '<option value="">' + T('probmod_opt_select_team_member') + '</option>'
         + teamMembers.map(function(m) {
             return '<option value="' + m.username + '|' + m.fullName.replace(/"/g, '&quot;') + '">' + m.fullName + ' (' + (m.role || 'employee') + ')</option>';
         }).join('')
         + '</select></div>'
-        + '<div class="form-group"><label>Instructions (optional)</label>'
-        + '<textarea id="assignProbNote" class="form-control" rows="2" placeholder="What needs to be done..."></textarea></div>'
+        + '<div class="form-group"><label>' + T('probmod_label_instructions_optional') + '</label>'
+        + '<textarea id="assignProbNote" class="form-control" rows="2" placeholder="' + T('probmod_placeholder_what_needs_done') + '"></textarea></div>'
         + '</form>';
 
-    openFormModal('Assign: ' + p.title, form, 'saveAssignProb()', false);
+    openFormModal(T('probmod_modal_assign_prefix') + p.title, form, 'saveAssignProb()', false);
 }
 
 function saveAssignProb() {
@@ -224,7 +243,7 @@ function saveAssignProb() {
     var memberVal = (document.getElementById('assignProbMember') || {}).value;
     var note = (document.getElementById('assignProbNote') || {}).value || '';
 
-    if (!memberVal) { APP.notify('Select a team member', 'error'); return false; }
+    if (!memberVal) { APP.notify(T('probmod_msg_select_team_member'), 'error'); return false; }
     var parts = memberVal.split('|');
     var assignUsername = parts[0];
     var assignName = parts.slice(1).join('|');
@@ -238,7 +257,7 @@ function saveAssignProb() {
         assignedAt: new Date().toISOString(),
         assignNote: note
     });
-    APP.notify('Problem assigned to ' + assignName, 'success');
+    APP.notify(T('probmod_msg_assigned_to_prefix') + assignName, 'success');
     renderProbList();
     return true;
 }
@@ -264,36 +283,36 @@ function viewProb(id) {
         + '</div>'
         + '<div style="background:#fff3e0;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
         + '<span style="font-size:16px;font-weight:800;color:#e65100;">' + (p.ticketId || '#' + p.id.slice(-6)) + '</span>'
-        + '<span class="badge ' + statusBadge + '" style="font-size:12px;">' + (p.status || 'open').replace('_', ' ') + '</span>'
-        + (p.source === 'checklist' ? '<span style="font-size:12px;color:var(--primary);">📋 From checklist: ' + (p.checklistTitle || '') + '</span>' : '')
+        + '<span class="badge ' + statusBadge + '" style="font-size:12px;">' + _probStatusLabel(p.status || 'open') + '</span>'
+        + (p.source === 'checklist' ? '<span style="font-size:12px;color:var(--primary);">' + T('probmod_from_checklist_prefix') + (p.checklistTitle || '') + '</span>' : '')
         + '</div>'
         + '<div class="grid-2" style="gap:12px;margin-bottom:14px;">'
-        + '<div><strong>Category:</strong> ' + (p.category || '-') + '</div>'
-        + '<div><strong>Priority:</strong> <span class="badge ' + priBadge + '">' + (p.priority || 'low') + '</span></div>'
-        + '<div><strong>Reported By:</strong> ' + (p.reportedBy || '-') + '</div>'
-        + '<div><strong>From Dept:</strong> ' + (p.department || '-') + '</div>'
-        + '<div><strong>Routed To:</strong> <strong style="color:var(--primary);">' + (p.routedTo || '-') + '</strong></div>'
-        + '<div><strong>Location:</strong> ' + (p.location || '-') + '</div>'
-        + '<div><strong>Status:</strong> <span class="badge ' + statusBadge + '">' + (p.status || 'open').replace('_', ' ') + '</span></div>'
-        + '<div><strong>Reported:</strong> ' + APP.formatDate(p.createdAt) + '</div>'
-        + (p.assignedToName ? '<div><strong>Assigned To:</strong> ' + p.assignedToName + '</div><div><strong>Assigned At:</strong> ' + APP.formatDate(p.assignedAt) + '</div>' : '')
-        + (p.resolvedAt ? '<div><strong>Resolved:</strong> ' + APP.formatDate(p.resolvedAt) + '</div><div><strong>Resolved By:</strong> ' + (p.resolvedBy || '-') + '</div>' : '')
+        + '<div><strong>' + T('probmod_view_category') + '</strong> ' + (p.category || '-') + '</div>'
+        + '<div><strong>' + T('probmod_view_priority') + '</strong> <span class="badge ' + priBadge + '">' + _probPriorityLabel(p.priority || 'low') + '</span></div>'
+        + '<div><strong>' + T('probmod_view_reported_by') + '</strong> ' + (p.reportedBy || '-') + '</div>'
+        + '<div><strong>' + T('probmod_view_from_dept') + '</strong> ' + (p.department || '-') + '</div>'
+        + '<div><strong>' + T('probmod_view_routed_to') + '</strong> <strong style="color:var(--primary);">' + (p.routedTo || '-') + '</strong></div>'
+        + '<div><strong>' + T('probmod_view_location') + '</strong> ' + (p.location || '-') + '</div>'
+        + '<div><strong>' + T('probmod_view_status') + '</strong> <span class="badge ' + statusBadge + '">' + _probStatusLabel(p.status || 'open') + '</span></div>'
+        + '<div><strong>' + T('probmod_view_reported') + '</strong> ' + APP.formatDate(p.createdAt) + '</div>'
+        + (p.assignedToName ? '<div><strong>' + T('probmod_view_assigned_to') + '</strong> ' + p.assignedToName + '</div><div><strong>' + T('probmod_view_assigned_at') + '</strong> ' + APP.formatDate(p.assignedAt) + '</div>' : '')
+        + (p.resolvedAt ? '<div><strong>' + T('probmod_view_resolved') + '</strong> ' + APP.formatDate(p.resolvedAt) + '</div><div><strong>' + T('probmod_view_resolved_by') + '</strong> ' + (p.resolvedBy || '-') + '</div>' : '')
         + '</div>'
-        + '<div style="margin-bottom:12px;"><strong>Description:</strong>'
+        + '<div style="margin-bottom:12px;"><strong>' + T('probmod_view_description') + '</strong>'
         + '<div style="background:var(--light-gray);border-radius:6px;padding:10px;margin-top:6px;">' + (p.description || '') + '</div></div>'
-        + (p.assignNote ? '<div style="margin-bottom:12px;"><strong>Assignment Instructions:</strong>'
+        + (p.assignNote ? '<div style="margin-bottom:12px;"><strong>' + T('probmod_view_assignment_instructions') + '</strong>'
             + '<div style="background:#fff3e0;border-radius:6px;padding:8px;font-size:12px;margin-top:4px;">' + p.assignNote + '</div></div>' : '')
-        + (p.solution ? '<div style="margin-bottom:12px;"><strong>Resolution:</strong>'
+        + (p.solution ? '<div style="margin-bottom:12px;"><strong>' + T('probmod_view_resolution') + '</strong>'
             + '<div style="background:#e8f5e9;border-radius:6px;padding:8px;margin-top:4px;">' + p.solution + '</div></div>' : '');
 
     if (canMarkInProgress && p.status === 'assigned') {
-        html += '<button class="btn btn-info" style="margin-bottom:10px;" onclick="markProbInProgress(\'' + p.id + '\')">Mark In Progress</button> ';
+        html += '<button class="btn btn-info" style="margin-bottom:10px;" onclick="markProbInProgress(\'' + p.id + '\')">' + T('probmod_btn_mark_in_progress') + '</button> ';
     }
     if (canResolve) {
         html += '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">'
-            + '<label style="font-weight:600;">Resolution Details *</label>'
-            + '<textarea id="solutionText" class="form-control" rows="2" style="margin:6px 0;" placeholder="Describe how the problem was resolved..."></textarea>'
-            + '<button class="btn btn-success" onclick="resolveProbDirect(\'' + p.id + '\')">Mark Resolved</button></div>';
+            + '<label style="font-weight:600;">' + T('probmod_label_resolution_details') + '</label>'
+            + '<textarea id="solutionText" class="form-control" rows="2" style="margin:6px 0;" placeholder="' + T('probmod_placeholder_describe_resolution') + '"></textarea>'
+            + '<button class="btn btn-success" onclick="resolveProbDirect(\'' + p.id + '\')">' + T('probmod_btn_mark_resolved') + '</button></div>';
     }
 
     showModal(html);
@@ -301,7 +320,7 @@ function viewProb(id) {
 
 function markProbInProgress(id) {
     DB.update('problems', id, { status: 'in_progress' });
-    APP.notify('Marked in progress', 'info');
+    APP.notify(T('probmod_msg_marked_in_progress'), 'info');
     var modal = document.querySelector('.modal.active');
     if (modal) modal.remove();
     renderProbList();
@@ -309,7 +328,7 @@ function markProbInProgress(id) {
 
 function resolveProb(id) {
     var p = DB.getById('problems', id);
-    if (!p || p.status === 'resolved') { APP.notify('Already resolved', 'info'); return; }
+    if (!p || p.status === 'resolved') { APP.notify(T('probmod_msg_already_resolved'), 'info'); return; }
     var tkt = p.ticketId || ('#' + p.id.slice(-6));
     var form = '<form id="solveProbForm">'
         + '<input type="hidden" id="solveProbId" value="' + id + '">'
@@ -317,16 +336,16 @@ function resolveProb(id) {
         + '<div style="font-size:14px;font-weight:800;color:#e65100;">' + tkt + '</div>'
         + '<div style="font-size:13px;font-weight:600;margin-top:2px;">' + (p.title || '') + '</div>'
         + '</div>'
-        + '<div class="form-group"><label>Resolution / Solution *</label>'
-        + '<textarea id="solveProbSolution" class="form-control" rows="3" required placeholder="Describe how the problem was resolved..."></textarea></div>'
+        + '<div class="form-group"><label>' + T('probmod_label_resolution_solution') + '</label>'
+        + '<textarea id="solveProbSolution" class="form-control" rows="3" required placeholder="' + T('probmod_placeholder_describe_resolution') + '"></textarea></div>'
         + '</form>';
-    openFormModal('✓ Solve Problem — ' + tkt, form, 'saveProbSolution()', false);
+    openFormModal(T('probmod_modal_solve_prefix') + tkt, form, 'saveProbSolution()', false);
 }
 
 function saveProbSolution() {
     var id       = (document.getElementById('solveProbId') || {}).value;
     var solution = ((document.getElementById('solveProbSolution') || {}).value || '').trim();
-    if (!solution) { APP.notify('Please describe the solution', 'error'); return false; }
+    if (!solution) { APP.notify(T('probmod_msg_describe_solution'), 'error'); return false; }
     var user = AUTH.currentUser();
     var p    = DB.getById('problems', id);
     DB.update('problems', id, {
@@ -336,7 +355,7 @@ function saveProbSolution() {
         resolvedAt: new Date().toISOString()
     });
     var tkt = p ? (p.ticketId || '#' + p.id.slice(-6)) : '';
-    APP.notify('Problem ' + tkt + ' marked as solved ✓', 'success');
+    APP.notify(T('probmod_msg_problem_solved_prefix') + tkt + T('probmod_msg_problem_solved_suffix'), 'success');
     var modal = document.querySelector('.modal');
     if (modal) modal.remove();
     renderProbList();
@@ -345,7 +364,7 @@ function saveProbSolution() {
 
 function resolveProbDirect(id) {
     var solution = (document.getElementById('solutionText') || {}).value || '';
-    if (!solution.trim()) { APP.notify('Please enter resolution details', 'error'); return; }
+    if (!solution.trim()) { APP.notify(T('probmod_msg_enter_resolution_details'), 'error'); return; }
     var user = AUTH.currentUser();
     DB.update('problems', id, {
         status: 'resolved',
@@ -353,7 +372,7 @@ function resolveProbDirect(id) {
         resolvedBy: user ? user.fullName : '',
         resolvedAt: new Date().toISOString()
     });
-    APP.notify('Problem resolved', 'success');
+    APP.notify(T('probmod_msg_problem_resolved'), 'success');
     var modal = document.querySelector('.modal.active');
     if (modal) modal.remove();
     renderProbList();

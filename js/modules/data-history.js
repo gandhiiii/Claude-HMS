@@ -1,7 +1,7 @@
 function renderDataHistory(container) {
     var cu = AUTH.currentUser();
     if (!cu || (cu.role !== 'admin' && !cu.isSuperAdmin)) {
-        container.innerHTML = '<div class="empty-state">Admin access only.</div>';
+        container.innerHTML = '<div class="empty-state">' + T('dhmod_admin_only') + '</div>';
         return;
     }
     _renderDataHistoryContent(container);
@@ -16,15 +16,15 @@ function _renderDataHistoryContent(container) {
         cloudHtml = `
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:10px 14px;border-radius:10px;background:rgba(52,168,83,0.08);border:1px solid rgba(52,168,83,0.25);">
             <span style="width:10px;height:10px;border-radius:50%;background:#34a853;animation:pulse 2s ease-in-out infinite;flex-shrink:0;display:inline-block;"></span>
-            <span style="font-weight:700;color:#34a853;font-size:13px;">Live Database</span>
-            <span style="font-size:12px;color:var(--gray);">— changes on any device sync instantly to all others</span>
+            <span style="font-weight:700;color:#34a853;font-size:13px;">${T('dhmod_live_database')}</span>
+            <span style="font-size:12px;color:var(--gray);">${T('dhmod_live_database_desc')}</span>
         </div>`;
     } else {
         cloudHtml = `
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:10px 14px;border-radius:10px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);">
             <span style="width:10px;height:10px;border-radius:50%;background:#f59e0b;flex-shrink:0;display:inline-block;"></span>
-            <span style="font-weight:700;color:#b45309;font-size:13px;">Connecting to database…</span>
-            <span style="font-size:12px;color:var(--gray);">— please wait or try refreshing the page</span>
+            <span style="font-weight:700;color:#b45309;font-size:13px;">${T('dhmod_connecting')}</span>
+            <span style="font-size:12px;color:var(--gray);">${T('dhmod_connecting_desc')}</span>
         </div>`;
     }
 
@@ -35,7 +35,7 @@ function _renderDataHistoryContent(container) {
 
     var rowsHtml = '';
     if (used === 0) {
-        rowsHtml = '<tr><td colspan="3" class="empty-state">No backups yet. Every data change auto-saves one (max once per 3 min).</td></tr>';
+        rowsHtml = '<tr><td colspan="3" class="empty-state">' + T('dhmod_no_backups') + '</td></tr>';
     } else {
         idx.forEach(function(entry) {
             var ts = new Date(entry.ts).toLocaleString('en-IN', {
@@ -53,34 +53,34 @@ function _renderDataHistoryContent(container) {
                 + '<td style="padding:9px 10px;"><span style="background:' + lc + ';color:#fff;font-size:11px;padding:2px 9px;border-radius:20px;display:inline-block;">'
                 + lbl.replace(/</g,'&lt;').replace(/&/g,'&amp;') + '</span></td>'
                 + '<td style="padding:9px 10px;white-space:nowrap;">'
-                + '<button class="btn btn-sm btn-warning" style="margin-right:4px;" onclick="dataHistoryRestore(' + entry.n + ')">Restore</button>'
-                + '<button class="btn btn-sm btn-outline" onclick="dataHistoryDownload(' + entry.n + ')">Download</button>'
+                + '<button class="btn btn-sm btn-warning" style="margin-right:4px;" onclick="dataHistoryRestore(' + entry.n + ')">' + T('dhmod_btn_restore') + '</button>'
+                + '<button class="btn btn-sm btn-outline" onclick="dataHistoryDownload(' + entry.n + ')">' + T('dhmod_btn_download') + '</button>'
                 + '</td></tr>';
         });
     }
 
     container.innerHTML = cloudHtml + `
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
-            <button class="btn btn-primary" onclick="dataHistorySnapNow()">+ Save Backup Now</button>
-            <button class="btn btn-outline" onclick="DB.exportAll('manual-export')">Export All Data (JSON)</button>
+            <button class="btn btn-primary" onclick="dataHistorySnapNow()">${T('dhmod_btn_save_backup_now')}</button>
+            <button class="btn btn-outline" onclick="DB.exportAll('manual-export')">${T('dhmod_btn_export_all')}</button>
             <label class="btn btn-outline" style="cursor:pointer;margin:0;">
-                Import / Restore from File
+                ${T('dhmod_btn_import_restore')}
                 <input type="file" accept=".json" style="display:none;" onchange="dataHistoryImportFile(this)">
             </label>
         </div>
 
         <div class="card">
             <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <h2>🕐 Local Backup History</h2>
-                <span style="font-size:12px;color:var(--gray);">${used} / ${max} slots used &nbsp;·&nbsp; Auto-saves before every change (max 1 per 3 min)</span>
+                <h2>${T('dhmod_heading_local_backup_history')}</h2>
+                <span style="font-size:12px;color:var(--gray);">${used} / ${max}${T('dhmod_slots_used_suffix')} &nbsp;·&nbsp; ${T('dhmod_autosave_note')}</span>
             </div>
             <div class="table-responsive">
                 <table style="width:100%;border-collapse:collapse;">
                     <thead>
                         <tr style="background:var(--light-gray);">
-                            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">Saved At</th>
-                            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">Trigger / Label</th>
-                            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">Actions</th>
+                            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">${T('dhmod_th_saved_at')}</th>
+                            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">${T('dhmod_th_trigger_label')}</th>
+                            <th style="padding:8px 10px;text-align:left;border-bottom:2px solid var(--border);">${T('dhmod_th_actions')}</th>
                         </tr>
                     </thead>
                     <tbody>${rowsHtml}</tbody>
@@ -89,8 +89,7 @@ function _renderDataHistoryContent(container) {
         </div>
 
         <div class="card" style="margin-top:14px;border-left:4px solid #f59e0b;padding:12px 16px;font-size:13px;">
-            <strong>Restore replaces ALL current data</strong> with the chosen snapshot.
-            Download a current backup first to be safe.
+            <strong>${T('dhmod_restore_warning_strong')}</strong> ${T('dhmod_restore_warning_rest')}
         </div>
     `;
 }
@@ -104,7 +103,7 @@ function _dataHistoryGetCfg() {
 
 function dataHistoryShareConfig() {
     var cfg = _dataHistoryGetCfg();
-    if (!cfg) { APP.notify('Firebase config not available on this device', 'error'); return; }
+    if (!cfg) { APP.notify(T('dhmod_msg_fb_config_unavailable'), 'error'); return; }
     try {
         var encoded = btoa(JSON.stringify(cfg));
         var href = window.location.href.replace(/#.*$/, '');
@@ -112,31 +111,31 @@ function dataHistoryShareConfig() {
         var url = base + 'dashboard.html#fbcfg=' + encoded;
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(url).then(function() {
-                APP.notify('Link copied! Open it on the other device — Firebase will auto-configure there.', 'success');
+                APP.notify(T('dhmod_msg_link_copied_auto'), 'success');
             });
         } else {
             var ta = document.createElement('textarea');
             ta.value = url; document.body.appendChild(ta); ta.select();
             document.execCommand('copy'); document.body.removeChild(ta);
-            APP.notify('Link copied! Open it on the other device.', 'success');
+            APP.notify(T('dhmod_msg_link_copied'), 'success');
         }
-    } catch(e) { APP.notify('Error: ' + e.message, 'error'); }
+    } catch(e) { APP.notify(T('dhmod_msg_error_prefix') + e.message, 'error'); }
 }
 
 function dataHistoryShowQR() {
     var cfg = _dataHistoryGetCfg();
-    if (!cfg) { APP.notify('Firebase config not available on this device', 'error'); return; }
+    if (!cfg) { APP.notify(T('dhmod_msg_fb_config_unavailable'), 'error'); return; }
     try {
         var encoded = btoa(JSON.stringify(cfg));
         var href = window.location.href.replace(/#.*$/, '');
         var base = href.substring(0, href.lastIndexOf('/') + 1);
         var url = base + 'dashboard.html#fbcfg=' + encoded;
         var escapedUrl = url.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-        openFormModal('Scan to Configure Firebase on Another Device',
+        openFormModal(T('dhmod_modal_scan_qr_title'),
             '<div style="text-align:center;padding:8px 0;">'
             + '<div id="fbConfigQR" style="display:inline-block;margin-bottom:12px;border:6px solid #fff;border-radius:4px;"></div>'
-            + '<p style="font-size:12px;color:var(--gray);margin-bottom:10px;">Scan this QR code on another device\'s browser to auto-configure Firebase sync.</p>'
-            + '<p style="font-size:12px;color:var(--gray);margin-bottom:6px;">Or copy the link:</p>'
+            + '<p style="font-size:12px;color:var(--gray);margin-bottom:10px;">' + T('dhmod_qr_instructions') + '</p>'
+            + '<p style="font-size:12px;color:var(--gray);margin-bottom:6px;">' + T('dhmod_or_copy_link') + '</p>'
             + '<input type="text" value="' + escapedUrl + '" readonly class="form-control" style="font-size:11px;" onclick="this.select()">'
             + '</div>',
             null, false);
@@ -145,15 +144,15 @@ function dataHistoryShowQR() {
             if (qrEl && typeof QRCode !== 'undefined') {
                 new QRCode(qrEl, { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
             } else if (qrEl) {
-                qrEl.textContent = 'QR library not loaded — use the link above.';
+                qrEl.textContent = T('dhmod_qr_lib_not_loaded');
             }
         }, 150);
-    } catch(e) { APP.notify('Error: ' + e.message, 'error'); }
+    } catch(e) { APP.notify(T('dhmod_msg_error_prefix') + e.message, 'error'); }
 }
 
 function dataHistoryDownloadFbConfig() {
     var cfg = _dataHistoryGetCfg();
-    if (!cfg) { APP.notify('Firebase config not available on this device', 'error'); return; }
+    if (!cfg) { APP.notify(T('dhmod_msg_fb_config_unavailable'), 'error'); return; }
     function esc(s) { return (s || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"'); }
     var content = [
         '// ═══════════════════════════════════════════════════════════════════',
@@ -211,8 +210,8 @@ function dataHistoryDownloadFbConfig() {
         a.href = bUrl; a.download = 'firebase-config.js';
         document.body.appendChild(a); a.click();
         setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(bUrl); }, 200);
-        APP.notify('Downloaded. Replace js/firebase-config.js and push to GitHub — all devices will auto-connect.', 'success');
-    } catch(e) { APP.notify('Download failed: ' + e.message, 'error'); }
+        APP.notify(T('dhmod_msg_downloaded_fb_config'), 'success');
+    } catch(e) { APP.notify(T('dhmod_msg_download_failed_prefix') + e.message, 'error'); }
 }
 
 /* ── Firebase setup ── */
@@ -228,39 +227,39 @@ function dataHistorySaveFbConfig() {
     };
     var msgEl = document.getElementById('fbSetupMsg');
     if (!cfg.apiKey || !cfg.databaseURL || !cfg.projectId || !cfg.appId) {
-        if (msgEl) { msgEl.style.color = 'var(--danger)'; msgEl.textContent = 'API Key, Database URL, Project ID and App ID are required.'; }
+        if (msgEl) { msgEl.style.color = 'var(--danger)'; msgEl.textContent = T('dhmod_msg_fb_fields_required'); }
         return;
     }
     try {
         localStorage.setItem('hms_firebase_cfg', JSON.stringify(cfg));
-        if (msgEl) { msgEl.style.color = 'var(--secondary)'; msgEl.textContent = 'Config saved! Reloading to connect to Firebase…'; }
+        if (msgEl) { msgEl.style.color = 'var(--secondary)'; msgEl.textContent = T('dhmod_msg_fb_config_saved'); }
         setTimeout(function() { window.location.reload(); }, 1200);
     } catch(e) {
-        if (msgEl) { msgEl.style.color = 'var(--danger)'; msgEl.textContent = 'Save error: ' + e.message; }
+        if (msgEl) { msgEl.style.color = 'var(--danger)'; msgEl.textContent = T('dhmod_msg_save_error_prefix') + e.message; }
     }
 }
 
 function dataHistoryClearFbConfig() {
-    if (!confirm('Clear Firebase config? The app will return to local-only mode.')) return;
+    if (!confirm(T('dhmod_confirm_clear_fb_config'))) return;
     localStorage.removeItem('hms_firebase_cfg');
-    APP.notify('Firebase config cleared. Reloading…', 'info');
+    APP.notify(T('dhmod_msg_fb_config_cleared'), 'info');
     setTimeout(function() { window.location.reload(); }, 800);
 }
 
 /* ── Cloud push / pull ── */
 function dataHistoryPushToCloud() {
-    confirmAction('Push all local data to Firebase cloud? This will overwrite cloud data.', function() {
-        try { SYNC.pushAll(); } catch(e) { APP.notify('Push failed: ' + e.message, 'error'); }
+    confirmAction(T('dhmod_confirm_push_cloud'), function() {
+        try { SYNC.pushAll(); } catch(e) { APP.notify(T('dhmod_msg_push_failed_prefix') + e.message, 'error'); }
     });
 }
 
 function dataHistoryPullFromCloud() {
-    confirmAction('Pull all data from Firebase? Local data will be merged with cloud data.', function() {
+    confirmAction(T('dhmod_confirm_pull_cloud'), function() {
         try {
             SYNC.pullNow(function(ok) {
                 if (ok) setTimeout(function() { APP.refreshCurrent(); }, 400);
             });
-        } catch(e) { APP.notify('Pull failed: ' + e.message, 'error'); }
+        } catch(e) { APP.notify(T('dhmod_msg_pull_failed_prefix') + e.message, 'error'); }
     });
 }
 
@@ -268,18 +267,18 @@ function dataHistoryPullFromCloud() {
 function dataHistorySnapNow() {
     var label = 'manual-' + new Date().toISOString().slice(0,16).replace('T',' ');
     DB.autoBackup(label);
-    APP.notify('Backup saved', 'success');
+    APP.notify(T('dhmod_msg_backup_saved'), 'success');
     APP.refreshCurrent();
 }
 
 function dataHistoryRestore(n) {
-    confirmAction('Restore this backup? ALL current data will be replaced. This cannot be undone.', function() {
+    confirmAction(T('dhmod_confirm_restore_backup'), function() {
         var result = DB.restoreFromSlot(n);
         if (result.success) {
-            APP.notify('Restored — reloading…', 'success');
+            APP.notify(T('dhmod_msg_restored_reloading'), 'success');
             setTimeout(function() { window.location.reload(); }, 1200);
         } else {
-            APP.notify('Restore failed: ' + (result.error || 'unknown'), 'error');
+            APP.notify(T('dhmod_msg_restore_failed_prefix') + (result.error || T('dhmod_unknown')), 'error');
         }
     });
 }
@@ -293,13 +292,13 @@ function dataHistoryImportFile(input) {
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function(e) {
-        confirmAction('Import this file? Records with matching IDs will be overwritten, others preserved.', function() {
+        confirmAction(T('dhmod_confirm_import_file'), function() {
             var result = DB.importAll(e.target.result, false);
             if (result.success) {
-                APP.notify('Import successful (' + result.count + ' stores). Reloading…', 'success');
+                APP.notify(T('dhmod_msg_import_success_prefix') + result.count + T('dhmod_msg_import_success_suffix'), 'success');
                 setTimeout(function() { window.location.reload(); }, 1200);
             } else {
-                APP.notify('Import failed: ' + (result.error || 'unknown'), 'error');
+                APP.notify(T('dhmod_msg_import_failed_prefix') + (result.error || T('dhmod_unknown')), 'error');
             }
         });
     };
