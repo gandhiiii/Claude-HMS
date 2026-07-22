@@ -1,0 +1,170 @@
+(function () {
+    if (typeof LANG === 'undefined') return;
+    LANG.extend({
+        en: {
+            /* Q Goals tab */
+            empd2_qgoals_not_loaded: 'Q Goals module not loaded.',
+
+            /* Checklists tab */
+            empd2_cl_my_checklists: 'My Checklists',
+            empd2_cl_all: 'All',
+            empd2_cl_daily: '🔄 Daily',
+            empd2_cl_weekly: '📅 Weekly',
+            empd2_cl_monthly: '🗓️ Monthly',
+            empd2_cl_none_all: 'No checklists assigned yet. Your HOD or Admin will assign them here.',
+            empd2_cl_none_filter: 'No {f} checklists assigned.',
+            empd2_freq_daily_cap: 'Daily',
+            empd2_freq_weekly_cap: 'Weekly',
+            empd2_freq_monthly_cap: 'Monthly',
+            empd2_cl_resets_in: '⏱ Resets in',
+            empd2_cl_submitted: '✓ Submitted',
+            empd2_cl_submit: '📤 Submit',
+            empd2_cl_open: 'Open',
+            empd2_done_word: 'done',
+            empd2_total_word: 'total',
+            empd2_cl_deadline: '📅 Deadline: ',
+
+            /* Performance tab */
+            empd2_perf_my_performance: 'My Performance',
+            empd2_perf_task_completion: 'Task Completion',
+            empd2_perf_problem_resolution: 'Problem Resolution',
+            empd2_perf_request_approval: 'Request Approval Rate',
+            empd2_perf_checklist_compliance: 'Checklist Compliance',
+            empd2_perf_q_summary: 'Q Summary Metrics',
+            empd2_perf_total_tasks: 'Total Tasks',
+            empd2_perf_completed: 'Completed',
+            empd2_perf_overdue: 'Overdue',
+            empd2_perf_checklists: 'Checklists',
+            empd2_perf_issues_raised: 'Issues Raised',
+            empd2_perf_requests_sent: 'Requests Sent',
+
+            /* Cleaning section */
+            empd2_clean_rooms_need: '{n} Rooms Need Cleaning',
+            empd2_clean_discharged_sub: 'Discharged patients\' rooms waiting to be cleaned.',
+            empd2_clean_all_clean: 'All Rooms Clean',
+            empd2_clean_none_sub: 'No pending cleaning tasks right now.',
+            empd2_clean_room: 'Room',
+            empd2_clean_floor: 'Floor',
+            empd2_clean_bed: 'Bed',
+            empd2_clean_discharged: 'Discharged: ',
+            empd2_clean_d_ago: 'd ago',
+            empd2_clean_today: 'Today',
+            empd2_clean_start: '▶ Start',
+            empd2_clean_mark: '✅ Mark Clean',
+            empd2_clean_by_you: '✅ Cleaned by You',
+            empd2_clean_th_patient: 'Patient',
+            empd2_clean_th_completed: 'Completed At',
+            empd2_clean_no_tasks: 'No cleaning tasks'
+        },
+        hi: {
+            /* Q Goals tab */
+            empd2_qgoals_not_loaded: 'Q लक्ष्य मॉड्यूल लोड नहीं हुआ।',
+
+            /* Checklists tab */
+            empd2_cl_my_checklists: 'मेरी चेकलिस्ट',
+            empd2_cl_all: 'सभी',
+            empd2_cl_daily: '🔄 दैनिक',
+            empd2_cl_weekly: '📅 साप्ताहिक',
+            empd2_cl_monthly: '🗓️ मासिक',
+            empd2_cl_none_all: 'अभी तक कोई चेकलिस्ट असाइन नहीं की गई। आपके एचओडी या एडमिन इन्हें यहाँ असाइन करेंगे।',
+            empd2_cl_none_filter: 'कोई {f} चेकलिस्ट असाइन नहीं की गई।',
+            empd2_freq_daily_cap: 'दैनिक',
+            empd2_freq_weekly_cap: 'साप्ताहिक',
+            empd2_freq_monthly_cap: 'मासिक',
+            empd2_cl_resets_in: '⏱ रीसेट होने में',
+            empd2_cl_submitted: '✓ सबमिट किया गया',
+            empd2_cl_submit: '📤 सबमिट करें',
+            empd2_cl_open: 'खोलें',
+            empd2_done_word: 'पूर्ण',
+            empd2_total_word: 'कुल',
+            empd2_cl_deadline: '📅 समय सीमा: ',
+
+            /* Performance tab */
+            empd2_perf_my_performance: 'मेरा प्रदर्शन',
+            empd2_perf_task_completion: 'कार्य पूर्णता',
+            empd2_perf_problem_resolution: 'समस्या समाधान',
+            empd2_perf_request_approval: 'अनुरोध स्वीकृति दर',
+            empd2_perf_checklist_compliance: 'चेकलिस्ट अनुपालन',
+            empd2_perf_q_summary: 'Q सारांश मेट्रिक्स',
+            empd2_perf_total_tasks: 'कुल कार्य',
+            empd2_perf_completed: 'पूर्ण',
+            empd2_perf_overdue: 'विलंबित',
+            empd2_perf_checklists: 'चेकलिस्ट',
+            empd2_perf_issues_raised: 'उठाई गई समस्याएँ',
+            empd2_perf_requests_sent: 'भेजे गए अनुरोध',
+
+            /* Cleaning section */
+            empd2_clean_rooms_need: '{n} कमरों की सफाई बाकी है',
+            empd2_clean_discharged_sub: 'छुट्टी दिए गए मरीजों के कमरे सफाई की प्रतीक्षा में हैं।',
+            empd2_clean_all_clean: 'सभी कमरे साफ हैं',
+            empd2_clean_none_sub: 'अभी कोई सफाई कार्य लंबित नहीं है।',
+            empd2_clean_room: 'कमरा',
+            empd2_clean_floor: 'मंज़िल',
+            empd2_clean_bed: 'बेड',
+            empd2_clean_discharged: 'छुट्टी: ',
+            empd2_clean_d_ago: ' दिन पहले',
+            empd2_clean_today: 'आज',
+            empd2_clean_start: '▶ शुरू करें',
+            empd2_clean_mark: '✅ साफ के रूप में चिह्नित करें',
+            empd2_clean_by_you: '✅ आपके द्वारा साफ किया गया',
+            empd2_clean_th_patient: 'मरीज़',
+            empd2_clean_th_completed: 'पूर्ण होने का समय',
+            empd2_clean_no_tasks: 'कोई सफाई कार्य नहीं'
+        },
+        gu: {
+            /* Q Goals tab */
+            empd2_qgoals_not_loaded: 'Q ધ્યેય મોડ્યુલ લોડ થયું નથી.',
+
+            /* Checklists tab */
+            empd2_cl_my_checklists: 'મારી ચેકલિસ્ટ',
+            empd2_cl_all: 'બધી',
+            empd2_cl_daily: '🔄 દૈનિક',
+            empd2_cl_weekly: '📅 સાપ્તાહિક',
+            empd2_cl_monthly: '🗓️ માસિક',
+            empd2_cl_none_all: 'હજી સુધી કોઈ ચેકલિસ્ટ સોંપાયેલ નથી. તમારા એચઓડી અથવા એડમિન તેને અહીં સોંપશે.',
+            empd2_cl_none_filter: 'કોઈ {f} ચેકલિસ્ટ સોંપાયેલ નથી.',
+            empd2_freq_daily_cap: 'દૈનિક',
+            empd2_freq_weekly_cap: 'સાપ્તાહિક',
+            empd2_freq_monthly_cap: 'માસિક',
+            empd2_cl_resets_in: '⏱ રીસેટ થવામાં',
+            empd2_cl_submitted: '✓ સબમિટ કર્યું',
+            empd2_cl_submit: '📤 સબમિટ કરો',
+            empd2_cl_open: 'ખોલો',
+            empd2_done_word: 'પૂર્ણ',
+            empd2_total_word: 'કુલ',
+            empd2_cl_deadline: '📅 સમયમર્યાદા: ',
+
+            /* Performance tab */
+            empd2_perf_my_performance: 'મારું પ્રદર્શન',
+            empd2_perf_task_completion: 'કાર્ય પૂર્ણતા',
+            empd2_perf_problem_resolution: 'સમસ્યા નિરાકરણ',
+            empd2_perf_request_approval: 'વિનંતી મંજૂરી દર',
+            empd2_perf_checklist_compliance: 'ચેકલિસ્ટ અનુપાલન',
+            empd2_perf_q_summary: 'Q સારાંશ મેટ્રિક્સ',
+            empd2_perf_total_tasks: 'કુલ કાર્યો',
+            empd2_perf_completed: 'પૂર્ણ',
+            empd2_perf_overdue: 'મુદત વીતી',
+            empd2_perf_checklists: 'ચેકલિસ્ટ',
+            empd2_perf_issues_raised: 'ઉઠાવેલ સમસ્યાઓ',
+            empd2_perf_requests_sent: 'મોકલેલ વિનંતીઓ',
+
+            /* Cleaning section */
+            empd2_clean_rooms_need: '{n} રૂમની સફાઈ બાકી છે',
+            empd2_clean_discharged_sub: 'રજા આપેલ દર્દીઓના રૂમ સફાઈની રાહ જોઈ રહ્યા છે.',
+            empd2_clean_all_clean: 'બધા રૂમ સાફ છે',
+            empd2_clean_none_sub: 'હાલમાં કોઈ સફાઈ કાર્ય બાકી નથી.',
+            empd2_clean_room: 'રૂમ',
+            empd2_clean_floor: 'માળ',
+            empd2_clean_bed: 'બેડ',
+            empd2_clean_discharged: 'રજા: ',
+            empd2_clean_d_ago: ' દિવસ પહેલાં',
+            empd2_clean_today: 'આજ',
+            empd2_clean_start: '▶ શરૂ કરો',
+            empd2_clean_mark: '✅ સાફ તરીકે ચિહ્નિત કરો',
+            empd2_clean_by_you: '✅ તમારા દ્વારા સાફ કરેલ',
+            empd2_clean_th_patient: 'દર્દી',
+            empd2_clean_th_completed: 'પૂર્ણ થયાનો સમય',
+            empd2_clean_no_tasks: 'કોઈ સફાઈ કાર્ય નથી'
+        }
+    });
+})();

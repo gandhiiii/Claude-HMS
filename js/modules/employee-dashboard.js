@@ -360,7 +360,7 @@ function renderEmpQGoalsTab(el) {
     if (typeof renderEmpQP === 'function') {
         renderEmpQP(el, user.username, user.fullName);
     } else {
-        el.innerHTML = '<div class="empty-state">Q Goals module not loaded.</div>';
+        el.innerHTML = '<div class="empty-state">' + T('empd2_qgoals_not_loaded') + '</div>';
     }
 }
 
@@ -638,14 +638,14 @@ function renderEmpChecklistsTab(el) {
     var monthly = myChecklists.filter(function(c){ return c.frequency === 'monthly'; });
 
     var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">'
-        + '<div style="font-weight:700;font-size:16px;">✅ My Checklists'
+        + '<div style="font-weight:700;font-size:16px;">✅ ' + T('empd2_cl_my_checklists')
         + ' <span class="badge badge-primary" style="font-size:11px;margin-left:4px;">' + myChecklists.length + '</span></div>'
         + '</div>'
         + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;">'
-        + '<button class="tab-btn active" onclick="filterEmpCl(\'all\',this)">All (' + myChecklists.length + ')</button>'
-        + '<button class="tab-btn" onclick="filterEmpCl(\'daily\',this)">🔄 Daily (' + daily.length + ')</button>'
-        + '<button class="tab-btn" onclick="filterEmpCl(\'weekly\',this)">📅 Weekly (' + weekly.length + ')</button>'
-        + '<button class="tab-btn" onclick="filterEmpCl(\'monthly\',this)">🗓️ Monthly (' + monthly.length + ')</button>'
+        + '<button class="tab-btn active" onclick="filterEmpCl(\'all\',this)">' + T('empd2_cl_all') + ' (' + myChecklists.length + ')</button>'
+        + '<button class="tab-btn" onclick="filterEmpCl(\'daily\',this)">' + T('empd2_cl_daily') + ' (' + daily.length + ')</button>'
+        + '<button class="tab-btn" onclick="filterEmpCl(\'weekly\',this)">' + T('empd2_cl_weekly') + ' (' + weekly.length + ')</button>'
+        + '<button class="tab-btn" onclick="filterEmpCl(\'monthly\',this)">' + T('empd2_cl_monthly') + ' (' + monthly.length + ')</button>'
         + '</div>';
 
     html += '<div id="empClListNew"></div>';
@@ -672,9 +672,10 @@ function _renderEmpChecklists(checklists) {
         return true; // 'all'
     });
     if (filtered.length === 0) {
+        var freqWordMap = { daily: T('empd2_freq_daily_cap'), weekly: T('empd2_freq_weekly_cap'), monthly: T('empd2_freq_monthly_cap') };
         var msg = _empClFilter === 'all'
-            ? 'No checklists assigned yet. Your HOD or Admin will assign them here.'
-            : 'No ' + _empClFilter + ' checklists assigned.';
+            ? T('empd2_cl_none_all')
+            : T('empd2_cl_none_filter').replace('{f}', freqWordMap[_empClFilter] || _empClFilter);
         el.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:24px;text-align:center;background:var(--light-gray);border-radius:8px;">' + msg + '</div>';
         return;
     }
@@ -691,6 +692,7 @@ function _renderEmpChecklists(checklists) {
         var bg    = freqBg[freq]  || '#e3f2fd';
         var clr   = freqClr[freq] || '#1565c0';
         var icon  = freqIcon[freq]|| '🔄';
+        var freqCap = { daily: T('empd2_freq_daily_cap'), weekly: T('empd2_freq_weekly_cap'), monthly: T('empd2_freq_monthly_cap') }[freq] || (freq.charAt(0).toUpperCase() + freq.slice(1));
         var periodLabel = _clPeriodLabel(freq);
         var timeLeft    = _clTimeUntil(_clNextReset(freq));
         var submitted   = !!cl.periodSubmitted;
@@ -701,23 +703,23 @@ function _renderEmpChecklists(checklists) {
             + '<div>'
             + '<div style="font-size:14px;font-weight:600;">' + (cl.title || '') + (cl.floor ? ' <span style="font-size:11px;color:var(--gray);">· ' + cl.floor + '</span>' : '') + '</div>'
             + '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:4px;">'
-            + '<span style="background:' + bg + ';color:' + clr + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + icon + ' ' + freq.charAt(0).toUpperCase() + freq.slice(1) + '</span>'
+            + '<span style="background:' + bg + ';color:' + clr + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + icon + ' ' + freqCap + '</span>'
             + '<span style="font-size:11px;color:var(--gray);">' + periodLabel + '</span>'
-            + '<span style="font-size:11px;color:var(--gray);">⏱ Resets in ' + timeLeft + '</span>'
-            + (submitted ? '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">✓ Submitted</span>' : '')
+            + '<span style="font-size:11px;color:var(--gray);">' + T('empd2_cl_resets_in') + ' ' + timeLeft + '</span>'
+            + (submitted ? '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + T('empd2_cl_submitted') + '</span>' : '')
             + '</div>'
             + '</div>'
             + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
             + '<span class="badge ' + (cl.status === 'completed' ? 'badge-success' : 'badge-info') + '" style="font-size:11px;">' + (cl.status || 'active') + '</span>'
-            + (!submitted ? '<button class="btn btn-sm btn-success" onclick="empSubmitClPeriod(\'' + cl.id + '\')" style="font-size:11px;padding:3px 8px;">📤 Submit</button>' : '')
-            + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'checklists\')" style="font-size:11px;padding:3px 8px;">Open</button>'
+            + (!submitted ? '<button class="btn btn-sm btn-success" onclick="empSubmitClPeriod(\'' + cl.id + '\')" style="font-size:11px;padding:3px 8px;">' + T('empd2_cl_submit') + '</button>' : '')
+            + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'checklists\')" style="font-size:11px;padding:3px 8px;">' + T('empd2_cl_open') + '</button>'
             + '</div></div>'
             // Progress bar
             + '<div style="display:flex;align-items:center;gap:8px;">'
             + '<div style="flex:1;height:8px;background:var(--light-gray);border-radius:4px;"><div style="height:100%;width:' + pct + '%;background:' + (pct === 100 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)') + ';border-radius:4px;transition:width .3s;"></div></div>'
-            + '<span style="font-size:12px;color:var(--gray);min-width:55px;">' + done + '/' + total + ' done</span>'
+            + '<span style="font-size:12px;color:var(--gray);min-width:55px;">' + done + '/' + total + ' ' + T('empd2_done_word') + '</span>'
             + '</div>'
-            + (cl.deadline ? '<div style="font-size:11px;color:' + (isDue ? 'var(--warning)' : 'var(--gray)') + ';">📅 Deadline: ' + APP.formatDate(cl.deadline) + '</div>' : '')
+            + (cl.deadline ? '<div style="font-size:11px;color:' + (isDue ? 'var(--warning)' : 'var(--gray)') + ';">' + T('empd2_cl_deadline') + APP.formatDate(cl.deadline) + '</div>' : '')
             + '</div>';
     });
     el.innerHTML = html;
@@ -878,24 +880,24 @@ function renderEmpPerformanceTab(el) {
         return '<div class="q-progress-track" style="height:20px;"><div class="q-progress-fill" style="width:' + pct + '%;background:' + color + ';display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;">' + (pct > 10 ? pct + '%' : '') + '</div></div>';
     }
 
-    var html = '<div style="font-weight:700;font-size:16px;margin-bottom:16px;">📊 My Performance — ' + q.name + '</div>'
+    var html = '<div style="font-weight:700;font-size:16px;margin-bottom:16px;">📊 ' + T('empd2_perf_my_performance') + ' — ' + q.name + '</div>'
 
         + '<div class="grid-2" style="gap:20px;margin-bottom:24px;">'
-        + _perfCard('Task Completion', tasksDone, d.myTasks.length, taskRate, 'var(--success)')
-        + _perfCard('Problem Resolution', probsSolved, d.myProblems.length, probRate, 'var(--info)')
-        + _perfCard('Request Approval Rate', reqApproved, d.myRequests.length, reqRate, 'var(--warning)')
-        + _perfCard('Checklist Compliance', clDone, d.myChecklists.length, clRate, 'var(--primary)')
+        + _perfCard(T('empd2_perf_task_completion'), tasksDone, d.myTasks.length, taskRate, 'var(--success)')
+        + _perfCard(T('empd2_perf_problem_resolution'), probsSolved, d.myProblems.length, probRate, 'var(--info)')
+        + _perfCard(T('empd2_perf_request_approval'), reqApproved, d.myRequests.length, reqRate, 'var(--warning)')
+        + _perfCard(T('empd2_perf_checklist_compliance'), clDone, d.myChecklists.length, clRate, 'var(--primary)')
         + '</div>'
 
         + '<div style="background:var(--light-gray);border-radius:10px;padding:16px;">'
-        + '<div style="font-weight:600;font-size:14px;margin-bottom:10px;">Q Summary Metrics</div>'
+        + '<div style="font-weight:600;font-size:14px;margin-bottom:10px;">' + T('empd2_perf_q_summary') + '</div>'
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">'
-        + _summaryNum(d.myTasks.length, 'Total Tasks')
-        + _summaryNum(tasksDone, 'Completed')
-        + _summaryNum(d.myTasks.filter(function(t){return t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='completed';}).length, 'Overdue', 'var(--danger)')
-        + _summaryNum(d.myChecklists.length, 'Checklists')
-        + _summaryNum(d.myProblems.length, 'Issues Raised')
-        + _summaryNum(d.myRequests.length, 'Requests Sent')
+        + _summaryNum(d.myTasks.length, T('empd2_perf_total_tasks'))
+        + _summaryNum(tasksDone, T('empd2_perf_completed'))
+        + _summaryNum(d.myTasks.filter(function(t){return t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='completed';}).length, T('empd2_perf_overdue'), 'var(--danger)')
+        + _summaryNum(d.myChecklists.length, T('empd2_perf_checklists'))
+        + _summaryNum(d.myProblems.length, T('empd2_perf_issues_raised'))
+        + _summaryNum(d.myRequests.length, T('empd2_perf_requests_sent'))
         + '</div></div>';
 
     el.innerHTML = html;
@@ -906,7 +908,7 @@ function _perfCard(label, done, total, pct, color) {
         + '<div style="font-size:13px;font-weight:600;margin-bottom:10px;">' + label + '</div>'
         + '<div class="q-progress-track" style="height:20px;margin-bottom:6px;"><div class="q-progress-fill" style="width:' + pct + '%;background:' + color + ';display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;">' + (pct > 10 ? pct + '%' : '') + '</div></div>'
         + '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray);">'
-        + '<span>' + done + ' done</span><span>' + total + ' total</span></div></div>';
+        + '<span>' + done + ' ' + T('empd2_done_word') + '</span><span>' + total + ' ' + T('empd2_total_word') + '</span></div></div>';
 }
 
 function _summaryNum(val, label, color) {
@@ -931,13 +933,13 @@ function renderEmpCleaningSection(el) {
     if (pending.length > 0) {
         html += '<div style="background:#fff3e0;border:2px solid var(--warning);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">'
             + '<span style="font-size:28px;">🧹</span>'
-            + '<div><div style="font-weight:700;font-size:15px;color:#e65100;">' + pending.length + ' Room' + (pending.length>1?'s':'') + ' Need Cleaning</div>'
-            + '<div style="font-size:13px;color:var(--gray);">Discharged patients\' rooms waiting to be cleaned.</div></div></div>';
+            + '<div><div style="font-weight:700;font-size:15px;color:#e65100;">' + T('empd2_clean_rooms_need').replace('{n}', pending.length) + '</div>'
+            + '<div style="font-size:13px;color:var(--gray);">' + T('empd2_clean_discharged_sub') + '</div></div></div>';
     } else {
         html += '<div style="background:#e8f5e9;border:2px solid var(--secondary);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">'
             + '<span style="font-size:28px;">✅</span>'
-            + '<div><div style="font-weight:700;font-size:15px;color:var(--secondary);">All Rooms Clean</div>'
-            + '<div style="font-size:13px;color:var(--gray);">No pending cleaning tasks right now.</div></div></div>';
+            + '<div><div style="font-weight:700;font-size:15px;color:var(--secondary);">' + T('empd2_clean_all_clean') + '</div>'
+            + '<div style="font-size:13px;color:var(--gray);">' + T('empd2_clean_none_sub') + '</div></div></div>';
     }
 
     if (pending.length > 0) {
@@ -948,28 +950,28 @@ function renderEmpCleaningSection(el) {
             var border  = since >= 1 ? 'var(--danger)' : 'var(--warning)';
             html += '<div style="background:' + urgency + ';border:2px solid ' + border + ';border-radius:10px;padding:14px;">'
                 + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
-                + '<span style="font-size:22px;font-weight:700;">Room ' + t.roomNo + '</span>'
+                + '<span style="font-size:22px;font-weight:700;">' + T('empd2_clean_room') + ' ' + t.roomNo + '</span>'
                 + '<span class="badge ' + (t.status==='in-progress'?'badge-info':'badge-warning') + '">' + t.status + '</span></div>'
                 + '<div style="font-size:12px;color:var(--gray);margin-bottom:6px;">'
-                + (t.floor?'Floor '+t.floor+' | ':'') + (t.category||'') + (t.bedId?' | Bed '+t.bedId:'')
+                + (t.floor?T('empd2_clean_floor')+' '+t.floor+' | ':'') + (t.category||'') + (t.bedId?' | '+T('empd2_clean_bed')+' '+t.bedId:'')
                 + '</div>'
                 + '<div style="font-size:13px;margin-bottom:4px;">👤 <strong>' + t.patientName + '</strong></div>'
                 + '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">'
-                + 'Discharged: ' + (t.dischargedAt ? new Date(t.dischargedAt).toLocaleDateString('en-IN') : '—')
-                + (since > 0 ? ' &nbsp;·&nbsp; <span style="color:var(--danger);font-weight:600;">' + since + 'd ago</span>' : ' &nbsp;·&nbsp; Today')
+                + T('empd2_clean_discharged') + (t.dischargedAt ? new Date(t.dischargedAt).toLocaleDateString('en-IN') : '—')
+                + (since > 0 ? ' &nbsp;·&nbsp; <span style="color:var(--danger);font-weight:600;">' + since + T('empd2_clean_d_ago') + '</span>' : ' &nbsp;·&nbsp; ' + T('empd2_clean_today'))
                 + '</div>'
                 + (t.assignedTo ? '<div style="font-size:12px;margin-bottom:6px;">👷 ' + t.assignedTo + '</div>' : '')
                 + '<div style="display:flex;gap:6px;">'
-                + (t.status==='pending' ? '<button class="btn btn-sm btn-warning" style="color:#fff;" onclick="empStartCleaning(\'' + t.id + '\')">▶ Start</button>' : '')
-                + '<button class="btn btn-sm btn-success" onclick="empCompleteCleaning(\'' + t.id + '\')">✅ Mark Clean</button>'
+                + (t.status==='pending' ? '<button class="btn btn-sm btn-warning" style="color:#fff;" onclick="empStartCleaning(\'' + t.id + '\')">' + T('empd2_clean_start') + '</button>' : '')
+                + '<button class="btn btn-sm btn-success" onclick="empCompleteCleaning(\'' + t.id + '\')">' + T('empd2_clean_mark') + '</button>'
                 + '</div></div>';
         });
         html += '</div>';
     }
 
     if (myDone.length > 0) {
-        html += '<div style="font-weight:600;font-size:14px;color:var(--gray);margin-bottom:8px;">✅ Cleaned by You</div>'
-            + '<div class="table-responsive"><table><thead><tr><th>Room</th><th>Patient</th><th>Completed At</th></tr></thead><tbody>';
+        html += '<div style="font-weight:600;font-size:14px;color:var(--gray);margin-bottom:8px;">' + T('empd2_clean_by_you') + '</div>'
+            + '<div class="table-responsive"><table><thead><tr><th>' + T('empd2_clean_room') + '</th><th>' + T('empd2_clean_th_patient') + '</th><th>' + T('empd2_clean_th_completed') + '</th></tr></thead><tbody>';
         myDone.slice().reverse().slice(0,10).forEach(function(t) {
             html += '<tr><td><strong>' + t.roomNo + '</strong></td><td>' + t.patientName + '</td>'
                 + '<td>' + (t.completedAt ? APP.formatDateTime(t.completedAt) : '—') + '</td></tr>';
@@ -977,7 +979,7 @@ function renderEmpCleaningSection(el) {
         html += '</tbody></table></div>';
     }
 
-    el.innerHTML = html || '<div class="empty-state">No cleaning tasks</div>';
+    el.innerHTML = html || '<div class="empty-state">' + T('empd2_clean_no_tasks') + '</div>';
 }
 
 function empStartCleaning(taskId) {
