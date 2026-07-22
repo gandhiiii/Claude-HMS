@@ -31,15 +31,15 @@ function _bKpi(val, label, color, icon, sub) {
 function renderBudget(container) {
     var user = AUTH.currentUser();
     if (!user || (user.role !== 'admin' && !user.isSuperAdmin)) {
-        container.innerHTML = '<div class="card"><div class="empty-state" style="padding:40px;">🔒 Access Denied — Budget is restricted to administrators only.</div></div>';
+        container.innerHTML = '<div class="card"><div class="empty-state" style="padding:40px;">' + T('budmod_access_denied') + '</div></div>';
         return;
     }
 
     var TABS = [
-        { id: 'overview',    label: '📊 Overview',    color: '#1a73e8' },
-        { id: 'set-budget',  label: '💰 Set Budgets',  color: '#34a853' },
-        { id: 'expenses',    label: '📋 Expenses',     color: '#ea4335' },
-        { id: 'reports',     label: '📈 Reports',      color: '#9c27b0' }
+        { id: 'overview',    label: T('budmod_tab_overview'),    color: '#1a73e8' },
+        { id: 'set-budget',  label: T('budmod_tab_set_budgets'), color: '#34a853' },
+        { id: 'expenses',    label: T('budmod_tab_expenses'),    color: '#ea4335' },
+        { id: 'reports',     label: T('budmod_tab_reports'),     color: '#9c27b0' }
     ];
 
     var btnHtml = TABS.map(function(t) {
@@ -121,29 +121,29 @@ function _bOverview(el) {
             + '<div style="font-size:14px;font-weight:700;">' + nm + '</div>'
             + '<span style="font-size:15px;font-weight:800;color:' + col + ';">' + pct + '%</span></div>'
             + '<div style="font-size:12px;color:var(--gray);display:flex;justify-content:space-between;margin-bottom:6px;">'
-            + '<span>Budget: <strong style="color:var(--text);">' + _bFmt(bAmt) + '</strong></span>'
-            + '<span>Spent: <strong style="color:' + (pct>80?'#ea4335':'var(--text)') + ';">' + _bFmt(spent) + '</strong></span>'
+            + '<span>' + T('budmod_label_budget_colon') + ' <strong style="color:var(--text);">' + _bFmt(bAmt) + '</strong></span>'
+            + '<span>' + T('budmod_label_spent_colon') + ' <strong style="color:' + (pct>80?'#ea4335':'var(--text)') + ';">' + _bFmt(spent) + '</strong></span>'
             + '</div>'
             + '<div style="height:8px;background:var(--light-gray);border-radius:4px;overflow:hidden;margin-bottom:6px;">'
             + '<div style="height:100%;width:' + Math.min(pct,100) + '%;background:' + col + ';border-radius:4px;transition:width .5s;"></div></div>'
-            + '<div style="font-size:11px;color:var(--gray);">Remaining: <strong style="color:' + (rem<0?'#ea4335':'#34a853') + ';">' + _bFmt(rem) + '</strong>'
-            + (rem < 0 ? ' <span style="color:#ea4335;font-weight:700;">⚠️ Overspent</span>' : '') + '</div>'
+            + '<div style="font-size:11px;color:var(--gray);">' + T('budmod_label_remaining_colon') + ' <strong style="color:' + (rem<0?'#ea4335':'#34a853') + ';">' + _bFmt(rem) + '</strong>'
+            + (rem < 0 ? ' <span style="color:#ea4335;font-weight:700;">' + T('budmod_overspent') + '</span>' : '') + '</div>'
             + '</div>';
     }).join('');
 
     el.innerHTML =
         '<div class="grid-4 mb-4">'
-        + _bKpi(_bFmt(totalBudget), 'Total Budget',  '#1a73e8', '💰', allDepts.length + ' departments')
-        + _bKpi(_bFmt(totalSpent),  'Total Spent',   '#ea4335', '💸', utilPct + '% utilized')
-        + _bKpi(_bFmt(remaining),   'Remaining',     remaining >= 0 ? '#34a853' : '#ea4335', '🏦', remaining < 0 ? '⚠️ Over budget' : 'available')
-        + _bKpi(utilPct + '%',      'Utilization',   utilPct >= 90 ? '#ea4335' : utilPct >= 70 ? '#fbbc04' : '#34a853', '📊', 'of total budget')
+        + _bKpi(_bFmt(totalBudget), T('budmod_kpi_total_budget'),  '#1a73e8', '💰', allDepts.length + T('budmod_suffix_departments'))
+        + _bKpi(_bFmt(totalSpent),  T('budmod_kpi_total_spent'),   '#ea4335', '💸', utilPct + T('budmod_suffix_pct_utilized'))
+        + _bKpi(_bFmt(remaining),   T('budmod_kpi_remaining'),     remaining >= 0 ? '#34a853' : '#ea4335', '🏦', remaining < 0 ? T('budmod_over_budget') : T('budmod_available'))
+        + _bKpi(utilPct + '%',      T('budmod_kpi_utilization'),   utilPct >= 90 ? '#ea4335' : utilPct >= 70 ? '#fbbc04' : '#34a853', '📊', T('budmod_of_total_budget'))
         + '</div>'
         + (allDepts.length > 0
             ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:20px;">' + deptCards + '</div>'
-            : '<div class="card" style="margin-bottom:16px;"><div class="empty-state">No budgets set yet. Go to <strong>Set Budgets</strong> to allocate department budgets.</div></div>')
+            : '<div class="card" style="margin-bottom:16px;"><div class="empty-state">' + T('budmod_empty_budgets_prefix') + '<strong>' + T('budmod_empty_budgets_bold') + '</strong>' + T('budmod_empty_budgets_suffix') + '</div></div>')
         + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">'
-        + '<div class="card" style="padding:16px;"><div style="font-size:14px;font-weight:700;margin-bottom:12px;">Budget vs Expenses by Department</div><div style="position:relative;height:260px;"><canvas id="bo_deptBar"></canvas></div></div>'
-        + '<div class="card" style="padding:16px;"><div style="font-size:14px;font-weight:700;margin-bottom:12px;">Expenses by Category</div><div style="position:relative;height:260px;"><canvas id="bo_catPie"></canvas></div></div>'
+        + '<div class="card" style="padding:16px;"><div style="font-size:14px;font-weight:700;margin-bottom:12px;">' + T('budmod_chart_budget_vs_expenses') + '</div><div style="position:relative;height:260px;"><canvas id="bo_deptBar"></canvas></div></div>'
+        + '<div class="card" style="padding:16px;"><div style="font-size:14px;font-weight:700;margin-bottom:12px;">' + T('budmod_chart_expenses_by_category') + '</div><div style="position:relative;height:260px;"><canvas id="bo_catPie"></canvas></div></div>'
         + '</div>';
 
     setTimeout(function() {
@@ -153,8 +153,8 @@ function _bOverview(el) {
                 data: {
                     labels: allDepts,
                     datasets: [
-                        { label: 'Budget', data: allDepts.map(function(n){ return latestBudget[n]?(parseFloat(latestBudget[n].amount)||0):0; }), backgroundColor: '#1a73e8', borderRadius: 4 },
-                        { label: 'Spent',  data: allDepts.map(function(n){ return deptSpent[n]||0; }),  backgroundColor: '#ea4335', borderRadius: 4 }
+                        { label: T('budmod_dataset_budget'), data: allDepts.map(function(n){ return latestBudget[n]?(parseFloat(latestBudget[n].amount)||0):0; }), backgroundColor: '#1a73e8', borderRadius: 4 },
+                        { label: T('budmod_dataset_spent'),  data: allDepts.map(function(n){ return deptSpent[n]||0; }),  backgroundColor: '#ea4335', borderRadius: 4 }
                     ]
                 },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } },
@@ -191,14 +191,14 @@ function _bSetBudgets(el) {
         var b = latestBudget[d.name];
         return '<tr>'
             + '<td><strong>' + d.name + '</strong></td>'
-            + '<td>' + (b ? '<strong style="color:#1a73e8;">' + _bFmt(b.amount) + '</strong>' : '<span style="color:var(--gray);">Not set</span>') + '</td>'
+            + '<td>' + (b ? '<strong style="color:#1a73e8;">' + _bFmt(b.amount) + '</strong>' : '<span style="color:var(--gray);">' + T('budmod_not_set') + '</span>') + '</td>'
             + '<td>' + (b ? (b.period||'-') : '-') + '</td>'
             + '<td>' + (b ? (b.periodLabel||'-') : '-') + '</td>'
             + '<td style="max-width:200px;font-size:12px;color:var(--gray);">' + (b&&b.notes ? b.notes : '-') + '</td>'
             + '<td>' + (b ? APP.formatDate(b.updatedAt||b.createdAt) : '-') + '</td>'
             + '<td style="white-space:nowrap;">'
-            + '<button class="btn btn-sm btn-primary" onclick="showBudgetForm(\'' + d.name.replace(/'/g,"\\'") + '\')">' + (b ? '✏️ Update' : '+ Set') + '</button>'
-            + (b ? ' <button class="btn btn-sm btn-danger" onclick="deleteBudgetEntry(\'' + b.id + '\')">Del</button>' : '')
+            + '<button class="btn btn-sm btn-primary" onclick="showBudgetForm(\'' + d.name.replace(/'/g,"\\'") + '\')">' + (b ? T('budmod_btn_update') : T('budmod_btn_set')) + '</button>'
+            + (b ? ' <button class="btn btn-sm btn-danger" onclick="deleteBudgetEntry(\'' + b.id + '\')">' + T('budmod_btn_del') + '</button>' : '')
             + '</td></tr>';
     }).join('');
 
@@ -210,17 +210,17 @@ function _bSetBudgets(el) {
 
     el.innerHTML =
         '<div class="flex-between mb-4">'
-        + '<div style="font-size:13px;color:var(--gray);">Allocate budgets per department. The latest budget per department is used for tracking.</div>'
-        + '<button class="btn btn-primary" onclick="showBudgetForm(null)">+ Set Budget</button>'
+        + '<div style="font-size:13px;color:var(--gray);">' + T('budmod_hint_allocate') + '</div>'
+        + '<button class="btn btn-primary" onclick="showBudgetForm(null)">' + T('budmod_btn_set_budget') + '</button>'
         + '</div>'
         + '<div class="card mb-4"><div class="table-responsive"><table><thead><tr>'
-        + '<th>Department</th><th>Budget Amount</th><th>Period Type</th><th>Period</th><th>Notes</th><th>Last Set</th><th>Actions</th>'
+        + '<th>' + T('budmod_th_department') + '</th><th>' + T('budmod_th_budget_amount') + '</th><th>' + T('budmod_th_period_type') + '</th><th>' + T('budmod_th_period') + '</th><th>' + T('budmod_th_notes') + '</th><th>' + T('budmod_th_last_set') + '</th><th>' + T('budmod_th_actions') + '</th>'
         + '</tr></thead><tbody>'
-        + (deptRows || '<tr><td colspan="7" class="empty-state">No departments found. Add departments first.</td></tr>')
+        + (deptRows || '<tr><td colspan="7" class="empty-state">' + T('budmod_empty_no_departments') + '</td></tr>')
         + '</tbody></table></div></div>'
         + (budgets.length > 0
-            ? '<div class="card"><div style="font-size:14px;font-weight:700;padding:12px 16px;border-bottom:1px solid var(--light-gray);">Budget History (last 20)</div>'
-            + '<div class="table-responsive"><table><thead><tr><th>Department</th><th>Amount</th><th>Type</th><th>Period</th><th>Date Set</th></tr></thead>'
+            ? '<div class="card"><div style="font-size:14px;font-weight:700;padding:12px 16px;border-bottom:1px solid var(--light-gray);">' + T('budmod_history_title') + '</div>'
+            + '<div class="table-responsive"><table><thead><tr><th>' + T('budmod_th_department') + '</th><th>' + T('budmod_th_amount') + '</th><th>' + T('budmod_th_type') + '</th><th>' + T('budmod_th_period') + '</th><th>' + T('budmod_th_date_set') + '</th></tr></thead>'
             + '<tbody>' + histRows + '</tbody></table></div></div>'
             : '');
 }
@@ -236,26 +236,26 @@ function showBudgetForm(dept) {
 
     var html = '<form id="budgetForm">'
         + '<div class="grid-2">'
-        + '<div class="form-group"><label>Department *</label>'
-        + '<select name="department" class="form-control" required><option value="">Select department</option>' + deptOpts + '</select></div>'
-        + '<div class="form-group"><label>Budget Amount (₹) *</label>'
-        + '<input type="number" name="amount" class="form-control" placeholder="e.g. 500000" min="1" step="100" required></div>'
-        + '<div class="form-group"><label>Period Type</label>'
+        + '<div class="form-group"><label>' + T('budmod_label_department_req') + '</label>'
+        + '<select name="department" class="form-control" required><option value="">' + T('budmod_opt_select_department') + '</option>' + deptOpts + '</select></div>'
+        + '<div class="form-group"><label>' + T('budmod_label_budget_amount') + '</label>'
+        + '<input type="number" name="amount" class="form-control" placeholder="' + T('budmod_placeholder_amount_example') + '" min="1" step="100" required></div>'
+        + '<div class="form-group"><label>' + T('budmod_label_period_type') + '</label>'
         + '<select name="period" class="form-control" onchange="bTogglePeriod(this)">'
-        + '<option value="monthly">Monthly</option>'
-        + '<option value="quarterly">Quarterly</option>'
-        + '<option value="annual">Annual</option>'
+        + '<option value="monthly">' + T('budmod_opt_monthly') + '</option>'
+        + '<option value="quarterly">' + T('budmod_opt_quarterly') + '</option>'
+        + '<option value="annual">' + T('budmod_opt_annual') + '</option>'
         + '</select></div>'
-        + '<div class="form-group" id="bMonthGroup"><label>Month</label>'
+        + '<div class="form-group" id="bMonthGroup"><label>' + T('budmod_label_month') + '</label>'
         + '<input type="month" name="periodMonth" class="form-control" value="' + currMonth + '"></div>'
-        + '<div class="form-group" id="bYearGroup" style="display:none;"><label>Year</label>'
+        + '<div class="form-group" id="bYearGroup" style="display:none;"><label>' + T('budmod_label_year') + '</label>'
         + '<input type="number" name="periodYear" class="form-control" value="' + currYear + '" min="2020" max="2040"></div>'
         + '</div>'
-        + '<div class="form-group"><label>Notes / Remarks</label>'
-        + '<textarea name="notes" class="form-control" rows="2" placeholder="e.g. Q3 allocation, includes equipment budget..."></textarea></div>'
+        + '<div class="form-group"><label>' + T('budmod_label_notes_remarks') + '</label>'
+        + '<textarea name="notes" class="form-control" rows="2" placeholder="' + T('budmod_placeholder_notes_example') + '"></textarea></div>'
         + '</form>';
 
-    openFormModal('Set Department Budget', html, 'saveBudget()', true);
+    openFormModal(T('budmod_modal_set_budget'), html, 'saveBudget()', true);
 }
 
 function bTogglePeriod(sel) {

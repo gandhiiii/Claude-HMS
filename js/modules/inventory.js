@@ -1,11 +1,34 @@
 let invView = 'items';
 
+function invStatusLabel(status) {
+    if (status === 'in-stock') return T('invmod_status_in_stock');
+    if (status === 'low-stock') return T('invmod_status_low_stock');
+    return T('invmod_status_out_of_stock');
+}
+
+const INV_CATEGORY_KEYS = {
+    'Medical Equipment': 'invmod_cat_medical_equipment',
+    'Medicine': 'invmod_cat_medicine',
+    'Surgical': 'invmod_cat_surgical',
+    'Laboratory': 'invmod_cat_laboratory',
+    'Office Supplies': 'invmod_cat_office_supplies',
+    'Cleaning': 'invmod_cat_cleaning',
+    'Bedding': 'invmod_cat_bedding',
+    'Food': 'invmod_cat_food',
+    'Other': 'invmod_cat_other'
+};
+
+function invCategoryLabel(cat) {
+    const key = INV_CATEGORY_KEYS[cat];
+    return key ? T(key) : cat;
+}
+
 function renderInventory(container) {
     container.innerHTML = `
         <div class="tabs" style="margin-bottom:16px;">
-            <button class="tab-btn active" onclick="switchInvView('items',this)">📦 All Items</button>
-            <button class="tab-btn" onclick="switchInvView('dept',this)">🏢 By Department</button>
-            <button class="tab-btn" onclick="switchInvView('movements',this)">📊 Movements</button>
+            <button class="tab-btn active" onclick="switchInvView('items',this)">${T('invmod_tab_items')}</button>
+            <button class="tab-btn" onclick="switchInvView('dept',this)">${T('invmod_tab_dept')}</button>
+            <button class="tab-btn" onclick="switchInvView('movements',this)">${T('invmod_tab_movements')}</button>
         </div>
         <div id="invContent">
             ${renderInvItemsTab()}
@@ -36,22 +59,22 @@ function renderInvItemsTab() {
     return `
         <div class="flex-between mb-4" style="flex-wrap:wrap;gap:8px;">
             <div style="display:flex;gap:8px;flex:2;min-width:200px;align-items:center;flex-wrap:wrap;">
-                <input type="text" class="form-control" id="invSearch" placeholder="Search name, category or barcode..." oninput="renderInvList()" style="flex:1;min-width:140px;max-width:300px;">
+                <input type="text" class="form-control" id="invSearch" placeholder="${T('invmod_placeholder_search')}" oninput="renderInvList()" style="flex:1;min-width:140px;max-width:300px;">
                 <div style="display:flex;align-items:center;gap:4px;">
-                    <span style="font-size:13px;font-weight:600;white-space:nowrap;">🏢 Dept:</span>
+                    <span style="font-size:13px;font-weight:600;white-space:nowrap;">${T('invmod_label_dept')}</span>
                     <span style="width:160px;">${deptDropdown('invDeptDropdown', invDeptFilter)}</span>
                 </div>
-                <button class="btn btn-sm btn-outline" onclick="setInvDeptFilter('')" style="${!invDeptFilter ? 'display:none;' : ''}">✕ Clear</button>
+                <button class="btn btn-sm btn-outline" onclick="setInvDeptFilter('')" style="${!invDeptFilter ? 'display:none;' : ''}">${T('invmod_btn_clear')}</button>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="showInvForm()">+ Add Item</button>
+            <button class="btn btn-primary btn-sm" onclick="showInvForm()">${T('invmod_btn_add_item')}</button>
         </div>
 
         <div class="card" style="padding:12px 16px;margin-bottom:16px;background:#f0f6ff;border:1px solid #c2d7f8;">
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-                <span style="font-weight:600;font-size:14px;">📷 Scan Barcode</span>
-                <input type="text" id="barcodeScanInput" class="form-control" placeholder="Scan or type barcode..." style="flex:1;min-width:180px;"
+                <span style="font-weight:600;font-size:14px;">${T('invmod_label_scan_barcode')}</span>
+                <input type="text" id="barcodeScanInput" class="form-control" placeholder="${T('invmod_placeholder_scan_barcode')}" style="flex:1;min-width:180px;"
                     onkeydown="if(event.key==='Enter')handleBarcodeScan()">
-                <button class="btn btn-primary btn-sm" onclick="handleBarcodeScan()">Find</button>
+                <button class="btn btn-primary btn-sm" onclick="handleBarcodeScan()">${T('invmod_btn_find')}</button>
                 <span id="barcodeScanResult" style="font-size:13px;color:var(--gray);"></span>
             </div>
         </div>
@@ -66,8 +89,8 @@ function renderInvItemsTab() {
             <div class="table-responsive">
                 <table>
                     <thead><tr>
-                        <th>Barcode</th><th>Item Name</th><th>Category</th><th>Department</th><th>Qty</th>
-                        <th>Unit Price</th><th>Value</th><th>Expiry</th><th>Lifecycle</th><th>Status</th><th>Actions</th>
+                        <th>${T('invmod_th_barcode')}</th><th>${T('invmod_th_item_name')}</th><th>${T('invmod_th_category')}</th><th>${T('invmod_th_department')}</th><th>${T('invmod_th_qty')}</th>
+                        <th>${T('invmod_th_unit_price')}</th><th>${T('invmod_th_value')}</th><th>${T('invmod_th_expiry')}</th><th>${T('invmod_th_lifecycle')}</th><th>${T('invmod_th_status')}</th><th>${T('invmod_th_actions')}</th>
                     </tr></thead>
                     <tbody id="invTableBody"></tbody>
                 </table>
@@ -83,7 +106,7 @@ function renderInvDeptFilters() {
     const depts = [...new Set(items.map(i => i.department).filter(Boolean))];
     const el = document.getElementById('invDeptFilters');
     if (!el) return;
-    let html = `<button class="btn btn-sm ${!invDeptFilter ? 'btn-primary' : 'btn-outline'}" onclick="setInvDeptFilter('')">All</button>`;
+    let html = `<button class="btn btn-sm ${!invDeptFilter ? 'btn-primary' : 'btn-outline'}" onclick="setInvDeptFilter('')">${T('invmod_btn_all')}</button>`;
     depts.forEach(d => {
         html += `<button class="btn btn-sm ${invDeptFilter === d ? 'btn-primary' : 'btn-outline'}" onclick="setInvDeptFilter('${d}')">${d}</button>`;
     });
@@ -137,10 +160,10 @@ function renderInvList() {
     const statsEl = document.getElementById('invStats');
     if (statsEl) {
         statsEl.innerHTML = `
-            <div class="stat-card" style="border-left-color:var(--primary)"><div class="stat-value">${total}</div><div class="stat-label">Total Items</div></div>
-            <div class="stat-card" style="border-left-color:var(--warning)"><div class="stat-value">${lowStock}</div><div class="stat-label">Low Stock (<10)</div></div>
-            <div class="stat-card" style="border-left-color:var(--danger)"><div class="stat-value">${expiring}</div><div class="stat-label">Expiring in 30d</div></div>
-            <div class="stat-card" style="border-left-color:var(--gray)"><div class="stat-value">${outOfStock}</div><div class="stat-label">Out of Stock</div></div>
+            <div class="stat-card" style="border-left-color:var(--primary)"><div class="stat-value">${total}</div><div class="stat-label">${T('invmod_stat_total_items')}</div></div>
+            <div class="stat-card" style="border-left-color:var(--warning)"><div class="stat-value">${lowStock}</div><div class="stat-label">${T('invmod_stat_low_stock')}</div></div>
+            <div class="stat-card" style="border-left-color:var(--danger)"><div class="stat-value">${expiring}</div><div class="stat-label">${T('invmod_stat_expiring')}</div></div>
+            <div class="stat-card" style="border-left-color:var(--gray)"><div class="stat-value">${outOfStock}</div><div class="stat-label">${T('invmod_stat_out_of_stock')}</div></div>
         `;
     }
 
@@ -163,7 +186,7 @@ function renderInvList() {
             </td>
             <td><strong>${i.name}</strong></td>
             <td>${i.category}</td>
-            <td><span class="badge badge-info">${i.department || 'All'}</span></td>
+            <td><span class="badge badge-info">${i.department || T('invmod_opt_all')}</span></td>
             <td>${qty} ${i.unit || 'pcs'}</td>
             <td style="font-size:12px;">${i.price ? '₹' + parseFloat(i.price).toFixed(2) : '-'}</td>
             <td style="font-size:12px;font-weight:600;">${i.price ? '₹' + (qty * parseFloat(i.price)).toFixed(2) : '-'}</td>
@@ -177,16 +200,16 @@ function renderInvList() {
                 </div>
                 <div class="progress-label">${lifecyclePct}% used</div>
             </td>
-            <td><span class="badge ${status === 'in-stock' ? 'badge-success' : status === 'low-stock' ? 'badge-warning' : 'badge-danger'}">${status.replace('-', ' ')}</span></td>
+            <td><span class="badge ${status === 'in-stock' ? 'badge-success' : status === 'low-stock' ? 'badge-warning' : 'badge-danger'}">${invStatusLabel(status)}</span></td>
             <td>
-                <button class="btn btn-sm btn-success" onclick="receiveInvStock('${i.id}')">📥 In</button>
-                <button class="btn btn-sm btn-warning" onclick="issueInvStock('${i.id}')" style="color:#fff;">📤 Out</button>
-                <button class="btn btn-sm btn-primary" onclick="editInv('${i.id}')">Edit</button>
+                <button class="btn btn-sm btn-success" onclick="receiveInvStock('${i.id}')">${T('invmod_btn_in')}</button>
+                <button class="btn btn-sm btn-warning" onclick="issueInvStock('${i.id}')" style="color:#fff;">${T('invmod_btn_out')}</button>
+                <button class="btn btn-sm btn-primary" onclick="editInv('${i.id}')">${T('invmod_btn_edit')}</button>
                 <button class="btn btn-sm btn-info" onclick="printBarcode('${i.id}')">🏷️</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteInv('${i.id}')">Del</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteInv('${i.id}')">${T('invmod_btn_del')}</button>
             </td>
         </tr>`;
-    }).join('') || '<tr><td colspan="11" class="empty-state">No inventory items</td></tr>';
+    }).join('') || '<tr><td colspan="11" class="empty-state">' + T('invmod_no_items') + '</td></tr>';
 
     setTimeout(generateBarcodeSvgs, 100);
 }
@@ -197,11 +220,11 @@ function renderInvDeptTab() {
     return `
         <div class="flex-between mb-4">
             <div>
-                <h3 style="margin:0;">🏢 Department-wise Inventory</h3>
-                <span style="font-size:13px;color:var(--gray);">View inventory items grouped by department</span>
+                <h3 style="margin:0;">${T('invmod_dept_view_title')}</h3>
+                <span style="font-size:13px;color:var(--gray);">${T('invmod_dept_view_subtitle')}</span>
             </div>
             <div style="display:flex;gap:6px;align-items:center;">
-                <span style="font-size:13px;font-weight:600;white-space:nowrap;">🔍 Jump to:</span>
+                <span style="font-size:13px;font-weight:600;white-space:nowrap;">${T('invmod_label_jump_to')}</span>
                 <span style="width:180px;">${deptDropdown('invDeptJump', '')}</span>
             </div>
         </div>
@@ -235,7 +258,7 @@ function renderInvDeptView() {
     const el = document.getElementById('invDeptView');
     if (!el) return;
     if (depts.length === 0) {
-        el.innerHTML = '<div class="card"><div class="empty-state">No inventory assigned to departments yet. Edit an item to assign a department.</div></div>';
+        el.innerHTML = '<div class="card"><div class="empty-state">' + T('invmod_no_dept_inventory') + '</div></div>';
         return;
     }
     el.innerHTML = depts.map(d => {
@@ -247,13 +270,13 @@ function renderInvDeptView() {
             <div class="card-header">
                 <div class="flex-between">
                     <h3>🏢 ${d}</h3>
-                    <span style="font-size:13px;color:var(--gray);">${totalItems} items | ${totalQty} qty | ₹${totalValue.toFixed(2)} value</span>
+                    <span style="font-size:13px;color:var(--gray);">${totalItems}${T('invmod_items_sep')}${totalQty}${T('invmod_qty_sep')}${totalValue.toFixed(2)}${T('invmod_value_suffix')}</span>
                 </div>
             </div>
-            ${totalItems === 0 ? '<div class="empty-state">No items assigned</div>' :
+            ${totalItems === 0 ? '<div class="empty-state">' + T('invmod_no_items_assigned') + '</div>' :
             `<div class="table-responsive">
                 <table>
-                    <thead><tr><th>Item</th><th>Category</th><th>Qty</th><th>Unit Price</th><th>Value</th><th>Status</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>${T('invmod_th_item')}</th><th>${T('invmod_th_category')}</th><th>${T('invmod_th_qty')}</th><th>${T('invmod_th_unit_price')}</th><th>${T('invmod_th_value')}</th><th>${T('invmod_th_status')}</th><th>${T('invmod_th_actions')}</th></tr></thead>
                     <tbody>${data.map(i => {
                         const qty = parseInt(i.quantity);
                         const price = parseFloat(i.price) || 0;
@@ -265,8 +288,8 @@ function renderInvDeptView() {
                             <td>${qty} ${i.unit || 'pcs'}</td>
                             <td>${price ? '₹' + price.toFixed(2) : '-'}</td>
                             <td style="font-weight:600;">${value ? '₹' + value.toFixed(2) : '-'}</td>
-                            <td><span class="badge ${status === 'in-stock' ? 'badge-success' : status === 'low-stock' ? 'badge-warning' : 'badge-danger'}">${status.replace('-', ' ')}</span></td>
-                            <td><button class="btn btn-sm btn-success" onclick="receiveInvStock('${i.id}')">📥 In</button> <button class="btn btn-sm btn-warning" onclick="issueInvStock('${i.id}')" style="color:#fff;">📤 Out</button> <button class="btn btn-sm btn-primary" onclick="editInv('${i.id}')">Edit</button></td>
+                            <td><span class="badge ${status === 'in-stock' ? 'badge-success' : status === 'low-stock' ? 'badge-warning' : 'badge-danger'}">${invStatusLabel(status)}</span></td>
+                            <td><button class="btn btn-sm btn-success" onclick="receiveInvStock('${i.id}')">${T('invmod_btn_in')}</button> <button class="btn btn-sm btn-warning" onclick="issueInvStock('${i.id}')" style="color:#fff;">${T('invmod_btn_out')}</button> <button class="btn btn-sm btn-primary" onclick="editInv('${i.id}')">${T('invmod_btn_edit')}</button></td>
                         </tr>`;
                     }).join('')}</tbody>
                 </table>
@@ -280,30 +303,30 @@ function receiveInvStock(id) {
     if (!item) return;
     const modal = showModal(`
         <div class="modal-header">
-            <h3>📥 Receive Stock — ${item.name}</h3>
+            <h3>${T('invmod_receive_stock_prefix')}${item.name}</h3>
             <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
         </div>
         <div style="display:flex;gap:16px;margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px;">
             <div>
-                <div style="font-size:13px;color:var(--gray);">Current Stock: <strong>${item.quantity} ${item.unit || 'pcs'}</strong></div>
-                <div style="font-size:13px;color:var(--gray);">Current Price: ${item.price ? '₹' + parseFloat(item.price).toFixed(2) : 'Not set'}</div>
+                <div style="font-size:13px;color:var(--gray);">${T('invmod_label_current_stock')}<strong>${item.quantity} ${item.unit || 'pcs'}</strong></div>
+                <div style="font-size:13px;color:var(--gray);">${T('invmod_label_current_price')}${item.price ? '₹' + parseFloat(item.price).toFixed(2) : T('invmod_not_set')}</div>
             </div>
         </div>
         <div class="grid-2">
             <div class="form-group">
-                <label>Quantity Received *</label>
+                <label>${T('invmod_label_qty_received')}</label>
                 <input type="number" id="recQty" class="form-control" min="1" value="1">
             </div>
             <div class="form-group">
-                <label>Unit Price (₹) *</label>
-                <input type="number" id="recPrice" class="form-control" step="0.01" min="0" value="${item.price || ''}" placeholder="Cost per unit">
+                <label>${T('invmod_label_unit_price_req')}</label>
+                <input type="number" id="recPrice" class="form-control" step="0.01" min="0" value="${item.price || ''}" placeholder="${T('invmod_placeholder_cost_per_unit')}">
             </div>
         </div>
         <div class="form-group">
-            <label>Supplier / Source</label>
-            <input type="text" id="recSource" class="form-control" placeholder="e.g. Vendor name (optional)">
+            <label>${T('invmod_label_supplier_source')}</label>
+            <input type="text" id="recSource" class="form-control" placeholder="${T('invmod_placeholder_vendor_example')}">
         </div>
-        <button class="btn btn-success btn-lg" style="width:100%;margin-top:8px;" onclick="saveReceiveStock('${id}')">✅ Record Stock Receipt</button>
+        <button class="btn btn-success btn-lg" style="width:100%;margin-top:8px;" onclick="saveReceiveStock('${id}')">${T('invmod_btn_record_receipt')}</button>
     `, false);
 }
 
@@ -314,8 +337,8 @@ function saveReceiveStock(id) {
     const price = parseFloat(document.getElementById('recPrice').value);
     const source = document.getElementById('recSource').value || '';
 
-    if (!qty || qty < 1) { APP.notify('Enter valid quantity', 'error'); return; }
-    if (!price || price < 0) { APP.notify('Enter a valid unit price', 'error'); return; }
+    if (!qty || qty < 1) { APP.notify(T('invmod_msg_enter_valid_qty'), 'error'); return; }
+    if (!price || price < 0) { APP.notify(T('invmod_msg_enter_valid_price'), 'error'); return; }
 
     const oldQty = parseInt(item.quantity) || 0;
     const oldPrice = parseFloat(item.price) || 0;
@@ -338,10 +361,10 @@ function saveReceiveStock(id) {
         qty: qty, unit: item.unit || 'pcs',
         unitPrice: price, totalValue: qty * price,
         dept: item.department || '', by: rcvUser ? rcvUser.fullName : 'Admin',
-        notes: source ? 'Source: ' + source : '', date: new Date().toISOString()
+        notes: source ? T('invmod_source_prefix') + source : '', date: new Date().toISOString()
     });
 
-    APP.notify(`Received ${qty} ${item.unit || 'pcs'} of ${item.name} (₹${(qty * price).toFixed(2)})`, 'success');
+    APP.notify(`${T('invmod_msg_received_prefix')}${qty} ${item.unit || 'pcs'}${T('invmod_msg_received_of')}${item.name} (₹${(qty * price).toFixed(2)})`, 'success');
     renderInvList();
     document.querySelector('.modal.active')?.remove();
 }
@@ -353,22 +376,22 @@ function issueInvStock(id) {
     const depts = DB.get('departments') || [];
     const deptOpts = depts.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
     showModal(`
-        <div class="modal-header"><h3>📤 Issue Stock — ${item.name}</h3></div>
+        <div class="modal-header"><h3>${T('invmod_issue_stock_prefix')}${item.name}</h3></div>
         <div class="modal-body">
-            <p style="font-size:13px;color:var(--gray);margin-bottom:12px;">Current stock: <strong>${item.quantity || 0} ${item.unit || 'pcs'}</strong> · Unit price: <strong>₹${parseFloat(item.price || 0).toFixed(2)}</strong></p>
+            <p style="font-size:13px;color:var(--gray);margin-bottom:12px;">${T('invmod_label_current_stock_issue')}<strong>${item.quantity || 0} ${item.unit || 'pcs'}</strong>${T('invmod_mid_unit_price')}<strong>₹${parseFloat(item.price || 0).toFixed(2)}</strong></p>
             <div class="form-group">
-                <label>Quantity to Issue *</label>
-                <input type="number" id="issueQty" class="form-control" placeholder="e.g. 10" min="1" max="${item.quantity || 0}">
+                <label>${T('invmod_label_qty_to_issue')}</label>
+                <input type="number" id="issueQty" class="form-control" placeholder="${T('invmod_placeholder_e_g_10')}" min="1" max="${item.quantity || 0}">
             </div>
             <div class="form-group">
-                <label>Issue To (Department)</label>
-                <select id="issueDept" class="form-control"><option value="">-- Select Department --</option>${deptOpts}</select>
+                <label>${T('invmod_label_issue_to_dept')}</label>
+                <select id="issueDept" class="form-control"><option value="">${T('invmod_opt_select_department')}</option>${deptOpts}</select>
             </div>
             <div class="form-group">
-                <label>Notes / Purpose</label>
-                <input type="text" id="issueNotes" class="form-control" placeholder="e.g. Monthly supply for ICU">
+                <label>${T('invmod_label_notes_purpose')}</label>
+                <input type="text" id="issueNotes" class="form-control" placeholder="${T('invmod_placeholder_notes_example')}">
             </div>
-            <button class="btn btn-warning btn-lg" style="width:100%;margin-top:8px;color:#fff;" onclick="saveIssueStock('${id}')">📤 Confirm Issue</button>
+            <button class="btn btn-warning btn-lg" style="width:100%;margin-top:8px;color:#fff;" onclick="saveIssueStock('${id}')">${T('invmod_btn_confirm_issue')}</button>
         </div>
     `, false);
 }
@@ -379,9 +402,9 @@ function saveIssueStock(id) {
     const qty = parseInt(document.getElementById('issueQty').value);
     const dept = (document.getElementById('issueDept').value || '').trim();
     const notes = document.getElementById('issueNotes').value || '';
-    if (!qty || qty < 1) { APP.notify('Enter valid quantity', 'error'); return; }
+    if (!qty || qty < 1) { APP.notify(T('invmod_msg_enter_valid_qty'), 'error'); return; }
     const currentQty = parseInt(item.quantity) || 0;
-    if (qty > currentQty) { APP.notify(`Only ${currentQty} ${item.unit || 'pcs'} available`, 'error'); return; }
+    if (qty > currentQty) { APP.notify(`${T('invmod_msg_only_available_prefix')}${currentQty} ${item.unit || 'pcs'}${T('invmod_msg_available_suffix')}`, 'error'); return; }
     const user = AUTH.currentUser();
     const unitPrice = parseFloat(item.price) || 0;
     DB.update('inventory', id, { quantity: currentQty - qty });
@@ -392,7 +415,7 @@ function saveIssueStock(id) {
         dept: dept, by: user ? user.fullName : 'Admin',
         notes: notes, date: new Date().toISOString()
     });
-    APP.notify(`Issued ${qty} ${item.unit || 'pcs'} of ${item.name}` + (dept ? ` to ${dept}` : ''), 'success');
+    APP.notify(`${T('invmod_msg_issued_prefix')}${qty} ${item.unit || 'pcs'}${T('invmod_msg_issued_of')}${item.name}` + (dept ? `${T('invmod_msg_issued_to')}${dept}` : ''), 'success');
     renderInvList();
     document.querySelector('.modal.active')?.remove();
 }
@@ -401,16 +424,16 @@ function saveIssueStock(id) {
 function renderInvMovementsTab() {
     return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
         <div>
-            <div style="font-weight:700;font-size:15px;">📊 Stock Movements</div>
-            <div style="font-size:12px;color:var(--gray);">All stock IN and OUT transactions with prices</div>
+            <div style="font-weight:700;font-size:15px;">${T('invmod_movements_title')}</div>
+            <div style="font-size:12px;color:var(--gray);">${T('invmod_movements_subtitle')}</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <select id="movTypeFilter" class="form-control" style="width:110px;" onchange="renderInvMovementsView()">
-                <option value="">All Types</option>
-                <option value="in">📥 IN only</option>
-                <option value="out">📤 OUT only</option>
+                <option value="">${T('invmod_opt_all_types')}</option>
+                <option value="in">${T('invmod_opt_in_only')}</option>
+                <option value="out">${T('invmod_opt_out_only')}</option>
             </select>
-            <input type="text" id="movSearch" class="form-control" style="width:180px;" placeholder="Search item or dept..." oninput="renderInvMovementsView()">
+            <input type="text" id="movSearch" class="form-control" style="width:180px;" placeholder="${T('invmod_placeholder_search_movements')}" oninput="renderInvMovementsView()">
         </div>
     </div>
     <div id="movContent"></div>`;
@@ -433,7 +456,7 @@ function renderInvMovementsView() {
     const _cu = AUTH.currentUser();
     const isAdmin = _cu && (_cu.role === 'admin' || _cu.role === 'super_admin');
     if (filtered.length === 0) {
-        el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--gray);">No movements recorded yet. Use 📥 In / 📤 Out buttons on inventory items.</div>';
+        el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--gray);">' + T('invmod_no_movements') + '</div>';
         return;
     }
     const totalIn  = filtered.filter(m => m.type === 'in').reduce((s,m) => s + (m.totalValue||0), 0);
@@ -442,30 +465,30 @@ function renderInvMovementsView() {
         <div style="background:#e8f5e9;border-radius:10px;padding:12px;text-align:center;">
             <div style="font-size:20px;">📥</div>
             <div style="font-size:16px;font-weight:700;color:#2e7d32;">${filtered.filter(m=>m.type==='in').length}</div>
-            <div style="font-size:11px;color:var(--gray);">IN movements</div>
+            <div style="font-size:11px;color:var(--gray);">${T('invmod_label_in_movements')}</div>
             <div style="font-size:13px;font-weight:600;color:#2e7d32;">₹${totalIn.toFixed(2)}</div>
         </div>
         <div style="background:#fff3e0;border-radius:10px;padding:12px;text-align:center;">
             <div style="font-size:20px;">📤</div>
             <div style="font-size:16px;font-weight:700;color:#e65100;">${filtered.filter(m=>m.type==='out').length}</div>
-            <div style="font-size:11px;color:var(--gray);">OUT movements</div>
+            <div style="font-size:11px;color:var(--gray);">${T('invmod_label_out_movements')}</div>
             <div style="font-size:13px;font-weight:600;color:#e65100;">₹${totalOut.toFixed(2)}</div>
         </div>
         <div style="background:#e3f2fd;border-radius:10px;padding:12px;text-align:center;">
             <div style="font-size:20px;">📊</div>
             <div style="font-size:16px;font-weight:700;color:#1565c0;">${filtered.length}</div>
-            <div style="font-size:11px;color:var(--gray);">Total transactions</div>
-            <div style="font-size:13px;font-weight:600;color:#1565c0;">₹${Math.abs(totalIn - totalOut).toFixed(2)} net</div>
+            <div style="font-size:11px;color:var(--gray);">${T('invmod_label_total_transactions')}</div>
+            <div style="font-size:13px;font-weight:600;color:#1565c0;">₹${Math.abs(totalIn - totalOut).toFixed(2)}${T('invmod_net_suffix')}</div>
         </div>
     </div>
     <div class="table-responsive"><table class="data-table" style="font-size:13px;">
-        <thead><tr><th>Date</th><th>Type</th><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total Value</th><th>Dept / To</th><th>By</th><th>Notes</th>${isAdmin ? '<th>Action</th>' : ''}</tr></thead>
+        <thead><tr><th>${T('invmod_th_date')}</th><th>${T('invmod_th_type')}</th><th>${T('invmod_th_item')}</th><th>${T('invmod_th_qty')}</th><th>${T('invmod_th_unit_price')}</th><th>${T('invmod_th_total_value')}</th><th>${T('invmod_th_dept_to')}</th><th>${T('invmod_th_by')}</th><th>${T('invmod_th_notes')}</th>${isAdmin ? '<th>' + T('invmod_th_action') + '</th>' : ''}</tr></thead>
         <tbody>`;
     filtered.forEach(m => {
         const isIn = m.type === 'in';
         html += `<tr>
             <td style="white-space:nowrap;">${APP.formatDate(m.date)}</td>
-            <td><span class="badge ${isIn ? 'badge-success' : 'badge-warning'}" style="${isIn ? '' : 'color:#fff;background:#e65100;'}">${isIn ? '📥 IN' : '📤 OUT'}</span></td>
+            <td><span class="badge ${isIn ? 'badge-success' : 'badge-warning'}" style="${isIn ? '' : 'color:#fff;background:#e65100;'}">${isIn ? T('invmod_badge_in') : T('invmod_badge_out')}</span></td>
             <td style="font-weight:600;">${m.itemName || '-'}</td>
             <td>${m.qty || 0} ${m.unit || ''}</td>
             <td>₹${parseFloat(m.unitPrice || 0).toFixed(2)}</td>
@@ -473,7 +496,7 @@ function renderInvMovementsView() {
             <td>${m.dept || '-'}</td>
             <td>${m.by || '-'}</td>
             <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;">${m.notes || '-'}</td>
-            ${isAdmin ? `<td><button onclick="deleteInvMovement('${m.id}')" class="btn btn-sm" style="background:#e53935;color:#fff;padding:3px 10px;border-radius:6px;font-size:12px;">🗑 Delete</button></td>` : ''}
+            ${isAdmin ? `<td><button onclick="deleteInvMovement('${m.id}')" class="btn btn-sm" style="background:#e53935;color:#fff;padding:3px 10px;border-radius:6px;font-size:12px;">${T('invmod_btn_delete_movement')}</button></td>` : ''}
         </tr>`;
     });
     html += '</tbody></table></div>';
@@ -483,11 +506,11 @@ function renderInvMovementsView() {
 function deleteInvMovement(id) {
     const cu = AUTH.currentUser();
     if (!cu || (cu.role !== 'admin' && cu.role !== 'super_admin')) {
-        APP.notify('Permission denied', 'error'); return;
+        APP.notify(T('invmod_msg_permission_denied'), 'error'); return;
     }
-    if (!confirm('Delete this inventory movement record? This cannot be undone.')) return;
+    if (!confirm(T('invmod_confirm_delete_movement'))) return;
     DB.delete('inventory_movements', id);
-    APP.notify('Movement record deleted', 'success');
+    APP.notify(T('invmod_msg_movement_deleted'), 'success');
     renderInvMovementsView();
 }
 
@@ -512,15 +535,15 @@ function handleBarcodeScan() {
     const input = document.getElementById('barcodeScanInput');
     const result = document.getElementById('barcodeScanResult');
     const code = (input?.value || '').trim();
-    if (!code) { result.textContent = 'Enter or scan a barcode'; return; }
+    if (!code) { result.textContent = T('invmod_msg_enter_scan_barcode'); return; }
 
     const items = DB.get('inventory');
     const item = items.find(i => (i.barcode || i.id.slice(-10)) === code);
     if (item) {
-        result.innerHTML = `✅ Found: <strong>${item.name}</strong> (Qty: ${item.quantity}) <button class="btn btn-sm btn-primary" onclick="editInv('${item.id}');document.getElementById('barcodeScanResult').textContent=''">Edit</button>`;
+        result.innerHTML = `${T('invmod_found_prefix')}<strong>${item.name}</strong>${T('invmod_qty_prefix')}${item.quantity}) <button class="btn btn-sm btn-primary" onclick="editInv('${item.id}');document.getElementById('barcodeScanResult').textContent=''">${T('invmod_btn_edit')}</button>`;
         input.value = '';
     } else {
-        result.innerHTML = `❌ No item found with barcode "${code}"`;
+        result.innerHTML = `${T('invmod_not_found_prefix')}${code}${T('invmod_not_found_suffix')}`;
     }
 }
 
@@ -535,77 +558,77 @@ function showInvForm(item) {
             <input type="hidden" name="id" value="${item?.id || ''}">
             <div class="grid-2">
                 <div class="form-group">
-                    <label>Item Name *</label>
+                    <label>${T('invmod_label_item_name')}</label>
                     <input type="text" name="name" class="form-control" value="${item?.name || ''}" required>
                 </div>
                 <div class="form-group">
-                    <label>Category *</label>
+                    <label>${T('invmod_label_category')}</label>
                     <select name="category" class="form-control" required>
-                        <option value="">Select</option>
-                        ${categories.map(c => `<option value="${c}" ${item?.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+                        <option value="">${T('invmod_opt_select')}</option>
+                        ${categories.map(c => `<option value="${c}" ${item?.category === c ? 'selected' : ''}>${invCategoryLabel(c)}</option>`).join('')}
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Barcode / SKU</label>
+                    <label>${T('invmod_label_barcode_sku')}</label>
                     <div style="display:flex;gap:6px;align-items:center;">
-                        <input type="text" name="barcode" class="form-control" value="${barcode}" placeholder="Auto-generated" style="font-family:monospace;">
-                        <button type="button" class="btn btn-sm btn-primary" onclick="generateBarcodeInput()">Generate</button>
+                        <input type="text" name="barcode" class="form-control" value="${barcode}" placeholder="${T('invmod_placeholder_auto_generated')}" style="font-family:monospace;">
+                        <button type="button" class="btn btn-sm btn-primary" onclick="generateBarcodeInput()">${T('invmod_btn_generate')}</button>
                     </div>
                     <div id="barcodePreview" style="margin-top:4px;"></div>
                 </div>
                 <div class="form-group">
-                    <label>Quantity *</label>
+                    <label>${T('invmod_label_quantity')}</label>
                     <input type="number" name="quantity" class="form-control" value="${item?.quantity || 0}" min="0" required>
                 </div>
                 <div class="form-group">
-                    <label>Unit</label>
+                    <label>${T('invmod_label_unit')}</label>
                     <select name="unit" class="form-control">
-                        <option value="pcs" ${item?.unit === 'pcs' ? 'selected' : ''}>Pieces</option>
-                        <option value="box" ${item?.unit === 'box' ? 'selected' : ''}>Box</option>
-                        <option value="kg" ${item?.unit === 'kg' ? 'selected' : ''}>Kg</option>
-                        <option value="ltr" ${item?.unit === 'ltr' ? 'selected' : ''}>Litre</option>
-                        <option value="pack" ${item?.unit === 'pack' ? 'selected' : ''}>Pack</option>
+                        <option value="pcs" ${item?.unit === 'pcs' ? 'selected' : ''}>${T('invmod_unit_pieces')}</option>
+                        <option value="box" ${item?.unit === 'box' ? 'selected' : ''}>${T('invmod_unit_box')}</option>
+                        <option value="kg" ${item?.unit === 'kg' ? 'selected' : ''}>${T('invmod_unit_kg')}</option>
+                        <option value="ltr" ${item?.unit === 'ltr' ? 'selected' : ''}>${T('invmod_unit_litre')}</option>
+                        <option value="pack" ${item?.unit === 'pack' ? 'selected' : ''}>${T('invmod_unit_pack')}</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Unit Price (₹)</label>
-                    <input type="number" name="price" class="form-control" step="0.01" min="0" value="${item?.price || ''}" placeholder="Cost per unit">
+                    <label>${T('invmod_label_unit_price')}</label>
+                    <input type="number" name="price" class="form-control" step="0.01" min="0" value="${item?.price || ''}" placeholder="${T('invmod_placeholder_cost_per_unit')}">
                 </div>
                 <div class="form-group">
-                    <label>Purchase Date</label>
+                    <label>${T('invmod_label_purchase_date')}</label>
                     <input type="date" name="purchaseDate" class="form-control" value="${item?.purchaseDate ? item.purchaseDate.split('T')[0] : ''}">
                 </div>
                 <div class="form-group">
-                    <label>Expiry Date</label>
+                    <label>${T('invmod_label_expiry_date')}</label>
                     <input type="date" name="expiryDate" class="form-control" value="${item?.expiryDate ? item.expiryDate.split('T')[0] : ''}">
                 </div>
                 <div class="form-group">
-                    <label>Warranty Until</label>
+                    <label>${T('invmod_label_warranty_until')}</label>
                     <input type="date" name="warrantyDate" class="form-control" value="${item?.warrantyDate ? item.warrantyDate.split('T')[0] : ''}">
                 </div>
                 <div class="form-group">
-                    <label>Supplier</label>
+                    <label>${T('invmod_label_supplier')}</label>
                     <input type="text" name="supplier" class="form-control" value="${item?.supplier || ''}">
                 </div>
                 <div class="form-group">
-                    <label>Department</label>
+                    <label>${T('invmod_label_department')}</label>
                     <select name="department" class="form-control">
-                        <option value="">All</option>
+                        <option value="">${T('invmod_opt_all')}</option>
                         ${depts.map(d => `<option value="${d.name}" ${item?.department === d.name ? 'selected' : ''}>${d.name}</option>`).join('')}
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Location / Rack</label>
+                    <label>${T('invmod_label_location_rack')}</label>
                     <input type="text" name="location" class="form-control" value="${item?.location || ''}">
                 </div>
             </div>
             <div class="form-group">
-                <label>Notes</label>
+                <label>${T('invmod_label_notes')}</label>
                 <textarea name="notes" class="form-control">${item?.notes || ''}</textarea>
             </div>
         </form>
     `;
-    openFormModal(item ? 'Edit Inventory Item' : 'Add Inventory Item', form, `saveInv()`, true);
+    openFormModal(item ? T('invmod_modal_edit_item') : T('invmod_modal_add_item'), form, `saveInv()`, true);
     setTimeout(() => {
         const bcInput = document.querySelector('[name="barcode"]');
         if (bcInput) { bcInput.oninput = () => previewBarcode(); previewBarcode(); }
@@ -640,7 +663,7 @@ function saveInv() {
     const form = document.getElementById('invForm');
     const data = {};
     form.querySelectorAll('[name]').forEach(el => { data[el.name] = el.value; });
-    if (!data.name || !data.category) { APP.notify('Name and Category required', 'error'); return; }
+    if (!data.name || !data.category) { APP.notify(T('invmod_msg_name_category_required'), 'error'); return; }
 
     if (!data.barcode) {
         data.barcode = 'HMS' + Date.now().toString(36).slice(-6).toUpperCase();
@@ -648,10 +671,10 @@ function saveInv() {
 
     if (data.id) {
         DB.update('inventory', data.id, data);
-        APP.notify('Item updated with barcode: ' + data.barcode, 'success');
+        APP.notify(T('invmod_msg_item_updated_barcode_prefix') + data.barcode, 'success');
     } else {
         DB.add('inventory', data);
-        APP.notify('Item added! Barcode: ' + data.barcode, 'success');
+        APP.notify(T('invmod_msg_item_added_barcode_prefix') + data.barcode, 'success');
     }
     renderInvList();
 }
@@ -662,9 +685,9 @@ function editInv(id) {
 }
 
 function deleteInv(id) {
-    confirmAction('Delete this item?', () => {
+    confirmAction(T('invmod_confirm_delete_item'), () => {
         DB.delete('inventory', id);
-        APP.notify('Item deleted', 'success');
+        APP.notify(T('invmod_msg_item_deleted'), 'success');
         renderInvList();
     });
 }

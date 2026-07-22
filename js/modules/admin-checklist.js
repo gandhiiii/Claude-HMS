@@ -2,12 +2,12 @@ function renderAdminChecklists(container) {
     const user = AUTH.currentUser();
     container.innerHTML = `
         <div class="flex-between mb-4">
-            <h2 style="font-size:18px;font-weight:700;">Admin Checklists</h2>
+            <h2 style="font-size:18px;font-weight:700;">${T('achkmod_page_title')}</h2>
         </div>
         <div class="tabs">
-            <button class="tab-btn active" onclick="switchChecklistTab('tasks',this)">📋 My Tasks</button>
-            <button class="tab-btn" onclick="switchChecklistTab('audits',this)">🔍 Compliance Audits</button>
-            <button class="tab-btn" onclick="switchChecklistTab('oversight',this)">👁️ All Checklists</button>
+            <button class="tab-btn active" onclick="switchChecklistTab('tasks',this)">${T('achkmod_tab_tasks')}</button>
+            <button class="tab-btn" onclick="switchChecklistTab('audits',this)">${T('achkmod_tab_audits')}</button>
+            <button class="tab-btn" onclick="switchChecklistTab('oversight',this)">${T('achkmod_tab_oversight')}</button>
         </div>
         <div id="admContent"></div>
     `;
@@ -35,21 +35,21 @@ function renderAdmTasks() {
     if (!content) return;
     content.innerHTML = `
         <div class="card" style="margin-bottom:16px;">
-            <div class="card-header"><h3>➕ New Task</h3></div>
+            <div class="card-header"><h3>${T('achkmod_new_task_header')}</h3></div>
             <div style="display:flex;gap:8px;">
-                <input type="text" id="admTaskInput" class="form-control" placeholder="Enter a task..." style="flex:1;">
-                <button class="btn btn-primary" onclick="addAdmTask()">Add</button>
+                <input type="text" id="admTaskInput" class="form-control" placeholder="${T('achkmod_placeholder_enter_task')}" style="flex:1;">
+                <button class="btn btn-primary" onclick="addAdmTask()">${T('achkmod_btn_add')}</button>
             </div>
         </div>
         <div class="card">
-            <div class="card-header"><h3>📋 My Tasks (${items.filter(i => !i.done).length} pending)</h3></div>
+            <div class="card-header"><h3>${T('achkmod_my_tasks_prefix')}${items.filter(i => !i.done).length}${T('achkmod_pending_suffix')}</h3></div>
             <div id="admTaskList">${renderAdmTaskItems(items)}</div>
         </div>
     `;
 }
 
 function renderAdmTaskItems(items) {
-    if (items.length === 0) return '<div class="empty-state">No tasks yet</div>';
+    if (items.length === 0) return '<div class="empty-state">' + T('achkmod_no_tasks_yet') + '</div>';
     return items.slice().reverse().map(i => `
         <div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);${i.done ? 'opacity:0.5;' : ''}">
             <input type="checkbox" ${i.done ? 'checked' : ''} onchange="toggleAdmTask('${i.id}')" style="width:18px;height:18px;">
@@ -63,10 +63,10 @@ function renderAdmTaskItems(items) {
 function addAdmTask() {
     const input = document.getElementById('admTaskInput');
     const text = input?.value?.trim();
-    if (!text) { APP.notify('Enter a task', 'error'); return; }
+    if (!text) { APP.notify(T('achkmod_msg_enter_task'), 'error'); return; }
     const user = AUTH.currentUser();
     DB.add('adminChecklist', { text, done: false, createdBy: user.fullName });
-    APP.notify('Task added', 'success');
+    APP.notify(T('achkmod_msg_task_added'), 'success');
     input.value = '';
     renderAdmTasks();
 }
@@ -79,9 +79,9 @@ function toggleAdmTask(id) {
 }
 
 function deleteAdmTask(id) {
-    confirmAction('Delete this task?', () => {
+    confirmAction(T('achkmod_confirm_delete_task'), () => {
         DB.delete('adminChecklist', id);
-        APP.notify('Task deleted', 'success');
+        APP.notify(T('achkmod_msg_task_deleted'), 'success');
         renderAdmTasks();
     });
 }
@@ -96,9 +96,9 @@ function renderAdmAudits() {
     content.innerHTML = `
         <div class="flex-between mb-4">
             <div class="search-box">
-                <input type="text" class="form-control" id="auditSearch" placeholder="Search audits..." oninput="renderAuditList()">
+                <input type="text" class="form-control" id="auditSearch" placeholder="${T('achkmod_placeholder_search_audits')}" oninput="renderAuditList()">
             </div>
-            <button class="btn btn-primary" onclick="showAuditForm()">+ New Audit</button>
+            <button class="btn btn-primary" onclick="showAuditForm()">${T('achkmod_btn_new_audit')}</button>
         </div>
         <div id="auditGrid" class="grid-2"></div>
     `;
@@ -114,7 +114,7 @@ function renderAuditList() {
     const grid = document.getElementById('auditGrid');
     if (!grid) return;
     if (filtered.length === 0) {
-        grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;">No compliance audits found</div>';
+        grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;">' + T('achkmod_no_audits_found') + '</div>';
         return;
     }
     grid.innerHTML = filtered.slice().reverse().map(a => {
@@ -127,8 +127,8 @@ function renderAuditList() {
                 <div>
                     <strong style="font-size:15px;">${a.title}</strong>
                     <span style="font-size:12px;color:var(--gray);display:block;">
-                        👤 ${a.assignedTo || 'Unassigned'} | 📍 ${a.area || 'N/A'}
-                        ${a.deadline ? ' | Due: ' + APP.formatDate(a.deadline) : ''}
+                        👤 ${a.assignedTo || T('achkmod_unassigned')} | 📍 ${a.area || T('achkmod_na')}
+                        ${a.deadline ? T('achkmod_due_prefix') + APP.formatDate(a.deadline) : ''}
                     </span>
                 </div>
                 <span class="badge ${a.status === 'completed' ? 'badge-success' : a.status === 'in-progress' ? 'badge-info' : 'badge-warning'}">${a.status}</span>
@@ -136,7 +136,7 @@ function renderAuditList() {
             <div class="progress-bar" style="margin-bottom:8px;">
                 <div class="progress-fill ${pct === 100 ? 'green' : pct > 50 ? 'yellow' : 'red'}" style="width:${pct}%"></div>
             </div>
-            <div style="font-size:12px;color:var(--gray);margin-bottom:8px;">${done}/${total} items (${pct}%)</div>
+            <div style="font-size:12px;color:var(--gray);margin-bottom:8px;">${done}/${total}${T('achkmod_items_progress_mid')}${pct}%)</div>
             <div style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto;">
                 ${items.map((item, idx) => {
                     const st = item.status || 'pending';
@@ -146,7 +146,7 @@ function renderAuditList() {
                         <span style="flex:1;">${item.task}</span>
                         ${item.notes ? '<span style="font-size:11px;color:var(--gray);">📝 ' + item.notes + '</span>' : ''}
                         ${a.status !== 'completed' ? `<select class="form-control" style="width:auto;padding:2px 4px;font-size:12px;" onchange="updateAuditItem('${a.id}',${idx},this.value)">
-                            <option value="">Set</option>
+                            <option value="">${T('achkmod_opt_set')}</option>
                             <option value="ok" ${st === 'ok' ? 'selected' : ''}>OK</option>
                             <option value="fault" ${st === 'fault' ? 'selected' : ''}>FAULT</option>
                             <option value="na" ${st === 'na' ? 'selected' : ''}>N/A</option>
@@ -157,9 +157,9 @@ function renderAuditList() {
             </div>
             ${a.notes ? '<div style="font-size:12px;color:var(--gray);margin-top:6px;padding:4px 8px;background:var(--bg);border-radius:4px;">📝 ' + a.notes + '</div>' : ''}
             <div style="margin-top:8px;display:flex;gap:4px;">
-                <button class="btn btn-sm btn-primary" onclick="editAudit('${a.id}')">Edit</button>
-                ${a.status !== 'completed' ? '<button class="btn btn-sm btn-success" onclick="completeAudit(\'' + a.id + '\')">Complete</button>' : ''}
-                <button class="btn btn-sm btn-danger" onclick="deleteAudit('${a.id}')">Del</button>
+                <button class="btn btn-sm btn-primary" onclick="editAudit('${a.id}')">${T('achkmod_btn_edit')}</button>
+                ${a.status !== 'completed' ? '<button class="btn btn-sm btn-success" onclick="completeAudit(\'' + a.id + '\')">' + T('achkmod_btn_complete') + '</button>' : ''}
+                <button class="btn btn-sm btn-danger" onclick="deleteAudit('${a.id}')">${T('achkmod_btn_del')}</button>
             </div>
         </div>`;
     }).join('');
@@ -173,39 +173,39 @@ function showAuditForm(audit) {
             <input type="hidden" name="id" value="${audit?.id || ''}">
             <div class="grid-2">
                 <div class="form-group">
-                    <label>Audit Title *</label>
-                    <input type="text" name="title" class="form-control" value="${audit?.title || ''}" required placeholder="e.g. Safety Compliance">
+                    <label>${T('achkmod_label_audit_title')}</label>
+                    <input type="text" name="title" class="form-control" value="${audit?.title || ''}" required placeholder="${T('achkmod_placeholder_audit_title_example')}">
                 </div>
                 <div class="form-group">
-                    <label>Assign To</label>
+                    <label>${T('achkmod_label_assign_to')}</label>
                     <select name="assignedTo" class="form-control">
-                        <option value="">Select...</option>
+                        <option value="">${T('achkmod_opt_select')}</option>
                         ${users.map(u => '<option value="' + u.fullName + '" ' + (audit?.assignedTo === u.fullName ? 'selected' : '') + '>' + u.fullName + '</option>').join('')}
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Area / Department</label>
-                    <input type="text" name="area" class="form-control" value="${audit?.area || ''}" placeholder="e.g. Ground Floor">
+                    <label>${T('achkmod_label_area_department')}</label>
+                    <input type="text" name="area" class="form-control" value="${audit?.area || ''}" placeholder="${T('achkmod_placeholder_area_example')}">
                 </div>
                 <div class="form-group">
-                    <label>Deadline</label>
+                    <label>${T('achkmod_label_deadline')}</label>
                     <input type="date" name="deadline" class="form-control" value="${audit?.deadline ? audit.deadline.split('T')[0] : ''}">
                 </div>
             </div>
             <div class="form-group">
-                <label>Status</label>
+                <label>${T('achkmod_label_status')}</label>
                 <select name="status" class="form-control">
                     ${AUDIT_STATUSES.map(s => '<option value="' + s + '" ' + (audit?.status === s ? 'selected' : '') + '>' + s + '</option>').join('')}
                 </select>
             </div>
             <div class="form-group">
-                <label>Notes (optional)</label>
+                <label>${T('achkmod_label_notes_optional')}</label>
                 <textarea name="notes" class="form-control" rows="2">${audit?.notes || ''}</textarea>
             </div>
             <div class="form-group">
                 <div class="flex-between" style="margin-bottom:8px;">
-                    <label style="font-weight:600;">Audit Items</label>
-                    <button type="button" class="btn btn-sm btn-primary" onclick="addAuditItem()">+ Add Item</button>
+                    <label style="font-weight:600;">${T('achkmod_label_audit_items')}</label>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="addAuditItem()">${T('achkmod_btn_add_item')}</button>
                 </div>
                 <div id="auditItemsContainer">
                     ${(audit?.items || []).map((item, i) => renderAuditItemRow(i, item.task, item.expected, item.notes)).join('')}
@@ -213,14 +213,14 @@ function showAuditForm(audit) {
             </div>
         </form>
     `;
-    openFormModal(isEdit ? 'Edit Audit' : 'New Compliance Audit', form, 'saveAudit()', true);
+    openFormModal(isEdit ? T('achkmod_modal_edit_audit') : T('achkmod_modal_new_audit'), form, 'saveAudit()', true);
 }
 
 function renderAuditItemRow(idx, task, expected, notes) {
     return '<div class="cl-item-row" style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">' +
-        '<input type="text" class="form-control" name="ai_task_' + idx + '" value="' + (task || '') + '" placeholder="Item" style="flex:2;">' +
-        '<input type="text" class="form-control" name="ai_expected_' + idx + '" value="' + (expected || '') + '" placeholder="Expected" style="flex:1;">' +
-        '<input type="text" class="form-control" name="ai_notes_' + idx + '" value="' + (notes || '') + '" placeholder="Notes" style="flex:1;">' +
+        '<input type="text" class="form-control" name="ai_task_' + idx + '" value="' + (task || '') + '" placeholder="' + T('achkmod_placeholder_item') + '" style="flex:2;">' +
+        '<input type="text" class="form-control" name="ai_expected_' + idx + '" value="' + (expected || '') + '" placeholder="' + T('achkmod_placeholder_expected') + '" style="flex:1;">' +
+        '<input type="text" class="form-control" name="ai_notes_' + idx + '" value="' + (notes || '') + '" placeholder="' + T('achkmod_placeholder_notes') + '" style="flex:1;">' +
         '<button type="button" class="btn btn-sm btn-danger" onclick="removeAuditItem(this)" ' + (idx === 0 ? 'disabled' : '') + '>✕</button>' +
     '</div>';
 }
@@ -232,9 +232,9 @@ function addAuditItem() {
     const row = document.createElement('div');
     row.className = 'cl-item-row';
     row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;';
-    row.innerHTML = '<input type="text" class="form-control" name="ai_task_' + idx + '" value="" placeholder="Item" style="flex:2;">' +
-        '<input type="text" class="form-control" name="ai_expected_' + idx + '" value="" placeholder="Expected" style="flex:1;">' +
-        '<input type="text" class="form-control" name="ai_notes_' + idx + '" value="" placeholder="Notes" style="flex:1;">' +
+    row.innerHTML = '<input type="text" class="form-control" name="ai_task_' + idx + '" value="" placeholder="' + T('achkmod_placeholder_item') + '" style="flex:2;">' +
+        '<input type="text" class="form-control" name="ai_expected_' + idx + '" value="" placeholder="' + T('achkmod_placeholder_expected') + '" style="flex:1;">' +
+        '<input type="text" class="form-control" name="ai_notes_' + idx + '" value="" placeholder="' + T('achkmod_placeholder_notes') + '" style="flex:1;">' +
         '<button type="button" class="btn btn-sm btn-danger" onclick="removeAuditItem(this)">✕</button>';
     container.appendChild(row);
 }
@@ -261,7 +261,7 @@ function saveAudit() {
     const deadline = form.querySelector('[name="deadline"]')?.value;
     const status = form.querySelector('[name="status"]')?.value || 'planned';
     const notes = form.querySelector('[name="notes"]')?.value;
-    if (!title) { APP.notify('Title is required', 'error'); return; }
+    if (!title) { APP.notify(T('achkmod_msg_title_required'), 'error'); return; }
     const items = [];
     const rows = form.querySelectorAll('.cl-item-row');
     rows.forEach((row, i) => {
@@ -270,7 +270,7 @@ function saveAudit() {
         const n = row.querySelector('[name^="ai_notes_"]')?.value?.trim() || '';
         if (task) items.push({ task, expected, notes: n, status: 'pending' });
     });
-    if (items.length === 0) { APP.notify('Add at least one audit item', 'error'); return; }
+    if (items.length === 0) { APP.notify(T('achkmod_msg_add_audit_item'), 'error'); return; }
     if (id) {
         const existing = DB.getById('adminAudits', id);
         const statusMap = {};
@@ -279,10 +279,10 @@ function saveAudit() {
             if (statusMap[item.task] !== undefined) item.status = statusMap[item.task];
         });
         DB.update('adminAudits', id, { title, assignedTo, area, deadline, notes, items, status });
-        APP.notify('Audit updated', 'success');
+        APP.notify(T('achkmod_msg_audit_updated'), 'success');
     } else {
         DB.add('adminAudits', { title, assignedTo: assignedTo || '', area: area || '', deadline: deadline || '', notes: notes || '', items, status, createdBy: AUTH.currentUser().fullName });
-        APP.notify('Audit created', 'success');
+        APP.notify(T('achkmod_msg_audit_created'), 'success');
     }
     renderAdmAudits();
 }
@@ -293,9 +293,9 @@ function editAudit(id) {
 }
 
 function deleteAudit(id) {
-    confirmAction('Delete this audit?', () => {
+    confirmAction(T('achkmod_confirm_delete_audit'), () => {
         DB.delete('adminAudits', id);
-        APP.notify('Audit deleted', 'success');
+        APP.notify(T('achkmod_msg_audit_deleted'), 'success');
         renderAdmAudits();
     });
 }
@@ -305,7 +305,7 @@ function completeAudit(id) {
     if (!audit) return;
     const items = (audit.items || []).map(i => ({ ...i, status: i.status || 'ok' }));
     DB.update('adminAudits', id, { items, status: 'completed', completedAt: new Date().toISOString() });
-    APP.notify('Audit completed', 'success');
+    APP.notify(T('achkmod_msg_audit_completed'), 'success');
     renderAdmAudits();
 }
 
@@ -322,7 +322,7 @@ function updateAuditItem(id, idx, value) {
         audit.completedAt = new Date().toISOString();
     }
     DB.update('adminAudits', id, { items: audit.items, status: audit.status, completedAt: audit.completedAt });
-    APP.notify('Item set to ' + value.toUpperCase(), 'success');
+    APP.notify(T('achkmod_msg_item_set_to_prefix') + value.toUpperCase(), 'success');
     renderAuditList();
 }
 
@@ -335,19 +335,19 @@ function renderAdmOversight() {
     const users = DB.get('users');
     content.innerHTML = `
         <div class="card">
-            <div class="card-header"><h3>👁️ All Employee Checklists (${allChecklists.length} total)</h3></div>
+            <div class="card-header"><h3>${T('achkmod_all_checklists_prefix')}${allChecklists.length}${T('achkmod_total_suffix')}</h3></div>
             <div class="table-responsive">
                 <table>
-                    <thead><tr><th>Title</th><th>Assigned To</th><th>Assigned By</th><th>Floor</th><th>Progress</th><th>Status</th><th>Due</th><th>Action</th></tr></thead>
+                    <thead><tr><th>${T('achkmod_th_title')}</th><th>${T('achkmod_th_assigned_to')}</th><th>${T('achkmod_th_assigned_by')}</th><th>${T('achkmod_th_floor')}</th><th>${T('achkmod_th_progress')}</th><th>${T('achkmod_th_status')}</th><th>${T('achkmod_th_due')}</th><th>${T('achkmod_th_action')}</th></tr></thead>
                     <tbody>${renderOversightRows(allChecklists)}</tbody>
                 </table>
             </div>
         </div>
         <div class="card" style="margin-top:16px;">
-            <div class="card-header"><h3>📊 Summary by Employee</h3></div>
+            <div class="card-header"><h3>${T('achkmod_summary_by_employee')}</h3></div>
             <div class="table-responsive">
                 <table>
-                    <thead><tr><th>Employee</th><th>Total</th><th>Active</th><th>Completed</th><th>Overdue</th><th>Completion Rate</th></tr></thead>
+                    <thead><tr><th>${T('achkmod_th_employee')}</th><th>${T('achkmod_th_total')}</th><th>${T('achkmod_th_active')}</th><th>${T('achkmod_th_completed')}</th><th>${T('achkmod_th_overdue')}</th><th>${T('achkmod_th_completion_rate')}</th></tr></thead>
                     <tbody>${renderOversightSummary(allChecklists, users)}</tbody>
                 </table>
             </div>
@@ -356,7 +356,7 @@ function renderAdmOversight() {
 }
 
 function renderOversightRows(checklists) {
-    if (checklists.length === 0) return '<tr><td colspan="8" class="empty-state">No checklists found</td></tr>';
+    if (checklists.length === 0) return '<tr><td colspan="8" class="empty-state">' + T('achkmod_no_checklists_found') + '</td></tr>';
     return checklists.slice().reverse().map(c => {
         const items = c.items || [];
         const total = items.length;
@@ -376,14 +376,14 @@ function renderOversightRows(checklists) {
             </td>
             <td><span class="badge ${c.status === 'completed' ? 'badge-success' : 'badge-info'}">${c.status}${overdue ? ' ⚠️' : ''}</span></td>
             <td style="font-size:12px;">${c.deadline ? APP.formatDate(c.deadline) : '-'}</td>
-            <td><button class="btn btn-sm btn-outline" onclick="viewOversightCl('${c.id}')">View</button></td>
+            <td><button class="btn btn-sm btn-outline" onclick="viewOversightCl('${c.id}')">${T('achkmod_btn_view')}</button></td>
         </tr>`;
     }).join('');
 }
 
 function renderOversightSummary(checklists, users) {
     const employees = users.filter(u => !u.isSuperAdmin && u.role !== 'admin');
-    if (employees.length === 0) return '<tr><td colspan="6" class="empty-state">No employees</td></tr>';
+    if (employees.length === 0) return '<tr><td colspan="6" class="empty-state">' + T('achkmod_no_employees') + '</td></tr>';
     return employees.map(e => {
         const empCls = checklists.filter(c => c.assignedTo === e.fullName);
         const total = empCls.length;
@@ -415,14 +415,14 @@ function viewOversightCl(id) {
     const done = items.filter(i => i.status && i.status !== 'pending').length;
     const html = `
         <div style="margin-bottom:12px;">
-            <p><strong>Title:</strong> ${c.title}</p>
-            <p><strong>Assigned To:</strong> ${c.assignedTo}</p>
-            <p><strong>Assigned By:</strong> ${c.assignedBy || '-'}</p>
-            <p><strong>Floor:</strong> ${c.floor || '-'}</p>
-            <p><strong>Status:</strong> ${c.status}</p>
-            <p><strong>Progress:</strong> ${done}/${total} (${total > 0 ? Math.round((done/total)*100) : 0}%)</p>
-            ${c.deadline ? '<p><strong>Deadline:</strong> ' + APP.formatDate(c.deadline) + '</p>' : ''}
-            ${c.description ? '<p><strong>Description:</strong> ' + c.description + '</p>' : ''}
+            <p><strong>${T('achkmod_field_title')}</strong> ${c.title}</p>
+            <p><strong>${T('achkmod_field_assigned_to')}</strong> ${c.assignedTo}</p>
+            <p><strong>${T('achkmod_field_assigned_by')}</strong> ${c.assignedBy || '-'}</p>
+            <p><strong>${T('achkmod_field_floor')}</strong> ${c.floor || '-'}</p>
+            <p><strong>${T('achkmod_field_status')}</strong> ${c.status}</p>
+            <p><strong>${T('achkmod_field_progress')}</strong> ${done}/${total} (${total > 0 ? Math.round((done/total)*100) : 0}%)</p>
+            ${c.deadline ? '<p><strong>' + T('achkmod_field_deadline') + '</strong> ' + APP.formatDate(c.deadline) + '</p>' : ''}
+            ${c.description ? '<p><strong>' + T('achkmod_field_description') + '</strong> ' + c.description + '</p>' : ''}
         </div>
         <div style="display:flex;flex-direction:column;gap:4px;">
             ${items.map(item => {
@@ -432,10 +432,10 @@ function viewOversightCl(id) {
                     '<span style="display:inline-block;width:70px;text-align:center;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;color:white;background:' + (sc[st] || '#e9ecef') + ';">' + (st || 'PENDING').toUpperCase() + '</span>' +
                     '<span style="flex:1;">' + item.task + '</span>' +
                     (item.unit ? '<span style="font-size:11px;color:var(--gray);">' + item.unit + '</span>' : '') +
-                    (item.updatedBy ? '<span style="font-size:11px;color:var(--gray);">by ' + item.updatedBy + '</span>' : '') +
+                    (item.updatedBy ? '<span style="font-size:11px;color:var(--gray);">' + T('achkmod_by_prefix') + item.updatedBy + '</span>' : '') +
                 '</div>';
             }).join('')}
         </div>
     `;
-    openFormModal('Checklist: ' + c.title, html, null, false);
+    openFormModal(T('achkmod_modal_checklist_prefix') + c.title, html, null, false);
 }

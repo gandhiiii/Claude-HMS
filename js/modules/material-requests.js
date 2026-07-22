@@ -5,21 +5,39 @@
 // Stage 4: store_fulfilled  → Creator confirmation
 // Stage 5: confirmed / partial → Closed
 
-var _matStatusMap = {
-    'pending':            { label: 'Pending HOD',       badge: 'badge-warning' },
-    'hod_approved':       { label: 'HOD Approved',      badge: 'badge-info' },
-    'hod_rejected':       { label: 'HOD Rejected',      badge: 'badge-danger' },
-    'facility_approved':  { label: 'Facility Approved', badge: 'badge-info' },
-    'facility_rejected':  { label: 'Facility Rejected', badge: 'badge-danger' },
-    'store_fulfilled':    { label: 'Ready to Collect',  badge: 'badge-success' },
-    'confirmed':          { label: 'Confirmed',         badge: 'badge-success' },
-    'partial':            { label: 'Partial',           badge: 'badge-warning' },
-    'approved':           { label: 'Approved',          badge: 'badge-success' },   // backward compat
-    'rejected':           { label: 'Rejected',          badge: 'badge-danger' }     // backward compat
+var _matStatusBadgeMap = {
+    'pending':            'badge-warning',
+    'hod_approved':       'badge-info',
+    'hod_rejected':       'badge-danger',
+    'facility_approved':  'badge-info',
+    'facility_rejected':  'badge-danger',
+    'store_fulfilled':    'badge-success',
+    'confirmed':          'badge-success',
+    'partial':            'badge-warning',
+    'approved':           'badge-success',   // backward compat
+    'rejected':           'badge-danger'     // backward compat
 };
 
+var _matStatusLabelKeyMap = {
+    'pending':            'mreqmod_status_pending_hod',
+    'hod_approved':       'mreqmod_status_hod_approved',
+    'hod_rejected':       'mreqmod_status_hod_rejected',
+    'facility_approved':  'mreqmod_status_facility_approved',
+    'facility_rejected':  'mreqmod_status_facility_rejected',
+    'store_fulfilled':    'mreqmod_status_ready_to_collect',
+    'confirmed':          'mreqmod_status_confirmed',
+    'partial':            'mreqmod_status_partial',
+    'approved':           'mreqmod_status_approved',   // backward compat
+    'rejected':           'mreqmod_status_rejected'    // backward compat
+};
+
+function _matStatusLabel(status) {
+    var key = _matStatusLabelKeyMap[status];
+    return key ? T(key) : (status || T('mreqmod_status_pending_hod'));
+}
+
 function _matStatusInfo(r) {
-    return _matStatusMap[r.status] || { label: r.status || 'pending', badge: 'badge-warning' };
+    return { label: _matStatusLabel(r.status), badge: _matStatusBadgeMap[r.status] || 'badge-warning' };
 }
 
 function _matProcurementDept() {
@@ -39,22 +57,22 @@ function renderMaterialRequests(container) {
 
     container.innerHTML = ''
         + '<div class="flex-between mb-4">'
-        + '<div class="search-box"><input type="text" class="form-control" id="matSearch" placeholder="Search requests..." oninput="renderMatList()"></div>'
+        + '<div class="search-box"><input type="text" class="form-control" id="matSearch" placeholder="' + T('mreqmod_search_placeholder') + '" oninput="renderMatList()"></div>'
         + '<div style="display:flex;gap:6px;align-items:center;">'
-        + '<span id="matCount" style="font-size:13px;color:var(--gray);">0 requests</span>'
-        + (!isStorekeeper ? '<button class="btn btn-primary" onclick="showMatForm()">+ New Request</button>' : '')
+        + '<span id="matCount" style="font-size:13px;color:var(--gray);">0 ' + T('mreqmod_request_plural') + '</span>'
+        + (!isStorekeeper ? '<button class="btn btn-primary" onclick="showMatForm()">' + T('mreqmod_btn_new_request') + '</button>' : '')
         + '</div></div>'
         + '<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-bottom:14px;background:var(--light-gray);border-radius:8px;padding:10px 14px;font-size:11px;">'
-        + '<span style="font-weight:700;margin-right:6px;font-size:12px;">Approval Flow:</span>'
-        + '<span class="badge badge-warning">1 Submit</span>'
+        + '<span style="font-weight:700;margin-right:6px;font-size:12px;">' + T('mreqmod_flow_label') + '</span>'
+        + '<span class="badge badge-warning">' + T('mreqmod_flow_step1') + '</span>'
         + '<span style="color:var(--gray);margin:0 3px;">→</span>'
-        + '<span class="badge badge-info">2 Dept HOD</span>'
+        + '<span class="badge badge-info">' + T('mreqmod_flow_step2') + '</span>'
         + '<span style="color:var(--gray);margin:0 3px;">→</span>'
-        + '<span class="badge badge-info">3 ' + procDept + ' HOD</span>'
+        + '<span class="badge badge-info">' + T('mreqmod_flow_step3_prefix') + procDept + T('mreqmod_flow_step3_suffix') + '</span>'
         + '<span style="color:var(--gray);margin:0 3px;">→</span>'
-        + '<span class="badge badge-success">4 Storekeeper</span>'
+        + '<span class="badge badge-success">' + T('mreqmod_flow_step4') + '</span>'
         + '<span style="color:var(--gray);margin:0 3px;">→</span>'
-        + '<span class="badge badge-success">5 Confirm</span>'
+        + '<span class="badge badge-success">' + T('mreqmod_flow_step5') + '</span>'
         + '</div>'
         + '<div id="matView"></div>';
 
@@ -96,13 +114,13 @@ function renderMatList() {
         }
 
         var countEl = document.getElementById('matCount');
-        if (countEl) countEl.textContent = requests.length + ' request' + (requests.length !== 1 ? 's' : '');
+        if (countEl) countEl.textContent = requests.length + ' ' + (requests.length !== 1 ? T('mreqmod_request_plural') : T('mreqmod_request_singular'));
 
         var viewEl = document.getElementById('matView');
         if (!viewEl) return;
 
         if (!requests.length) {
-            viewEl.innerHTML = '<div class="card"><div class="empty-state">No requests found</div></div>';
+            viewEl.innerHTML = '<div class="card"><div class="empty-state">' + T('mreqmod_no_requests_found') + '</div></div>';
             return;
         }
 
@@ -127,55 +145,55 @@ function renderMatList() {
             html += '<div class="card" style="padding:14px;margin-bottom:10px;">'
                 + '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
                 + '<div>'
-                + '<div style="font-size:14px;font-weight:700;">' + (r.title || 'Request') + '</div>'
+                + '<div style="font-size:14px;font-weight:700;">' + (r.title || T('mreqmod_untitled_request')) + '</div>'
                 + '<div style="font-size:12px;color:var(--gray);margin-top:2px;">'
-                + 'From: <strong>' + (r.createdByName || r.createdBy || '?') + '</strong>'
-                + ' &nbsp;&middot;&nbsp; Dept: <strong>' + (r.department || '-') + '</strong>'
+                + T('mreqmod_label_from') + ' <strong>' + (r.createdByName || r.createdBy || '?') + '</strong>'
+                + ' &nbsp;&middot;&nbsp; ' + T('mreqmod_label_dept') + ' <strong>' + (r.department || '-') + '</strong>'
                 + ' &nbsp;&middot;&nbsp; ' + APP.formatDate(r.createdAt)
                 + '</div></div>'
                 + '<span class="badge ' + st.badge + '" style="font-size:12px;">' + st.label + '</span>'
                 + '</div>'
 
                 + '<div style="font-size:12px;background:var(--light-gray);border-radius:6px;padding:8px;margin-bottom:10px;">'
-                + '<strong>Items:</strong> ' + (itemStr || '—')
-                + (r.reason ? '<br><strong>Reason:</strong> ' + r.reason : '')
+                + '<strong>' + T('mreqmod_label_items') + '</strong> ' + (itemStr || '—')
+                + (r.reason ? '<br><strong>' + T('mreqmod_label_reason') + '</strong> ' + r.reason : '')
                 + '</div>'
 
                 + _matTimeline(r, procDept)
 
                 + (r.hodRejectionNote || r.facilityRejectionNote ? '<div style="background:#ffebee;border-radius:6px;padding:8px;font-size:12px;margin-bottom:8px;">'
-                    + '<strong style="color:var(--danger);">Rejection Note:</strong> ' + (r.hodRejectionNote || r.facilityRejectionNote || '')
+                    + '<strong style="color:var(--danger);">' + T('mreqmod_label_rejection_note') + '</strong> ' + (r.hodRejectionNote || r.facilityRejectionNote || '')
                     + '</div>' : '')
 
                 + (r.confirmationNote ? '<div style="background:#e8f5e9;border-radius:6px;padding:8px;font-size:12px;margin-bottom:8px;">'
-                    + '<strong>Confirmation Note:</strong> ' + r.confirmationNote
+                    + '<strong>' + T('mreqmod_label_confirmation_note') + '</strong> ' + r.confirmationNote
                     + '</div>' : '')
 
                 + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'
                 + (canHodApprove
-                    ? '<button class="btn btn-sm btn-success" onclick="hodApproveMatReq(\'' + r.id + '\')">&#10003; Approve</button>'
-                    + '<button class="btn btn-sm btn-danger" onclick="hodRejectMatReq(\'' + r.id + '\')">&#10007; Reject</button>'
+                    ? '<button class="btn btn-sm btn-success" onclick="hodApproveMatReq(\'' + r.id + '\')">&#10003; ' + T('mreqmod_btn_approve') + '</button>'
+                    + '<button class="btn btn-sm btn-danger" onclick="hodRejectMatReq(\'' + r.id + '\')">&#10007; ' + T('mreqmod_btn_reject') + '</button>'
                     : '')
                 + (canFacHodApprovePending
-                    ? '<button class="btn btn-sm btn-success" onclick="facilityApproveOwnDept(\'' + r.id + '\')">&#10003; Approve (skip to Storekeeper)</button>'
-                    + '<button class="btn btn-sm btn-danger" onclick="hodRejectMatReq(\'' + r.id + '\')">&#10007; Reject</button>'
+                    ? '<button class="btn btn-sm btn-success" onclick="facilityApproveOwnDept(\'' + r.id + '\')">&#10003; ' + T('mreqmod_btn_approve_skip_storekeeper') + '</button>'
+                    + '<button class="btn btn-sm btn-danger" onclick="hodRejectMatReq(\'' + r.id + '\')">&#10007; ' + T('mreqmod_btn_reject') + '</button>'
                     : '')
                 + (canFacApprove
-                    ? '<button class="btn btn-sm btn-success" onclick="facilityApproveMatReq(\'' + r.id + '\')">&#10003; Facility Approve</button>'
-                    + '<button class="btn btn-sm btn-danger" onclick="facilityRejectMatReq(\'' + r.id + '\')">&#10007; Reject</button>'
+                    ? '<button class="btn btn-sm btn-success" onclick="facilityApproveMatReq(\'' + r.id + '\')">&#10003; ' + T('mreqmod_btn_facility_approve') + '</button>'
+                    + '<button class="btn btn-sm btn-danger" onclick="facilityRejectMatReq(\'' + r.id + '\')">&#10007; ' + T('mreqmod_btn_reject') + '</button>'
                     : '')
                 + (canStoreFulfill
-                    ? '<button class="btn btn-sm btn-success" onclick="storeFulfillMatReq(\'' + r.id + '\')">&#128230; Mark Fulfilled</button>'
+                    ? '<button class="btn btn-sm btn-success" onclick="storeFulfillMatReq(\'' + r.id + '\')">&#128230; ' + T('mreqmod_btn_mark_fulfilled') + '</button>'
                     : '')
                 + (canConfirm
-                    ? '<button class="btn btn-sm btn-success" onclick="confirmMatReq(\'' + r.id + '\',false)">&#10003; Confirm Full Receipt</button>'
-                    + '<button class="btn btn-sm btn-warning" onclick="confirmMatReq(\'' + r.id + '\',true)">Partial Receipt</button>'
+                    ? '<button class="btn btn-sm btn-success" onclick="confirmMatReq(\'' + r.id + '\',false)">&#10003; ' + T('mreqmod_btn_confirm_full_receipt') + '</button>'
+                    + '<button class="btn btn-sm btn-warning" onclick="confirmMatReq(\'' + r.id + '\',true)">' + T('mreqmod_btn_partial_receipt') + '</button>'
                     : '')
                 + (canDelete
-                    ? '<button class="btn btn-sm btn-danger" onclick="deleteMatReq(\'' + r.id + '\')">Delete</button>'
+                    ? '<button class="btn btn-sm btn-danger" onclick="deleteMatReq(\'' + r.id + '\')">' + T('mreqmod_btn_delete') + '</button>'
                     : '')
                 + (canAdminOverride
-                    ? '<button class="btn btn-sm btn-outline" onclick="adminPushMatReq(\'' + r.id + '\')" title="Admin: push through all pending stages">&#9889; Push to Storekeeper</button>'
+                    ? '<button class="btn btn-sm btn-outline" onclick="adminPushMatReq(\'' + r.id + '\')" title="' + T('mreqmod_title_admin_push') + '">&#9889; ' + T('mreqmod_btn_push_to_storekeeper') + '</button>'
                     : '')
                 + '</div></div>';
         }
@@ -188,18 +206,18 @@ function renderMatList() {
 
 function _matTimeline(r, procDept) {
     var steps = [
-        { label: 'Submitted',             done: true,   rejected: false, by: r.createdByName,          at: r.createdAt },
-        { label: 'Dept HOD',              done: ['hod_approved','facility_approved','store_fulfilled','confirmed','partial','approved'].indexOf(r.status) >= 0,
+        { label: T('mreqmod_step_submitted'),   done: true,   rejected: false, by: r.createdByName,          at: r.createdAt },
+        { label: T('mreqmod_step_dept_hod'),    done: ['hod_approved','facility_approved','store_fulfilled','confirmed','partial','approved'].indexOf(r.status) >= 0,
                                           rejected: r.status === 'hod_rejected',
                                           by: r.hodApprovedByName,                                      at: r.hodApprovedAt },
-        { label: (procDept || 'Facility') + ' HOD',
+        { label: (procDept || T('mreqmod_step_facility_fallback')) + T('mreqmod_step_hod_suffix'),
                                           done: ['facility_approved','store_fulfilled','confirmed','partial'].indexOf(r.status) >= 0,
                                           rejected: r.status === 'facility_rejected',
                                           by: r.facilityApprovedByName,                                 at: r.facilityApprovedAt },
-        { label: 'Storekeeper',           done: ['store_fulfilled','confirmed','partial'].indexOf(r.status) >= 0,
+        { label: T('mreqmod_step_storekeeper'), done: ['store_fulfilled','confirmed','partial'].indexOf(r.status) >= 0,
                                           rejected: false,
                                           by: r.fulfilledByName,                                        at: r.fulfilledAt },
-        { label: 'Confirmed',             done: r.status === 'confirmed' || r.status === 'partial',
+        { label: T('mreqmod_step_confirmed'),   done: r.status === 'confirmed' || r.status === 'partial',
                                           rejected: false,
                                           by: r.confirmedByName,                                        at: r.confirmedAt }
     ];
@@ -246,25 +264,25 @@ function showMatForm() {
     }
 
     var html = '<form id="matForm">'
-        + '<div class="form-group"><label>Request Title *</label><input type="text" name="title" class="form-control" required></div>'
-        + '<div class="form-group"><label>Department</label>' + deptField + '</div>'
-        + '<div class="form-group"><label>Reason / Justification</label><textarea name="reason" class="form-control" rows="2"></textarea></div>'
-        + '<div class="form-group"><label>Items from Inventory</label>'
+        + '<div class="form-group"><label>' + T('mreqmod_label_request_title') + '</label><input type="text" name="title" class="form-control" required></div>'
+        + '<div class="form-group"><label>' + T('mreqmod_label_department') + '</label>' + deptField + '</div>'
+        + '<div class="form-group"><label>' + T('mreqmod_label_reason_justification') + '</label><textarea name="reason" class="form-control" rows="2"></textarea></div>'
+        + '<div class="form-group"><label>' + T('mreqmod_label_items_from_inventory') + '</label>'
         + '<div id="matItemsContainer"><div class="mat-item-row" style="display:flex;gap:6px;margin-bottom:4px;">'
         + '<select class="form-control mat-item-select" style="flex:2;">' + itemOpts + '</select>'
-        + '<input type="number" class="form-control mat-item-qty" placeholder="Qty" style="width:80px;" min="1" value="1">'
-        + '<input type="text" class="form-control mat-item-unit" placeholder="Unit" style="width:70px;" value="pcs">'
+        + '<input type="number" class="form-control mat-item-qty" placeholder="' + T('mreqmod_placeholder_qty') + '" style="width:80px;" min="1" value="1">'
+        + '<input type="text" class="form-control mat-item-unit" placeholder="' + T('mreqmod_placeholder_unit') + '" style="width:70px;" value="pcs">'
         + '<button type="button" class="btn btn-sm btn-success" onclick="addMatItemRow()">+</button>'
         + '</div></div></div>'
-        + '<div class="form-group"><label>Custom Item (not in inventory)</label>'
+        + '<div class="form-group"><label>' + T('mreqmod_label_custom_item') + '</label>'
         + '<div style="display:flex;gap:6px;">'
-        + '<input type="text" id="matCustomName" class="form-control" placeholder="Item name" style="flex:2;">'
-        + '<input type="number" id="matCustomQty" class="form-control" placeholder="Qty" style="width:80px;" min="1" value="1">'
-        + '<button type="button" class="btn btn-sm btn-primary" onclick="addMatCustomItem()">Add</button>'
+        + '<input type="text" id="matCustomName" class="form-control" placeholder="' + T('mreqmod_placeholder_item_name') + '" style="flex:2;">'
+        + '<input type="number" id="matCustomQty" class="form-control" placeholder="' + T('mreqmod_placeholder_qty') + '" style="width:80px;" min="1" value="1">'
+        + '<button type="button" class="btn btn-sm btn-primary" onclick="addMatCustomItem()">' + T('mreqmod_btn_add') + '</button>'
         + '</div></div>'
         + '</form>';
 
-    openFormModal('New Material Request', html, 'saveMatReq()', true);
+    openFormModal(T('mreqmod_modal_new_request'), html, 'saveMatReq()', true);
     var f = document.getElementById('matForm');
     if (f) f.addEventListener('submit', function(e) { e.preventDefault(); saveMatReq(); });
 }
@@ -284,8 +302,8 @@ function addMatItemRow() {
     row.className = 'mat-item-row';
     row.style.cssText = 'display:flex;gap:6px;margin-bottom:4px;';
     row.innerHTML = '<select class="form-control mat-item-select" style="flex:2;">' + itemOpts + '</select>'
-        + '<input type="number" class="form-control mat-item-qty" placeholder="Qty" style="width:80px;" min="1" value="1">'
-        + '<input type="text" class="form-control mat-item-unit" placeholder="Unit" style="width:70px;" value="pcs">'
+        + '<input type="number" class="form-control mat-item-qty" placeholder="' + T('mreqmod_placeholder_qty') + '" style="width:80px;" min="1" value="1">'
+        + '<input type="text" class="form-control mat-item-unit" placeholder="' + T('mreqmod_placeholder_unit') + '" style="width:70px;" value="pcs">'
         + '<button type="button" class="btn btn-sm btn-danger" onclick="this.parentElement.remove()">&times;</button>';
     container.appendChild(row);
 }
@@ -295,11 +313,11 @@ function addMatCustomItem() {
     var qtyEl = document.getElementById('matCustomQty');
     var name = nameEl ? nameEl.value.trim() : '';
     var qty = parseInt(qtyEl ? qtyEl.value : '1') || 1;
-    if (!name) { APP.notify('Enter item name', 'error'); return; }
+    if (!name) { APP.notify(T('mreqmod_msg_enter_item_name'), 'error'); return; }
     matCustomItems.push({ name: name, qty: qty, unit: 'pcs' });
     if (nameEl) nameEl.value = '';
     if (qtyEl) qtyEl.value = '1';
-    APP.notify('Added: ' + name + ' \xd7' + qty, 'success');
+    APP.notify(T('mreqmod_msg_added_prefix') + name + ' \xd7' + qty, 'success');
 }
 
 function saveMatReq() {
@@ -309,7 +327,7 @@ function saveMatReq() {
     title = title ? title.trim() : '';
     var department = (form.querySelector('[name="department"]') || {}).value || '';
     var reason = (form.querySelector('[name="reason"]') || {}).value || '';
-    if (!title) { APP.notify('Enter a request title', 'error'); return false; }
+    if (!title) { APP.notify(T('mreqmod_msg_enter_request_title'), 'error'); return false; }
 
     var items = [];
     var rows = document.querySelectorAll('.mat-item-row');
@@ -323,7 +341,7 @@ function saveMatReq() {
     for (var i = 0; i < matCustomItems.length; i++) {
         items.push(matCustomItems[i]);
     }
-    if (!items.length) { APP.notify('Add at least one item', 'error'); return false; }
+    if (!items.length) { APP.notify(T('mreqmod_msg_add_one_item'), 'error'); return false; }
 
     var user = AUTH.currentUser();
     // Storekeeper requests bypass dept HOD and go directly to Facility HOD
@@ -341,13 +359,13 @@ function saveMatReq() {
         hodApprovedAt: isStorekeeper ? new Date().toISOString() : undefined
     });
     matCustomItems = [];
-    APP.notify(isStorekeeper ? 'Request sent to Facility HOD for approval' : 'Request submitted — waiting for HOD approval', 'success');
+    APP.notify(isStorekeeper ? T('mreqmod_msg_sent_to_facility_hod') : T('mreqmod_msg_submitted_waiting_hod'), 'success');
     renderMatList();
     return true;
 }
 
 function deleteMatReq(id) {
-    confirmAction('Delete this request?', function() {
+    confirmAction(T('mreqmod_confirm_delete_request'), function() {
         DB.delete('material_requests', id);
         renderMatList();
     });
@@ -363,12 +381,12 @@ function hodApproveMatReq(id) {
         hodApprovedByName: user.fullName,
         hodApprovedAt: now
     });
-    APP.notify('Approved — request sent to Facility HOD', 'success');
+    APP.notify(T('mreqmod_msg_approved_sent_facility_hod'), 'success');
     renderMatList();
 }
 
 function hodRejectMatReq(id) {
-    var note = prompt('Reason for rejection (optional):');
+    var note = prompt(T('mreqmod_prompt_rejection_reason'));
     if (note === null) return;
     var user = AUTH.currentUser();
     DB.update('material_requests', id, {
@@ -378,7 +396,7 @@ function hodRejectMatReq(id) {
         hodRejectedAt: new Date().toISOString(),
         hodRejectionNote: note || ''
     });
-    APP.notify('Request rejected', 'info');
+    APP.notify(T('mreqmod_msg_request_rejected'), 'info');
     renderMatList();
 }
 
@@ -395,7 +413,7 @@ function facilityApproveOwnDept(id) {
         facilityApprovedByName: user.fullName,
         facilityApprovedAt: now
     });
-    APP.notify('Approved — request sent to Storekeeper', 'success');
+    APP.notify(T('mreqmod_msg_approved_sent_storekeeper'), 'success');
     renderMatList();
 }
 
@@ -408,12 +426,12 @@ function facilityApproveMatReq(id) {
         facilityApprovedByName: user.fullName,
         facilityApprovedAt: new Date().toISOString()
     });
-    APP.notify('Approved — request sent to Storekeeper', 'success');
+    APP.notify(T('mreqmod_msg_approved_sent_storekeeper'), 'success');
     renderMatList();
 }
 
 function facilityRejectMatReq(id) {
-    var note = prompt('Reason for rejection (optional):');
+    var note = prompt(T('mreqmod_prompt_rejection_reason'));
     if (note === null) return;
     var user = AUTH.currentUser();
     DB.update('material_requests', id, {
@@ -423,13 +441,13 @@ function facilityRejectMatReq(id) {
         facilityRejectedAt: new Date().toISOString(),
         facilityRejectionNote: note || ''
     });
-    APP.notify('Request rejected by Facility HOD', 'info');
+    APP.notify(T('mreqmod_msg_rejected_by_facility_hod'), 'info');
     renderMatList();
 }
 
 /* ── Stage 4: Storekeeper Fulfillment ── */
 function storeFulfillMatReq(id) {
-    if (!confirm('Mark this request as fulfilled? The requester will be notified to confirm receipt.')) return;
+    if (!confirm(T('mreqmod_confirm_mark_fulfilled'))) return;
     var user = AUTH.currentUser();
     var now  = new Date().toISOString();
     var r    = DB.getById('material_requests', id);
@@ -457,19 +475,19 @@ function storeFulfillMatReq(id) {
                     totalValue: issueQty * (parseFloat(inv.price) || 0),
                     dept: r.department || '',
                     by: user.fullName,
-                    notes: 'Request fulfilled: ' + (r.title || ''),
+                    notes: T('mreqmod_note_request_fulfilled_prefix') + (r.title || ''),
                     date: now
                 });
             }
         });
     }
-    APP.notify('Marked as fulfilled — awaiting creator confirmation', 'success');
+    APP.notify(T('mreqmod_msg_marked_fulfilled_awaiting'), 'success');
     renderMatList();
 }
 
 /* ── Stage 5: Creator Confirmation ── */
 function confirmMatReq(id, partial) {
-    var note = prompt(partial ? 'Describe what was partially received:' : 'Any notes about the receipt? (optional):');
+    var note = prompt(partial ? T('mreqmod_prompt_describe_partial') : T('mreqmod_prompt_receipt_notes'));
     if (note === null) return;
     var user = AUTH.currentUser();
     DB.update('material_requests', id, {
@@ -479,7 +497,7 @@ function confirmMatReq(id, partial) {
         confirmedAt: new Date().toISOString(),
         confirmationNote: note || ''
     });
-    APP.notify(partial ? 'Marked as partially fulfilled' : 'Request confirmed and closed!', 'success');
+    APP.notify(partial ? T('mreqmod_msg_marked_partial') : T('mreqmod_msg_confirmed_closed'), 'success');
     renderMatList();
 }
 
@@ -492,7 +510,7 @@ function adminPushMatReq(id) {
         hodApprovedBy: user.username, hodApprovedByName: user.fullName, hodApprovedAt: now,
         facilityApprovedBy: user.username, facilityApprovedByName: user.fullName, facilityApprovedAt: now
     });
-    APP.notify('All stages approved — request sent to Storekeeper', 'success');
+    APP.notify(T('mreqmod_msg_all_stages_approved'), 'success');
     renderMatList();
 }
 
