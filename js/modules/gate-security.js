@@ -19,14 +19,14 @@ function renderGateSecurity(container) {
     const user = AUTH.currentUser();
     container.innerHTML = `
         <div class="flex-between mb-4">
-            <h3 style="margin:0;">Gate Security</h3>
+            <h3 style="margin:0;">${T('gsmod_title')}</h3>
         </div>
         <div class="tabs" style="margin-bottom:16px;">
-            <button class="tab-btn ${gateSection === 'goods' ? 'active' : ''}" onclick="switchGateSection('goods',this)">🚚 Goods</button>
-            <button class="tab-btn ${gateSection === 'patients' ? 'active' : ''}" onclick="switchGateSection('patients',this)">🧑 Patients</button>
-            <button class="tab-btn ${gateSection === 'doctors' ? 'active' : ''}" onclick="switchGateSection('doctors',this)">🩺 Doctors</button>
-            <button class="tab-btn ${gateSection === 'passes' ? 'active' : ''}" onclick="switchGateSection('passes',this)">🎫 Pass Generator</button>
-            <button class="tab-btn ${gateSection === 'approvals' ? 'active' : ''}" onclick="switchGateSection('approvals',this)">🔄 Approvals</button>
+            <button class="tab-btn ${gateSection === 'goods' ? 'active' : ''}" onclick="switchGateSection('goods',this)">🚚 ${T('gsmod_tab_goods')}</button>
+            <button class="tab-btn ${gateSection === 'patients' ? 'active' : ''}" onclick="switchGateSection('patients',this)">🧑 ${T('gsmod_tab_patients')}</button>
+            <button class="tab-btn ${gateSection === 'doctors' ? 'active' : ''}" onclick="switchGateSection('doctors',this)">🩺 ${T('gsmod_tab_doctors')}</button>
+            <button class="tab-btn ${gateSection === 'passes' ? 'active' : ''}" onclick="switchGateSection('passes',this)">🎫 ${T('gsmod_tab_passes')}</button>
+            <button class="tab-btn ${gateSection === 'approvals' ? 'active' : ''}" onclick="switchGateSection('approvals',this)">🔄 ${T('gsmod_tab_approvals')}</button>
         </div>
         <div id="gateContent"></div>
     `;
@@ -56,21 +56,21 @@ function renderGoodsSection() {
     el.innerHTML = `
         <div class="flex-between mb-4">
             <div class="search-box">
-                <input type="text" class="form-control" id="gateSearch" placeholder="Search entries..." oninput="renderGateList()">
+                <input type="text" class="form-control" id="gateSearch" placeholder="${T('gsmod_search_entries')}" oninput="renderGateList()">
             </div>
             <div>
-                <button class="btn btn-success" onclick="showGateForm('in')">+ Goods In</button>
-                <button class="btn btn-warning" onclick="showGateForm('out')">+ Goods Out</button>
+                <button class="btn btn-success" onclick="showGateForm('in')">+ ${T('gsmod_goods_in')}</button>
+                <button class="btn btn-warning" onclick="showGateForm('out')">+ ${T('gsmod_goods_out')}</button>
             </div>
         </div>
         <div class="tabs" style="margin-bottom:8px;">
-            <button class="tab-btn active" onclick="switchGateTab('all',this)">All</button>
-            <button class="tab-btn" onclick="switchGateTab('pending',this)">Pending</button>
-            <button class="tab-btn" onclick="switchGateTab('approved',this)">Approved</button>
-            <button class="tab-btn" onclick="switchGateTab('rejected',this)">Rejected</button>
+            <button class="tab-btn active" onclick="switchGateTab('all',this)">${T('gsmod_f_all')}</button>
+            <button class="tab-btn" onclick="switchGateTab('pending',this)">${T('gsmod_f_pending')}</button>
+            <button class="tab-btn" onclick="switchGateTab('approved',this)">${T('gsmod_f_approved')}</button>
+            <button class="tab-btn" onclick="switchGateTab('rejected',this)">${T('gsmod_f_rejected')}</button>
         </div>
         <div class="card"><div class="table-responsive"><table>
-            <thead><tr><th>Date/Time</th><th>Item Name</th><th>Direction</th><th>Department</th><th>Vehicle No</th><th>Driver</th><th>Purpose</th><th>Submitted By</th><th>Approved By</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>${T('gsmod_th_datetime')}</th><th>${T('gsmod_th_item')}</th><th>${T('gsmod_th_direction')}</th><th>${T('gsmod_th_department')}</th><th>${T('gsmod_th_vehicle')}</th><th>${T('gsmod_th_driver')}</th><th>${T('gsmod_th_purpose')}</th><th>${T('gsmod_th_submitted')}</th><th>${T('gsmod_th_approved')}</th><th>${T('gsmod_th_status')}</th><th>${T('gsmod_th_actions')}</th></tr></thead>
             <tbody id="gateTableBody"></tbody>
         </table></div></div>
     `;
@@ -109,19 +109,19 @@ function renderGateList() {
             <td>${e.driverName || '-'} ${e.driverPhone ? '('+e.driverPhone+')' : ''}</td>
             <td>${e.purpose || '-'}</td>
             <td>${e.submittedBy || '-'}</td>
-            <td>${e.approvedBy || (e.status === 'rejected' ? '<span style="color:red;">Rejected by ' + (e.rejectedBy || 'N/A') + '</span>' : '-')}</td>
+            <td>${e.approvedBy || (e.status === 'rejected' ? '<span style="color:red;">' + T('gsmod_rejected_by') + ' ' + (e.rejectedBy || 'N/A') + '</span>' : '-')}</td>
             <td><span class="badge ${e.status === 'rejected' ? 'badge-danger' : APP.getStatusBadge(e.status)}" style="${e.status === 'rejected' ? 'background:var(--danger);color:#fff;' : ''}">${e.status.toUpperCase()}</span></td>
             <td>
                 ${e.status === 'pending' && isUserHodOfDept(e.department) ? `
-                    <button class="btn btn-sm btn-success" onclick="approveGateEntry('${e.id}')">Approve</button>
-                    <button class="btn btn-sm btn-danger" onclick="showRejectReason('gatesecurity','${e.id}')">Reject</button>
+                    <button class="btn btn-sm btn-success" onclick="approveGateEntry('${e.id}')">${T('gsmod_approve')}</button>
+                    <button class="btn btn-sm btn-danger" onclick="showRejectReason('gatesecurity','${e.id}')">${T('gsmod_reject')}</button>
                 ` : ''}
-                <button class="btn btn-sm btn-primary" onclick="viewGateEntry('${e.id}')">View</button>
+                <button class="btn btn-sm btn-primary" onclick="viewGateEntry('${e.id}')">${T('gsmod_view')}</button>
                 ${e.status === 'approved' ? `<button class="btn btn-sm btn-info" onclick="printGoodsPass('${e.id}')">🖨️</button>` : ''}
-                ${e.status === 'rejected' ? '<span style="color:var(--danger);font-size:11px;font-weight:600;">⛔ REJECTED</span>' : ''}
+                ${e.status === 'rejected' ? '<span style="color:var(--danger);font-size:11px;font-weight:600;">⛔ ' + T('gsmod_rejected_cap') + '</span>' : ''}
             </td>
         </tr>
-    `).join('') || '<tr><td colspan="11" class="empty-state">No gate entries</td></tr>';
+    `).join('') || '<tr><td colspan="11" class="empty-state">' + T('gsmod_no_gate_entries') + '</td></tr>';
 }
 
 function showGateForm(direction) {
@@ -129,60 +129,60 @@ function showGateForm(direction) {
         <form id="gateForm">
             <div class="grid-2">
                 <div class="form-group">
-                    <label>Item/Goods Name *</label>
+                    <label>${T('gsmod_lbl_item')}</label>
                     <input type="text" name="itemName" class="form-control" required>
                 </div>
                 <div class="form-group">
-                    <label>Direction</label>
+                    <label>${T('gsmod_lbl_direction')}</label>
                     <input type="text" class="form-control" value="${direction.toUpperCase()}" readonly>
                     <input type="hidden" name="direction" value="${direction}">
                 </div>
                 <div class="form-group">
-                    <label>Vehicle Number *</label>
-                    <input type="text" name="vehicleNo" class="form-control" placeholder="e.g. KA-01-1234" required>
+                    <label>${T('gsmod_lbl_vehicle_no_req')}</label>
+                    <input type="text" name="vehicleNo" class="form-control" placeholder="${T('gsmod_ph_vehicle')}" required>
                 </div>
                 <div class="form-group">
-                    <label>Driver Name</label>
+                    <label>${T('gsmod_lbl_driver_name')}</label>
                     <input type="text" name="driverName" class="form-control">
                 </div>
                 <div class="form-group">
-                    <label>Driver Phone</label>
+                    <label>${T('gsmod_lbl_driver_phone')}</label>
                     <input type="text" name="driverPhone" class="form-control">
                 </div>
                 <div class="form-group">
-                    <label>Quantity</label>
-                    <input type="text" name="quantity" class="form-control" placeholder="e.g. 10 boxes">
+                    <label>${T('gsmod_lbl_quantity')}</label>
+                    <input type="text" name="quantity" class="form-control" placeholder="${T('gsmod_ph_quantity')}">
                 </div>
                 <div class="form-group">
-                    <label>Company / Vendor</label>
+                    <label>${T('gsmod_lbl_vendor')}</label>
                     <input type="text" name="vendor" class="form-control">
                 </div>
                 <div class="form-group">
-                    <label>Department</label>
+                    <label>${T('gsmod_lbl_department')}</label>
                     ${deptDropdown('department')}
                 </div>
                 <div class="form-group">
-                    <label>Gate Pass No</label>
+                    <label>${T('gsmod_lbl_gatepass')}</label>
                     <input type="text" name="gatePassNo" class="form-control" value="GP-${Date.now().toString(36).toUpperCase()}">
                 </div>
             </div>
             <div class="form-group">
-                <label>Purpose / Details *</label>
+                <label>${T('gsmod_lbl_purpose_details')}</label>
                 <textarea name="purpose" class="form-control" required></textarea>
             </div>
             <div class="form-group">
-                <label>Remarks</label>
+                <label>${T('gsmod_lbl_remarks')}</label>
                 <textarea name="remarks" class="form-control"></textarea>
             </div>
         </form>
     `;
-    openFormModal(`${direction === 'in' ? 'Goods Inward' : 'Goods Outward'} Entry`, form, `saveGateEntry()`);
+    openFormModal(`${direction === 'in' ? T('gsmod_goods_inward') : T('gsmod_goods_outward')} ${T('gsmod_entry_word')}`, form, `saveGateEntry()`);
 }
 
 function saveGateEntry() {
     const data = getFormData('gateForm');
     if (!data.itemName || !data.vehicleNo || !data.purpose) {
-        APP.notify('Please fill required fields', 'error'); return;
+        APP.notify(T('gsmod_fill_required'), 'error'); return;
     }
     const user = AUTH.currentUser();
     data.status = 'pending';
@@ -191,7 +191,7 @@ function saveGateEntry() {
     data.submittedBy = user ? user.fullName : 'Unknown';
     data.rejectionReason = '';
     DB.add('gatesecurity', data);
-    APP.notify('Gate entry recorded & pending approval', 'success');
+    APP.notify(T('gsmod_msg_gate_recorded'), 'success');
     renderGateList();
 }
 
@@ -199,12 +199,12 @@ function approveGateEntry(id) {
     const entry = DB.getById('gatesecurity', id);
     if (!entry) return;
     if (!isUserHodOfDept(entry.department)) {
-        APP.notify('Only the HOD of ' + entry.department + ' can approve this entry', 'error');
+        APP.notify(T('gsmod_only_hod_pre') + ' ' + entry.department + ' ' + T('gsmod_only_hod_approve'), 'error');
         return;
     }
     const user = AUTH.currentUser();
     DB.update('gatesecurity', id, { status: 'approved', approvedBy: user.fullName, approvedAt: new Date().toISOString() });
-    APP.notify('Entry approved', 'success');
+    APP.notify(T('gsmod_msg_entry_approved'), 'success');
     renderGateList();
     renderApprovalsList();
 }
@@ -213,11 +213,11 @@ function rejectGateEntry(id, reason) {
     const entry = DB.getById('gatesecurity', id);
     if (!entry) return;
     if (!isUserHodOfDept(entry.department)) {
-        APP.notify('Only the HOD of ' + entry.department + ' can reject this entry', 'error');
+        APP.notify(T('gsmod_only_hod_pre') + ' ' + entry.department + ' ' + T('gsmod_only_hod_reject'), 'error');
         return;
     }
     DB.update('gatesecurity', id, { status: 'rejected', rejectionReason: reason || 'No reason provided', rejectedBy: AUTH.currentUser()?.fullName || 'Unknown' });
-    APP.notify('Entry rejected', 'info');
+    APP.notify(T('gsmod_msg_entry_rejected'), 'info');
     renderGateList();
     renderApprovalsList();
 }
@@ -262,24 +262,24 @@ function viewGateEntry(id) {
     const e = DB.getById('gatesecurity', id);
     if (!e) return;
     showModal(`
-        <div class="modal-header"><h3>Gate Entry Details</h3><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
+        <div class="modal-header"><h3>${T('gsmod_gate_details')}</h3><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
         <div class="grid-2">
-            <div><strong>Item:</strong> ${e.itemName}</div>
-            <div><strong>Direction:</strong> <span class="badge ${e.direction === 'in' ? 'badge-success' : 'badge-danger'}">${e.direction.toUpperCase()}</span></div>
-            <div><strong>Department:</strong> ${e.department || '-'}</div>
-            <div><strong>Vehicle:</strong> ${e.vehicleNo || '-'}</div>
-            <div><strong>Driver:</strong> ${e.driverName || '-'} ${e.driverPhone ? '('+e.driverPhone+')' : ''}</div>
-            <div><strong>Quantity:</strong> ${e.quantity || '-'}</div>
-            <div><strong>Vendor:</strong> ${e.vendor || '-'}</div>
-            <div><strong>Gate Pass:</strong> ${e.gatePassNo || '-'}</div>
-            <div><strong>Submitted By:</strong> ${e.submittedBy || '-'}</div>
-            <div><strong>Status:</strong> <span class="badge ${e.status === 'rejected' ? 'badge-danger' : APP.getStatusBadge(e.status)}">${e.status.toUpperCase()}</span></div>
-            <div><strong>Approved By:</strong> ${e.approvedBy || (e.status === 'rejected' ? '<span style="color:red;">Rejected by ' + (e.rejectedBy || 'N/A') + '</span>' : 'Pending')}</div>
-            <div><strong>Date:</strong> ${APP.formatDateTime(e.createdAt)}</div>
+            <div><strong>${T('gsmod_f_item')}</strong> ${e.itemName}</div>
+            <div><strong>${T('gsmod_f_direction')}</strong> <span class="badge ${e.direction === 'in' ? 'badge-success' : 'badge-danger'}">${e.direction.toUpperCase()}</span></div>
+            <div><strong>${T('gsmod_f_department')}</strong> ${e.department || '-'}</div>
+            <div><strong>${T('gsmod_f_vehicle')}</strong> ${e.vehicleNo || '-'}</div>
+            <div><strong>${T('gsmod_f_driver')}</strong> ${e.driverName || '-'} ${e.driverPhone ? '('+e.driverPhone+')' : ''}</div>
+            <div><strong>${T('gsmod_f_quantity')}</strong> ${e.quantity || '-'}</div>
+            <div><strong>${T('gsmod_f_vendor')}</strong> ${e.vendor || '-'}</div>
+            <div><strong>${T('gsmod_f_gatepass')}</strong> ${e.gatePassNo || '-'}</div>
+            <div><strong>${T('gsmod_f_submitted')}</strong> ${e.submittedBy || '-'}</div>
+            <div><strong>${T('gsmod_f_status')}</strong> <span class="badge ${e.status === 'rejected' ? 'badge-danger' : APP.getStatusBadge(e.status)}">${e.status.toUpperCase()}</span></div>
+            <div><strong>${T('gsmod_f_approved')}</strong> ${e.approvedBy || (e.status === 'rejected' ? '<span style="color:red;">' + T('gsmod_rejected_by') + ' ' + (e.rejectedBy || 'N/A') + '</span>' : T('gsmod_pending_word'))}</div>
+            <div><strong>${T('gsmod_f_date')}</strong> ${APP.formatDateTime(e.createdAt)}</div>
         </div>
-        <div class="mt-4"><strong>Purpose:</strong><br>${e.purpose || '-'}</div>
-        <div class="mt-2"><strong>Remarks:</strong><br>${e.remarks || '-'}</div>
-        ${e.rejectionReason ? '<div class="mt-2" style="background:rgba(220,53,69,0.1);padding:8px 12px;border-radius:6px;border-left:3px solid var(--danger);"><strong style="color:var(--danger);">Rejection Reason:</strong><br>' + e.rejectionReason + '</div>' : ''}
+        <div class="mt-4"><strong>${T('gsmod_f_purpose')}</strong><br>${e.purpose || '-'}</div>
+        <div class="mt-2"><strong>${T('gsmod_f_remarks')}</strong><br>${e.remarks || '-'}</div>
+        ${e.rejectionReason ? '<div class="mt-2" style="background:rgba(220,53,69,0.1);padding:8px 12px;border-radius:6px;border-left:3px solid var(--danger);"><strong style="color:var(--danger);">' + T('gsmod_f_rejection_reason') + '</strong><br>' + e.rejectionReason + '</div>' : ''}
     `);
 }
 
@@ -295,20 +295,20 @@ function renderPatientsSection() {
     el.innerHTML = `
         <div class="flex-between mb-4">
             <div class="search-box">
-                <input type="text" class="form-control" id="ptSearch" placeholder="Search patient name, code, phone..." oninput="renderPatientList()">
+                <input type="text" class="form-control" id="ptSearch" placeholder="${T('gsmod_search_patient')}" oninput="renderPatientList()">
             </div>
             <div style="display:flex;gap:6px;">
-                <button class="btn btn-primary" onclick="showPatientForm()">+ New Patient Visit</button>
-                <button class="btn btn-info" onclick="showScanModal()">📷 Scan / Enter Code</button>
+                <button class="btn btn-primary" onclick="showPatientForm()">+ ${T('gsmod_new_patient_visit')}</button>
+                <button class="btn btn-info" onclick="showScanModal()">📷 ${T('gsmod_scan_code')}</button>
             </div>
         </div>
         <div class="tabs" style="margin-bottom:8px;">
-            <button class="tab-btn active" onclick="switchPatientTab('all',this)">All</button>
-            <button class="tab-btn" onclick="switchPatientTab('active',this)">Inside (Active)</button>
-            <button class="tab-btn" onclick="switchPatientTab('completed',this)">Checked Out</button>
+            <button class="tab-btn active" onclick="switchPatientTab('all',this)">${T('gsmod_f_all')}</button>
+            <button class="tab-btn" onclick="switchPatientTab('active',this)">${T('gsmod_f_inside')}</button>
+            <button class="tab-btn" onclick="switchPatientTab('completed',this)">${T('gsmod_f_checkedout')}</button>
         </div>
         <div class="card"><div class="table-responsive"><table>
-            <thead><tr><th>Unique Code</th><th>Patient Name</th><th>Phone</th><th>Purpose</th><th>Entry Time</th><th>Exit Time</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>${T('gsmod_th_code')}</th><th>${T('gsmod_th_patient_name')}</th><th>${T('gsmod_th_phone')}</th><th>${T('gsmod_th_purpose')}</th><th>${T('gsmod_th_entry')}</th><th>${T('gsmod_th_exit')}</th><th>${T('gsmod_th_status')}</th><th>${T('gsmod_th_actions')}</th></tr></thead>
             <tbody id="ptTableBody"></tbody>
         </table></div></div>
     `;
@@ -344,27 +344,27 @@ function renderPatientList() {
             <td>${v.purpose || '-'}</td>
             <td>${APP.formatDateTime(v.entryTime)}</td>
             <td>${v.exitTime ? APP.formatDateTime(v.exitTime) : '<span style="color:var(--gray);">-</span>'}</td>
-            <td><span class="badge ${v.status === 'active' ? 'badge-success' : 'badge-secondary'}">${v.status === 'active' ? 'IN' : 'OUT'}</span></td>
+            <td><span class="badge ${v.status === 'active' ? 'badge-success' : 'badge-secondary'}">${v.status === 'active' ? T('gsmod_in') : T('gsmod_out')}</span></td>
             <td style="white-space:nowrap;">
-                <button class="btn btn-sm btn-primary" onclick="viewPatientPass('${v.id}')">Pass</button>
-                ${v.status === 'active' ? `<button class="btn btn-sm btn-warning" onclick="checkOutPatient('${v.id}')">Check Out</button>` : ''}
+                <button class="btn btn-sm btn-primary" onclick="viewPatientPass('${v.id}')">${T('gsmod_pass')}</button>
+                ${v.status === 'active' ? `<button class="btn btn-sm btn-warning" onclick="checkOutPatient('${v.id}')">${T('gsmod_checkout')}</button>` : ''}
                 <button class="btn btn-sm btn-danger" onclick="deletePass('visitor','${v.id}','${(v.patientName||'').replace(/'/g,"\\'")}','${v.uniqueCode}')">🗑</button>
             </td>
         </tr>
-    `).join('') || '<tr><td colspan="8" class="empty-state">No patient visits</td></tr>';
+    `).join('') || '<tr><td colspan="8" class="empty-state">' + T('gsmod_no_patient_visits') + '</td></tr>';
 }
 
 function capturePhotoHtml(inputName, previewId) {
     return `<div style="margin-bottom:12px;">
-        <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">📷 Visitor Photo</label>
+        <label style="font-weight:600;font-size:13px;display:block;margin-bottom:4px;">📷 ${T('gsmod_visitor_photo')}</label>
         <div style="display:flex;gap:12px;align-items:center;">
             <div style="width:100px;height:100px;border:2px dashed #ccc;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:var(--bg);flex-shrink:0;" id="${previewId}">
-                <span style="font-size:11px;color:var(--gray);text-align:center;">No photo</span>
+                <span style="font-size:11px;color:var(--gray);text-align:center;">${T('gsmod_no_photo')}</span>
             </div>
             <div>
-                <button type="button" class="btn btn-sm btn-primary" onclick="openPhotoCamera('${previewId}')">📸 Capture Photo</button>
-                <button type="button" class="btn btn-sm btn-outline" onclick="openPhotoUpload('${previewId}')">📁 Upload</button>
-                <div style="font-size:11px;color:var(--gray);margin-top:4px;" id="${previewId}_status">Camera or upload a photo</div>
+                <button type="button" class="btn btn-sm btn-primary" onclick="openPhotoCamera('${previewId}')">📸 ${T('gsmod_capture_photo')}</button>
+                <button type="button" class="btn btn-sm btn-outline" onclick="openPhotoUpload('${previewId}')">📁 ${T('gsmod_upload')}</button>
+                <div style="font-size:11px;color:var(--gray);margin-top:4px;" id="${previewId}_status">${T('gsmod_camera_or_upload')}</div>
             </div>
         </div>
         <input type="hidden" name="${inputName}_data" id="${previewId}_data" value="">
@@ -376,12 +376,12 @@ function openPhotoCamera(previewId) {
     if (!status) return;
     // Use getUserMedia for live camera capture
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        status.innerHTML = '<span style="color:red;">Camera not supported. Use Upload instead.</span>';
+        status.innerHTML = '<span style="color:red;">' + T('gsmod_camera_not_supported') + '</span>';
         return;
     }
     const modal = showModal(`
         <div class="modal-header">
-            <h3>📸 Capture Photo</h3>
+            <h3>📸 ${T('gsmod_capture_photo')}</h3>
             <button class="modal-close" onclick="stopPhotoStream();this.closest('.modal').remove()">&times;</button>
         </div>
         <div style="text-align:center;padding:12px;">
@@ -393,10 +393,10 @@ function openPhotoCamera(previewId) {
                 </div>
             </div>
             <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
-                <button id="btnCapture" class="btn btn-primary btn-lg" onclick="capturePhoto('${previewId}')">📸 Capture</button>
-                <button id="btnRetake" class="btn btn-warning" style="display:none;" onclick="retakePhoto()">🔄 Retake</button>
-                <button id="btnUsePhoto" class="btn btn-success" style="display:none;" onclick="usePhoto('${previewId}')">✅ Use This Photo</button>
-                <button class="btn btn-danger" onclick="stopPhotoStream();this.closest('.modal').remove()">Cancel</button>
+                <button id="btnCapture" class="btn btn-primary btn-lg" onclick="capturePhoto('${previewId}')">📸 ${T('gsmod_btn_capture')}</button>
+                <button id="btnRetake" class="btn btn-warning" style="display:none;" onclick="retakePhoto()">🔄 ${T('gsmod_btn_retake')}</button>
+                <button id="btnUsePhoto" class="btn btn-success" style="display:none;" onclick="usePhoto('${previewId}')">✅ ${T('gsmod_btn_use_photo')}</button>
+                <button class="btn btn-danger" onclick="stopPhotoStream();this.closest('.modal').remove()">${T('gsmod_cancel')}</button>
             </div>
         </div>
     `);
@@ -410,7 +410,7 @@ function openPhotoCamera(previewId) {
                     video.srcObject = stream;
                 })
                 .catch(() => {
-                    status.innerHTML = '<span style="color:red;">Camera access denied. Use Upload instead.</span>';
+                    status.innerHTML = '<span style="color:red;">' + T('gsmod_camera_denied') + '</span>';
                 });
         }
     }, 300);
@@ -477,7 +477,7 @@ function usePhoto(previewId) {
     const canvas = document.getElementById('photoCanvas');
     const photoData = canvas && canvas.dataset.photoData;
     if (!photoData) {
-        APP.notify('No photo captured — please tap 📸 Capture first', 'error');
+        APP.notify(T('gsmod_no_photo_captured'), 'error');
         return;
     }
     const preview = document.getElementById(previewId);
@@ -485,7 +485,7 @@ function usePhoto(previewId) {
     const status  = document.getElementById(previewId + '_status');
     if (preview) preview.innerHTML = '<img src="' + photoData + '" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">';
     if (hidden)  hidden.value = photoData;
-    if (status)  status.innerHTML = '<span style="color:var(--secondary);">✅ Photo added</span>';
+    if (status)  status.innerHTML = '<span style="color:var(--secondary);">✅ ' + T('gsmod_photo_added') + '</span>';
     stopPhotoStream();
     // Close only the camera modal — not the patient/doctor form behind it
     const videoEl = document.getElementById('photoVideo');
@@ -509,7 +509,7 @@ function openPhotoUpload(previewId) {
                 preview.innerHTML = '<img src="' + dataUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">';
             }
             if (hidden) hidden.value = dataUrl;
-            if (status) status.innerHTML = '<span style="color:green;">✅ Photo uploaded</span>';
+            if (status) status.innerHTML = '<span style="color:green;">✅ ' + T('gsmod_photo_uploaded') + '</span>';
         };
         reader.readAsDataURL(file);
     };
@@ -522,34 +522,34 @@ function showPatientForm() {
             ${capturePhotoHtml('visitorPhoto', 'ptPhotoPreview')}
             <div class="grid-2">
                 <div class="form-group">
-                    <label>Patient Name *</label>
+                    <label>${T('gsmod_lbl_patient_name')}</label>
                     <input type="text" name="patientName" class="form-control" required>
                 </div>
                 <div class="form-group">
-                    <label>Age *</label>
+                    <label>${T('gsmod_lbl_age')}</label>
                     <input type="number" name="age" class="form-control" required>
                 </div>
                 <div class="form-group">
-                    <label>Gender *</label>
+                    <label>${T('gsmod_lbl_gender')}</label>
                     <select name="gender" class="form-control" required>
-                        <option value="">Select</option>
+                        <option value="">${T('gsmod_opt_select')}</option>
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
                         <option value="Other">Other</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Phone *</label>
+                    <label>${T('gsmod_lbl_phone_req')}</label>
                     <input type="text" name="phone" class="form-control" required>
                 </div>
                 <div class="form-group">
-                    <label>Address</label>
+                    <label>${T('gsmod_lbl_address')}</label>
                     <textarea name="address" class="form-control" rows="2"></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Purpose / Reason *</label>
+                    <label>${T('gsmod_lbl_purpose_reason')}</label>
                     <select name="purpose" class="form-control" required>
-                        <option value="">Select</option>
+                        <option value="">${T('gsmod_opt_select')}</option>
                         <option value="Visit">Visit</option>
                         <option value="Appointment">Appointment</option>
                         <option value="Emergency">Emergency</option>
@@ -559,35 +559,35 @@ function showPatientForm() {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Department</label>
+                    <label>${T('gsmod_lbl_department')}</label>
                     ${deptDropdown('department')}
                 </div>
                 <div class="form-group">
-                    <label>Doctor Name</label>
+                    <label>${T('gsmod_lbl_doctor_name')}</label>
                     <input type="text" name="doctorName" class="form-control">
                 </div>
                 <div class="form-group">
-                    <label>Attendant Name</label>
+                    <label>${T('gsmod_lbl_attendant_name')}</label>
                     <input type="text" name="attendantName" class="form-control">
                 </div>
                 <div class="form-group">
-                    <label>Attendant Phone</label>
+                    <label>${T('gsmod_lbl_attendant_phone')}</label>
                     <input type="text" name="attendantPhone" class="form-control">
                 </div>
             </div>
             <div class="form-group">
-                <label>Notes</label>
+                <label>${T('gsmod_lbl_notes')}</label>
                 <textarea name="notes" class="form-control" rows="2"></textarea>
             </div>
         </form>
     `;
-    openFormModal('New Patient Visit', form, 'savePatientVisit()', true);
+    openFormModal(T('gsmod_new_patient_visit'), form, 'savePatientVisit()', true);
 }
 
 function savePatientVisit() {
     const data = getFormData('ptForm');
     if (!data.patientName || !data.age || !data.gender || !data.phone || !data.purpose) {
-        APP.notify('Please fill all required fields', 'error'); return;
+        APP.notify(T('gsmod_fill_all_required'), 'error'); return;
     }
     const photoData = document.getElementById('ptPhotoPreview_data')?.value || '';
     const code = generatePatientCode();
@@ -601,7 +601,7 @@ function savePatientVisit() {
     if (document.getElementById('genPassBody')) renderGenPassList();
     showModal(`
         <div class="modal-header">
-            <h3>✅ Visitor Pass Generated</h3>
+            <h3>✅ ${T('gsmod_visitor_pass_generated')}</h3>
             <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
         </div>
         <div style="text-align:center;padding:16px;">
@@ -622,8 +622,8 @@ function savePatientVisit() {
                 </div>
             </div>
             <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
-                <button class="btn btn-primary" onclick="printPatientPass('${visit.id}')">🖨️ Print Pass</button>
-                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">Close</button>
+                <button class="btn btn-primary" onclick="printPatientPass('${visit.id}')">🖨️ ${T('gsmod_print_pass')}</button>
+                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">${T('gsmod_close')}</button>
             </div>
         </div>
     `);
@@ -641,7 +641,7 @@ function viewPatientPass(id) {
     if (!v) return;
     showModal(`
         <div class="modal-header">
-            <h3>Visitor Pass</h3>
+            <h3>${T('gsmod_visitor_pass')}</h3>
             <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
         </div>
         <div style="text-align:center;padding:16px;">
@@ -664,9 +664,9 @@ function viewPatientPass(id) {
                 </div>
             </div>
             <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
-                <button class="btn btn-primary" onclick="printPatientPass('${v.id}')">🖨️ Print Pass</button>
-                ${v.status === 'active' ? '<button class="btn btn-danger" onclick="checkOutPatient(\''+v.id+'\');this.closest(\'.modal\').remove()">Check Out</button>' : ''}
-                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">Close</button>
+                <button class="btn btn-primary" onclick="printPatientPass('${v.id}')">🖨️ ${T('gsmod_print_pass')}</button>
+                ${v.status === 'active' ? '<button class="btn btn-danger" onclick="checkOutPatient(\''+v.id+'\');this.closest(\'.modal\').remove()">' + T('gsmod_checkout') + '</button>' : ''}
+                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">${T('gsmod_close')}</button>
             </div>
         </div>
     `);
@@ -725,11 +725,11 @@ function printPatientPass(id) {
 function checkOutPatient(id) {
     const v = DB.getById('patientVisits', id);
     if (!v) return;
-    if (v.status === 'completed') { APP.notify('Already checked out', 'info'); return; }
-    if (v.status !== 'active') { APP.notify('Only active passes can be checked out', 'error'); return; }
-    confirmAction('Check out patient "' + v.patientName + '" (Code: ' + v.uniqueCode + ')? The pass will be deactivated.', () => {
+    if (v.status === 'completed') { APP.notify(T('gsmod_already_checkedout'), 'info'); return; }
+    if (v.status !== 'active') { APP.notify(T('gsmod_only_active_checkout'), 'error'); return; }
+    confirmAction(T('gsmod_confirm_checkout_pt_pre') + ' "' + v.patientName + '" (' + T('gsmod_code_label') + ' ' + v.uniqueCode + ')' + T('gsmod_confirm_checkout_post'), () => {
         DB.update('patientVisits', id, { status: 'completed', exitTime: new Date().toISOString() });
-        APP.notify('Patient "' + v.patientName + '" checked out. Pass deactivated.', 'success');
+        APP.notify(T('gsmod_patient_word') + ' "' + v.patientName + '" ' + T('gsmod_checked_out_deactivated'), 'success');
         renderPatientList();
         if (document.getElementById('genPassBody')) renderGenPassList();
     });
@@ -738,13 +738,13 @@ function checkOutPatient(id) {
 function showScanModal() {
     showModal(`
         <div class="modal-header">
-            <h3>📷 Scan QR or Enter Code</h3>
+            <h3>📷 ${T('gsmod_scan_qr_title')}</h3>
             <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
         </div>
         <div style="padding:16px;text-align:center;">
-            <p style="font-size:13px;color:var(--gray);margin-bottom:12px;">Enter the unique code printed on the visitor pass to check out the patient.</p>
-            <input type="text" id="scanCodeInput" class="form-control" style="max-width:300px;margin:0 auto 12px;text-align:center;font-family:monospace;font-size:18px;letter-spacing:2px;" placeholder="Enter code (e.g. PT-A7X3K9)" autofocus>
-            <div><button class="btn btn-primary" onclick="processScanCode()">Verify & Check Out</button></div>
+            <p style="font-size:13px;color:var(--gray);margin-bottom:12px;">${T('gsmod_scan_instr_patient')}</p>
+            <input type="text" id="scanCodeInput" class="form-control" style="max-width:300px;margin:0 auto 12px;text-align:center;font-family:monospace;font-size:18px;letter-spacing:2px;" placeholder="${T('gsmod_ph_enter_code_pt')}" autofocus>
+            <div><button class="btn btn-primary" onclick="processScanCode()">${T('gsmod_verify_checkout')}</button></div>
             <div id="scanResult" style="margin-top:12px;font-size:14px;"></div>
         </div>
     `);
@@ -760,13 +760,13 @@ function showScanModal() {
 function processScanCode() {
     const code = (document.getElementById('scanCodeInput')?.value || '').trim().toUpperCase();
     const result = document.getElementById('scanResult');
-    if (!code) { result.innerHTML = '<span style="color:red;">Please enter a code</span>'; return; }
+    if (!code) { result.innerHTML = '<span style="color:red;">' + T('gsmod_enter_code') + '</span>'; return; }
     const visits = DB.get('patientVisits');
     const visit = visits.find(v => v.uniqueCode.toUpperCase() === code);
-    if (!visit) { result.innerHTML = '<span style="color:red;">❌ No visit found with code "' + code + '"</span>'; return; }
-    if (visit.status === 'completed') { result.innerHTML = '<span style="color:orange;">⚠️ This pass was already used. Patient checked out at ' + APP.formatDateTime(visit.exitTime) + '.</span>'; return; }
-    result.innerHTML = '<span style="color:green;">✅ Found: ' + visit.patientName + ' (entered ' + APP.formatDateTime(visit.entryTime) + ')</span>' +
-        '<div style="margin-top:8px;"><button class="btn btn-danger" onclick="checkOutPatient(\'' + visit.id + '\');document.getElementById(\'scanCodeInput\').value=\'\';document.getElementById(\'scanResult\').innerHTML=\'<span style=color:green;>✓ Checked out</span>\';">Confirm Check Out</button></div>';
+    if (!visit) { result.innerHTML = '<span style="color:red;">❌ ' + T('gsmod_no_visit_found') + ' "' + code + '"</span>'; return; }
+    if (visit.status === 'completed') { result.innerHTML = '<span style="color:orange;">⚠️ ' + T('gsmod_pass_already_used') + ' ' + APP.formatDateTime(visit.exitTime) + '.</span>'; return; }
+    result.innerHTML = '<span style="color:green;">✅ ' + T('gsmod_found') + ': ' + visit.patientName + ' (' + T('gsmod_entered') + ' ' + APP.formatDateTime(visit.entryTime) + ')</span>' +
+        '<div style="margin-top:8px;"><button class="btn btn-danger" onclick="checkOutPatient(\'' + visit.id + '\');document.getElementById(\'scanCodeInput\').value=\'\';document.getElementById(\'scanResult\').innerHTML=\'<span style=color:green;>✓ Checked out</span>\';">' + T('gsmod_confirm_checkout') + '</button></div>';
 }
 
 /* ==================== DOCTOR VISITS ==================== */
@@ -781,21 +781,21 @@ function renderDoctorsSection() {
     el.innerHTML = `
         <div class="flex-between mb-4">
             <div class="search-box">
-                <input type="text" class="form-control" id="drSearch" placeholder="Search doctor name, code, phone..." oninput="renderDoctorList()">
+                <input type="text" class="form-control" id="drSearch" placeholder="${T('gsmod_search_doctor')}" oninput="renderDoctorList()">
             </div>
             <div style="display:flex;gap:6px;">
-                <button class="btn btn-primary" onclick="showDoctorForm()">+ New Doctor Visit</button>
-                <button class="btn btn-info" onclick="showDoctorScanModal()">📷 Scan / Enter Code</button>
+                <button class="btn btn-primary" onclick="showDoctorForm()">+ ${T('gsmod_new_doctor_visit')}</button>
+                <button class="btn btn-info" onclick="showDoctorScanModal()">📷 ${T('gsmod_scan_code')}</button>
             </div>
         </div>
         <div class="tabs" style="margin-bottom:8px;">
-            <button class="tab-btn active" onclick="switchDoctorTab('all',this)">All</button>
-            <button class="tab-btn" onclick="switchDoctorTab('pending',this)">Pending</button>
-            <button class="tab-btn" onclick="switchDoctorTab('active',this)">Inside (Active)</button>
-            <button class="tab-btn" onclick="switchDoctorTab('completed',this)">Checked Out</button>
+            <button class="tab-btn active" onclick="switchDoctorTab('all',this)">${T('gsmod_f_all')}</button>
+            <button class="tab-btn" onclick="switchDoctorTab('pending',this)">${T('gsmod_f_pending')}</button>
+            <button class="tab-btn" onclick="switchDoctorTab('active',this)">${T('gsmod_f_inside')}</button>
+            <button class="tab-btn" onclick="switchDoctorTab('completed',this)">${T('gsmod_f_checkedout')}</button>
         </div>
         <div class="card"><div class="table-responsive"><table>
-            <thead><tr><th>Unique Code</th><th>Doctor Name</th><th>Specialization</th><th>Phone</th><th>Purpose</th><th>Entry Time</th><th>Approved By</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>${T('gsmod_th_code')}</th><th>${T('gsmod_th_doctor_name')}</th><th>${T('gsmod_th_specialization')}</th><th>${T('gsmod_th_phone')}</th><th>${T('gsmod_th_purpose')}</th><th>${T('gsmod_th_entry')}</th><th>${T('gsmod_th_approved')}</th><th>${T('gsmod_th_status')}</th><th>${T('gsmod_th_actions')}</th></tr></thead>
             <tbody id="drTableBody"></tbody>
         </table></div></div>
     `;
@@ -834,10 +834,10 @@ function renderDoctorList() {
         return 'badge-secondary';
     };
     const statusLabel = (s) => {
-        if (s === 'active') return 'APPROVED';
-        if (s === 'pending') return 'PENDING';
-        if (s === 'rejected') return 'REJECTED';
-        if (s === 'completed') return 'CHECKED OUT';
+        if (s === 'active') return T('gsmod_st_approved');
+        if (s === 'pending') return T('gsmod_st_pending');
+        if (s === 'rejected') return T('gsmod_st_rejected');
+        if (s === 'completed') return T('gsmod_st_checkedout');
         return s.toUpperCase();
     };
 
@@ -849,21 +849,21 @@ function renderDoctorList() {
             <td>${v.phone}</td>
             <td>${v.purpose || '-'}</td>
             <td>${APP.formatDateTime(v.entryTime)}</td>
-            <td>${v.approvedBy || (v.status === 'rejected' ? '<span style="color:red;">Rejected by '+(v.rejectedBy||'N/A')+'</span>' : v.status === 'pending' ? '<span style="color:var(--warning);">⏳ Pending</span>' : '-')}</td>
+            <td>${v.approvedBy || (v.status === 'rejected' ? '<span style="color:red;">' + T('gsmod_rejected_by') + ' '+(v.rejectedBy||'N/A')+'</span>' : v.status === 'pending' ? '<span style="color:var(--warning);">⏳ ' + T('gsmod_pending_word') + '</span>' : '-')}</td>
             <td><span class="badge ${statusBadge(v.status)}">${statusLabel(v.status)}</span></td>
             <td style="white-space:nowrap;">
                 ${v.status === 'pending' && isUserHodOfDept(v.department) ? `
-                    <button class="btn btn-sm btn-success" onclick="approveDoctorEntry('${v.id}')">Approve</button>
-                    <button class="btn btn-sm btn-danger" onclick="showRejectReason('doctorVisits','${v.id}')">Reject</button>
+                    <button class="btn btn-sm btn-success" onclick="approveDoctorEntry('${v.id}')">${T('gsmod_approve')}</button>
+                    <button class="btn btn-sm btn-danger" onclick="showRejectReason('doctorVisits','${v.id}')">${T('gsmod_reject')}</button>
                 ` : ''}
-                ${v.status === 'active' ? `<button class="btn btn-sm btn-primary" onclick="viewDoctorPass('${v.id}')">Pass</button>` : ''}
-                ${v.status === 'pending' ? `<button class="btn btn-sm btn-info" onclick="viewDoctorPass('${v.id}')">View</button>` : ''}
-                ${v.status === 'active' ? `<button class="btn btn-sm btn-warning" onclick="checkOutDoctor('${v.id}')">Check Out</button>` : ''}
-                ${v.status === 'rejected' ? '<span style="color:var(--danger);font-size:11px;font-weight:600;">⛔ REJECTED</span>' : ''}
+                ${v.status === 'active' ? `<button class="btn btn-sm btn-primary" onclick="viewDoctorPass('${v.id}')">${T('gsmod_pass')}</button>` : ''}
+                ${v.status === 'pending' ? `<button class="btn btn-sm btn-info" onclick="viewDoctorPass('${v.id}')">${T('gsmod_view')}</button>` : ''}
+                ${v.status === 'active' ? `<button class="btn btn-sm btn-warning" onclick="checkOutDoctor('${v.id}')">${T('gsmod_checkout')}</button>` : ''}
+                ${v.status === 'rejected' ? '<span style="color:var(--danger);font-size:11px;font-weight:600;">⛔ ' + T('gsmod_rejected_cap') + '</span>' : ''}
                 <button class="btn btn-sm btn-danger" onclick="deletePass('doctor','${v.id}','${(v.doctorName||'').replace(/'/g,"\\'")}','${v.uniqueCode}')">🗑</button>
             </td>
         </tr>
-    `).join('') || '<tr><td colspan="9" class="empty-state">No doctor visits</td></tr>';
+    `).join('') || '<tr><td colspan="9" class="empty-state">' + T('gsmod_no_doctor_visits') + '</td></tr>';
 }
 
 function showDoctorForm() {
@@ -872,33 +872,33 @@ function showDoctorForm() {
             ${capturePhotoHtml('doctorPhoto', 'drPhotoPreview')}
             <div class="grid-2">
                 <div class="form-group">
-                    <label>Doctor Name *</label>
+                    <label>${T('gsmod_lbl_doctor_name_req')}</label>
                     <input type="text" name="doctorName" class="form-control" required>
                 </div>
                 <div class="form-group">
-                    <label>Specialization *</label>
-                    <input type="text" name="specialization" class="form-control" placeholder="e.g. Cardiologist" required>
+                    <label>${T('gsmod_lbl_specialization')}</label>
+                    <input type="text" name="specialization" class="form-control" placeholder="${T('gsmod_ph_specialization')}" required>
                 </div>
                 <div class="form-group">
-                    <label>Phone *</label>
+                    <label>${T('gsmod_lbl_phone_req')}</label>
                     <input type="text" name="phone" class="form-control" required>
                 </div>
                 <div class="form-group">
-                    <label>Email</label>
+                    <label>${T('gsmod_lbl_email')}</label>
                     <input type="email" name="email" class="form-control">
                 </div>
                 <div class="form-group">
-                    <label>Hospital / Clinic</label>
-                    <input type="text" name="hospital" class="form-control" placeholder="e.g. City Hospital">
+                    <label>${T('gsmod_lbl_hospital')}</label>
+                    <input type="text" name="hospital" class="form-control" placeholder="${T('gsmod_ph_hospital')}">
                 </div>
                 <div class="form-group">
-                    <label>Department Visiting</label>
+                    <label>${T('gsmod_lbl_dept_visiting')}</label>
                     ${deptDropdown('department')}
                 </div>
                 <div class="form-group">
-                    <label>Purpose *</label>
+                    <label>${T('gsmod_lbl_purpose_req')}</label>
                     <select name="purpose" class="form-control" required>
-                        <option value="">Select</option>
+                        <option value="">${T('gsmod_opt_select')}</option>
                         <option value="Consultation">Consultation</option>
                         <option value="Surgery">Surgery</option>
                         <option value="Meeting">Meeting</option>
@@ -908,23 +908,23 @@ function showDoctorForm() {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Vehicle No</label>
-                    <input type="text" name="vehicleNo" class="form-control" placeholder="e.g. KA-01-1234">
+                    <label>${T('gsmod_lbl_vehicle_no')}</label>
+                    <input type="text" name="vehicleNo" class="form-control" placeholder="${T('gsmod_ph_vehicle')}">
                 </div>
             </div>
             <div class="form-group">
-                <label>Notes</label>
+                <label>${T('gsmod_lbl_notes')}</label>
                 <textarea name="notes" class="form-control" rows="2"></textarea>
             </div>
         </form>
     `;
-    openFormModal('New Doctor Visit', form, 'saveDoctorVisit()', true);
+    openFormModal(T('gsmod_new_doctor_visit'), form, 'saveDoctorVisit()', true);
 }
 
 function saveDoctorVisit() {
     const data = getFormData('drForm');
     if (!data.doctorName || !data.specialization || !data.phone || !data.purpose) {
-        APP.notify('Please fill all required fields', 'error'); return;
+        APP.notify(T('gsmod_fill_all_required'), 'error'); return;
     }
     const user = AUTH.currentUser();
     const photoData = document.getElementById('drPhotoPreview_data')?.value || '';
@@ -941,16 +941,16 @@ function saveDoctorVisit() {
     const visit = DB.add('doctorVisits', data);
     renderDoctorList();
     if (document.getElementById('genPassBody')) renderGenPassList();
-    APP.notify('Doctor entry submitted for HOD approval', 'success');
+    APP.notify(T('gsmod_msg_doctor_submitted'), 'success');
     showModal(`
-        <div class="modal-header"><h3>✅ Request Submitted</h3><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
+        <div class="modal-header"><h3>✅ ${T('gsmod_request_submitted')}</h3><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
         <div style="text-align:center;padding:16px;">
             <div style="font-size:48px;margin-bottom:8px;">⏳</div>
-            <p style="font-size:15px;">Doctor entry for <strong>${data.doctorName}</strong> has been submitted.</p>
-            <p style="font-size:13px;color:var(--gray);">Waiting for HOD approval of ${data.department || 'the department'}.</p>
+            <p style="font-size:15px;">${T('gsmod_doctor_entry_for')} <strong>${data.doctorName}</strong> ${T('gsmod_has_been_submitted')}</p>
+            <p style="font-size:13px;color:var(--gray);">${T('gsmod_waiting_hod_of')} ${data.department || T('gsmod_the_department')}.</p>
             <p style="font-family:monospace;font-size:18px;font-weight:700;">${code}</p>
-            <p style="font-size:12px;color:var(--gray);">You will receive the pass once approved.</p>
-            <div style="margin-top:12px;"><button class="btn btn-secondary" onclick="this.closest('.modal').remove()">OK</button></div>
+            <p style="font-size:12px;color:var(--gray);">${T('gsmod_receive_pass')}</p>
+            <div style="margin-top:12px;"><button class="btn btn-secondary" onclick="this.closest('.modal').remove()">${T('gsmod_ok')}</button></div>
         </div>
     `);
 }
@@ -963,7 +963,7 @@ function showDoctorPassModal(id) {
         return;
     }
     showModal(`
-        <div class="modal-header"><h3>✅ Doctor Pass Generated</h3><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
+        <div class="modal-header"><h3>✅ ${T('gsmod_doctor_pass_generated')}</h3><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
         <div style="text-align:center;padding:16px;">
             <div style="background:#f0f6ff;border:2px dashed var(--primary);border-radius:12px;padding:20px;display:inline-block;max-width:350px;">
                 <div style="font-size:12px;color:var(--gray);margin-bottom:4px;">HOSPITAL MANAGEMENT SYSTEM</div>
@@ -981,8 +981,8 @@ function showDoctorPassModal(id) {
                 </div>
             </div>
             <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
-                <button class="btn btn-primary" onclick="printDoctorPass('${v.id}')">🖨️ Print Pass</button>
-                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">Close</button>
+                <button class="btn btn-primary" onclick="printDoctorPass('${v.id}')">🖨️ ${T('gsmod_print_pass')}</button>
+                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">${T('gsmod_close')}</button>
             </div>
         </div>
     `);
@@ -1014,7 +1014,7 @@ function viewDoctorPass(id) {
 
     const showPassContent = v.status === 'active';
     showModal(`
-        <div class="modal-header"><h3>Doctor ${showPassContent ? 'Pass' : 'Entry Details'}</h3><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
+        <div class="modal-header"><h3>${T('gsmod_doctor_word')} ${showPassContent ? T('gsmod_pass_word') : T('gsmod_entry_details')}</h3><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
         <div style="text-align:center;padding:16px;">
             <div style="background:${v.status === 'rejected' ? '#fff0f0' : v.status === 'pending' ? '#fffbe6' : '#f0f6ff'};border:2px dashed ${v.status === 'rejected' ? 'var(--danger)' : v.status === 'pending' ? 'var(--warning)' : 'var(--primary)'};border-radius:12px;padding:20px;display:inline-block;max-width:350px;">
                 <div style="font-size:12px;color:var(--gray);margin-bottom:4px;">HOSPITAL MANAGEMENT SYSTEM</div>
@@ -1037,10 +1037,10 @@ function viewDoctorPass(id) {
                 </div>
             </div>
             <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
-                ${showPassContent ? '<button class="btn btn-primary" onclick="printDoctorPass(\''+v.id+'\')">🖨️ Print Pass</button>' : ''}
-                ${v.status === 'active' ? '<button class="btn btn-danger" onclick="checkOutDoctor(\''+v.id+'\');this.closest(\'.modal\').remove()">Check Out</button>' : ''}
-                ${v.status === 'pending' ? '<span style="font-size:13px;color:var(--warning);font-weight:600;">⏳ Waiting for HOD approval</span>' : ''}
-                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">Close</button>
+                ${showPassContent ? '<button class="btn btn-primary" onclick="printDoctorPass(\''+v.id+'\')">🖨️ ' + T('gsmod_print_pass') + '</button>' : ''}
+                ${v.status === 'active' ? '<button class="btn btn-danger" onclick="checkOutDoctor(\''+v.id+'\');this.closest(\'.modal\').remove()">' + T('gsmod_checkout') + '</button>' : ''}
+                ${v.status === 'pending' ? '<span style="font-size:13px;color:var(--warning);font-weight:600;">⏳ ' + T('gsmod_waiting_hod') + '</span>' : ''}
+                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">${T('gsmod_close')}</button>
             </div>
         </div>
     `);
@@ -1102,12 +1102,12 @@ function approveDoctorEntry(id) {
     const entry = DB.getById('doctorVisits', id);
     if (!entry) return;
     if (!isUserHodOfDept(entry.department)) {
-        APP.notify('Only the HOD of ' + entry.department + ' can approve this entry', 'error');
+        APP.notify(T('gsmod_only_hod_pre') + ' ' + entry.department + ' ' + T('gsmod_only_hod_approve'), 'error');
         return;
     }
     const user = AUTH.currentUser();
     DB.update('doctorVisits', id, { status: 'active', approvedBy: user.fullName, approvedAt: new Date().toISOString() });
-    APP.notify('Doctor entry approved. Pass is now available.', 'success');
+    APP.notify(T('gsmod_msg_doctor_approved'), 'success');
     renderDoctorList();
     renderApprovalsList();
 }
@@ -1116,24 +1116,24 @@ function rejectDoctorEntry(id, reason) {
     const entry = DB.getById('doctorVisits', id);
     if (!entry) return;
     if (!isUserHodOfDept(entry.department)) {
-        APP.notify('Only the HOD of ' + entry.department + ' can reject this entry', 'error');
+        APP.notify(T('gsmod_only_hod_pre') + ' ' + entry.department + ' ' + T('gsmod_only_hod_reject'), 'error');
         return;
     }
     DB.update('doctorVisits', id, { status: 'rejected', rejectionReason: reason || 'No reason provided', rejectedBy: AUTH.currentUser()?.fullName || 'Unknown' });
-    APP.notify('Doctor entry rejected', 'info');
+    APP.notify(T('gsmod_msg_doctor_rejected'), 'info');
     renderDoctorList();
     renderApprovalsList();
 }
 
 function showRejectReason(store, id) {
     showModal(`
-        <div class="modal-header"><h3>⛔ Reject Request</h3><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
+        <div class="modal-header"><h3>⛔ ${T('gsmod_reject_request')}</h3><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
         <div style="padding:16px;">
-            <p style="font-size:13px;color:var(--gray);margin-bottom:12px;">Provide a reason for rejection:</p>
-            <textarea id="rejectReasonInput" class="form-control" rows="3" placeholder="Enter rejection reason..." style="margin-bottom:12px;"></textarea>
+            <p style="font-size:13px;color:var(--gray);margin-bottom:12px;">${T('gsmod_provide_reason')}</p>
+            <textarea id="rejectReasonInput" class="form-control" rows="3" placeholder="${T('gsmod_ph_reject_reason')}" style="margin-bottom:12px;"></textarea>
             <div style="display:flex;gap:8px;justify-content:flex-end;">
-                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">Cancel</button>
-                <button class="btn btn-danger" onclick="confirmReject('${store}','${id}')">Confirm Reject</button>
+                <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">${T('gsmod_cancel')}</button>
+                <button class="btn btn-danger" onclick="confirmReject('${store}','${id}')">${T('gsmod_confirm_reject')}</button>
             </div>
         </div>
     `);
@@ -1162,14 +1162,14 @@ function renderApprovalsSection() {
     el.innerHTML = `
         <div class="flex-between mb-4">
             <div>
-                <h3 style="margin:0;">🔄 Approvals Dashboard</h3>
-                <span style="font-size:13px;color:var(--gray);">${isHodUser ? 'Review and manage pending requests for your department' : 'Track your submitted requests'}</span>
+                <h3 style="margin:0;">🔄 ${T('gsmod_approvals_dashboard')}</h3>
+                <span style="font-size:13px;color:var(--gray);">${isHodUser ? T('gsmod_hod_sub') : T('gsmod_user_sub')}</span>
             </div>
         </div>
         <div class="card">
             <div class="table-responsive">
                 <table>
-                    <thead><tr><th>Date</th><th>Type</th><th>Details</th><th>Department</th><th>Submitted By</th><th>Status</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>${T('gsmod_th_date')}</th><th>${T('gsmod_th_type')}</th><th>${T('gsmod_th_details')}</th><th>${T('gsmod_th_department')}</th><th>${T('gsmod_th_submitted')}</th><th>${T('gsmod_th_status')}</th><th>${T('gsmod_th_actions')}</th></tr></thead>
                     <tbody id="approvalsTableBody"></tbody>
                 </table>
             </div>
@@ -1186,10 +1186,10 @@ function renderApprovalsList() {
     const hodDepts = getHodDepartments();
 
     const goods = (DB.get('gatesecurity') || []).map(g => ({
-        ...g, _type: 'goods', _typeLabel: '🚚 Goods', _details: g.itemName + ' (' + g.direction + ')', _idField: 'id'
+        ...g, _type: 'goods', _typeLabel: '🚚 ' + T('gsmod_tab_goods'), _details: g.itemName + ' (' + g.direction + ')', _idField: 'id'
     }));
     const doctors = (DB.get('doctorVisits') || []).map(d => ({
-        ...d, _type: 'doctor', _typeLabel: '🩺 Doctor', _details: d.doctorName + ' (' + (d.specialization || '-') + ')', _idField: 'id'
+        ...d, _type: 'doctor', _typeLabel: '🩺 ' + T('gsmod_doctor_word'), _details: d.doctorName + ' (' + (d.specialization || '-') + ')', _idField: 'id'
     }));
 
     let all = [...goods, ...doctors];
@@ -1209,10 +1209,10 @@ function renderApprovalsList() {
         return 'badge-secondary';
     };
     const statusLabel = (s) => {
-        if (s === 'active') return 'APPROVED';
-        if (s === 'pending') return 'PENDING';
-        if (s === 'rejected') return 'REJECTED';
-        if (s === 'completed') return 'CHECKED OUT';
+        if (s === 'active') return T('gsmod_st_approved');
+        if (s === 'pending') return T('gsmod_st_pending');
+        if (s === 'rejected') return T('gsmod_st_rejected');
+        if (s === 'completed') return T('gsmod_st_checkedout');
         return s.toUpperCase();
     };
 
@@ -1226,26 +1226,26 @@ function renderApprovalsList() {
             <td><span class="badge ${statusBadge(item.status)}">${statusLabel(item.status)}</span></td>
             <td>
                 ${item.status === 'pending' && isHodUser ? `
-                    <button class="btn btn-sm btn-success" onclick="${item._type === 'goods' ? 'approveGateEntry' : 'approveDoctorEntry'}('${item.id}')">Approve</button>
-                    <button class="btn btn-sm btn-danger" onclick="showRejectReason('${item._type === 'goods' ? 'gatesecurity' : 'doctorVisits'}','${item.id}')">Reject</button>
+                    <button class="btn btn-sm btn-success" onclick="${item._type === 'goods' ? 'approveGateEntry' : 'approveDoctorEntry'}('${item.id}')">${T('gsmod_approve')}</button>
+                    <button class="btn btn-sm btn-danger" onclick="showRejectReason('${item._type === 'goods' ? 'gatesecurity' : 'doctorVisits'}','${item.id}')">${T('gsmod_reject')}</button>
                 ` : ''}
-                ${item._type === 'doctor' && item.status === 'active' ? `<button class="btn btn-sm btn-primary" onclick="viewDoctorPass('${item.id}')">Pass</button>` : ''}
-                ${item._type === 'doctor' && item.status === 'pending' ? `<button class="btn btn-sm btn-info" onclick="viewDoctorPass('${item.id}')">View</button>` : ''}
-                ${item._type === 'goods' ? `<button class="btn btn-sm btn-info" onclick="viewGateEntry('${item.id}')">View</button>` : ''}
-                ${item.status === 'rejected' ? '<span style="color:var(--danger);font-size:11px;font-weight:600;">⛔ REJECTED</span>' : ''}
+                ${item._type === 'doctor' && item.status === 'active' ? `<button class="btn btn-sm btn-primary" onclick="viewDoctorPass('${item.id}')">${T('gsmod_pass')}</button>` : ''}
+                ${item._type === 'doctor' && item.status === 'pending' ? `<button class="btn btn-sm btn-info" onclick="viewDoctorPass('${item.id}')">${T('gsmod_view')}</button>` : ''}
+                ${item._type === 'goods' ? `<button class="btn btn-sm btn-info" onclick="viewGateEntry('${item.id}')">${T('gsmod_view')}</button>` : ''}
+                ${item.status === 'rejected' ? '<span style="color:var(--danger);font-size:11px;font-weight:600;">⛔ ' + T('gsmod_rejected_cap') + '</span>' : ''}
             </td>
         </tr>
-    `).join('') || '<tr><td colspan="7" class="empty-state">No requests found</td></tr>';
+    `).join('') || '<tr><td colspan="7" class="empty-state">' + T('gsmod_no_requests') + '</td></tr>';
 }
 
 function checkOutDoctor(id) {
     const v = DB.getById('doctorVisits', id);
     if (!v) return;
-    if (v.status === 'completed') { APP.notify('Already checked out', 'info'); return; }
-    if (v.status !== 'active') { APP.notify('Only approved entries can be checked out', 'error'); return; }
-    confirmAction('Check out doctor "' + v.doctorName + '" (Code: ' + v.uniqueCode + ')? The pass will be deactivated.', () => {
+    if (v.status === 'completed') { APP.notify(T('gsmod_already_checkedout'), 'info'); return; }
+    if (v.status !== 'active') { APP.notify(T('gsmod_only_approved_checkout'), 'error'); return; }
+    confirmAction(T('gsmod_confirm_checkout_dr_pre') + ' "' + v.doctorName + '" (' + T('gsmod_code_label') + ' ' + v.uniqueCode + ')' + T('gsmod_confirm_checkout_post'), () => {
         DB.update('doctorVisits', id, { status: 'completed', exitTime: new Date().toISOString() });
-        APP.notify('Doctor "' + v.doctorName + '" checked out. Pass deactivated.', 'success');
+        APP.notify(T('gsmod_doctor_word') + ' "' + v.doctorName + '" ' + T('gsmod_checked_out_deactivated'), 'success');
         renderDoctorList();
         if (document.getElementById('genPassBody')) renderGenPassList();
     });
@@ -1253,11 +1253,11 @@ function checkOutDoctor(id) {
 
 function showDoctorScanModal() {
     showModal(`
-        <div class="modal-header"><h3>📷 Scan QR or Enter Code</h3><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
+        <div class="modal-header"><h3>📷 ${T('gsmod_scan_qr_title')}</h3><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
         <div style="padding:16px;text-align:center;">
-            <p style="font-size:13px;color:var(--gray);margin-bottom:12px;">Enter the unique code printed on the doctor pass to check out.</p>
-            <input type="text" id="drScanInput" class="form-control" style="max-width:300px;margin:0 auto 12px;text-align:center;font-family:monospace;font-size:18px;letter-spacing:2px;" placeholder="Enter code (e.g. DR-A7X3K9)" autofocus>
-            <div><button class="btn btn-primary" onclick="processDoctorScan()">Verify & Check Out</button></div>
+            <p style="font-size:13px;color:var(--gray);margin-bottom:12px;">${T('gsmod_scan_instr_doctor')}</p>
+            <input type="text" id="drScanInput" class="form-control" style="max-width:300px;margin:0 auto 12px;text-align:center;font-family:monospace;font-size:18px;letter-spacing:2px;" placeholder="${T('gsmod_ph_enter_code_dr')}" autofocus>
+            <div><button class="btn btn-primary" onclick="processDoctorScan()">${T('gsmod_verify_checkout')}</button></div>
             <div id="drScanResult" style="margin-top:12px;font-size:14px;"></div>
         </div>
     `);
@@ -1270,14 +1270,14 @@ function showDoctorScanModal() {
 function processDoctorScan() {
     const code = (document.getElementById('drScanInput')?.value || '').trim().toUpperCase();
     const result = document.getElementById('drScanResult');
-    if (!code) { result.innerHTML = '<span style="color:red;">Please enter a code</span>'; return; }
+    if (!code) { result.innerHTML = '<span style="color:red;">' + T('gsmod_enter_code') + '</span>'; return; }
     const visits = DB.get('doctorVisits');
     const visit = visits.find(v => v.uniqueCode.toUpperCase() === code);
-    if (!visit) { result.innerHTML = '<span style="color:red;">❌ No doctor visit found with code "' + code + '"</span>'; return; }
-    if (visit.status === 'completed') { result.innerHTML = '<span style="color:orange;">⚠️ Already checked out at ' + APP.formatDateTime(visit.exitTime) + '.</span>'; return; }
-    if (visit.status !== 'active') { result.innerHTML = '<span style="color:red;">⛔ Visit is not approved. Current status: ' + visit.status.toUpperCase() + '</span>'; return; }
-    result.innerHTML = '<span style="color:green;">✅ Found: Dr. ' + visit.doctorName + ' (' + visit.specialization + ', entered ' + APP.formatDateTime(visit.entryTime) + ')</span>' +
-        '<div style="margin-top:8px;"><button class="btn btn-danger" onclick="checkOutDoctor(\'' + visit.id + '\');document.getElementById(\'drScanInput\').value=\'\';document.getElementById(\'drScanResult\').innerHTML=\'<span style=color:green;>✓ Checked out</span>\';">Confirm Check Out</button></div>';
+    if (!visit) { result.innerHTML = '<span style="color:red;">❌ ' + T('gsmod_no_doctor_found') + ' "' + code + '"</span>'; return; }
+    if (visit.status === 'completed') { result.innerHTML = '<span style="color:orange;">⚠️ ' + T('gsmod_already_checkedout_at') + ' ' + APP.formatDateTime(visit.exitTime) + '.</span>'; return; }
+    if (visit.status !== 'active') { result.innerHTML = '<span style="color:red;">⛔ ' + T('gsmod_visit_not_approved') + ' ' + visit.status.toUpperCase() + '</span>'; return; }
+    result.innerHTML = '<span style="color:green;">✅ ' + T('gsmod_found') + ': Dr. ' + visit.doctorName + ' (' + visit.specialization + ', ' + T('gsmod_entered') + ' ' + APP.formatDateTime(visit.entryTime) + ')</span>' +
+        '<div style="margin-top:8px;"><button class="btn btn-danger" onclick="checkOutDoctor(\'' + visit.id + '\');document.getElementById(\'drScanInput\').value=\'\';document.getElementById(\'drScanResult\').innerHTML=\'<span style=color:green;>✓ Checked out</span>\';">' + T('gsmod_confirm_checkout') + '</button></div>';
 }
 
 /* ═══════════════════════════════════════════
@@ -1292,36 +1292,36 @@ function renderPassGenerator() {
     el.innerHTML = `
         <div class="flex-between mb-4">
             <div>
-                <h3 style="margin:0;">🎫 Pass Generator</h3>
-                <span style="font-size:13px;color:var(--gray);">Create and manage all visitor & doctor passes in one place</span>
+                <h3 style="margin:0;">🎫 ${T('gsmod_pass_generator')}</h3>
+                <span style="font-size:13px;color:var(--gray);">${T('gsmod_passgen_sub')}</span>
             </div>
             <div style="display:flex;gap:6px;">
-                <button class="btn btn-primary" onclick="showGenPassForm('patient')">+ Visitor Pass</button>
-                <button class="btn btn-info" onclick="showGenPassForm('doctor')">+ Doctor Pass</button>
+                <button class="btn btn-primary" onclick="showGenPassForm('patient')">+ ${T('gsmod_visitor_pass')}</button>
+                <button class="btn btn-info" onclick="showGenPassForm('doctor')">+ ${T('gsmod_doctor_pass')}</button>
             </div>
         </div>
         <div class="grid-4 mb-4">
-            <div class="stat-card"><div class="stat-value">${patients.length + doctors.length}</div><div class="stat-label">Total Entries</div><div style="font-size:11px;color:var(--gray);">${doctors.filter(d => d.status === 'pending').length} pending</div></div>
-            <div class="stat-card" style="border-left-color:var(--success);"><div class="stat-value">${patients.filter(p => p.status === 'active').length + doctors.filter(d => d.status === 'active').length}</div><div class="stat-label">Active (Approved)</div></div>
-            <div class="stat-card" style="border-left-color:var(--secondary);"><div class="stat-value">${patients.filter(p => p.status === 'completed').length + doctors.filter(d => d.status === 'completed').length}</div><div class="stat-label">Checked Out</div></div>
-            <div class="stat-card" style="border-left-color:var(--info);"><div class="stat-value">${patients.length}</div><div class="stat-label">Visitors</div><div style="font-size:11px;color:var(--gray);">${doctors.length} Doctors (${doctors.filter(d => d.status === 'pending').length} pending)</div></div>
+            <div class="stat-card"><div class="stat-value">${patients.length + doctors.length}</div><div class="stat-label">${T('gsmod_stat_total_entries')}</div><div style="font-size:11px;color:var(--gray);">${doctors.filter(d => d.status === 'pending').length} ${T('gsmod_pending_lower')}</div></div>
+            <div class="stat-card" style="border-left-color:var(--success);"><div class="stat-value">${patients.filter(p => p.status === 'active').length + doctors.filter(d => d.status === 'active').length}</div><div class="stat-label">${T('gsmod_stat_active')}</div></div>
+            <div class="stat-card" style="border-left-color:var(--secondary);"><div class="stat-value">${patients.filter(p => p.status === 'completed').length + doctors.filter(d => d.status === 'completed').length}</div><div class="stat-label">${T('gsmod_stat_checkedout')}</div></div>
+            <div class="stat-card" style="border-left-color:var(--info);"><div class="stat-value">${patients.length}</div><div class="stat-label">${T('gsmod_stat_visitors')}</div><div style="font-size:11px;color:var(--gray);">${doctors.length} ${T('gsmod_doctors_word')} (${doctors.filter(d => d.status === 'pending').length} ${T('gsmod_pending_lower')})</div></div>
         </div>
         <div class="card">
             <div class="flex-between mb-2" style="padding:0 0 8px 0;">
                 <div class="search-box">
-                    <input type="text" class="form-control" id="genPassSearch" placeholder="Search name, code, phone..." oninput="renderGenPassList()">
+                    <input type="text" class="form-control" id="genPassSearch" placeholder="${T('gsmod_search_name')}" oninput="renderGenPassList()">
                 </div>
                 <div class="tabs" style="margin:0;">
-                    <button class="tab-btn active" onclick="switchGenPassFilter('all',this)">All</button>
-                    <button class="tab-btn" onclick="switchGenPassFilter('active',this)">Active</button>
-                    <button class="tab-btn" onclick="switchGenPassFilter('completed',this)">Checked Out</button>
-                    <button class="tab-btn" onclick="switchGenPassFilter('visitor',this)">Visitors</button>
-                    <button class="tab-btn" onclick="switchGenPassFilter('doctor',this)">Doctors</button>
+                    <button class="tab-btn active" onclick="switchGenPassFilter('all',this)">${T('gsmod_f_all')}</button>
+                    <button class="tab-btn" onclick="switchGenPassFilter('active',this)">${T('gsmod_f_active')}</button>
+                    <button class="tab-btn" onclick="switchGenPassFilter('completed',this)">${T('gsmod_f_checkedout')}</button>
+                    <button class="tab-btn" onclick="switchGenPassFilter('visitor',this)">${T('gsmod_f_visitors')}</button>
+                    <button class="tab-btn" onclick="switchGenPassFilter('doctor',this)">${T('gsmod_f_doctors')}</button>
                 </div>
             </div>
             <div class="table-responsive">
                 <table>
-                    <thead><tr><th>Code</th><th>Type</th><th>Name</th><th>Phone</th><th>Purpose</th><th>Entry Time</th><th>Status</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>${T('gsmod_th_code')}</th><th>${T('gsmod_th_type')}</th><th>${T('gsmod_th_name')}</th><th>${T('gsmod_th_phone')}</th><th>${T('gsmod_th_purpose')}</th><th>${T('gsmod_th_entry')}</th><th>${T('gsmod_th_status')}</th><th>${T('gsmod_th_actions')}</th></tr></thead>
                     <tbody id="genPassBody"></tbody>
                 </table>
             </div>
@@ -1345,8 +1345,8 @@ function renderGenPassList() {
     const search = (document.getElementById('genPassSearch')?.value || '').toLowerCase();
 
     let allPasses = [
-        ...patients.map(p => ({ ...p, _type: 'visitor', _name: p.patientName, _typeLabel: 'Visitor' })),
-        ...doctors.map(d => ({ ...d, _type: 'doctor', _name: d.doctorName, _typeLabel: 'Doctor' }))
+        ...patients.map(p => ({ ...p, _type: 'visitor', _name: p.patientName, _typeLabel: T('gsmod_visitor_word') })),
+        ...doctors.map(d => ({ ...d, _type: 'doctor', _name: d.doctorName, _typeLabel: T('gsmod_doctor_word') }))
     ];
 
     if (genPassFilter === 'active') allPasses = allPasses.filter(p => p.status === 'active');
@@ -1369,10 +1369,10 @@ function renderGenPassList() {
         return 'badge-secondary';
     };
     const statusLabel = (s) => {
-        if (s === 'active') return 'APPROVED';
-        if (s === 'pending') return 'PENDING';
-        if (s === 'rejected') return 'REJECTED';
-        if (s === 'completed') return 'OUT';
+        if (s === 'active') return T('gsmod_st_approved');
+        if (s === 'pending') return T('gsmod_st_pending');
+        if (s === 'rejected') return T('gsmod_st_rejected');
+        if (s === 'completed') return T('gsmod_out');
         return s.toUpperCase();
     };
 
@@ -1388,25 +1388,25 @@ function renderGenPassList() {
             <td style="font-size:12px;">${APP.formatDateTime(p.entryTime)}</td>
             <td><span class="badge ${statusBadge(p.status)}">${statusLabel(p.status)}</span></td>
             <td style="white-space:nowrap;">
-                ${p._type === 'visitor' && p.status === 'active' ? `<button class="btn btn-sm btn-primary" onclick="viewPatientPass('${p.id}')">Pass</button>` : ''}
-                ${p._type === 'doctor' ? `<button class="btn btn-sm ${p.status === 'active' ? 'btn-primary' : 'btn-info'}" onclick="viewDoctorPass('${p.id}')">${p.status === 'active' ? 'Pass' : p.status === 'pending' ? 'Pending' : 'View'}</button>` : ''}
+                ${p._type === 'visitor' && p.status === 'active' ? `<button class="btn btn-sm btn-primary" onclick="viewPatientPass('${p.id}')">${T('gsmod_pass')}</button>` : ''}
+                ${p._type === 'doctor' ? `<button class="btn btn-sm ${p.status === 'active' ? 'btn-primary' : 'btn-info'}" onclick="viewDoctorPass('${p.id}')">${p.status === 'active' ? T('gsmod_pass') : p.status === 'pending' ? T('gsmod_pending_word') : T('gsmod_view')}</button>` : ''}
                 ${p.status === 'active' ? `<button class="btn btn-sm btn-info" onclick="${p._type === 'visitor' ? 'printPatientPass' : 'printDoctorPass'}('${p.id}')">🖨️</button>` : ''}
-                ${p.status === 'active' ? `<button class="btn btn-sm btn-warning" onclick="${p._type === 'visitor' ? 'checkOutPatient' : 'checkOutDoctor'}('${p.id}')">Check Out</button>` : ''}
-                ${p.status === 'rejected' ? '<span style="color:var(--danger);font-size:11px;font-weight:600;">⛔ REJECTED</span>' : ''}
+                ${p.status === 'active' ? `<button class="btn btn-sm btn-warning" onclick="${p._type === 'visitor' ? 'checkOutPatient' : 'checkOutDoctor'}('${p.id}')">${T('gsmod_checkout')}</button>` : ''}
+                ${p.status === 'rejected' ? '<span style="color:var(--danger);font-size:11px;font-weight:600;">⛔ ' + T('gsmod_rejected_cap') + '</span>' : ''}
                 <button class="btn btn-sm btn-danger" onclick="deletePass('${p._type}','${p.id}','${(p._name||'').replace(/'/g,"\\'")}','${p.uniqueCode}')">🗑</button>
             </td>
         </tr>
-    `).join('') || '<tr><td colspan="8" class="empty-state">No passes found</td></tr>';
+    `).join('') || '<tr><td colspan="8" class="empty-state">' + T('gsmod_no_passes') + '</td></tr>';
 }
 
 function deletePass(type, id, name, code) {
     var cu = AUTH.currentUser();
-    if (!cu || (cu.role !== 'admin' && !cu.isSuperAdmin)) { APP.notify('Only admin can delete passes', 'error'); return; }
+    if (!cu || (cu.role !== 'admin' && !cu.isSuperAdmin)) { APP.notify(T('gsmod_only_admin_delete'), 'error'); return; }
     var label = name ? '"' + name + '" (' + code + ')' : code;
-    confirmAction('Delete pass for ' + label + '? This permanently removes the record.', function() {
+    confirmAction(T('gsmod_delete_pass_pre') + ' ' + label + T('gsmod_delete_pass_post'), function() {
         var key = type === 'visitor' ? 'patientVisits' : 'doctorVisits';
         DB.delete(key, id);
-        APP.notify('Pass deleted', 'success');
+        APP.notify(T('gsmod_msg_pass_deleted'), 'success');
         renderPatientList();
         renderDoctorList();
         if (document.getElementById('genPassBody')) renderGenPassList();
