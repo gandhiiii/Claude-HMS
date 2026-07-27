@@ -245,14 +245,18 @@ function renderEmployeeDashboard(container) {
     var clDone     = _empData.myChecklists.filter(function(c) { return c.status === 'completed'; }).length;
     var clPct      = clTotal > 0 ? Math.round((clDone / clTotal) * 100) : 100;
 
+    var allTodos = (DB.get('employeeTodos')||[]).filter(function(t){ return t.createdBy===u; });
+    var todoPend = allTodos.filter(function(t){ return t.status!=='completed'; }).length;
+
     var tabs = [
-        { id: 'overview',    label: T('tab_overview') },
-        { id: 'work',        label: T('tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
-        { id: 'checklists',  label: T('tab_checklists') },
-        { id: 'reports',     label: T('tab_reports') },
-        { id: 'cleaning',    label: T('tab_cleaning'), badge: _empData.pendingCleaning.length, badgeClass: 'badge-danger' },
-        { id: 'performance', label: T('tab_performance') },
-        { id: 'qgoals',      label: T('tab_qgoals') }
+        { id: 'overview',    label: T('empd2_tab_overview') },
+        { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
+        { id: 'todo',        label: T('empd2_tab_todo'), badge: todoPend, badgeClass: 'badge-warning' },
+        { id: 'checklists',  label: T('empd2_tab_checklists') },
+        { id: 'reports',     label: T('empd2_tab_reports') },
+        ...(dept !== 'IT' ? [{ id: 'cleaning', label: T('empd2_tab_cleaning'), badge: _empData.pendingCleaning.length, badgeClass: 'badge-danger' }] : []),
+        { id: 'performance', label: T('empd2_tab_performance') },
+        { id: 'qgoals',      label: T('empd2_tab_qgoals') }
     ];
 
     var html = ''
@@ -268,42 +272,43 @@ function renderEmployeeDashboard(container) {
 
         // ── KPI strip ──
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px;">'
-        + _kpiCard('📅', T('kpi_due_today'),  todayTasks.length, '#fff3e0', '#e65100', 'work')
-        + _kpiCard('📆', T('kpi_due_week'),   weekTasks.length,  '#e3f2fd', 'var(--primary)', 'work')
-        + _kpiCard('✅', T('kpi_checklist'),  clPct + '%',       '#e8f5e9', 'var(--secondary)', 'checklists')
-        + _kpiCard('🔧', T('kpi_issues'),     openProbs.length,  '#fce4ec', 'var(--danger)', 'reports')
-        + _kpiCard('📋', T('kpi_projects'),   _empData.myProjects.length, '#f3e5f5', '#7b1fa2', 'work')
+        + _kpiCard('📅', T('empd2_kpi_due_today'),  todayTasks.length, '#fff3e0', '#e65100', 'work')
+        + _kpiCard('📆', T('empd2_kpi_due_week'),   weekTasks.length,  '#e3f2fd', 'var(--primary)', 'work')
+        + _kpiCard('✅', T('empd2_kpi_checklist'),  clPct + '%',       '#e8f5e9', 'var(--secondary)', 'checklists')
+        + _kpiCard('🔧', T('empd2_kpi_issues'),     openProbs.length,  '#fce4ec', 'var(--danger)', 'reports')
+        + _kpiCard('📋', T('empd2_kpi_projects'),   _empData.myProjects.length, '#f3e5f5', '#7b1fa2', 'work')
+        + _kpiCard('📝', T('empd2_kpi_todo'), todoPend, '#fff8e1', '#f57f17', 'todo')
         + '</div>'
 
         // ── Quarterly strip ──
         + '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:18px;">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">'
-        + '<div style="font-weight:700;font-size:15px;">📅 ' + q.name + ' ' + T('qprogress') + '</div>'
-        + '<div style="font-size:13px;color:var(--gray);">' + qDone.length + ' ' + T('done_lbl') + ' · ' + qInProg.length + ' ' + T('in_progress_lbl') + ' · ' + qTasks.length + ' ' + T('total_lbl') + '</div>'
+        + '<div style="font-weight:700;font-size:15px;">📅 ' + q.name + ' ' + T('empd2_qprogress') + '</div>'
+        + '<div style="font-size:13px;color:var(--gray);">' + qDone.length + ' ' + T('empd2_done_lbl') + ' · ' + qInProg.length + ' ' + T('empd2_in_progress_lbl') + ' · ' + qTasks.length + ' ' + T('empd2_total_lbl') + '</div>'
         + '</div>'
         + '<div style="margin-bottom:6px;">'
         // Stacked bar: green = done, blue = in-progress
         + '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray);margin-bottom:3px;">'
-        + '<span>' + T('task_completion') + '</span>'
+        + '<span>' + T('empd2_task_completion') + '</span>'
         + '<span style="font-weight:600;color:' + (qPct >= 80 ? 'var(--success)' : qPct >= 50 ? 'var(--warning)' : (qInProgPct > 0 ? 'var(--primary)' : 'var(--danger)')) + ';">'
-        + qPct + '% ' + T('done_lbl') + (qInProgPct > 0 ? ' · ' + qInProgPct + '% ' + T('in_progress_lbl') : '') + '</span></div>'
+        + qPct + '% ' + T('empd2_done_lbl') + (qInProgPct > 0 ? ' · ' + qInProgPct + '% ' + T('empd2_in_progress_lbl') : '') + '</span></div>'
         + '<div class="q-progress-track" style="position:relative;">'
         + '<div style="position:absolute;left:0;top:0;height:100%;width:' + Math.min(100, qPct + qInProgPct) + '%;background:var(--primary);opacity:0.35;border-radius:8px;"></div>'
         + '<div class="q-progress-fill" style="width:' + qPct + '%;background:' + (qPct >= 80 ? 'var(--success)' : qPct >= 50 ? 'var(--warning)' : 'var(--secondary)') + ';position:relative;z-index:1;"></div>'
         + '</div>'
         + '</div>'
         + '<div style="display:flex;gap:12px;font-size:11px;color:var(--gray);margin-top:6px;flex-wrap:wrap;">'
-        + '<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--secondary);display:inline-block;"></span>' + T('grp_completed') + ' (' + qDone.length + ')</span>'
-        + (qInProg.length > 0 ? '<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--primary);opacity:0.5;display:inline-block;"></span>' + T('status_inprogress') + ' (' + qInProg.length + ')</span>' : '')
+        + '<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--secondary);display:inline-block;"></span>' + T('empd2_grp_completed') + ' (' + qDone.length + ')</span>'
+        + (qInProg.length > 0 ? '<span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--primary);opacity:0.5;display:inline-block;"></span>' + T('empd2_status_inprogress') + ' (' + qInProg.length + ')</span>' : '')
         + '<span style="margin-left:auto;">' + q.start.toLocaleDateString('en-IN',{month:'short',day:'numeric'}) + ' – ' + q.end.toLocaleDateString('en-IN',{month:'short',day:'numeric'}) + '</span>'
         + '</div>'
         + '</div>'
 
-        // ── Cleaning alert ──
-        + (_empData.pendingCleaning.length > 0
+        // ── Cleaning alert (hidden for IT) ──
+        + (dept !== 'IT' && _empData.pendingCleaning.length > 0
             ? '<div style="background:#fff3e0;border:2px solid var(--warning);border-radius:10px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="empTabSwitch(\'cleaning\',this)">'
-              + '<span style="font-size:24px;">🧹</span><div style="flex:1;"><div style="font-weight:700;color:#e65100;">' + _empData.pendingCleaning.length + ' ' + T('rooms_cleaning') + '</div>'
-              + '<div style="font-size:12px;color:var(--gray);">' + T('tap_view') + '</div></div><span style="color:#e65100;">›</span></div>'
+              + '<span style="font-size:24px;">🧹</span><div style="flex:1;"><div style="font-weight:700;color:#e65100;">' + _empData.pendingCleaning.length + ' ' + T('empd2_rooms_cleaning') + '</div>'
+              + '<div style="font-size:12px;color:var(--gray);">' + T('empd2_tap_view') + '</div></div><span style="color:#e65100;">›</span></div>'
             : '')
 
         // ── Tab bar ──
@@ -347,6 +352,7 @@ function _renderEmpTab(tab) {
     if (!el) return;
     if (tab === 'overview')    { renderEmpOverview(el); return; }
     if (tab === 'work')        { renderEmpWorkTab(el); return; }
+    if (tab === 'todo')        { renderEmpTodoTab(el); return; }
     if (tab === 'checklists')  { renderEmpChecklistsTab(el); return; }
     if (tab === 'reports')     { renderEmpReportsTab(el); return; }
     if (tab === 'cleaning')    { renderEmpCleaningSection(el); return; }
@@ -360,7 +366,7 @@ function renderEmpQGoalsTab(el) {
     if (typeof renderEmpQP === 'function') {
         renderEmpQP(el, user.username, user.fullName);
     } else {
-        el.innerHTML = '<div class="empty-state">Q Goals module not loaded.</div>';
+        el.innerHTML = '<div class="empty-state">' + T('empd2_qgoals_not_loaded') + '</div>';
     }
 }
 
@@ -392,26 +398,61 @@ function renderEmpOverview(el) {
     // Overdue alert
     if (overdueTasks.length > 0) {
         html += '<div style="background:#ffebee;border:1px solid var(--danger);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;">'
-            + '<strong style="color:var(--danger);">⚠️ ' + overdueTasks.length + ' ' + T('overdue_alert') + '</strong> &nbsp;'
+            + '<strong style="color:var(--danger);">⚠️ ' + overdueTasks.length + ' ' + T('empd2_overdue_alert') + '</strong> &nbsp;'
             + overdueTasks.slice(0,2).map(function(t){ return '<span style="color:var(--danger);">' + t.title + '</span>'; }).join(', ')
             + (overdueTasks.length > 2 ? ' +' + (overdueTasks.length - 2) + ' more' : '')
-            + ' &nbsp;<button class="btn btn-sm btn-danger" onclick="empTabSwitch(\'work\')">' + T('btn_view_all') + '</button></div>';
+            + ' &nbsp;<button class="btn btn-sm btn-danger" onclick="empTabSwitch(\'work\')">' + T('empd2_btn_view_all') + '</button></div>';
     }
 
     // Today's focus
     html += '<div style="margin-bottom:18px;">'
-        + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">🎯 ' + T('todays_focus') + '</div>';
+        + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">🎯 ' + T('empd2_todays_focus') + '</div>';
     if (todayTasks.length === 0 && recentCl.length === 0) {
-        html += '<div style="color:var(--gray);font-size:13px;padding:16px;text-align:center;background:var(--light-gray);border-radius:8px;">' + T('nothing_today') + '</div>';
+        html += '<div style="color:var(--gray);font-size:13px;padding:16px;text-align:center;background:var(--light-gray);border-radius:8px;">' + T('empd2_nothing_today') + '</div>';
     } else {
         if (todayTasks.length > 0) {
-            html += '<div style="font-size:12px;font-weight:600;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">' + T('tasks_due_today') + '</div>';
+            html += '<div style="font-size:12px;font-weight:600;color:var(--gray);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">' + T('empd2_tasks_due_today') + '</div>';
             todayTasks.slice(0, 5).forEach(function(t) {
                 html += _workItem(t, d.adminNames, true);
             });
         }
+        // Departmental CHECKLISTS API assignments
+        var _myDchkAssignments = [];
+        if (typeof CHECKLISTS !== 'undefined') {
+            _myDchkAssignments = CHECKLISTS.myAssignments(d.user);
+        }
+        var _todayStr = new Date().toISOString().slice(0, 10);
+        var _pendingDchk = _myDchkAssignments.filter(function(a) {
+            return !CHECKLISTS.hasAssignmentEntry(a.id, _todayStr);
+        });
+        if (_pendingDchk.length > 0) {
+            html += '<div style="background:#fff3e0;border:1px solid #ffcc80;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">'
+                + '<span style="font-size:13px;font-weight:600;">📋 ' + _pendingDchk.length + ' departmental checklist(s) pending today</span>'
+                + '<button class="btn btn-sm btn-primary" onclick="Router.navigate(\'departmental-checklist\')">Fill Now</button>'
+                + '</div>';
+        }
+
+        // TODO items for today
+        var _myTodos = (DB.get('employeeTodos')||[]).filter(function(t){ return t.createdBy===d.user.username; });
+        var _todayStr2 = new Date().toISOString().slice(0,10);
+        var _todayTodos = _myTodos.filter(function(t){ return (t.date===_todayStr2||t.category==='daily') && t.status!=='completed'; });
+        if (_todayTodos.length > 0) {
+            html += '<div style="margin-top:8px;">'
+                + '<div style="font-size:12px;font-weight:600;color:var(--gray);margin-bottom:4px;">' + T('empd2_todo_today_section', {n: _todayTodos.length}) + '</div>';
+            _todayTodos.slice(0,4).forEach(function(t){
+                var priColor = {low:'var(--secondary)',medium:'#e65100',high:'var(--danger)'}[t.priority]||'var(--gray)';
+                html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;">'
+                    + '<input type="checkbox" onchange="empToggleTodo(\''+t.id+'\')" style="cursor:pointer;">'
+                    + '<span>' + t.title + '</span>'
+                    + '<span style="width:6px;height:6px;border-radius:50%;background:' + priColor + ';display:inline-block;"></span>'
+                    + '</div>';
+            });
+            if (_todayTodos.length > 4) html += '<div style="font-size:11px;color:var(--primary);cursor:pointer;" onclick="empTabSwitch(\'todo\')">' + T('empd2_todo_more', {n: _todayTodos.length-4}) + '</div>';
+            html += '</div>';
+        }
+
         if (recentCl.length > 0) {
-            html += '<div style="font-size:12px;font-weight:600;color:var(--gray);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.5px;">' + T('open_checklists') + '</div>';
+            html += '<div style="font-size:12px;font-weight:600;color:var(--gray);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.5px;">' + T('empd2_open_checklists') + '</div>';
             recentCl.slice(0, 3).forEach(function(cl) {
                 var total = cl.items ? cl.items.length : 0;
                 var done  = cl.items ? cl.items.filter(function(i){ return i.status === 'ok'; }).length : 0;
@@ -421,7 +462,7 @@ function renderEmpOverview(el) {
                     + '<div style="display:flex;align-items:center;gap:6px;margin-top:4px;">'
                     + '<div style="flex:1;max-width:180px;height:5px;background:var(--light-gray);border-radius:3px;"><div style="height:100%;width:' + pct + '%;background:var(--success);border-radius:3px;"></div></div>'
                     + '<span style="font-size:11px;color:var(--gray);">' + done + '/' + total + '</span></div></div>'
-                    + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'checklists\')">' + T('btn_open') + '</button></div>';
+                    + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'checklists\')">' + T('empd2_btn_open') + '</button></div>';
             });
         }
     }
@@ -430,26 +471,26 @@ function renderEmpOverview(el) {
     // Two-column: recent tasks + quick actions
     html += '<div class="grid-2" style="gap:16px;">'
         + '<div>'
-        + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">📝 ' + T('recent_tasks') + '</div>';
+        + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">📝 ' + T('empd2_recent_tasks') + '</div>';
     if (recentTasks.length === 0) {
-        html += '<div style="color:var(--gray);font-size:13px;">' + T('no_tasks_yet') + '</div>';
+        html += '<div style="color:var(--gray);font-size:13px;">' + T('empd2_no_tasks_yet') + '</div>';
     } else {
         recentTasks.forEach(function(t) { html += _workItem(t, d.adminNames, false); });
     }
     html += '</div>'
         + '<div>'
-        + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">⚡ ' + T('quick_actions') + '</div>'
+        + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">⚡ ' + T('empd2_quick_actions') + '</div>'
         + '<div style="display:flex;flex-direction:column;gap:8px;">'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'work\')">' + T('btn_view_tasks') + '</button>'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'checklists\')">' + T('btn_open_cl') + '</button>'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="Router.navigate(\'problems\')">' + T('btn_report_prob') + '</button>'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="Router.navigate(\'material-requests\')">' + T('btn_mat_request') + '</button>'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empCreateReturn()">' + T('btn_return_mat') + '</button>'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="showReportForm()">' + T('btn_submit_rep') + '</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'work\')">' + T('empd2_btn_view_tasks') + '</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'checklists\')">' + T('empd2_btn_open_cl') + '</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="Router.navigate(\'problems\')">' + T('empd2_btn_report_prob') + '</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empShowMatReqForm()">' + T('empd2_btn_mat_request') + '</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empCreateReturn()">' + T('empd2_btn_return_mat') + '</button>'
+        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="showReportForm()">' + T('empd2_btn_submit_rep') + '</button>'
         + '</div>'
         + (pendingReqs.length > 0
-            ? '<div style="margin-top:14px;"><div style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--gray);">' + T('pending_requests') + '</div>'
-              + pendingReqs.map(function(r){ return '<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--light-gray);">' + (r.title||'Request') + ' <span class="badge badge-warning" style="font-size:10px;">' + T('pending_lbl') + '</span></div>'; }).join('')
+            ? '<div style="margin-top:14px;"><div style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--gray);">' + T('empd2_pending_requests') + '</div>'
+              + pendingReqs.map(function(r){ return '<div style="font-size:12px;padding:4px 0;border-bottom:1px solid var(--light-gray);">' + (r.title||'Request') + ' <span class="badge badge-warning" style="font-size:10px;">' + T('empd2_pending_lbl') + '</span></div>'; }).join('')
               + '</div>'
             : '')
         + '</div></div>';
@@ -484,21 +525,21 @@ function renderEmpWorkTab(el) {
     var completed = d.myTasks.filter(function(t){ return t.status === 'completed'; });
 
     var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
-        + '<div style="font-weight:700;font-size:16px;">📝 ' + T('my_tasks') + ' (' + d.myTasks.length + ')</div>'
+        + '<div style="font-weight:700;font-size:16px;">📝 ' + T('empd2_my_tasks') + ' (' + d.myTasks.length + ')</div>'
         + '<div style="display:flex;gap:8px;">'
-        + '<span class="badge badge-warning" style="padding:5px 10px;">' + pending.length + ' ' + T('pending_lbl') + '</span>'
-        + '<span class="badge badge-success" style="padding:5px 10px;">' + completed.length + ' ' + T('done_lbl') + '</span>'
+        + '<span class="badge badge-warning" style="padding:5px 10px;">' + pending.length + ' ' + T('empd2_pending_lbl') + '</span>'
+        + '<span class="badge badge-success" style="padding:5px 10px;">' + completed.length + ' ' + T('empd2_done_lbl') + '</span>'
         + '</div></div>';
 
     if (d.myTasks.length === 0) {
-        html += '<div style="text-align:center;padding:32px;color:var(--gray);font-size:13px;">' + T('no_tasks') + '</div>';
+        html += '<div style="text-align:center;padding:32px;color:var(--gray);font-size:13px;">' + T('empd2_no_tasks') + '</div>';
     } else {
         var groups = [
-            { label: T('grp_overdue'),  items: pending.filter(function(t){ return t.deadline && new Date(t.deadline) < new Date(); }) },
-            { label: T('grp_today'),    items: pending.filter(function(t){ return _isToday(t.deadline) && !(t.deadline && new Date(t.deadline) < new Date()); }) },
-            { label: T('grp_week'),     items: pending.filter(function(t){ return _isThisWeek(t.deadline) && !_isToday(t.deadline) && !(t.deadline && new Date(t.deadline) < new Date()); }) },
-            { label: T('grp_later'),    items: pending.filter(function(t){ return !t.deadline || (!_isThisWeek(t.deadline) && !(t.deadline && new Date(t.deadline) < new Date())); }) },
-            { label: T('grp_completed'),items: completed }
+            { label: T('empd2_grp_overdue'),  items: pending.filter(function(t){ return t.deadline && new Date(t.deadline) < new Date(); }) },
+            { label: T('empd2_grp_today'),    items: pending.filter(function(t){ return _isToday(t.deadline) && !(t.deadline && new Date(t.deadline) < new Date()); }) },
+            { label: T('empd2_grp_week'),     items: pending.filter(function(t){ return _isThisWeek(t.deadline) && !_isToday(t.deadline) && !(t.deadline && new Date(t.deadline) < new Date()); }) },
+            { label: T('empd2_grp_later'),    items: pending.filter(function(t){ return !t.deadline || (!_isThisWeek(t.deadline) && !(t.deadline && new Date(t.deadline) < new Date())); }) },
+            { label: T('empd2_grp_completed'),items: completed }
         ];
 
         groups.forEach(function(g) {
@@ -514,18 +555,18 @@ function renderEmpWorkTab(el) {
                     + '<div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
                     + '<span>' + (t.title||'') + '</span>'
                     + (roleLabel ? '<span class="hod-tag">' + roleLabel + '</span>' : '')
-                    + (t.priority === 'high' ? '<span class="badge badge-danger" style="font-size:10px;">' + T('status_high') + '</span>' : t.priority === 'medium' ? '<span class="badge badge-warning" style="font-size:10px;">' + T('status_med') + '</span>' : '')
+                    + (t.priority === 'high' ? '<span class="badge badge-danger" style="font-size:10px;">' + T('empd2_status_high') + '</span>' : t.priority === 'medium' ? '<span class="badge badge-warning" style="font-size:10px;">' + T('status_med') + '</span>' : '')
                     + '</div>'
                     + (t.description ? '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + t.description.substring(0,80) + (t.description.length>80?'…':'') + '</div>' : '')
                     + '<div style="font-size:11px;color:var(--gray);margin-top:3px;">'
-                    + (t.deadline ? (isOverdue ? '<span style="color:var(--danger);">⚠️ ' + T('due_lbl') + ' ' : '📅 ' + T('due_lbl') + ' ') + APP.formatDate(t.deadline) + (isOverdue?'</span>':'') : '')
-                    + (t.createdBy ? ' &nbsp;·&nbsp; ' + T('from_lbl') + ' ' + t.createdBy : '')
+                    + (t.deadline ? (isOverdue ? '<span style="color:var(--danger);">⚠️ ' + T('empd2_due_lbl') + ' ' : '📅 ' + T('empd2_due_lbl') + ' ') + APP.formatDate(t.deadline) + (isOverdue?'</span>':'') : '')
+                    + (t.createdBy ? ' &nbsp;·&nbsp; ' + T('empd2_from_lbl') + ' ' + t.createdBy : '')
                     + '</div></div>'
                     + '<span class="badge ' + APP.getStatusBadge(t.status) + '" style="font-size:11px;">' + (t.status||'pending') + '</span>'
                     + (t.status !== 'completed'
                         ? '<button class="btn btn-sm btn-success" onclick="empUpdateTaskStatus(\'' + t.id + '\',\'' + (t._store||'tasks') + '\')" style="white-space:nowrap;">'
-                          + (t.status === 'in-progress' ? T('status_mark_done') : T('status_start')) + '</button>'
-                        : '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'tasks\')">' + T('btn_view') + '</button>')
+                          + (t.status === 'in-progress' ? T('empd2_status_mark_done') : T('empd2_status_start')) + '</button>'
+                        : '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'tasks\')">' + T('empd2_btn_view') + '</button>')
                     + '</div>';
             });
             html += '</div>';
@@ -535,7 +576,7 @@ function renderEmpWorkTab(el) {
     // Projects
     if (d.myProjects.length > 0) {
         html += '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">'
-            + '<div style="font-weight:700;font-size:15px;margin-bottom:12px;">📋 ' + T('my_projects') + ' (' + d.myProjects.length + ')</div>';
+            + '<div style="font-weight:700;font-size:15px;margin-bottom:12px;">📋 ' + T('empd2_my_projects') + ' (' + d.myProjects.length + ')</div>';
         d.myProjects.forEach(function(p) {
             var pct = p.budget > 0 ? Math.round((p.spent / p.budget) * 100) : 0;
             html += '<div class="work-item" style="flex-wrap:wrap;gap:10px;">'
@@ -552,29 +593,29 @@ function renderEmpWorkTab(el) {
 
     // Material requests with new multi-stage status display
     var empMatStatusMap = {
-        'pending':           { label: T('mr_waiting_hod'),  badge: 'badge-warning' },
-        'hod_approved':      { label: T('mr_hod_approved'), badge: 'badge-info' },
+        'pending':           { label: T('empd2_mr_waiting_hod'),  badge: 'badge-warning' },
+        'hod_approved':      { label: T('empd2_mr_hod_approved'), badge: 'badge-info' },
         'hod_rejected':      { label: T('mr_hod_rejected'), badge: 'badge-danger' },
         'facility_approved': { label: T('mr_fac_approved'), badge: 'badge-info' },
         'facility_rejected': { label: T('mr_fac_rejected'), badge: 'badge-danger' },
         'store_fulfilled':   { label: T('mr_ready'),        badge: 'badge-success' },
-        'confirmed':         { label: T('mr_confirmed'),    badge: 'badge-success' },
-        'partial':           { label: T('mr_partial'),      badge: 'badge-warning' },
+        'confirmed':         { label: T('empd2_mr_confirmed'),    badge: 'badge-success' },
+        'partial':           { label: T('empd2_mr_partial'),      badge: 'badge-warning' },
         'approved':          { label: T('mr_approved'),     badge: 'badge-success' },
-        'rejected':          { label: T('mr_rejected'),     badge: 'badge-danger' }
+        'rejected':          { label: T('empd2_mr_rejected'),     badge: 'badge-danger' }
     };
     if (d.myRequests.length > 0) {
         var storeFulfilledReqs = d.myRequests.filter(function(r){ return r.status === 'store_fulfilled'; });
         html += '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
-            + '<div style="font-weight:700;font-size:15px;">&#128230; ' + T('my_mat_requests') + ' (' + d.myRequests.length + ')</div>'
-            + '<button class="btn btn-sm btn-primary" onclick="Router.navigate(\'material-requests\')">' + T('btn_new_request') + '</button></div>';
+            + '<div style="font-weight:700;font-size:15px;">&#128230; ' + T('empd2_my_mat_requests') + ' (' + d.myRequests.length + ')</div>'
+            + '<button class="btn btn-sm btn-primary" onclick="empShowMatReqForm()">' + T('empd2_btn_new_request') + '</button></div>';
         if (storeFulfilledReqs.length > 0) {
             html += '<div style="background:#e8f5e9;border:2px solid var(--success);border-radius:8px;padding:10px 14px;margin-bottom:10px;">'
-                + '<strong style="color:var(--success);">&#128230; ' + storeFulfilledReqs.length + ' ' + T('ready_collect') + '</strong></div>';
+                + '<strong style="color:var(--success);">&#128230; ' + storeFulfilledReqs.length + ' ' + T('empd2_ready_collect') + '</strong></div>';
         }
         d.myRequests.slice().reverse().slice(0, 6).forEach(function(r) {
-            var stInfo = empMatStatusMap[r.status] || { label: r.status || T('mr_waiting_hod'), badge: 'badge-warning' };
+            var stInfo = empMatStatusMap[r.status] || { label: r.status || T('empd2_mr_waiting_hod'), badge: 'badge-warning' };
             var canConfirm = r.status === 'store_fulfilled';
             html += '<div class="work-item" style="flex-wrap:wrap;gap:6px;">'
                 + '<div style="flex:1;min-width:180px;">'
@@ -583,8 +624,8 @@ function renderEmpWorkTab(el) {
                 + '</div>'
                 + '<span class="badge ' + stInfo.badge + '" style="font-size:11px;">' + stInfo.label + '</span>'
                 + (canConfirm
-                    ? '<button class="btn btn-sm btn-success" onclick="empConfirmMatReq(\'' + r.id + '\',false)">' + T('btn_confirm') + '</button>'
-                    + '<button class="btn btn-sm btn-warning" onclick="empConfirmMatReq(\'' + r.id + '\',true)">' + T('btn_partial') + '</button>'
+                    ? '<button class="btn btn-sm btn-success" onclick="empConfirmMatReq(\'' + r.id + '\',false)">' + T('empd2_btn_confirm') + '</button>'
+                    + '<button class="btn btn-sm btn-warning" onclick="empConfirmMatReq(\'' + r.id + '\',true)">' + T('empd2_btn_partial') + '</button>'
                     : '')
                 + '</div>';
         });
@@ -595,15 +636,15 @@ function renderEmpWorkTab(el) {
     var assignedProbs = d.myProblems.filter(function(p) { return p.assignedTo === d.user.username && p.status !== 'resolved'; });
     if (assignedProbs.length > 0) {
         html += '<div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">'
-            + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">&#128295; ' + T('prob_assigned') + ' (' + assignedProbs.length + ')</div>';
+            + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">&#128295; ' + T('empd2_prob_assigned') + ' (' + assignedProbs.length + ')</div>';
         assignedProbs.forEach(function(p) {
             var statusBadge = p.status === 'in_progress' ? 'badge-info' : 'badge-warning';
             html += '<div class="work-item" style="flex-wrap:wrap;gap:6px;">'
                 + '<div style="flex:1;min-width:180px;">'
                 + '<div style="font-size:13px;font-weight:600;">' + (p.title || '') + '</div>'
                 + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">'
-                + T('prob_category') + ' ' + (p.category || '-') + ' &middot; ' + APP.formatDate(p.createdAt)
-                + (p.assignNote ? '<br>' + T('prob_note') + ' ' + p.assignNote : '')
+                + T('empd2_prob_category') + ' ' + (p.category || '-') + ' &middot; ' + APP.formatDate(p.createdAt)
+                + (p.assignNote ? '<br>' + T('empd2_prob_note') + ' ' + p.assignNote : '')
                 + '</div></div>'
                 + '<span class="badge ' + statusBadge + '" style="font-size:11px;">' + (p.status || 'assigned').replace('_', ' ') + '</span>'
                 + (p.status === 'assigned' ? '<button class="btn btn-sm btn-info" onclick="empMarkProbInProgress(\'' + p.id + '\')">' + T('prob_start') + '</button>' : '')
@@ -633,19 +674,50 @@ function renderEmpChecklistsTab(el) {
     // Check for period crossings — auto-report and reset items as needed
     _checkAndResetChecklists(myChecklists, user);
 
+    // Also load assignments from the CHECKLISTS API (new departmental system)
+    var myAssignments = [];
+    var empAsgnFreqMap = {};
+    if (typeof CHECKLISTS !== 'undefined') {
+        myAssignments = CHECKLISTS.myAssignments(user);
+        myAssignments.forEach(function(a) {
+            var freq = 'daily';
+            if (a.refs && a.refs.length > 0) {
+                var tpl = CHECKLISTS.getTemplate(a.refs[0].templateId);
+                if (tpl && tpl.frequency) freq = tpl.frequency;
+            }
+            empAsgnFreqMap[a.id] = freq;
+        });
+    }
+    window._empMyAssignments = myAssignments;
+    window._empAsgnFreqMap = empAsgnFreqMap;
+
     var daily   = myChecklists.filter(function(c){ return !c.frequency || c.frequency === 'daily'; });
     var weekly  = myChecklists.filter(function(c){ return c.frequency === 'weekly'; });
     var monthly = myChecklists.filter(function(c){ return c.frequency === 'monthly'; });
 
-    var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">'
-        + '<div style="font-weight:700;font-size:16px;">✅ My Checklists'
-        + ' <span class="badge badge-primary" style="font-size:11px;margin-left:4px;">' + myChecklists.length + '</span></div>'
+    // Frequency counts including CHECKLISTS API assignments
+    var ad = 0, aw = 0, am = 0;
+    myAssignments.forEach(function(a) {
+        var f = empAsgnFreqMap[a.id] || 'daily';
+        if (f === 'daily') ad++; else if (f === 'weekly') aw++; else if (f === 'monthly') am++;
+    });
+
+    var html = '';
+
+    var totalAll = myChecklists.length + myAssignments.length;
+    var totalDaily = daily.length + ad;
+    var totalWeekly = weekly.length + aw;
+    var totalMonthly = monthly.length + am;
+
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:16px;">✅ ' + T('empd2_cl_my_checklists')
+        + ' <span class="badge badge-primary" style="font-size:11px;margin-left:4px;">' + totalAll + '</span></div>'
         + '</div>'
         + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;">'
-        + '<button class="tab-btn active" onclick="filterEmpCl(\'all\',this)">All (' + myChecklists.length + ')</button>'
-        + '<button class="tab-btn" onclick="filterEmpCl(\'daily\',this)">🔄 Daily (' + daily.length + ')</button>'
-        + '<button class="tab-btn" onclick="filterEmpCl(\'weekly\',this)">📅 Weekly (' + weekly.length + ')</button>'
-        + '<button class="tab-btn" onclick="filterEmpCl(\'monthly\',this)">🗓️ Monthly (' + monthly.length + ')</button>'
+        + '<button class="tab-btn active" onclick="filterEmpCl(\'all\',this)">' + T('empd2_cl_all') + ' (' + totalAll + ')</button>'
+        + '<button class="tab-btn" onclick="filterEmpCl(\'daily\',this)">' + T('empd2_cl_daily') + ' (' + totalDaily + ')</button>'
+        + '<button class="tab-btn" onclick="filterEmpCl(\'weekly\',this)">' + T('empd2_cl_weekly') + ' (' + totalWeekly + ')</button>'
+        + '<button class="tab-btn" onclick="filterEmpCl(\'monthly\',this)">' + T('empd2_cl_monthly') + ' (' + totalMonthly + ')</button>'
         + '</div>';
 
     html += '<div id="empClListNew"></div>';
@@ -665,62 +737,243 @@ function filterEmpCl(filter, btn) {
 function _renderEmpChecklists(checklists) {
     var el = document.getElementById('empClListNew');
     if (!el) return;
+    var user = AUTH.currentUser();
+    var myAssignments = window._empMyAssignments || [];
+    var empAsgnFreqMap = window._empAsgnFreqMap || {};
+
+    // Filter assignments by frequency too
+    var filteredAsgns = myAssignments.filter(function(a) {
+        var freq = empAsgnFreqMap[a.id] || 'daily';
+        if (_empClFilter === 'daily')   return freq === 'daily';
+        if (_empClFilter === 'weekly')  return freq === 'weekly';
+        if (_empClFilter === 'monthly') return freq === 'monthly';
+        return true;
+    });
+
+    // Floor detection for floor-based departments (e.g. IT)
+    var needsFloor = typeof CHECKLISTS !== 'undefined' && CHECKLISTS.requiresFloor(user.department);
+    var allFloors = [];
+    if (needsFloor && filteredAsgns.length > 0) {
+        filteredAsgns.forEach(function(a) {
+            var items = CHECKLISTS.resolveAssignmentItems(a);
+            items.forEach(function(it) {
+                if (it.floorName && allFloors.indexOf(it.floorName) === -1) {
+                    allFloors.push(it.floorName);
+                }
+            });
+        });
+        allFloors.sort();
+    }
+
+    var selectedFloor = window._empClAsgnFloor || (allFloors.length > 0 ? allFloors[0] : '');
+
+    // Filter assignments by floor
+    if (needsFloor && selectedFloor && filteredAsgns.length > 0) {
+        filteredAsgns = filteredAsgns.filter(function(a) {
+            var items = CHECKLISTS.resolveAssignmentItems(a);
+            return items.some(function(it) { return it.floorName === selectedFloor; });
+        });
+    }
+
+    // Old checklists filtered by frequency
     var filtered = checklists.filter(function(cl) {
         if (_empClFilter === 'daily')   return !cl.frequency || cl.frequency === 'daily';
         if (_empClFilter === 'weekly')  return cl.frequency === 'weekly';
         if (_empClFilter === 'monthly') return cl.frequency === 'monthly';
-        return true; // 'all'
+        return true;
     });
-    if (filtered.length === 0) {
+
+    // Shared empty state when both are empty
+    if (filtered.length === 0 && filteredAsgns.length === 0) {
+        var freqWordMap = { daily: T('empd2_freq_daily_cap'), weekly: T('empd2_freq_weekly_cap'), monthly: T('empd2_freq_monthly_cap') };
         var msg = _empClFilter === 'all'
-            ? 'No checklists assigned yet. Your HOD or Admin will assign them here.'
-            : 'No ' + _empClFilter + ' checklists assigned.';
+            ? T('empd2_cl_none_all')
+            : T('empd2_cl_none_filter').replace('{f}', freqWordMap[_empClFilter] || _empClFilter);
         el.innerHTML = '<div style="color:var(--gray);font-size:13px;padding:24px;text-align:center;background:var(--light-gray);border-radius:8px;">' + msg + '</div>';
         return;
     }
-    var freqBg   = { daily:'#e3f2fd', weekly:'#f3e5f5', monthly:'#e8f5e9' };
-    var freqClr  = { daily:'#1565c0', weekly:'#6a1b9a', monthly:'#2e7d32' };
-    var freqIcon = { daily:'🔄', weekly:'📅', monthly:'🗓️' };
-    var html = '';
-    filtered.forEach(function(cl) {
-        var freq  = cl.frequency || 'daily';
-        var total = cl.items ? cl.items.length : 0;
-        var done  = cl.items ? cl.items.filter(function(i){ return i.status && i.status !== 'pending'; }).length : 0;
-        var pct   = total > 0 ? Math.round((done / total) * 100) : 0;
-        var isDue = cl.deadline && _isToday(cl.deadline);
-        var bg    = freqBg[freq]  || '#e3f2fd';
-        var clr   = freqClr[freq] || '#1565c0';
-        var icon  = freqIcon[freq]|| '🔄';
-        var periodLabel = _clPeriodLabel(freq);
-        var timeLeft    = _clTimeUntil(_clNextReset(freq));
-        var submitted   = !!cl.periodSubmitted;
 
-        html += '<div class="work-item' + (isDue ? ' urgent' : '') + '" style="flex-direction:column;align-items:stretch;gap:8px;border-left:4px solid ' + clr + ';">'
-            // Title + actions row
-            + '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">'
-            + '<div>'
-            + '<div style="font-size:14px;font-weight:600;">' + (cl.title || '') + (cl.floor ? ' <span style="font-size:11px;color:var(--gray);">· ' + cl.floor + '</span>' : '') + '</div>'
-            + '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:4px;">'
-            + '<span style="background:' + bg + ';color:' + clr + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + icon + ' ' + freq.charAt(0).toUpperCase() + freq.slice(1) + '</span>'
-            + '<span style="font-size:11px;color:var(--gray);">' + periodLabel + '</span>'
-            + '<span style="font-size:11px;color:var(--gray);">⏱ Resets in ' + timeLeft + '</span>'
-            + (submitted ? '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">✓ Submitted</span>' : '')
-            + '</div>'
-            + '</div>'
-            + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
-            + '<span class="badge ' + (cl.status === 'completed' ? 'badge-success' : 'badge-info') + '" style="font-size:11px;">' + (cl.status || 'active') + '</span>'
-            + (!submitted ? '<button class="btn btn-sm btn-success" onclick="empSubmitClPeriod(\'' + cl.id + '\')" style="font-size:11px;padding:3px 8px;">📤 Submit</button>' : '')
-            + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'checklists\')" style="font-size:11px;padding:3px 8px;">Open</button>'
-            + '</div></div>'
-            // Progress bar
-            + '<div style="display:flex;align-items:center;gap:8px;">'
-            + '<div style="flex:1;height:8px;background:var(--light-gray);border-radius:4px;"><div style="height:100%;width:' + pct + '%;background:' + (pct === 100 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)') + ';border-radius:4px;transition:width .3s;"></div></div>'
-            + '<span style="font-size:12px;color:var(--gray);min-width:55px;">' + done + '/' + total + ' done</span>'
-            + '</div>'
-            + (cl.deadline ? '<div style="font-size:11px;color:' + (isDue ? 'var(--warning)' : 'var(--gray)') + ';">📅 Deadline: ' + APP.formatDate(cl.deadline) + '</div>' : '')
-            + '</div>';
-    });
+    var today = new Date().toISOString().slice(0, 10);
+    var html = '';
+
+    /* ─── Render CHECKLISTS API assignments ─── */
+    if (filteredAsgns.length > 0) {
+        if (needsFloor && allFloors.length > 1) {
+            html += '<div class="form-group" style="margin-bottom:12px;max-width:300px;">'
+                + '<label style="font-size:13px;font-weight:600;display:block;margin-bottom:4px;">📍 ' + T('dchk_select_floor') + '</label>'
+                + '<select class="form-control" onchange="window._empClAsgnFloor=this.value;_renderEmpChecklists(window._empChecklists||[])">';
+            allFloors.forEach(function(f) {
+                html += '<option value="' + f + '" ' + (f === selectedFloor ? 'selected' : '') + '>' + f + '</option>';
+            });
+            html += '</select></div>';
+        }
+
+        html += '<div style="margin-bottom:14px;">'
+            + '<div style="font-weight:700;font-size:14px;margin-bottom:8px;">📋 ' + T('empd2_dept_assignments') + '</div>';
+
+        var empStatusColors = { ok: '#28a745', fault: '#dc3545', na: '#6c757d', report: '#fd7e14', pending: '#e9ecef' };
+        var empStatusBgs  = { ok: '#f0faf0', fault: '#fff5f5', na: '#f5f5f5', report: '#fff8f0', pending: 'var(--bg)' };
+
+        var empFreqBg   = { daily:'#e3f2fd', weekly:'#f3e5f5', monthly:'#e8f5e9' };
+        var empFreqClr  = { daily:'#1565c0', weekly:'#6a1b9a', monthly:'#2e7d32' };
+        var empFreqIcon = { daily:'🔄', weekly:'📅', monthly:'🗓️' };
+        var empFreqCap  = { daily: T('empd2_freq_daily_cap'), weekly: T('empd2_freq_weekly_cap'), monthly: T('empd2_freq_monthly_cap') };
+
+        filteredAsgns.forEach(function(a) {
+            var items = CHECKLISTS.resolveAssignmentItems(a);
+            var submitted = CHECKLISTS.hasAssignmentEntry(a.id, today);
+            var asgnFloor = '';
+            if (needsFloor && items.length > 0) {
+                asgnFloor = items[0].floorName || '';
+            }
+
+            var af = empAsgnFreqMap[a.id] || 'daily';
+            var afBg = empFreqBg[af] || '#e3f2fd';
+            var afCl = empFreqClr[af] || '#1565c0';
+            var afIc = empFreqIcon[af] || '🔄';
+
+            if (!window._empClAsgnState) window._empClAsgnState = {};
+            if (!window._empClAsgnState[a.id]) {
+                var st = {};
+                items.forEach(function(it) { st[it.itemId] = { status: 'pending', value: '', remarks: '' }; });
+                window._empClAsgnState[a.id] = st;
+            }
+
+            html += '<div class="card" style="margin-bottom:10px;' + (submitted ? 'opacity:0.6;' : '') + '">'
+                + '<div class="card-header" style="padding:8px 12px;">'
+                + '<h3 style="font-size:14px;margin:0;">' + a.title
+                + (asgnFloor ? ' <span style="font-size:12px;color:var(--gray);font-weight:400;">📍 ' + asgnFloor + '</span>' : '')
+                + ' <span style="background:' + afBg + ';color:' + afCl + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + afIc + ' ' + (empFreqCap[af] || af) + '</span>'
+                + '</h3>'
+                + (submitted ? '<span class="badge badge-success" style="font-size:10px;">✓ ' + T('empd2_cl_submitted') + '</span>' : '')
+                + '</div>'
+                + '<div style="max-height:250px;overflow-y:auto;padding:4px 12px;">';
+
+            items.forEach(function(it) {
+                var st = (window._empClAsgnState[a.id] && window._empClAsgnState[a.id][it.itemId]) || { status: 'pending', value: '', remarks: '' };
+                var sel = st.status || 'pending';
+                var val = st.value || '';
+                var rem = st.remarks || '';
+                var sc = empStatusColors[sel] || '#e9ecef';
+                var sbg = empStatusBgs[sel] || 'var(--bg)';
+                var opts = ['ok','fault','report','na'].map(function(s) { return '<option value="' + s + '" ' + (sel === s ? 'selected' : '') + '>' + s.toUpperCase() + '</option>'; }).join('');
+                html += '<div class="empClItem" data-status="' + sel + '" data-item-id="' + it.itemId + '" data-key="' + a.id + '" style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;background:' + sbg + ';font-size:13px;flex-wrap:wrap;">'
+                    + '<span style="display:inline-block;min-width:70px;text-align:center;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;color:white;background:' + sc + ';flex-shrink:0;">' + (sel !== 'pending' ? sel.toUpperCase() : 'PENDING') + '</span>'
+                    + '<span style="flex:1;min-width:120px;">' + it.label + '</span>'
+                    + (it.unit ? '<input type="number" step="any" value="' + val + '" ' + (submitted ? 'disabled' : '') + ' onchange="window._empClAsgnState[\'' + a.id + '\'][\'' + it.itemId + '\'].value=this.value" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;text-align:right;" placeholder="0">' : '')
+                    + (it.unit ? '<span style="font-size:11px;font-weight:600;color:var(--gray);background:var(--card);padding:2px 7px;border-radius:4px;border:1px solid var(--border);flex-shrink:0;">' + it.unit + '</span>' : '')
+                    + '<select ' + (submitted ? 'disabled' : '') + ' onchange="window._empClAsgnState[\'' + a.id + '\'][\'' + it.itemId + '\'].status=this.value;_renderEmpChecklists(window._empChecklists||[])" style="width:auto;padding:3px 4px;border:1px solid var(--border);border-radius:4px;font-size:12px;flex-shrink:0;">' + opts + '</select>'
+                    + '</div>';
+            });
+
+            html += '</div>'
+                + (!submitted ? '<div style="padding:8px 12px;display:flex;gap:6px;flex-wrap:wrap;">'
+                    + '<button class="btn btn-sm btn-success" onclick="empSubmitDeptAsgn(\'' + a.id + '\')" style="font-size:11px;padding:3px 8px;">📤 ' + T('empd2_cl_submit') + '</button>'
+                    + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'departmental-checklist\')" style="font-size:11px;padding:3px 8px;">' + T('empd2_cl_open') + '</button>'
+                    + '</div>' : '')
+                + '</div>';
+        });
+
+        html += '</div>';
+    }
+
+    /* ─── Render old DB checklists ─── */
+    if (filtered.length > 0) {
+        var freqBg   = { daily:'#e3f2fd', weekly:'#f3e5f5', monthly:'#e8f5e9' };
+        var freqClr  = { daily:'#1565c0', weekly:'#6a1b9a', monthly:'#2e7d32' };
+        var freqIcon = { daily:'🔄', weekly:'📅', monthly:'🗓️' };
+        filtered.forEach(function(cl) {
+            var freq  = cl.frequency || 'daily';
+            var total = cl.items ? cl.items.length : 0;
+            var done  = cl.items ? cl.items.filter(function(i){ return i.status && i.status !== 'pending'; }).length : 0;
+            var pct   = total > 0 ? Math.round((done / total) * 100) : 0;
+            var isDue = cl.deadline && _isToday(cl.deadline);
+            var bg    = freqBg[freq]  || '#e3f2fd';
+            var clr   = freqClr[freq] || '#1565c0';
+            var icon  = freqIcon[freq]|| '🔄';
+            var freqCap = { daily: T('empd2_freq_daily_cap'), weekly: T('empd2_freq_weekly_cap'), monthly: T('empd2_freq_monthly_cap') }[freq] || (freq.charAt(0).toUpperCase() + freq.slice(1));
+            var periodLabel = _clPeriodLabel(freq);
+            var timeLeft    = _clTimeUntil(_clNextReset(freq));
+            var submitted   = !!cl.periodSubmitted;
+
+            html += '<div class="work-item' + (isDue ? ' urgent' : '') + '" style="flex-direction:column;align-items:stretch;gap:8px;border-left:4px solid ' + clr + ';">'
+                + '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">'
+                + '<div>'
+                + '<div style="font-size:14px;font-weight:600;">' + (cl.title || '') + (cl.floor ? ' <span style="font-size:11px;color:var(--gray);">· ' + cl.floor + '</span>' : '') + '</div>'
+                + '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:4px;">'
+                + '<span style="background:' + bg + ';color:' + clr + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + icon + ' ' + freqCap + '</span>'
+                + '<span style="font-size:11px;color:var(--gray);">' + periodLabel + '</span>'
+                + '<span style="font-size:11px;color:var(--gray);">' + T('empd2_cl_resets_in') + ' ' + timeLeft + '</span>'
+                + (submitted ? '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + T('empd2_cl_submitted') + '</span>' : '')
+                + '</div>'
+                + '</div>'
+                + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+                + '<span class="badge ' + (cl.status === 'completed' ? 'badge-success' : 'badge-info') + '" style="font-size:11px;">' + (cl.status || 'active') + '</span>'
+                + (!submitted ? '<button class="btn btn-sm btn-success" onclick="empSubmitClPeriod(\'' + cl.id + '\')" style="font-size:11px;padding:3px 8px;">' + T('empd2_cl_submit') + '</button>' : '')
+                + '<button class="btn btn-sm btn-outline" onclick="Router.navigate(\'checklists\')" style="font-size:11px;padding:3px 8px;">' + T('empd2_cl_open') + '</button>'
+                + '</div></div>'
+                + '<div style="display:flex;align-items:center;gap:8px;">'
+                + '<div style="flex:1;height:8px;background:var(--light-gray);border-radius:4px;"><div style="height:100%;width:' + pct + '%;background:' + (pct === 100 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)') + ';border-radius:4px;transition:width .3s;"></div></div>'
+                + '<span style="font-size:12px;color:var(--gray);min-width:55px;">' + done + '/' + total + ' ' + T('empd2_done_word') + '</span>'
+                + '</div>'
+                + (cl.deadline ? '<div style="font-size:11px;color:' + (isDue ? 'var(--warning)' : 'var(--gray)') + ';">' + T('empd2_cl_deadline') + APP.formatDate(cl.deadline) + '</div>' : '')
+                + '</div>';
+        });
+    }
+
     el.innerHTML = html;
+    try {
+        el.querySelectorAll('.empClItem[data-status="report"]').forEach(function(el2) {
+            var itemId = el2.dataset.itemId;
+            var key = el2.dataset.key;
+            if (!itemId || !key) return;
+            var existing = el2.querySelector('.empClProblemDesc');
+            if (existing) { existing.remove(); }
+            var div = document.createElement('div');
+            div.className = 'empClProblemDesc';
+            div.style.cssText = 'width:100%;margin-top:6px;padding:8px;background:#fff3e0;border:1px solid #ffcc02;border-radius:6px;';
+            div.innerHTML = '<div style="font-size:11px;font-weight:600;color:#e65100;margin-bottom:4px;">\u26a0\ufe0f Problem Description</div>'
+                + '<textarea rows="2" placeholder="Describe the problem in detail..." style="width:100%;padding:8px;border:1px solid #ffb300;border-radius:4px;font-size:13px;resize:vertical;background:#fff;color:#333;">'
+                + ((window._empClAsgnState[key] && window._empClAsgnState[key][itemId] && window._empClAsgnState[key][itemId].remarks) || '')
+                + '</textarea>';
+            var ta = div.querySelector('textarea');
+            ta.oninput = function() {
+                if (window._empClAsgnState[key] && window._empClAsgnState[key][itemId]) {
+                    window._empClAsgnState[key][itemId].remarks = this.value;
+                }
+            };
+            el2.appendChild(div);
+        });
+        var reportCount = el.querySelectorAll('.empClItem[data-status="report"]').length;
+        if (reportCount > 0) {
+            var dbg = document.getElementById('empClListNew');
+            if (dbg) dbg.insertAdjacentHTML('afterbegin', '<div style="background:red;color:white;padding:4px 8px;font-size:12px;border-radius:4px;margin-bottom:4px;">DEBUG: ' + reportCount + ' REPORT items, textareas added</div>');
+        }
+    } catch(e) {
+        if (el) el.insertAdjacentHTML('afterbegin', '<div style="background:red;color:white;padding:4px;font-size:11px;">DEBUG ERROR: ' + e.message + '</div>');
+    }
+}
+
+function empSubmitDeptAsgn(assignmentId) {
+    if (!window.CHECKLISTS) return;
+    var user = AUTH.currentUser();
+    var today = new Date().toISOString().slice(0, 10);
+    var startResult = CHECKLISTS.startAssignmentEntry(user, assignmentId, today);
+    if (!startResult.success) { APP.notify(startResult.message, 'error'); return; }
+    var entry = startResult.entry;
+    var state = (window._empClAsgnState && window._empClAsgnState[assignmentId]) || {};
+    entry.items.forEach(function(it) {
+        if (entry.results[it.itemId] !== undefined) {
+            var s = state[it.itemId] || {};
+            entry.results[it.itemId].status = s.status || 'pending';
+            entry.results[it.itemId].value = s.value || '';
+            entry.results[it.itemId].remarks = s.remarks || '';
+        }
+    });
+    var submitResult = CHECKLISTS.submitAssignmentEntry(user, entry);
+    if (!submitResult.success) { APP.notify(submitResult.message, 'error'); return; }
+    APP.notify(T('dchk_assigned_ok'), 'success');
+    _renderEmpChecklists(window._empChecklists || []);
 }
 
 function empSubmitClPeriod(id) {
@@ -775,6 +1028,214 @@ function empSubmitClPeriod(id) {
 }
 
 /* ══════════════════════════════════════════
+   TODO TAB (daily + future tasks)
+══════════════════════════════════════════ */
+var _empTodoReminderTimers = [];
+
+function loadEmpTodos(user) {
+    return (DB.get('employeeTodos') || []).filter(function(t){ return t.createdBy === user.username; });
+}
+
+function empAddTodo() {
+    var inp = document.getElementById('empTodoInput');
+    if (!inp) return;
+    var title = inp.value.trim();
+    if (!title) { APP.notify('Enter a task', 'error'); return; }
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var today = new Date().toISOString().slice(0,10);
+    DB.add('employeeTodos', {
+        title: title,
+        description: '',
+        date: today,
+        dueDate: today,
+        priority: 'medium',
+        status: 'pending',
+        category: 'daily',
+        reminder: false,
+        reminderMinutes: 0,
+        createdBy: user.username,
+        createdByName: user.fullName,
+        completedAt: null,
+        sortOrder: Date.now()
+    });
+    inp.value = '';
+    APP.notify('TODO added ✓', 'success');
+    renderEmpTodoTab(document.getElementById('empTabContent'));
+}
+
+function empToggleTodo(id) {
+    var todo = DB.getById('employeeTodos', id);
+    if (!todo) return;
+    var newStatus = todo.status === 'completed' ? 'pending' : 'completed';
+    var updates = { status: newStatus };
+    if (newStatus === 'completed') updates.completedAt = new Date().toISOString();
+    else updates.completedAt = null;
+    DB.update('employeeTodos', id, updates);
+    APP.notify(newStatus === 'completed' ? 'Marked done ✓' : 'Reopened', newStatus === 'completed' ? 'success' : 'info');
+    renderEmpTodoTab(document.getElementById('empTabContent'));
+}
+
+function empDeleteTodo(id) {
+    if (!confirm('Delete this TODO?')) return;
+    DB.delete('employeeTodos', id);
+    APP.notify('Deleted', 'info');
+    renderEmpTodoTab(document.getElementById('empTabContent'));
+}
+
+function empSaveFutureTodo() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var title = (document.getElementById('empFutureTodoTitle')||{}).value || '';
+    var desc  = (document.getElementById('empFutureTodoDesc')||{}).value || '';
+    var date  = (document.getElementById('empFutureTodoDate')||{}).value || '';
+    var priority = (document.getElementById('empFutureTodoPriority')||{}).value || 'medium';
+    var reminder = (document.getElementById('empFutureTodoReminder')||{}).checked || false;
+    var reminderMin = parseInt((document.getElementById('empFutureTodoReminderMin')||{}).value) || 30;
+    if (!title.trim()) { APP.notify('Enter a title', 'error'); return; }
+    if (!date) { APP.notify('Select a due date', 'error'); return; }
+    DB.add('employeeTodos', {
+        title: title.trim(),
+        description: desc.trim(),
+        date: date,
+        dueDate: date,
+        priority: priority,
+        status: 'pending',
+        category: 'future',
+        reminder: reminder,
+        reminderMinutes: reminderMin,
+        createdBy: user.username,
+        createdByName: user.fullName,
+        completedAt: null,
+        sortOrder: Date.now()
+    });
+    APP.notify('Future TODO saved ✓', 'success');
+    renderEmpTodoTab(document.getElementById('empTabContent'));
+}
+
+function empCheckTodoReminders(todos, user) {
+    var now = new Date();
+    var today = now.toISOString().slice(0,10);
+    todos.forEach(function(t) {
+        if (t.status === 'completed') return;
+        if (t.reminder && t.date === today) {
+            var due = new Date(t.dueDate + 'T' + (t.dueTime || '17:00'));
+            var diffMs = due - now;
+            if (diffMs > 0 && diffMs < t.reminderMinutes * 60 * 1000) {
+                if (typeof HMS_REM !== 'undefined' && HMS_REM.requestPermission()) {
+                    HMS_REM.schedule('TODO Reminder', '"' + t.title + '" is due soon!', diffMs);
+                }
+            }
+        }
+    });
+}
+
+function renderEmpTodoTab(el) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var todos = loadEmpTodos(user);
+    var today = new Date().toISOString().slice(0,10);
+
+    // Split into daily (today) and future
+    var dailyTodos = todos.filter(function(t){ return t.category === 'daily' || t.date === today; });
+    var futureTodos = todos.filter(function(t){ return t.category === 'future' && t.date !== today; });
+    var pendingDaily = dailyTodos.filter(function(t){ return t.status !== 'completed'; });
+    var completedDaily = dailyTodos.filter(function(t){ return t.status === 'completed'; });
+    var pendingFuture = futureTodos.filter(function(t){ return t.status !== 'completed'; });
+
+    // Check reminders
+    empCheckTodoReminders(todos, user);
+
+    function todoItem(t, isFuture) {
+        var priColor = { low:'var(--secondary)', medium:'#e65100', high:'var(--danger)' }[t.priority] || 'var(--gray)';
+        var checked = t.status === 'completed' ? 'checked' : '';
+        var opacity = t.status === 'completed' ? 'opacity:0.6;' : '';
+        var dueLabel = isFuture ? '<span style="font-size:10px;color:var(--gray);margin-left:6px;">📅 ' + APP.formatDate(t.date) + '</span>' : '';
+        var remLabel = t.reminder ? '<span style="font-size:10px;color:var(--primary);margin-left:4px;">🔔 ' + t.reminderMinutes + 'min</span>' : '';
+        var descHtml = t.description ? '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + t.description.substring(0,80) + '</div>' : '';
+        return '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;' + opacity + '">'
+            + '<input type="checkbox" ' + checked + ' onchange="empToggleTodo(\'' + t.id + '\')" style="margin-top:3px;cursor:pointer;">'
+            + '<div style="flex:1;min-width:0;">'
+            + '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">'
+            + '<span style="font-size:13px;font-weight:' + (t.status==='completed'?'400':'600') + ';' + (t.status==='completed'?'text-decoration:line-through;':'') + '">' + t.title + '</span>'
+            + '<span style="width:8px;height:8px;border-radius:50%;background:' + priColor + ';display:inline-block;"></span>'
+            + dueLabel + remLabel
+            + '</div>' + descHtml
+            + '</div>'
+            + '<button class="btn btn-sm" style="background:transparent;color:var(--danger);padding:2px 6px;font-size:14px;" onclick="empDeleteTodo(\'' + t.id + '\')" title="' + T('empd2_todo_delete_title') + '">✕</button>'
+            + '</div>';
+    }
+
+    var html = '';
+
+    // ── Daily TODO section ──
+    html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
+        + '<div style="font-weight:700;font-size:15px;">' + T('empd2_todo_title_today', {n: pendingDaily.length}) + '</div>'
+        + '<span style="font-size:11px;color:var(--gray);">' + new Date().toLocaleDateString('en-IN', {weekday:'long',day:'numeric',month:'long'}) + '</span>'
+        + '</div>'
+        // Quick add
+        + '<div style="display:flex;gap:6px;margin-bottom:12px;">'
+        + '<input type="text" id="empTodoInput" placeholder="' + T('empd2_todo_add_placeholder') + '" style="flex:1;padding:8px 12px;border:2px solid var(--border);border-radius:8px;font-size:13px;outline:none;" onkeydown="if(event.key===\'Enter\')empAddTodo()">'
+        + '<button class="btn btn-sm btn-primary" onclick="empAddTodo()" style="padding:8px 16px;">' + T('empd2_todo_btn_add') + '</button>'
+        + '</div>';
+
+    if (pendingDaily.length === 0 && completedDaily.length === 0) {
+        html += '<div style="color:var(--gray);font-size:13px;text-align:center;padding:20px;">' + T('empd2_todo_empty_today') + '</div>';
+    } else {
+        pendingDaily.forEach(function(t){ html += todoItem(t, false); });
+        if (completedDaily.length > 0) {
+            html += '<div style="margin-top:10px;font-size:11px;color:var(--gray);cursor:pointer;" onclick="var n=this.nextElementSibling;n.style.display=n.style.display===\'none\'?\'block\':\'none\'">' + T('empd2_todo_completed_count', {n: completedDaily.length}) + '</div>'
+                + '<div style="display:none;margin-top:4px;">';
+            completedDaily.forEach(function(t){ html += todoItem(t, false); });
+            html += '</div>';
+        }
+    }
+    html += '</div>';
+
+    // ── Future TODO section ──
+    html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">'
+        + '<div style="font-weight:700;font-size:15px;margin-bottom:12px;">' + T('empd2_todo_title_future', {n: pendingFuture.length}) + '</div>'
+        // Add form
+        + '<div style="background:var(--light-gray);border-radius:8px;padding:12px;margin-bottom:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+        + '<input type="text" id="empFutureTodoTitle" placeholder="' + T('empd2_todo_future_title_placeholder') + '" style="grid-column:1/-1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none;">'
+        + '<textarea id="empFutureTodoDesc" placeholder="' + T('empd2_todo_future_desc_placeholder') + '" style="grid-column:1/-1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none;resize:vertical;min-height:50px;"></textarea>'
+        + '<div><label style="font-size:11px;color:var(--gray);display:block;margin-bottom:2px;">' + T('empd2_todo_future_due_label') + '</label><input type="date" id="empFutureTodoDate" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;"></div>'
+        + '<div><label style="font-size:11px;color:var(--gray);display:block;margin-bottom:2px;">' + T('empd2_todo_future_priority_label') + '</label><select id="empFutureTodoPriority" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">'
+        + '<option value="low">' + T('empd2_todo_future_priority_low') + '</option><option value="medium" selected>' + T('empd2_todo_future_priority_medium') + '</option><option value="high">' + T('empd2_todo_future_priority_high') + '</option></select></div>'
+        + '<div style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="empFutureTodoReminder" style="cursor:pointer;"> <label for="empFutureTodoReminder" style="font-size:12px;cursor:pointer;">' + T('empd2_todo_future_reminder') + '</label></div>'
+        + '<div><select id="empFutureTodoReminderMin" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">'
+        + '<option value="15">' + T('empd2_todo_future_reminder_15') + '</option><option value="30" selected>' + T('empd2_todo_future_reminder_30') + '</option><option value="60">' + T('empd2_todo_future_reminder_60') + '</option><option value="1440">' + T('empd2_todo_future_reminder_1440') + '</option></select></div>'
+        + '<button class="btn btn-sm btn-primary" onclick="empSaveFutureTodo()" style="grid-column:1/-1;padding:8px;">' + T('empd2_todo_btn_add_future') + '</button>'
+        + '</div>';
+
+    if (pendingFuture.length === 0) {
+        html += '<div style="color:var(--gray);font-size:13px;text-align:center;padding:16px;">' + T('empd2_todo_empty_future') + '</div>';
+    } else {
+        // Group by date
+        var dateGroups = {};
+        pendingFuture.concat(futureTodos.filter(function(t){ return t.status === 'completed'; })).forEach(function(t){
+            var g = t.date || 'unscheduled';
+            if (!dateGroups[g]) dateGroups[g] = { label: g, items: [] };
+            dateGroups[g].items.push(t);
+        });
+        var sortedDates = Object.keys(dateGroups).sort();
+        sortedDates.forEach(function(d) {
+            if (d === 'unscheduled') return;
+            var grp = dateGroups[d];
+            var grpDone = grp.items.filter(function(t){ return t.status === 'completed'; }).length;
+            html += '<div style="margin-bottom:8px;"><div style="font-size:12px;font-weight:600;color:var(--gray);margin-bottom:4px;">📅 ' + APP.formatDate(d) + ' (' + grpDone + '/' + grp.items.length + ')</div>';
+            grp.items.forEach(function(t){ html += todoItem(t, true); });
+            html += '</div>';
+        });
+    }
+    html += '</div>';
+
+    el.innerHTML = html;
+    document.getElementById('empFutureTodoDate').valueAsDate = new Date(new Date().getTime() + 86400000);
+}
+
+/* ══════════════════════════════════════════
    REPORTS TAB (reports + problems)
 ══════════════════════════════════════════ */
 function renderEmpReportsTab(el) {
@@ -792,6 +1253,9 @@ function renderEmpReportsTab(el) {
     var clDone   = cls.filter(function(c){ return c.status==='completed'; }).length;
     var clRate   = cls.length > 0 ? Math.round(clDone/cls.length*100) : 0;
     var reqPend  = reqs.filter(function(r){ return r.status==='pending'||r.status==='hod_approved'; }).length;
+    var myTodos  = (DB.get('employeeTodos')||[]).filter(function(t){ return t.createdBy===d.user.username; });
+    var todoDone = myTodos.filter(function(t){ return t.status==='completed'; }).length;
+    var todoPend = myTodos.length - todoDone;
 
     function _sBox(val, lbl, color) {
         return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;min-width:90px;">'
@@ -799,28 +1263,34 @@ function renderEmpReportsTab(el) {
             + '<div style="font-size:10px;color:var(--gray);margin-top:2px;">' + lbl + '</div></div>';
     }
 
-    var html = '<div style="background:linear-gradient(135deg,#6a1b9a 0%,#4a148c 100%);border-radius:12px;padding:16px 20px;color:#fff;margin-bottom:16px;">'
+    var html = '';
+
+    // ── Comprehensive Report Actions ──
+    html += '<div style="background:linear-gradient(135deg,#1a237e 0%,#283593 100%);border-radius:12px;padding:16px 20px;color:#fff;margin-bottom:16px;">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">'
-        + '<div><div style="font-size:16px;font-weight:700;">📊 My Work Summary</div>'
+        + '<div><div style="font-size:16px;font-weight:700;">📊 ' + T('empd2_rep_comprehensive') + '</div>'
         + '<div style="font-size:12px;opacity:0.8;margin-top:2px;">' + d.user.fullName + ' &nbsp;·&nbsp; ' + (d.dept||'No Dept') + ' &nbsp;·&nbsp; ' + new Date().toLocaleDateString('en-IN') + '</div></div>'
-        + '<button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.4);" onclick="showReportForm()">+ Submit Report</button>'
-        + '</div>'
-        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">'
-        + _sBox(tDone,     'Tasks Done',    '#a5d6a7')
-        + _sBox(tPend,     'Pending',       '#fff176')
-        + _sBox(tOverdue,  'Overdue',       '#ef9a9a')
-        + _sBox(pOpen,     'Open Issues',   '#ef9a9a')
-        + _sBox(pRes,      'Issues Fixed',  '#a5d6a7')
-        + _sBox(clRate+'%','Checklist',     '#80cbc4')
-        + _sBox(reqs.length,'Requests',     '#b39ddb')
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm" style="background:#fff;color:#1a237e;padding:6px 12px;font-weight:600;" onclick="showReportForm()">' + T('empd2_rep_send_hod') + '</button>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:6px 12px;" onclick="empDownloadFullReport()">' + T('empd2_rep_excel') + '</button>'
+        + '</div></div>'
+        // Stats row
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:6px;margin-top:12px;">'
+        + _sBox(tDone+'/'+tasks.length,  T('empd2_rep_tasks'),         '#a5d6a7')
+        + _sBox(tOverdue,                T('empd2_rep_overdue'),       '#ef9a9a')
+        + _sBox(pOpen,                   T('empd2_rep_issues'),        '#ef9a9a')
+        + _sBox(clRate+'%',              T('empd2_rep_checklist'),     '#80cbc4')
+        + _sBox(reqs.length,             T('empd2_rep_requests'),      '#b39ddb')
+        + _sBox(todoPend,                T('empd2_rep_todo_pending'),  '#fff176')
+        + _sBox(todoDone,                T('empd2_rep_todo_done'),     '#a5d6a7')
         + '</div></div>';
 
     // Problems section
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
-        + '<div style="font-weight:700;font-size:15px;">🔧 My Problems (' + probs.length + ')</div>'
-        + '<button class="btn btn-sm btn-primary" onclick="Router.navigate(\'problems\')">+ Report Problem</button></div>';
+        + '<div style="font-weight:700;font-size:15px;">🔧 ' + T('empd2_rep_my_problems', {n: probs.length}) + '</div>'
+        + '<button class="btn btn-sm btn-primary" onclick="Router.navigate(\'problems\')">' + T('empd2_btn_report_problem') + '</button></div>';
     if (probs.length === 0) {
-        html += '<div style="color:var(--gray);font-size:13px;margin-bottom:16px;">No problems reported</div>';
+        html += '<div style="color:var(--gray);font-size:13px;margin-bottom:16px;">' + T('empd2_rep_no_problems') + '</div>';
     } else {
         probs.slice().reverse().slice(0,5).forEach(function(p) {
             html += '<div class="work-item">'
@@ -835,10 +1305,10 @@ function renderEmpReportsTab(el) {
     // Reports section
     html += '<div style="border-top:1px solid var(--border);padding-top:16px;">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
-        + '<div style="font-weight:700;font-size:15px;">📋 My Reports (' + d.myReports.length + ')</div>'
-        + '<button class="btn btn-sm btn-primary" onclick="showReportForm()">+ New Report</button></div>';
+        + '<div style="font-weight:700;font-size:15px;">📋 ' + T('empd2_rep_my_reports', {n: d.myReports.length}) + '</div>'
+        + '<button class="btn btn-sm btn-primary" onclick="showReportForm()">' + T('empd2_btn_new_report') + '</button></div>';
     if (d.myReports.length === 0) {
-        html += '<div style="color:var(--gray);font-size:13px;">No reports submitted yet. Click "+ New Report" to send a detailed work summary to your HOD/Admin.</div>';
+        html += '<div style="color:var(--gray);font-size:13px;">' + T('empd2_rep_no_reports') + '</div>';
     } else {
         d.myReports.slice().reverse().forEach(function(r) {
             html += '<div class="work-item" style="flex-wrap:wrap;gap:6px;">'
@@ -878,24 +1348,24 @@ function renderEmpPerformanceTab(el) {
         return '<div class="q-progress-track" style="height:20px;"><div class="q-progress-fill" style="width:' + pct + '%;background:' + color + ';display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;">' + (pct > 10 ? pct + '%' : '') + '</div></div>';
     }
 
-    var html = '<div style="font-weight:700;font-size:16px;margin-bottom:16px;">📊 My Performance — ' + q.name + '</div>'
+    var html = '<div style="font-weight:700;font-size:16px;margin-bottom:16px;">📊 ' + T('empd2_perf_my_performance') + ' — ' + q.name + '</div>'
 
         + '<div class="grid-2" style="gap:20px;margin-bottom:24px;">'
-        + _perfCard('Task Completion', tasksDone, d.myTasks.length, taskRate, 'var(--success)')
-        + _perfCard('Problem Resolution', probsSolved, d.myProblems.length, probRate, 'var(--info)')
-        + _perfCard('Request Approval Rate', reqApproved, d.myRequests.length, reqRate, 'var(--warning)')
-        + _perfCard('Checklist Compliance', clDone, d.myChecklists.length, clRate, 'var(--primary)')
+        + _perfCard(T('empd2_perf_task_completion'), tasksDone, d.myTasks.length, taskRate, 'var(--success)')
+        + _perfCard(T('empd2_perf_problem_resolution'), probsSolved, d.myProblems.length, probRate, 'var(--info)')
+        + _perfCard(T('empd2_perf_request_approval'), reqApproved, d.myRequests.length, reqRate, 'var(--warning)')
+        + _perfCard(T('empd2_perf_checklist_compliance'), clDone, d.myChecklists.length, clRate, 'var(--primary)')
         + '</div>'
 
         + '<div style="background:var(--light-gray);border-radius:10px;padding:16px;">'
-        + '<div style="font-weight:600;font-size:14px;margin-bottom:10px;">Q Summary Metrics</div>'
+        + '<div style="font-weight:600;font-size:14px;margin-bottom:10px;">' + T('empd2_perf_q_summary') + '</div>'
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">'
-        + _summaryNum(d.myTasks.length, 'Total Tasks')
-        + _summaryNum(tasksDone, 'Completed')
-        + _summaryNum(d.myTasks.filter(function(t){return t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='completed';}).length, 'Overdue', 'var(--danger)')
-        + _summaryNum(d.myChecklists.length, 'Checklists')
-        + _summaryNum(d.myProblems.length, 'Issues Raised')
-        + _summaryNum(d.myRequests.length, 'Requests Sent')
+        + _summaryNum(d.myTasks.length, T('empd2_perf_total_tasks'))
+        + _summaryNum(tasksDone, T('empd2_perf_completed'))
+        + _summaryNum(d.myTasks.filter(function(t){return t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='completed';}).length, T('empd2_perf_overdue'), 'var(--danger)')
+        + _summaryNum(d.myChecklists.length, T('empd2_perf_checklists'))
+        + _summaryNum(d.myProblems.length, T('empd2_perf_issues_raised'))
+        + _summaryNum(d.myRequests.length, T('empd2_perf_requests_sent'))
         + '</div></div>';
 
     el.innerHTML = html;
@@ -906,7 +1376,7 @@ function _perfCard(label, done, total, pct, color) {
         + '<div style="font-size:13px;font-weight:600;margin-bottom:10px;">' + label + '</div>'
         + '<div class="q-progress-track" style="height:20px;margin-bottom:6px;"><div class="q-progress-fill" style="width:' + pct + '%;background:' + color + ';display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;">' + (pct > 10 ? pct + '%' : '') + '</div></div>'
         + '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray);">'
-        + '<span>' + done + ' done</span><span>' + total + ' total</span></div></div>';
+        + '<span>' + done + ' ' + T('empd2_done_word') + '</span><span>' + total + ' ' + T('empd2_total_word') + '</span></div></div>';
 }
 
 function _summaryNum(val, label, color) {
@@ -931,13 +1401,13 @@ function renderEmpCleaningSection(el) {
     if (pending.length > 0) {
         html += '<div style="background:#fff3e0;border:2px solid var(--warning);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">'
             + '<span style="font-size:28px;">🧹</span>'
-            + '<div><div style="font-weight:700;font-size:15px;color:#e65100;">' + pending.length + ' Room' + (pending.length>1?'s':'') + ' Need Cleaning</div>'
-            + '<div style="font-size:13px;color:var(--gray);">Discharged patients\' rooms waiting to be cleaned.</div></div></div>';
+            + '<div><div style="font-weight:700;font-size:15px;color:#e65100;">' + T('empd2_clean_rooms_need').replace('{n}', pending.length) + '</div>'
+            + '<div style="font-size:13px;color:var(--gray);">' + T('empd2_clean_discharged_sub') + '</div></div></div>';
     } else {
         html += '<div style="background:#e8f5e9;border:2px solid var(--secondary);border-radius:10px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">'
             + '<span style="font-size:28px;">✅</span>'
-            + '<div><div style="font-weight:700;font-size:15px;color:var(--secondary);">All Rooms Clean</div>'
-            + '<div style="font-size:13px;color:var(--gray);">No pending cleaning tasks right now.</div></div></div>';
+            + '<div><div style="font-weight:700;font-size:15px;color:var(--secondary);">' + T('empd2_clean_all_clean') + '</div>'
+            + '<div style="font-size:13px;color:var(--gray);">' + T('empd2_clean_none_sub') + '</div></div></div>';
     }
 
     if (pending.length > 0) {
@@ -948,28 +1418,28 @@ function renderEmpCleaningSection(el) {
             var border  = since >= 1 ? 'var(--danger)' : 'var(--warning)';
             html += '<div style="background:' + urgency + ';border:2px solid ' + border + ';border-radius:10px;padding:14px;">'
                 + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
-                + '<span style="font-size:22px;font-weight:700;">Room ' + t.roomNo + '</span>'
+                + '<span style="font-size:22px;font-weight:700;">' + T('empd2_clean_room') + ' ' + t.roomNo + '</span>'
                 + '<span class="badge ' + (t.status==='in-progress'?'badge-info':'badge-warning') + '">' + t.status + '</span></div>'
                 + '<div style="font-size:12px;color:var(--gray);margin-bottom:6px;">'
-                + (t.floor?'Floor '+t.floor+' | ':'') + (t.category||'') + (t.bedId?' | Bed '+t.bedId:'')
+                + (t.floor?T('empd2_clean_floor')+' '+t.floor+' | ':'') + (t.category||'') + (t.bedId?' | '+T('empd2_clean_bed')+' '+t.bedId:'')
                 + '</div>'
                 + '<div style="font-size:13px;margin-bottom:4px;">👤 <strong>' + t.patientName + '</strong></div>'
                 + '<div style="font-size:12px;color:var(--gray);margin-bottom:8px;">'
-                + 'Discharged: ' + (t.dischargedAt ? new Date(t.dischargedAt).toLocaleDateString('en-IN') : '—')
-                + (since > 0 ? ' &nbsp;·&nbsp; <span style="color:var(--danger);font-weight:600;">' + since + 'd ago</span>' : ' &nbsp;·&nbsp; Today')
+                + T('empd2_clean_discharged') + (t.dischargedAt ? new Date(t.dischargedAt).toLocaleDateString('en-IN') : '—')
+                + (since > 0 ? ' &nbsp;·&nbsp; <span style="color:var(--danger);font-weight:600;">' + since + T('empd2_clean_d_ago') + '</span>' : ' &nbsp;·&nbsp; ' + T('empd2_clean_today'))
                 + '</div>'
                 + (t.assignedTo ? '<div style="font-size:12px;margin-bottom:6px;">👷 ' + t.assignedTo + '</div>' : '')
                 + '<div style="display:flex;gap:6px;">'
-                + (t.status==='pending' ? '<button class="btn btn-sm btn-warning" style="color:#fff;" onclick="empStartCleaning(\'' + t.id + '\')">▶ Start</button>' : '')
-                + '<button class="btn btn-sm btn-success" onclick="empCompleteCleaning(\'' + t.id + '\')">✅ Mark Clean</button>'
+                + (t.status==='pending' ? '<button class="btn btn-sm btn-warning" style="color:#fff;" onclick="empStartCleaning(\'' + t.id + '\')">' + T('empd2_clean_start') + '</button>' : '')
+                + '<button class="btn btn-sm btn-success" onclick="empCompleteCleaning(\'' + t.id + '\')">' + T('empd2_clean_mark') + '</button>'
                 + '</div></div>';
         });
         html += '</div>';
     }
 
     if (myDone.length > 0) {
-        html += '<div style="font-weight:600;font-size:14px;color:var(--gray);margin-bottom:8px;">✅ Cleaned by You</div>'
-            + '<div class="table-responsive"><table><thead><tr><th>Room</th><th>Patient</th><th>Completed At</th></tr></thead><tbody>';
+        html += '<div style="font-weight:600;font-size:14px;color:var(--gray);margin-bottom:8px;">' + T('empd2_clean_by_you') + '</div>'
+            + '<div class="table-responsive"><table><thead><tr><th>' + T('empd2_clean_room') + '</th><th>' + T('empd2_clean_th_patient') + '</th><th>' + T('empd2_clean_th_completed') + '</th></tr></thead><tbody>';
         myDone.slice().reverse().slice(0,10).forEach(function(t) {
             html += '<tr><td><strong>' + t.roomNo + '</strong></td><td>' + t.patientName + '</td>'
                 + '<td>' + (t.completedAt ? APP.formatDateTime(t.completedAt) : '—') + '</td></tr>';
@@ -977,7 +1447,7 @@ function renderEmpCleaningSection(el) {
         html += '</tbody></table></div>';
     }
 
-    el.innerHTML = html || '<div class="empty-state">No cleaning tasks</div>';
+    el.innerHTML = html || '<div class="empty-state">' + T('empd2_clean_no_tasks') + '</div>';
 }
 
 function empStartCleaning(taskId) {
@@ -1022,6 +1492,7 @@ function _genEmpWorkSummary() {
     var probs  = d.myProblems || [];
     var reqs   = d.myRequests || [];
     var cls    = d.myChecklists || [];
+    var todos  = (DB.get('employeeTodos') || []).filter(function(t){ return t.createdBy === d.user.username; });
 
     var tDone  = tasks.filter(function(t){ return t.status==='completed'; });
     var tProg  = tasks.filter(function(t){ return t.status==='in-progress'; });
@@ -1031,6 +1502,8 @@ function _genEmpWorkSummary() {
     var pRes   = probs.filter(function(p){ return p.status==='resolved'; });
     var clDone = cls.filter(function(c){ return c.status==='completed'; });
     var clRate = cls.length > 0 ? Math.round(clDone.length/cls.length*100) : 0;
+    var todoDone = todos.filter(function(t){ return t.status==='completed'; });
+    var todoPend = todos.filter(function(t){ return t.status!=='completed'; });
 
     var lines = [];
     lines.push('WORK SUMMARY REPORT');
@@ -1083,6 +1556,25 @@ function _genEmpWorkSummary() {
         lines.push('  None');
     }
 
+    lines.push('');
+    lines.push('── TODO ──');
+    lines.push('Total: ' + todos.length + ' | Done: ' + todoDone.length + ' | Pending: ' + todoPend.length);
+    if (todoPend.length > 0) {
+        lines.push('');
+        lines.push('Pending Items:');
+        todoPend.forEach(function(t, i){
+            lines.push('  ' + (i+1) + '. ' + t.title + (t.date === new Date().toISOString().slice(0,10) ? ' (Today)' : ' (Due: ' + APP.formatDate(t.date) + ')'));
+        });
+    }
+    if (todoDone.length > 0) {
+        lines.push('');
+        lines.push('Completed:');
+        todoDone.slice(0,5).forEach(function(t, i){
+            lines.push('  ' + (i+1) + '. ' + t.title + (t.completedAt ? ' ✓' : ''));
+        });
+        if (todoDone.length > 5) lines.push('  ... and ' + (todoDone.length-5) + ' more completed');
+    }
+
     return lines.join('\n');
 }
 
@@ -1120,6 +1612,9 @@ function saveReport() {
         data._probsTotal   = (d.myProblems||[]).length;
         data._reqsTotal    = (d.myRequests||[]).length;
         data._clRate       = d.myChecklists&&d.myChecklists.length>0 ? Math.round(d.myChecklists.filter(function(c){ return c.status==='completed'; }).length/d.myChecklists.length*100) : 0;
+        var _myTodos = (DB.get('employeeTodos')||[]).filter(function(t){ return t.createdBy===d.user.username; });
+        data._todoDone    = _myTodos.filter(function(t){ return t.status==='completed'; }).length;
+        data._todoTotal   = _myTodos.length;
     }
     DB.add('reports', data);
     APP.notify('Report submitted! Share it using 💬 ✉️ 📊 buttons in My Reports.', 'success');
@@ -1211,11 +1706,92 @@ function empExportReportExcel(id) {
         });
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(reqRows), 'Material Requests');
 
+        // Sheet 5: TODO
+        var myTodos = (DB.get('employeeTodos')||[]).filter(function(t){ return t.createdBy===d.user.username; });
+        var todoRows = [['Title','Date','Priority','Status','Completed At']];
+        myTodos.forEach(function(t){
+            todoRows.push([t.title||'', t.date||'', t.priority||'', t.status||'', t.completedAt ? APP.formatDate(t.completedAt) : '']);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(todoRows), 'TODO');
+
         var fname = ((r.title||'Work_Report').replace(/[^a-z0-9]/gi,'_')) + '.xlsx';
         XLSX.writeFile(wb, fname);
         APP.notify('Excel downloaded: ' + fname, 'success');
     } catch(e) {
         APP.notify('Excel export failed: ' + e.message, 'error');
+    }
+}
+
+function empDownloadFullReport() {
+    var d = _empData;
+    if (!d || !d.user) { APP.notify('View your dashboard first', 'error'); return; }
+    try {
+        var wb = XLSX.utils.book_new();
+        var user = d.user;
+        var today = new Date().toISOString().slice(0,10);
+        var nowLabel = new Date().toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'});
+
+        // Sheet 1: Cover / Summary
+        var cover = [
+            ['COMPREHENSIVE WORK REPORT'],
+            [''],
+            ['Employee', user.fullName],
+            ['Department', d.dept||'—'],
+            ['Username', user.username],
+            ['Report Date', nowLabel],
+            [''],
+            ['── OVERVIEW ──'],
+            [''],
+        ];
+        var tDone = d.myTasks.filter(function(t){ return t.status==='completed'; }).length;
+        var tTot  = d.myTasks.length;
+        var tOver = d.myTasks.filter(function(t){ return t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='completed'; }).length;
+        var pOpen = d.myProblems.filter(function(p){ return p.status!=='resolved'; }).length;
+        var pRes  = d.myProblems.filter(function(p){ return p.status==='resolved'; }).length;
+        var pTot  = d.myProblems.length;
+        var clDone= d.myChecklists.filter(function(c){ return c.status==='completed'; }).length;
+        var clTot = d.myChecklists.length;
+        var clRate= clTot>0?Math.round(clDone/clTot*100):0;
+        var myTodos = (DB.get('employeeTodos')||[]).filter(function(t){ return t.createdBy===user.username; });
+        var tdDone = myTodos.filter(function(t){ return t.status==='completed'; }).length;
+        var tdPend = myTodos.length - tdDone;
+        cover.push(['Tasks: Completed', tDone, 'Total', tTot, 'Overdue', tOver]);
+        cover.push(['Problems: Resolved', pRes, 'Open', pOpen, 'Total', pTot]);
+        cover.push(['Checklists: Done', clDone, 'Total', clTot, 'Rate', clRate+'%']);
+        cover.push(['TODO: Done', tdDone, 'Pending', tdPend, 'Total', myTodos.length]);
+        cover.push(['Material Requests:', d.myRequests.length]);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cover), 'Summary');
+
+        // Sheet 2: Tasks
+        var tRows = [['Title','Status','Priority','Deadline','Department']];
+        d.myTasks.forEach(function(t){ tRows.push([t.title||'', t.status||'', t.priority||'', t.deadline||'', t.department||'']); });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tRows), 'Tasks');
+
+        // Sheet 3: Problems
+        var pRows = [['Title','Category','Status','Created At']];
+        d.myProblems.forEach(function(p){ pRows.push([p.title||'', p.category||'', p.status||'', p.createdAt?APP.formatDate(p.createdAt):'']); });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pRows), 'Problems');
+
+        // Sheet 4: Checklists
+        var cRows = [['Title','Assigned To','Status','Frequency']];
+        d.myChecklists.forEach(function(c){ cRows.push([c.title||'', c.assignedTo||'', c.status||'', c.frequency||'']); });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cRows), 'Checklists');
+
+        // Sheet 5: TODO
+        var todoRows = [['Title','Date','Priority','Status','Completed At']];
+        myTodos.forEach(function(t){ todoRows.push([t.title||'', t.date||'', t.priority||'', t.status||'', t.completedAt?APP.formatDate(t.completedAt):'']); });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(todoRows), 'TODO');
+
+        // Sheet 6: Material Requests
+        var reqRows = [['Title','Status','Created At']];
+        d.myRequests.forEach(function(r){ reqRows.push([r.title||'', r.status||'', r.createdAt?APP.formatDate(r.createdAt):'']); });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(reqRows), 'Material Requests');
+
+        var fname = 'Work_Report_' + user.username + '_' + today + '.xlsx';
+        XLSX.writeFile(wb, fname);
+        APP.notify('Full report downloaded: ' + fname, 'success');
+    } catch(e) {
+        APP.notify('Export failed: ' + e.message, 'error');
     }
 }
 
@@ -1232,6 +1808,102 @@ function empConfirmMatReq(id, partial) {
     });
     APP.notify(partial ? 'Marked as partially received' : 'Request confirmed and closed!', 'success');
     Router.navigate('employee-dashboard');
+}
+
+function empShowMatReqForm() {
+    var user = AUTH.currentUser();
+    var dept = (user ? user.department : '') || '';
+    var deptLow = dept.trim().toLowerCase();
+    var inventory = DB.get('inventory') || [];
+    var deptInv = inventory.filter(function(i) { return (i.department || '').trim().toLowerCase() === deptLow; });
+    var itemOpts = '';
+    for (var i = 0; i < deptInv.length; i++) {
+        var inv = deptInv[i];
+        itemOpts += '<option value="' + inv.name.replace(/"/g, '&quot;') + '" data-unit="' + (inv.unit || 'pcs') + '">' + inv.name + '</option>';
+    }
+    var deptField = '<input type="text" name="department" class="form-control" value="' + (dept || '').replace(/"/g, '&quot;') + '" readonly style="background:var(--light-gray);">';
+    var html = '<form id="empMatReqForm" style="min-width:420px;">'
+        + '<div class="form-group"><label>' + T('mreqmod_label_request_title') + '</label><input type="text" name="title" class="form-control" required></div>'
+        + '<div class="form-group"><label>' + T('mreqmod_label_department') + '</label>' + deptField + '</div>'
+        + '<div class="form-group"><label>' + T('mreqmod_label_reason_justification') + '</label><textarea name="reason" class="form-control" rows="2"></textarea></div>'
+        + '<div class="form-group"><div class="flex-between"><label style="font-weight:600;">' + T('mreqmod_label_items') + '</label><button type="button" class="btn btn-sm btn-primary" onclick="empMatReqAddItem()">+ ' + T('mreqmod_btn_add') + '</button></div>'
+        + '<div id="empMatReqItems"><div class="mat-item-row" style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">'
+        + '<select class="mat-item-select form-control" style="flex:1;font-size:12px;padding:3px 6px;" onchange="empMatReqAutoUnit(this)">' + itemOpts + '</select>'
+        + '<input type="number" class="mat-item-qty form-control" style="width:70px;font-size:12px;padding:3px 6px;" placeholder="' + T('mreqmod_placeholder_qty') + '" value="1" min="1">'
+        + '<input type="text" class="mat-item-unit form-control" style="width:70px;font-size:12px;padding:3px 6px;" readonly>'
+        + '</div></div></div>'
+        + '</form>';
+    openFormModal(T('empd2_btn_new_request'), html, 'empSaveMatReq()', true);
+    setTimeout(function() {
+        var sel = document.querySelector('.mat-item-select');
+        if (sel) empMatReqAutoUnit(sel);
+    }, 50);
+}
+
+function empSaveMatReq() {
+    var form = document.getElementById('empMatReqForm');
+    if (!form) return;
+    var title = form.querySelector('[name="title"]')?.value?.trim();
+    var department = form.querySelector('[name="department"]')?.value || '';
+    var reason = form.querySelector('[name="reason"]')?.value?.trim() || '';
+    if (!title) { APP.notify(T('mreqmod_msg_enter_request_title'), 'error'); return; }
+    var items = [];
+    var rows = form.querySelectorAll('.mat-item-row');
+    for (var i = 0; i < rows.length; i++) {
+        var name = (rows[i].querySelector('.mat-item-select') || {}).value || '';
+        var qty = parseInt((rows[i].querySelector('.mat-item-qty') || {}).value) || 1;
+        var unit = (rows[i].querySelector('.mat-item-unit') || {}).value || 'pcs';
+        if (name) items.push({ name: name, qty: qty, unit: unit });
+    }
+    if (!items.length) { APP.notify(T('mreqmod_msg_add_one_item'), 'error'); return; }
+    var user = AUTH.currentUser();
+    DB.add('material_requests', {
+        title: title,
+        department: department || (user ? user.department : '') || '',
+        reason: reason,
+        items: items,
+        status: 'pending',
+        _source: 'employee',
+        createdBy: user ? user.username : '',
+        createdByName: user ? user.fullName : ''
+    });
+    APP.notify(T('mreqmod_msg_submitted_waiting_hod'), 'success');
+    closeModal();
+    Router.navigate('employee-dashboard');
+}
+
+function empMatReqAddItem() {
+    var container = document.getElementById('empMatReqItems');
+    if (!container) return;
+    var user = AUTH.currentUser();
+    var dept = (user ? user.department : '') || '';
+    var deptLow = dept.trim().toLowerCase();
+    var inventory = DB.get('inventory') || [];
+    var deptInv = inventory.filter(function(i) { return (i.department || '').trim().toLowerCase() === deptLow; });
+    var itemOpts = '';
+    for (var i = 0; i < deptInv.length; i++) {
+        var inv = deptInv[i];
+        itemOpts += '<option value="' + inv.name.replace(/"/g, '&quot;') + '" data-unit="' + (inv.unit || 'pcs') + '">' + inv.name + '</option>';
+    }
+    var row = document.createElement('div');
+    row.className = 'mat-item-row';
+    row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center;';
+    row.innerHTML = '<select class="mat-item-select form-control" style="flex:1;font-size:12px;padding:3px 6px;" onchange="empMatReqAutoUnit(this)">' + itemOpts + '</select>'
+        + '<input type="number" class="mat-item-qty form-control" style="width:70px;font-size:12px;padding:3px 6px;" placeholder="' + T('mreqmod_placeholder_qty') + '" value="1" min="1">'
+        + '<input type="text" class="mat-item-unit form-control" style="width:70px;font-size:12px;padding:3px 6px;" readonly>'
+        + '<button type="button" class="btn btn-sm btn-danger" onclick="this.parentElement.remove()" style="padding:2px 6px;font-size:11px;">✕</button>';
+    container.appendChild(row);
+}
+
+function empMatReqAutoUnit(sel) {
+    if (!sel) return;
+    var row = sel.closest('.mat-item-row');
+    if (!row) return;
+    var unitInput = row.querySelector('.mat-item-unit');
+    if (unitInput) {
+        var opt = sel.options[sel.selectedIndex];
+        unitInput.value = opt ? (opt.getAttribute('data-unit') || 'pcs') : 'pcs';
+    }
 }
 
 function empMarkProbInProgress(id) {

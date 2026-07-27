@@ -153,6 +153,9 @@ function adminAddToTeam(dept) {
     // Pre-fill showUserForm with the dept locked
     var depts = DB.get('departments') || [];
     var roles = ['employee', 'hod', 'storekeeper', 'ambulance_employee'];
+    // Load department's inherited features
+    var deptObj = depts.find(function(d) { return d.name === dept; });
+    var deptFeatures = deptObj && Array.isArray(deptObj.features) ? deptObj.features : [];
     var deptField = '<input type="hidden" name="department" value="' + dept + '">'
         + '<div style="background:#e3f2fd;border-radius:6px;padding:8px 12px;font-size:12px;color:#1565c0;margin-top:4px;">'
         + T('usrmod_adding_to_prefix') + '<strong>' + dept + '</strong></div>';
@@ -171,7 +174,7 @@ function adminAddToTeam(dept) {
         + '</div>'
         + deptField
         + '<div class="form-group" style="margin-top:10px;"><label>' + T('usrmod_label_permissions') + '</label>'
-        + '<div class="permission-grid" id="permissionsGrid">' + renderPermissionCheckboxes([], []) + '</div></div>'
+        + '<div class="permission-grid" id="permissionsGrid">' + renderPermissionCheckboxes(deptFeatures, []) + '</div></div>'
         + '</form>';
     openFormModal(T('usrmod_modal_add_member_prefix') + dept, form, 'saveUser()', true);
 }
@@ -308,7 +311,7 @@ function showUserForm(user) {
                     <span class="badge badge-success">${T('usrmod_badge_extra')}</span>${T('usrmod_permissions_extra_desc')}
                 </div>
                 <div class="permission-grid" id="permissionsGrid">
-                    ${renderPermissionCheckboxes(deptFeatures, userPerms)}
+                    ${renderPermissionCheckboxes(deptFeatures, userPerms, !!user)}
                 </div>
             </div>
         </form>
@@ -317,7 +320,7 @@ function showUserForm(user) {
     openFormModal(isEdit ? T('usrmod_modal_edit_user') : T('usrmod_modal_add_user'), form, `saveUser()`, true);
 }
 
-function renderPermissionCheckboxes(deptFeatures, userPerms) {
+function renderPermissionCheckboxes(deptFeatures, userPerms, isEdit) {
     const allFeatures = [
         'dashboard', 'users', 'departments', 'inventory', 'gate-security',
         'projects', 'ambulance', 'problems', 'tasks', 'complaints',
@@ -331,8 +334,10 @@ function renderPermissionCheckboxes(deptFeatures, userPerms) {
         const fromDept = inheritedSet.has(f);
         const checkedByUser = userSet.has(f);
         const checked = fromDept || checkedByUser;
-        return `<label class="permission-item" style="${fromDept ? 'background:#e8f0fe;border:1px solid #c2d7f8;' : 'background:var(--bg);'}">
-            <input type="checkbox" name="permissions" value="${f}" ${checked ? 'checked' : ''}>
+        // Inherited features are disabled (read-only) only when EDITING an existing user
+        var disabledAttr = fromDept && isEdit ? 'disabled' : '';
+        return `<label class="permission-item" style="${fromDept ? 'background:#e8f0fe;border:1px solid #c2d7f8;' + (isEdit ? 'opacity:0.85;' : '') : 'background:var(--bg);'}">
+            <input type="checkbox" name="permissions" value="${f}" ${checked ? 'checked' : ''} ${disabledAttr}>
             <span>${f.replace('-', ' ')}</span>
             ${fromDept ? '<span style="font-size:10px;color:var(--primary);margin-left:auto;">' + T('usrmod_badge_dept_tag') + '</span>' : ''}
         </label>`;
@@ -350,16 +355,17 @@ function onDeptChange(select) {
     if (!grid) return;
 
     const form = document.getElementById('userForm');
+    const isEdit = !!(form?.querySelector('[name="id"]')?.value);
     const currentPerms = Array.from(form.querySelectorAll('[name="permissions"]:checked')).map(cb => cb.value);
 
-    grid.innerHTML = renderPermissionCheckboxes(deptFeatures, currentPerms);
+    grid.innerHTML = renderPermissionCheckboxes(deptFeatures, currentPerms, isEdit);
 }
 
 function onRoleChange(select) {
     const role = select.value;
     const grid = document.getElementById('permissionsGrid');
     if (!grid) return;
-    const allCbs = document.querySelectorAll('[name="permissions"]');
+    const allCbs = grid.querySelectorAll('[name="permissions"]');
     const rolePerms = {
         hod: ['dashboard','employee-dashboard','material-requests','suggestions','tasks','checklists','complaints','problems'],
         employee: ['employee-dashboard','material-requests','suggestions'],
@@ -368,10 +374,10 @@ function onRoleChange(select) {
     };
     const perms = rolePerms[role];
     if (perms) {
-        allCbs.forEach(cb => cb.checked = perms.indexOf(cb.value) > -1);
-    }
-    if (!rolePerms[role]) {
-        allCbs.forEach(cb => cb.checked = false);
+        // ADD role defaults on top of existing selection, never uncheck user's choices
+        allCbs.forEach(function(cb) {
+            if (perms.indexOf(cb.value) !== -1) cb.checked = true;
+        });
     }
 }
 
@@ -381,7 +387,8 @@ function saveUser() {
     form.querySelectorAll('[name]').forEach(el => {
         if (el.name !== 'permissions') data[el.name] = el.value;
     });
-    data.permissions = Array.from(form.querySelectorAll('[name="permissions"]:checked')).map(cb => cb.value);
+    // Only save non-disabled checkboxes (disabled = inherited from dept, not user-specific)
+    data.permissions = Array.from(form.querySelectorAll('[name="permissions"]:checked:not([disabled])')).map(cb => cb.value);
 
     if (!data.fullName || !data.username) {
         APP.notify(T('usrmod_msg_username_fullname_required'), 'error'); return false;

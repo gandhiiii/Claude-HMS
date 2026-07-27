@@ -379,7 +379,7 @@ const AUTH = {
         // Storekeeper auto-gets inventory and material-requests access
         if (user.role === 'storekeeper' && ['inventory','material-requests','problems'].indexOf(permission) !== -1) return true;
         // HOD auto-gets admissions, checklists, material-requests so they can manage their dept
-        if (user.role === 'hod' && ['admissions','checklists','material-requests','problems','tasks'].indexOf(permission) !== -1) return true;
+        if (user.role === 'hod' && ['admissions','checklists','departmental-checklist','material-requests','problems','tasks','department-meetings'].indexOf(permission) !== -1) return true;
         return user.permissions && user.permissions.includes(permission);
     },
     canAccess(permission) {
@@ -848,11 +848,15 @@ const APP = {
             if (!Array.isArray(DB.get('quarterly_priorities'))) {
                 DB.set('quarterly_priorities', []);
             }
+            if (!Array.isArray(DB.get('departmentMeetings'))) {
+                DB.set('departmentMeetings', []);
+            }
             if (!Array.isArray(existingRights) || existingRights.length === 0) {
                 const defaultRights = ['dashboard','users','departments','inventory','gate-security',
                     'projects','ambulance','problems','tasks','complaints',
                     'room-checklist','admissions','lost-found','checklists','admin-checklists',
-                    'material-requests','suggestions','reports','employee-dashboard'];
+                    'material-requests','suggestions','reports','employee-dashboard',
+                    'departmental-checklist','department-meetings'];
                 DB.set('featureRights', defaultRights);
             }
             const floors = DB.get('floorItems');

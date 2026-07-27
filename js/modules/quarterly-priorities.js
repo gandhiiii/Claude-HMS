@@ -27,9 +27,9 @@ function _qpCurQ() {
     return m < 3 ? 'Q1' : m < 6 ? 'Q2' : m < 9 ? 'Q3' : 'Q4';
 }
 function _qpPriBadge(p) {
-    return p === 'high' ? '<span class="qp-badge-h">High</span>'
-         : p === 'low'  ? '<span class="qp-badge-l">Low</span>'
-         : '<span class="qp-badge-m">Medium</span>';
+    return p === 'high' ? '<span class="qp-badge-h">' + T('qpmod_pri_high') + '</span>'
+         : p === 'low'  ? '<span class="qp-badge-l">' + T('qpmod_pri_low') + '</span>'
+         : '<span class="qp-badge-m">' + T('qpmod_pri_medium') + '</span>';
 }
 function _qpColor(pct) { return pct >= 80 ? '#34a853' : pct >= 50 ? '#fbbc04' : '#ea4335'; }
 function _qpBar(pct) {

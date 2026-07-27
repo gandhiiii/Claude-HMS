@@ -122,6 +122,13 @@ function renderClList() {
                                 ${CL_STATUSES.map(s => `<option value="${s}" ${item.status === s ? 'selected' : ''}>${s.toUpperCase()}</option>`).join('')}
                             </select>
                         ` : ''}
+                        ${st === 'problem' && canFill ? `
+                            <div style="width:100%;margin-top:6px;padding:8px;background:#fff3e0;border:1px solid #ffcc02;border-radius:6px;">
+                                <div style="font-size:11px;font-weight:600;color:#e65100;margin-bottom:4px;">⚠️ Problem Description</div>
+                                <textarea id="clProbDesc_${c.id}_${idx}" rows="2" placeholder="Describe the problem in detail..." style="width:100%;padding:8px;border:1px solid #ffb300;border-radius:4px;font-size:13px;resize:vertical;background:#fff;color:#333;box-sizing:border-box;">${item.remarks || ''}</textarea>
+                                <button class="btn btn-sm btn-warning" style="margin-top:6px;" onclick="submitClProblem('${c.id}',${idx})">📤 Submit Problem Report</button>
+                            </div>
+                        ` : ''}
                     </div>`;
                 }).join('')}
             </div>
@@ -339,9 +346,27 @@ function updateClItemStatus(id, idx, value) {
         cl.completedAt = new Date().toISOString();
     }
     DB.update('checklists', id, { items: cl.items, status: cl.status, completedAt: cl.completedAt });
-    // Auto-create a problem ticket when item is flagged as "problem"
-    if (value === 'problem') _autoCreateProblemFromCl(id, idx);
     APP.notify(T('chkmod_msg_item_set_to_prefix') + value.toUpperCase(), 'success');
+    renderClList();
+}
+
+function updateClItemRemarks(id, idx, value) {
+    const cl = DB.getById('checklists', id);
+    if (!cl || !cl.items[idx]) return;
+    cl.items[idx].remarks = value;
+    cl.items[idx].updatedAt = new Date().toISOString();
+}
+
+function submitClProblem(clId, idx) {
+    const cl = DB.getById('checklists', clId);
+    if (!cl || !cl.items[idx]) return;
+    const item = cl.items[idx];
+    const ta = document.getElementById('clProbDesc_' + clId + '_' + idx);
+    const descText = ta ? ta.value.trim() : '';
+    item.remarks = descText;
+    item.updatedAt = new Date().toISOString();
+    DB.update('checklists', clId, { items: cl.items });
+    _autoCreateProblemFromCl(clId, idx);
     renderClList();
 }
 
@@ -364,6 +389,7 @@ function _autoCreateProblemFromCl(clId, idx) {
     const desc = 'Problem flagged in checklist "' + cl.title + '"'
         + '\nItem: ' + item.task
         + (item.value !== undefined && item.value !== '' ? '\nReading: ' + item.value + (item.unit ? ' ' + item.unit : '') : '')
+        + (item.remarks ? '\nDescription: ' + item.remarks : '')
         + '\nFlagged by: ' + (user ? user.fullName : 'Unknown')
         + '\nFloor/Area: ' + (cl.floor || 'N/A');
     DB.add('problems', {

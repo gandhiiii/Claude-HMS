@@ -123,7 +123,13 @@
 
         // ── On load: redirect if already logged in, else pull from Firebase ──
         (function () {
-            try { if (AUTH.currentUser()) { window.location.replace('dashboard.html'); return; } } catch(e){}
+            try {
+                // A password-reset link must take priority over the "already logged in" redirect —
+                // otherwise a logged-in user clicking a reset link is bounced to the dashboard and
+                // can never reach the reset form.
+                var hasResetToken = new URLSearchParams(window.location.search).has('reset');
+                if (!hasResetToken && AUTH.currentUser()) { window.location.replace('dashboard.html'); return; }
+            } catch(e){}
 
             var localUsers = [];
             try { localUsers = DB.get('users') || []; } catch(e){}
@@ -240,7 +246,9 @@
                     existing[idx].password = pass;
                     existing[idx].fullName = name || existing[idx].fullName;
                     DB.set('users', existing);
-                } else {
+                } else if (existing.length === 0) {
+                    // No accounts exist anywhere yet — this is genuinely the very first
+                    // setup on this system, so it's safe to bootstrap the first super-admin.
                     var admin = {
                         id: 'admin_' + Date.now(), username: uname, password: pass,
                         fullName: name, email: '', phone: '',
@@ -250,6 +258,13 @@
                     };
                     existing.push(admin);
                     DB.set('users', existing);
+                } else {
+                    // Accounts already exist (locally or in the cloud) but none match this
+                    // username. Do NOT silently mint a new super-admin here — the most likely
+                    // causes are a typo, or this device hasn't finished pulling the cloud
+                    // account list yet. Fail safely instead of creating a duplicate/rogue admin.
+                    errEl.textContent = 'No matching account found for "' + uname + '". Double-check the username and password, or wait a moment for cloud sync to finish and try again.';
+                    return;
                 }
                 var result = AUTH.login(uname, pass);
                 if (result.success) { window.location.replace('dashboard.html'); }

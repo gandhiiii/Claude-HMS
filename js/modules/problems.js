@@ -121,6 +121,7 @@ function renderProbList() {
             + '<button class="btn btn-sm btn-primary" onclick="viewProb(\'' + p.id + '\')">' + T('probmod_btn_view') + '</button>'
             + (canAssign ? ' <button class="btn btn-sm btn-warning" onclick="showAssignProbForm(\'' + p.id + '\')">' + T('probmod_btn_assign') + '</button>' : '')
             + (canResolve ? ' <button class="btn btn-sm btn-success" onclick="resolveProb(\'' + p.id + '\')">' + T('probmod_btn_solve') + '</button>' : '')
+            + (isAdmin ? ' <button class="btn btn-sm btn-danger" onclick="deleteProb(\'' + p.id + '\',\'' + (p.title||'').replace(/'/g,"\\'") + '\')">' + T('probmod_btn_delete') + '</button>' : '')
             + '</td></tr>';
     }).join('');
 }
@@ -375,5 +376,20 @@ function resolveProbDirect(id) {
     APP.notify(T('probmod_msg_problem_resolved'), 'success');
     var modal = document.querySelector('.modal.active');
     if (modal) modal.remove();
+    renderProbList();
+}
+
+function deleteProb(id, title) {
+    if (!confirm('Delete problem "' + (title || id) + '"? This cannot be undone.')) return;
+    var p = DB.getById('problems', id);
+    if (p && p.source === 'checklist' && p.checklistId && p.itemIdx !== undefined) {
+        var cl = DB.getById('checklists', p.checklistId);
+        if (cl && cl.items && cl.items[p.itemIdx]) {
+            cl.items[p.itemIdx].status = 'pending';
+            DB.update('checklists', cl.id, { items: cl.items });
+        }
+    }
+    DB.delete('problems', id);
+    APP.notify(T('probmod_msg_problem_deleted'), 'success');
     renderProbList();
 }

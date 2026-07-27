@@ -186,6 +186,7 @@ function renderHodDashboard(container) {
         { id: 'tasks',       label: 'Tasks', badge: _hodData.overdueTasks.length, bc: 'badge-danger' },
         { id: 'team',        label: '👥 My Team', badge: team.length, bc: 'badge-success' },
         { id: 'checklists',  label: 'Checklists', badge: pendingCl, bc: 'badge-info' },
+        { id: 'dept-checklist', label: '📋 Dept Checklists' },
         { id: 'requests',    label: '🔧 Problems & Requests', badge: pendingReq + openProblems, bc: 'badge-danger' },
         { id: 'performance', label: 'Performance' },
         { id: 'hodreports',  label: '📤 Reports', badge: teamReports.length, bc: 'badge-danger' },
@@ -266,7 +267,8 @@ function _renderHodTab(tab) {
     if (!el) return;
     var map = { overview: _hodOverview, admissions: _hodAdmissions, tasks: _hodTasks,
                 team: _hodTeam, checklists: _hodChecklists, requests: _hodRequests,
-                performance: _hodPerformance, hodreports: _hodReports, hodqp: _hodQP };
+                performance: _hodPerformance, hodreports: _hodReports, hodqp: _hodQP,
+                'dept-checklist': _hodDeptChecklists };
     if (map[tab]) map[tab](el);
 }
 
@@ -1497,6 +1499,7 @@ function _hodReports(el) {
                 + '<div style="display:flex;flex-direction:column;gap:4px;">'
                 + '<button class="btn btn-sm" style="background:#25D366;color:#fff;padding:4px 8px;white-space:nowrap;" onclick="hodShareReport(\'' + r.id + '\',\'whatsapp\')">💬 WA</button>'
                 + '<button class="btn btn-sm" style="background:#1a73e8;color:#fff;padding:4px 8px;white-space:nowrap;" onclick="hodShareReport(\'' + r.id + '\',\'email\')">✉️ Email</button>'
+                + '<button class="btn btn-sm" style="background:#1e7e34;color:#fff;padding:4px 8px;white-space:nowrap;" onclick="hodExportEmployeeReport(\'' + (r.createdByName||r.createdBy||'').replace(/'/g,"\\'") + '\')">📊 Excel</button>'
                 + '</div></div></div>';
         });
     }
@@ -1551,6 +1554,17 @@ function _hodReports(el) {
         +'<button class="btn btn-sm" style="flex:1;background:#25D366;color:#fff;" onclick="hodShareSummary(\'whatsapp\')">💬 WhatsApp</button>'
         +'<button class="btn btn-sm" style="flex:1;background:#1a73e8;color:#fff;" onclick="hodShareSummary(\'email\')">✉️ Email</button>'
         +'</div></div></div>'
+        // Per-employee report download
+        +'<div class="card" style="padding:18px;border-top:3px solid #e65100;">'
+        +'<div style="font-size:15px;font-weight:700;margin-bottom:4px;">👤 Employee Report</div>'
+        +'<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Download detailed report for a team member</div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        +'<select id="hodEmpReportSelect" style="flex:1;min-width:140px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">'
+        +'<option value="">— Select employee —</option>'
+        + (d.team||[]).map(function(m){ return '<option value="' + m.fullName.replace(/"/g,'&quot;') + '">' + m.fullName + '</option>'; }).join('')
+        +'</select>'
+        +'<button class="btn btn-sm" style="background:#1e7e34;color:#fff;" onclick="var s=document.getElementById(\'hodEmpReportSelect\');if(s.value)hodExportEmployeeReport(s.value);else APP.notify(\'Select an employee\',\'error\')">📥 Download</button>'
+        +'</div></div>'
         +'</div>';
 
     // send to admin form with auto-generated summary
@@ -1739,6 +1753,77 @@ function _hodPdfExport(title, headers, rows) {
     doc.autoTable({ head:[headers], body:rows, startY:27, styles:{fontSize:8}, headStyles:{fillColor:[106,27,154]} });
     doc.save(title.replace(/[^a-z0-9]/gi,'_')+'.pdf');
     APP.notify('PDF downloaded', 'success');
+}
+
+function hodExportEmployeeReport(employeeName) {
+    var d = _hodData;
+    if (!d || !d.user) { APP.notify('Data not loaded', 'error'); return; }
+    var allUsers = DB.get('users') || [];
+    var emp = allUsers.find(function(u){ return u.fullName === employeeName; });
+    if (!emp) { APP.notify('Employee not found', 'error'); return; }
+    try {
+        var wb = XLSX.utils.book_new();
+        var today = new Date().toISOString().slice(0,10);
+        var nowLabel = new Date().toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'});
+
+        // Employee's data
+        var empTasks = (d.allDeptTasks||[]).filter(function(t){ return t.assignedTo === emp.fullName; });
+        var empReports = (d.teamReports||[]).filter(function(r){ return r.createdBy === emp.username || r.createdByName === emp.fullName; });
+        var empProbs = (d.routedProblems||[]).filter(function(p){ return p.createdBy === emp.username || p.createdBy === emp.fullName; });
+        var empCl = (d.myCl||[]).filter(function(c){ return c.assignedTo === emp.fullName; });
+        var empTodos = (DB.get('employeeTodos')||[]).filter(function(t){ return t.createdBy === emp.username; });
+
+        // Sheet 1: Cover
+        var cover = [
+            ['EMPLOYEE REPORT — ' + employeeName],
+            [''],
+            ['Employee', employeeName],
+            ['Department', d.dept||'—'],
+            ['Report Date', nowLabel],
+            [''],
+            ['── OVERVIEW ──'],
+            ['Tasks: ' + empTasks.length + ' total, ' + empTasks.filter(function(t){return t.status==='completed';}).length + ' done, ' + empTasks.filter(function(t){return t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='completed';}).length + ' overdue'],
+            ['Problems: ' + empProbs.length + ' total'],
+            ['Checklists: ' + empCl.length + ' total'],
+            ['TODO: ' + empTodos.length + ' total, ' + empTodos.filter(function(t){return t.status==='completed';}).length + ' done'],
+            ['Reports Submitted: ' + empReports.length],
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cover), 'Summary');
+
+        // Sheet 2: Tasks
+        var tRows = [['Title','Priority','Status','Deadline','Source']];
+        empTasks.forEach(function(t){
+            tRows.push([t.title||'', t.priority||'', t.status||'', t.deadline||'', t._source||'']);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tRows), 'Tasks');
+
+        // Sheet 3: Problems
+        var pRows = [['Title','Category','Status','Created At']];
+        empProbs.forEach(function(p){
+            pRows.push([p.title||'', p.category||'', p.status||'', p.createdAt?APP.formatDate(p.createdAt):'']);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pRows), 'Problems');
+
+        // Sheet 4: TODO
+        var todoRows = [['Title','Date','Priority','Status','Completed At']];
+        empTodos.forEach(function(t){
+            todoRows.push([t.title||'', t.date||'', t.priority||'', t.status||'', t.completedAt?APP.formatDate(t.completedAt):'']);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(todoRows), 'TODO');
+
+        // Sheet 5: Reports
+        var repRows = [['Title','Category','Sent To','Date']];
+        empReports.forEach(function(r){
+            repRows.push([r.title||'', r.category||'', r.sentTo||'', r.createdAt?APP.formatDate(r.createdAt):'']);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(repRows), 'Reports');
+
+        var fname = employeeName.replace(/[^a-z0-9]/gi,'_') + '_Report.xlsx';
+        XLSX.writeFile(wb, fname);
+        APP.notify('Employee report downloaded: ' + fname, 'success');
+    } catch(e) {
+        APP.notify('Export failed: ' + e.message, 'error');
+    }
 }
 
 /* ── Share helpers ── */
@@ -1969,4 +2054,378 @@ function hodSaveReturn() {
     }).slice().reverse();
     _renderHodTab('requests');
     return true;
+}
+
+/* ═══════════════════════════════════════════════
+   DEPT CHECKLISTS TAB (uses CHECKLISTS API)
+═══════════════════════════════════════════════ */
+var _hodDchkSubTab = 'templates';
+
+function _hodDeptChecklists(el) {
+    var user = AUTH.currentUser();
+    if (!user || !user.department) {
+        el.innerHTML = '<div style="padding:20px;color:var(--gray);">No department assigned.</div>';
+        return;
+    }
+    var dept = user.department;
+    var templates = (typeof CHECKLISTS !== 'undefined' ? CHECKLISTS.listTemplates(user) : [])
+        .filter(function(t){ return t.department === dept; });
+    var units = typeof CHECKLISTS !== 'undefined' ? CHECKLISTS.listHospitalUnits() : [];
+    var floors = typeof CHECKLISTS !== 'undefined' ? CHECKLISTS.listFloors() : [];
+    var assignments = typeof CHECKLISTS !== 'undefined' ? CHECKLISTS.listAssignments(user, { activeOnly: true }) : [];
+    var team = _hodData && _hodData.team ? _hodData.team : [];
+
+    var html = ''
+        + '<div style="font-weight:700;font-size:16px;margin-bottom:4px;">📋 Departmental Checklists — ' + dept + '</div>'
+        + '<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">' + templates.length + ' template(s) · ' + assignments.length + ' active assignment(s)</div>'
+        // Sub-tabs
+        + '<div style="display:flex;gap:4px;margin-bottom:14px;">'
+        + '<button class="tab-btn' + (_hodDchkSubTab==='templates'?' active':'') + '" onclick="hodDchkSubSwitch(\'templates\',this)">Templates</button>'
+        + '<button class="tab-btn' + (_hodDchkSubTab==='assign'?' active':'') + '" onclick="hodDchkSubSwitch(\'assign\',this)">Assign</button>'
+        + '<button class="tab-btn' + (_hodDchkSubTab==='oversight'?' active':'') + '" onclick="hodDchkSubSwitch(\'oversight\',this)">Oversight</button>'
+        + '</div>'
+        + '<div id="hodDchkSubContent">';
+
+    el.innerHTML = html + '</div>';
+    _hodDchkRenderSub(user, dept, templates, units, floors, assignments, team);
+}
+
+function hodDchkSubSwitch(tab, btn) {
+    _hodDchkSubTab = tab;
+    document.querySelectorAll('#hodTabContent .tab-btn').forEach(function(b){ b.classList.remove('active'); });
+    if (btn) btn.classList.add('active');
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = user.department;
+    var templates = (typeof CHECKLISTS !== 'undefined' ? CHECKLISTS.listTemplates(user) : []).filter(function(t){ return t.department === dept; });
+    var units = typeof CHECKLISTS !== 'undefined' ? CHECKLISTS.listHospitalUnits() : [];
+    var floors = typeof CHECKLISTS !== 'undefined' ? CHECKLISTS.listFloors() : [];
+    var assignments = typeof CHECKLISTS !== 'undefined' ? CHECKLISTS.listAssignments(user, { activeOnly: true }) : [];
+    var team = _hodData && _hodData.team ? _hodData.team : [];
+    _hodDchkRenderSub(user, dept, templates, units, floors, assignments, team);
+}
+
+function _hodDchkRenderSub(user, dept, templates, units, floors, assignments, team) {
+    var subEl = document.getElementById('hodDchkSubContent');
+    if (!subEl) return;
+    if (_hodDchkSubTab === 'templates') _hodDchkTemplates(subEl, user, dept, templates, units, floors);
+    else if (_hodDchkSubTab === 'assign') _hodDchkAssign(subEl, user, dept, templates, assignments, team);
+    else if (_hodDchkSubTab === 'oversight') _hodDchkOversight(subEl, user, dept, assignments, team);
+}
+
+/* ── TEMPLATES SUB-TAB ── */
+function _hodDchkTemplates(el, user, dept, templates, units, floors) {
+    var html = '<div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:600;font-size:14px;">Checklist Templates</div>'
+        + '<button class="btn btn-sm btn-primary" onclick="hodDchkNewTemplate()">+ New Template</button>'
+        + '</div>';
+
+    if (templates.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:24px;text-align:center;font-size:13px;color:var(--gray);">No templates yet. Click "+ New Template" to create one.</div>';
+        el.innerHTML = html;
+        return;
+    }
+
+    templates.forEach(function(tpl){
+        var items = tpl.items || [];
+        var fixedItems = items.filter(function(i){ return i.type === 'fixed'; });
+        var customItems = items.filter(function(i){ return i.type === 'custom'; });
+        html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:6px;">'
+            + '<div><div style="font-size:14px;font-weight:700;">' + (tpl.title || '') + '</div>'
+            + '<div style="font-size:11px;color:var(--gray);">'
+            + (tpl.floorName ? '📍 ' + tpl.floorName + ' · ' : '')
+            + items.length + ' point(s)'
+            + (fixedItems.length ? ' · ' + fixedItems.length + ' fixed' : '')
+            + (customItems.length ? ' · ' + customItems.length + ' custom' : '')
+            + '</div></div>'
+            + '<button class="btn btn-sm btn-outline" onclick="hodDchkManageItems(\'' + tpl.id + '\')">Manage Items</button>'
+            + '</div>'
+            + '<div style="padding:10px 16px 14px;">';
+
+        if (items.length === 0) {
+            html += '<div style="font-size:12px;color:var(--gray);padding:4px 0;">No points yet.</div>';
+        } else {
+            items.forEach(function(it){
+                html += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;">'
+                    + '<span style="color:var(--gray);font-size:11px;">' + (it.type === 'fixed' ? '🔵' : '🟢') + '</span>'
+                    + '<span style="flex:1;">' + it.label + '</span>'
+                    + (it.unit ? '<span style="font-size:11px;color:var(--gray);background:var(--light-gray);padding:1px 6px;border-radius:4px;">' + it.unit + '</span>' : '')
+                    + '</div>';
+            });
+        }
+        html += '</div></div>';
+    });
+
+    el.innerHTML = html;
+}
+
+function hodDchkNewTemplate() {
+    var user = AUTH.currentUser();
+    if (!user || !user.department) return;
+    var dept = user.department;
+    var title = prompt('Enter checklist title (e.g. "IT Daily Checklist"):');
+    if (!title || !title.trim()) return;
+    title = title.trim();
+
+    var floors = typeof CHECKLISTS !== 'undefined' ? CHECKLISTS.listFloors() : [];
+    var needsFloor = typeof CHECKLISTS !== 'undefined' && CHECKLISTS.requiresFloor(dept);
+    var floorId = null;
+
+    if (needsFloor && floors.length > 0) {
+        var floorOpts = floors.map(function(f,i){ return (i+1) + '. ' + f.name; }).join('\n');
+        var choice = prompt('Select floor (enter number):\n' + floorOpts);
+        var idx = parseInt(choice, 10) - 1;
+        if (idx >= 0 && idx < floors.length) floorId = floors[idx].id;
+    }
+
+    var result = CHECKLISTS.createTemplate(user, dept, title, floorId);
+    if (result.success) {
+        APP.notify('Template created', 'success');
+        hodDchkSubSwitch('templates', document.querySelector('.tab-btn'));
+    } else {
+        APP.notify(result.message, 'error');
+    }
+}
+
+function hodDchkManageItems(tplId) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var tpl = CHECKLISTS.getTemplate(tplId);
+    if (!tpl) { APP.notify('Template not found', 'error'); return; }
+
+    var modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    modal.onclick = function(e){ if(e.target===modal) modal.remove(); };
+
+    var items = tpl.items || [];
+    var units = typeof CHECKLISTS !== 'undefined' ? CHECKLISTS.listHospitalUnits() : [];
+    var unitOptions = units.map(function(u){ return u.name; }).join(',');
+
+    var html = '<div style="background:var(--card);border-radius:12px;max-width:520px;width:90%;max-height:80vh;overflow-y:auto;padding:20px;" onclick="event.stopPropagation()">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
+        + '<div style="font-weight:700;font-size:15px;">Manage Items — ' + tpl.title + '</div>'
+        + '<button class="btn btn-sm btn-outline" onclick="this.closest(\'[style*=\\"z-index\\"]\').remove()">✕</button>'
+        + '</div>'
+        // Add item form
+        + '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">'
+        + '<input type="text" id="hodDchkNewItemLabel" placeholder="New point text" style="flex:1;min-width:140px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;">'
+        + '<select id="hodDchkNewItemUnit" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--card);">'
+        + '<option value="">No unit</option>'
+        + units.map(function(u){ return '<option value="' + u.name + '">' + u.name + '</option>'; }).join('')
+        + '</select>'
+        + '<button class="btn btn-sm btn-primary" onclick="hodDchkDoAddItem(\'' + tplId + '\')">+ Add</button>'
+        + '</div>'
+        // Items list
+        + '<div style="max-height:300px;overflow-y:auto;">';
+
+    if (items.length === 0) {
+        html += '<div style="font-size:12px;color:var(--gray);text-align:center;padding:16px;">No items yet.</div>';
+    } else {
+        items.forEach(function(it){
+            html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);font-size:13px;">'
+                + '<span style="font-size:11px;color:var(--gray);width:40px;">' + (it.type==='fixed'?'🔵':'🟢') + '</span>'
+                + '<span style="flex:1;">' + it.label + '</span>'
+                + (it.unit ? '<span style="font-size:11px;color:var(--gray);background:var(--light-gray);padding:1px 6px;border-radius:4px;">' + it.unit + '</span>' : '<span style="font-size:11px;color:var(--gray);">—</span>')
+                + '<button class="btn btn-sm btn-danger" style="font-size:11px;padding:2px 8px;" onclick="hodDchkDoRemoveItem(\'' + tplId + '\',\'' + it.id + '\')">✕</button>'
+                + '</div>';
+        });
+    }
+    html += '</div></div>';
+    modal.innerHTML = html;
+    document.body.appendChild(modal);
+}
+
+function hodDchkDoAddItem(tplId) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var input = document.getElementById('hodDchkNewItemLabel');
+    if (!input) return;
+    var label = input.value.trim();
+    if (!label) { APP.notify('Enter point text', 'error'); return; }
+    var unitEl = document.getElementById('hodDchkNewItemUnit');
+    var opts = { label: label, type: 'custom' };
+    if (unitEl && unitEl.value) opts.unit = unitEl.value;
+    var result = CHECKLISTS.addItem(user, tplId, opts);
+    if (result.success) {
+        APP.notify('Point added', 'success');
+        input.value = '';
+        hodDchkManageItems(tplId);
+    } else {
+        APP.notify(result.message, 'error');
+    }
+}
+
+function hodDchkDoRemoveItem(tplId, itemId) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    confirmAction('Remove this point?', function(){
+        var r = CHECKLISTS.removeItem(user, tplId, itemId);
+        if (r.success) { APP.notify('Point removed', 'success'); hodDchkManageItems(tplId); }
+        else APP.notify(r.message, 'error');
+    });
+}
+
+/* ── ASSIGN SUB-TAB ── */
+function _hodDchkAssign(el, user, dept, templates, assignments, team) {
+    var html = '<div style="font-weight:600;font-size:14px;margin-bottom:12px;">Assign Checklist to Team Member</div>';
+
+    if (templates.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:24px;text-align:center;font-size:13px;color:var(--gray);">No templates yet. Create one first.</div>';
+        el.innerHTML = html;
+        return;
+    }
+    if (team.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:24px;text-align:center;font-size:13px;color:var(--gray);">No team members yet. Add your team first.</div>';
+        el.innerHTML = html;
+        return;
+    }
+
+    html += '<div style="display:grid;gap:12px;">'
+        + '<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Template</label>'
+        + '<select id="hodDchkAssignTpl" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--card);" onchange="hodDchkAssignTplChanged()">'
+        + '<option value="">— Select —</option>'
+        + templates.map(function(t){ return '<option value="' + t.id + '">' + t.title + (t.floorName ? ' (' + t.floorName + ')' : '') + '</option>'; }).join('')
+        + '</select></div>'
+        + '<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Team Member</label>'
+        + '<select id="hodDchkAssignEmp" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--card);">'
+        + '<option value="">— Select —</option>'
+        + team.map(function(m){ return '<option value="' + m.id + '">' + m.fullName + '</option>'; }).join('')
+        + '</select></div>'
+        + '<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Title (optional)</label>'
+        + '<input type="text" id="hodDchkAssignTitle" placeholder="e.g. IT Daily Checks" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;"></div>'
+        + '<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">Select Points</label>'
+        + '<div id="hodDchkAssignItems" style="border:1px solid var(--border);border-radius:6px;padding:8px;max-height:200px;overflow-y:auto;font-size:13px;">'
+        + '<div style="color:var(--gray);font-size:12px;">Select a template first</div>'
+        + '</div></div>'
+        + '<button class="btn btn-primary" onclick="hodDchkDoAssign()">Assign Checklist</button>'
+        + '</div>';
+
+    // Existing assignments for this department
+    if (assignments.length > 0) {
+        html += '<div style="font-weight:600;font-size:14px;margin:20px 0 10px;">Active Assignments</div>';
+        assignments.forEach(function(a){
+            var emp = team.find(function(m){ return m.id === a.employeeId; });
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;">'
+                + '<div><div style="font-size:13px;font-weight:600;">' + a.title + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);">👤 ' + (emp ? emp.fullName : a.employeeName) + ' · ' + (a.refs ? a.refs.length : 0) + ' point(s)</div></div>'
+                + '<button class="btn btn-sm btn-danger" onclick="hodDchkDoRevoke(\'' + a.id + '\')">Revoke</button>'
+                + '</div>';
+        });
+    }
+
+    el.innerHTML = html;
+}
+
+function hodDchkAssignTplChanged() {
+    var sel = document.getElementById('hodDchkAssignTpl');
+    var container = document.getElementById('hodDchkAssignItems');
+    if (!sel || !container) return;
+    var tplId = sel.value;
+    if (!tplId) {
+        container.innerHTML = '<div style="color:var(--gray);font-size:12px;">Select a template first</div>';
+        return;
+    }
+    var tpl = typeof CHECKLISTS !== 'undefined' ? CHECKLISTS.getTemplate(tplId) : null;
+    if (!tpl || !tpl.items) {
+        container.innerHTML = '<div style="color:var(--gray);font-size:12px;">No items in this template.</div>';
+        return;
+    }
+    var html = '';
+    tpl.items.forEach(function(it){
+        html += '<label style="display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer;">'
+            + '<input type="checkbox" class="hodDchkItemCb" value="' + it.id + '" data-tpl="' + tplId + '">'
+            + '<span>' + it.label + '</span>'
+            + (it.unit ? '<span style="font-size:11px;color:var(--gray);background:var(--light-gray);padding:1px 6px;border-radius:4px;">' + it.unit + '</span>' : '')
+            + '</label>';
+    });
+    container.innerHTML = html;
+}
+
+function hodDchkDoAssign() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var tplId = document.getElementById('hodDchkAssignTpl').value;
+    var empId = document.getElementById('hodDchkAssignEmp').value;
+    var title = document.getElementById('hodDchkAssignTitle').value.trim() || 'Checklist Assignment';
+
+    if (!tplId) { APP.notify('Select a template', 'error'); return; }
+    if (!empId) { APP.notify('Select a team member', 'error'); return; }
+
+    var cbs = document.querySelectorAll('#hodDchkAssignItems .hodDchkItemCb:checked');
+    if (cbs.length === 0) { APP.notify('Select at least one point', 'error'); return; }
+
+    var refs = [];
+    cbs.forEach(function(cb){
+        refs.push({ templateId: cb.dataset.tpl, itemId: cb.value });
+    });
+
+    var result = CHECKLISTS.assignToEmployee(user, {
+        employeeId: empId,
+        title: title,
+        refs: refs
+    });
+
+    if (result.success) {
+        APP.notify('Checklist assigned', 'success');
+        hodDchkSubSwitch('assign', document.querySelectorAll('.tab-btn')[1]);
+    } else {
+        APP.notify(result.message, 'error');
+    }
+}
+
+function hodDchkDoRevoke(assignmentId) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    confirmAction('Revoke this assignment? The employee will no longer see it.', function(){
+        var r = CHECKLISTS.revokeAssignment(user, assignmentId);
+        if (r.success) { APP.notify('Assignment revoked', 'success'); hodDchkSubSwitch('assign', document.querySelectorAll('.tab-btn')[1]); }
+        else APP.notify(r.message, 'error');
+    });
+}
+
+/* ── OVERSIGHT SUB-TAB ── */
+function _hodDchkOversight(el, user, dept, assignments, team) {
+    var dateStr = new Date().toISOString().slice(0,10);
+
+    var html = '<div style="font-weight:600;font-size:14px;margin-bottom:8px;">Oversight — ' + APP.formatDate(dateStr) + '</div>'
+        + '<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Whether each team member has submitted their assigned checklist today.</div>';
+
+    var statusResult = typeof CHECKLISTS !== 'undefined' ? CHECKLISTS.assignmentStatus(user, dept, dateStr) : null;
+    var rows = statusResult && statusResult.success ? statusResult.assignments : [];
+
+    if (rows.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:24px;text-align:center;font-size:13px;color:var(--gray);">No active assignments for today.</div>';
+        el.innerHTML = html;
+        return;
+    }
+
+    var submitted = rows.filter(function(r){ return r.filled; });
+    var pending = rows.filter(function(r){ return !r.filled; });
+
+    html += '<div style="font-size:12px;color:var(--gray);margin-bottom:10px;">'
+        + submitted.length + '/' + rows.length + ' submitted today</div>';
+
+    if (pending.length > 0) {
+        html += '<div style="font-size:12px;font-weight:700;color:var(--danger);margin-bottom:6px;">Pending (' + pending.length + ')</div>';
+        pending.forEach(function(r){
+            var emp = team.find(function(m){ return m.id === r.assignment.employeeId; });
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;border-left:3px solid var(--danger);">'
+                + '<div><div style="font-size:13px;">' + r.assignment.title + '</div><div style="font-size:11px;color:var(--gray);">👤 ' + (emp ? emp.fullName : r.assignment.employeeName) + '</div></div>'
+                + '<span class="badge badge-danger" style="font-size:10px;">Pending</span></div>';
+        });
+    }
+
+    if (submitted.length > 0) {
+        html += '<div style="font-size:12px;font-weight:700;color:var(--success);margin:12px 0 6px;">Submitted (' + submitted.length + ')</div>';
+        submitted.forEach(function(r){
+            var emp = team.find(function(m){ return m.id === r.assignment.employeeId; });
+            var time = r.submittedAt ? new Date(r.submittedAt).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }) : '';
+            html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;border-left:3px solid var(--success);">'
+                + '<div><div style="font-size:13px;">' + r.assignment.title + '</div><div style="font-size:11px;color:var(--gray);">👤 ' + (emp ? emp.fullName : r.assignment.employeeName) + ' · ' + time + '</div></div>'
+                + '<span class="badge badge-success" style="font-size:10px;">✓ Done</span></div>';
+        });
+    }
+
+    el.innerHTML = html;
 }

@@ -242,13 +242,13 @@ function _matTimeline(r, procDept) {
 function showMatForm() {
     var user = AUTH.currentUser();
     var inventory = DB.get('inventory') || [];
+    var isAdmin = !user || user.isSuperAdmin || user.role === 'admin';
+    var filteredInv = isAdmin ? inventory : inventory.filter(function(i) { return (i.department || '').trim().toLowerCase() === (user.department || '').trim().toLowerCase(); });
     var itemOpts = '';
-    for (var i = 0; i < inventory.length; i++) {
-        var inv = inventory[i];
+    for (var i = 0; i < filteredInv.length; i++) {
+        var inv = filteredInv[i];
         itemOpts += '<option value="' + inv.name.replace(/"/g, '&quot;') + '" data-unit="' + (inv.unit || 'pcs') + '">' + inv.name + ' (' + (inv.quantity || 0) + ' ' + (inv.unit || 'pcs') + ')</option>';
     }
-
-    var isAdmin = !user || user.isSuperAdmin || user.role === 'admin';
     var depts = DB.get('departments') || [];
     var deptField;
     if (isAdmin) {
@@ -290,10 +290,13 @@ function showMatForm() {
 var matCustomItems = [];
 
 function addMatItemRow() {
+    var user = AUTH.currentUser();
     var inventory = DB.get('inventory') || [];
+    var isAdmin = !user || user.isSuperAdmin || user.role === 'admin';
+    var filteredInv = isAdmin ? inventory : inventory.filter(function(i) { return (i.department || '').trim().toLowerCase() === (user.department || '').trim().toLowerCase(); });
     var itemOpts = '';
-    for (var i = 0; i < inventory.length; i++) {
-        var inv = inventory[i];
+    for (var i = 0; i < filteredInv.length; i++) {
+        var inv = filteredInv[i];
         itemOpts += '<option value="' + inv.name.replace(/"/g, '&quot;') + '">' + inv.name + '</option>';
     }
     var container = document.getElementById('matItemsContainer');

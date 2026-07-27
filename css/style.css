@@ -368,4 +368,15 @@ tr:hover td { background: var(--primary-light); }
     .form-control { font-size: 16px; padding: 10px 12px; }
     .form-group label { font-size: 14px; }
     .card-header h2 { font-size: 17px; }
+    .lang-btn { padding: 7px 14px; font-size: 14px; min-height: 38px; }
 }
+
+.lang-switcher { display:inline-flex; align-items:center; gap:4px; }
+.lang-btn {
+    background: transparent; border: 1px solid var(--light-gray);
+    border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600;
+    padding: 5px 10px; color: var(--gray); min-height: 32px;
+    transition: all 0.15s; line-height: 1.2;
+}
+.lang-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.lang-btn:hover:not(.active) { background: var(--primary-light); border-color: var(--primary); }

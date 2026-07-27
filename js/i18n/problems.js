@@ -94,7 +94,9 @@
             probmod_msg_problem_solved_prefix: 'Problem ',
             probmod_msg_problem_solved_suffix: ' marked as solved ✓',
             probmod_msg_enter_resolution_details: 'Please enter resolution details',
-            probmod_msg_problem_resolved: 'Problem resolved'
+            probmod_msg_problem_resolved: 'Problem resolved',
+            probmod_msg_problem_deleted: 'Problem deleted',
+            probmod_btn_delete: '🗑 Delete'
         },
         hi: {
             probmod_search_placeholder: 'समस्याएं खोजें...',
@@ -189,7 +191,9 @@
             probmod_msg_problem_solved_prefix: 'समस्या ',
             probmod_msg_problem_solved_suffix: ' को सुलझाया गया के रूप में चिह्नित किया गया ✓',
             probmod_msg_enter_resolution_details: 'कृपया समाधान का विवरण दर्ज करें',
-            probmod_msg_problem_resolved: 'समस्या सुलझाई गई'
+            probmod_msg_problem_resolved: 'समस्या सुलझाई गई',
+            probmod_msg_problem_deleted: 'समस्या हटाई गई',
+            probmod_btn_delete: '🗑 हटाएं'
         },
         gu: {
             probmod_search_placeholder: 'સમસ્યાઓ શોધો...',
@@ -284,7 +288,9 @@
             probmod_msg_problem_solved_prefix: 'સમસ્યા ',
             probmod_msg_problem_solved_suffix: ' ને ઉકેલાયેલ તરીકે ચિહ્નિત કરવામાં આવી ✓',
             probmod_msg_enter_resolution_details: 'કૃપા કરી ઉકેલની વિગતો દાખલ કરો',
-            probmod_msg_problem_resolved: 'સમસ્યા ઉકેલાઈ'
+            probmod_msg_problem_resolved: 'સમસ્યા ઉકેલાઈ',
+            probmod_msg_problem_deleted: 'સમસ્યા કાઢી નાખવામાં આવી',
+            probmod_btn_delete: '🗑 દૂર કરો'
         }
     });
 })();

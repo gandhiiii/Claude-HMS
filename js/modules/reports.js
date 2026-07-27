@@ -67,7 +67,10 @@ function renderReports(container) {
         { id: 'submitted',   label: '📬 Submitted',    color: '#6a1b9a' },
         { id: 'download',    label: '⬇️ Download',     color: '#455a64' }
     ];
-    if (isAdmin) TABS.splice(TABS.length - 1, 0, { id: 'budget', label: '💰 Budget', color: '#2e7d32' });
+    if (isAdmin) {
+        TABS.splice(TABS.length - 1, 0, { id: 'budget', label: '💰 Budget', color: '#2e7d32' });
+        TABS.splice(TABS.length - 1, 0, { id: 'fullreport', label: '📋 Full Report', color: '#1565c0' });
+    }
 
     var btnHtml = TABS.map(function(t) {
         var active = t.id === _reportTab;
@@ -119,6 +122,7 @@ function _renderReportTab(tab) {
         checklists:  _rChecklists,
         submitted:   _rSubmittedReports,
         budget:      _rBudgetReport,
+        fullreport:  _rFullReport,
         download:    _rDownload
     };
     if (map[tab]) map[tab](el);
@@ -1104,6 +1108,172 @@ function _rBudgetReport(el) {
             });
         }
     }, 50);
+}
+
+// ══════════════════════════════════════════════════════════════
+// FULL REPORT TAB (admin only)
+// ══════════════════════════════════════════════════════════════
+
+function _rFullReport(el) {
+    el.innerHTML = '<div id="rFullReportContainer" style="max-width:800px;margin:0 auto;padding:20px 16px;">'
+        + '<h2 style="margin:0 0 6px;font-size:22px;">📋 Full Report</h2>'
+        + '<p style="color:var(--gray);margin:0 0 20px;font-size:13px;">Download a complete Excel report containing all modules and data points from the system.</p>'
+        + '<div style="background:var(--card-bg);border-radius:12px;padding:24px;box-shadow:0 1px 6px rgba(0,0,0,.08);">'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">'
+        + '<div style="padding:14px;background:var(--light-gray);border-radius:8px;text-align:center;"><div style="font-size:24px;font-weight:700;" id="rfr_tasks">0</div><div style="font-size:12px;color:var(--gray);">Tasks</div></div>'
+        + '<div style="padding:14px;background:var(--light-gray);border-radius:8px;text-align:center;"><div style="font-size:24px;font-weight:700;" id="rfr_problems">0</div><div style="font-size:12px;color:var(--gray);">Problems</div></div>'
+        + '<div style="padding:14px;background:var(--light-gray);border-radius:8px;text-align:center;"><div style="font-size:24px;font-weight:700;" id="rfr_admissions">0</div><div style="font-size:12px;color:var(--gray);">Admissions</div></div>'
+        + '<div style="padding:14px;background:var(--light-gray);border-radius:8px;text-align:center;"><div style="font-size:24px;font-weight:700;" id="rfr_inventory">0</div><div style="font-size:12px;color:var(--gray);">Inventory Items</div></div>'
+        + '<div style="padding:14px;background:var(--light-gray);border-radius:8px;text-align:center;"><div style="font-size:24px;font-weight:700;" id="rfr_users">0</div><div style="font-size:12px;color:var(--gray);">Users</div></div>'
+        + '<div style="padding:14px;background:var(--light-gray);border-radius:8px;text-align:center;"><div style="font-size:24px;font-weight:700;" id="rfr_mat_req">0</div><div style="font-size:12px;color:var(--gray);">Material Requests</div></div>'
+        + '</div>'
+        + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
+        + '<button class="btn btn-primary" onclick="rDownloadFullReport(\'excel\')" style="flex:1;min-width:160px;padding:12px 20px;font-size:15px;">⬇️ Download Excel Report</button>'
+        + '<button class="btn btn-outline" onclick="rDownloadFullReport(\'pdf\')" style="flex:1;min-width:160px;padding:12px 20px;font-size:15px;">📄 Download PDF Report</button>'
+        + '</div></div></div>';
+
+    setTimeout(function() {
+        var counts = {
+            tasks:      (DB.get('tasks') || []).length,
+            problems:   (DB.get('problems') || []).length,
+            admissions: (DB.get('admissions') || []).length,
+            inventory:  (DB.get('inventory') || []).length,
+            users:      (DB.get('users') || []).length,
+            mat_req:    (DB.get('material_requests') || []).length
+        };
+        for (var k in counts) {
+            var el_ = document.getElementById('rfr_' + k);
+            if (el_) el_.textContent = counts[k];
+        }
+    }, 50);
+}
+
+function rDownloadFullReport(format) {
+    var user = AUTH.currentUser();
+    if (!user || (!user.isSuperAdmin && user.role !== 'admin')) {
+        APP.notify('Access denied', 'error'); return;
+    }
+    var dbKeys = ['tasks','problems','admissions','inventory','material_requests','users','complaints','suggestions','budgets','budget_expenses','departments'];
+    var labelMap = {
+        tasks: 'Tasks', problems: 'Problems', admissions: 'Admissions', inventory: 'Inventory',
+        material_requests: 'Material Requests', users: 'Staff', complaints: 'Complaints',
+        suggestions: 'Suggestions', budgets: 'Budget Allocations', budget_expenses: 'Budget Expenses',
+        departments: 'Departments'
+    };
+    var headerMap = {
+        tasks: ['Title','Status','Priority','Department','Assigned To','Deadline','Created By','Date'],
+        problems: ['Title','Category','Status','Priority','Department','Reported By','Date'],
+        admissions: ['Patient Name','Age','Gender','Type','Status','Ward','Admission Date','Discharge Date','Bill Amount','Payment Status'],
+        inventory: ['Item Name','Category','Quantity','Unit','Department','Last Updated'],
+        material_requests: ['Title','Department','Status','Requested By','Date','Approved By'],
+        users: ['Full Name','Username','Role','Department','Email','Phone'],
+        complaints: ['Patient Name','Room','Category','Priority','Status','Department','Date','Resolved By'],
+        suggestions: ['Title','Department','Submitted By','Date'],
+        budgets: ['Department','Amount (₹)','Period','Period Type','Set By','Date'],
+        budget_expenses: ['Department','Category','Amount (₹)','Description','Date','Added By'],
+        departments: ['Name','Status','HOD','Created At']
+    };
+    var rowMap = {
+        tasks: function(t) { return [t.title||'', t.status||'', t.priority||'', t.department||'', t.assignedTo||'', t.deadline||'', t.createdByName||t.createdBy||'', APP.formatDate(t.createdAt)]; },
+        problems: function(p) { return [p.title||'', p.category||'', p.status||'', p.priority||'', p.department||'', p.reportedBy||p.createdByName||'', APP.formatDate(p.createdAt)]; },
+        admissions: function(a) { return [a.patientName||'', a.age||'', a.gender||'', a.type||'', a.status||'', a.ward||a.roomNo||'', APP.formatDate(a.admissionDate), APP.formatDate(a.dischargeDate), a.billAmount||0, a.paymentStatus||'']; },
+        inventory: function(i) { return [i.name||'', i.category||'', i.quantity||0, i.unit||'pcs', i.department||'', APP.formatDate(i.updatedAt||i.createdAt)]; },
+        material_requests: function(r) { return [r.title||'', r.department||'', r.status||'', r.createdByName||r.createdBy||'', APP.formatDate(r.createdAt), r.approvedBy||'']; },
+        users: function(u) { return [u.fullName||'', u.username||'', u.role||'', u.department||'', u.email||'', u.phone||'']; },
+        complaints: function(c) { return [c.patientName||'', c.roomNo||'', c.category||'', c.priority||'', c.status||'', c.department||'', APP.formatDate(c.createdAt), c.resolvedBy||'']; },
+        suggestions: function(s) { return [s.title||'', s.department||'', s.createdByName||s.createdBy||'', APP.formatDate(s.createdAt)]; },
+        budgets: function(b) { return [b.department||'', b.amount||0, b.period||'', b.periodType||'', b.createdByName||b.createdBy||'', APP.formatDate(b.createdAt)]; },
+        budget_expenses: function(e) { return [e.department||'', e.category||'', e.amount||0, e.description||'', e.expenseDate||APP.formatDate(e.createdAt), e.createdByName||e.createdBy||'']; },
+        departments: function(d) { return [d.name||'', d.active !== false ? 'Active' : 'Inactive', d.hod||'', APP.formatDate(d.createdAt)]; }
+    };
+
+    if (format === 'excel') {
+        var allRows = [];
+        for (var i = 0; i < dbKeys.length; i++) {
+            var key = dbKeys[i];
+            var items = DB.get(key) || [];
+            if (items.length === 0) continue;
+            var label = labelMap[key] || key;
+            var headers = headerMap[key] || ['Name'];
+            var fn = rowMap[key] || (function(it) { return [it.name||it.title||'']; });
+            if (allRows.length > 0) allRows.push([]);
+            allRows.push([label.toUpperCase()]);
+            allRows.push(headers);
+            for (var j = 0; j < items.length; j++) {
+                allRows.push(fn(items[j]));
+            }
+        }
+        if (allRows.length === 0) { APP.notify('No data to export', 'info'); return; }
+        var XLSX = window.XLSX;
+        if (!XLSX) { APP.notify('Excel library not loaded', 'error'); return; }
+        var ws = XLSX.utils.aoa_to_sheet(allRows);
+        ws['!cols'] = (allRows[1] || []).map(function(){ return { wch: 22 }; });
+        ws['!merges'] = [];
+        var curRow = 0;
+        for (var i = 0; i < dbKeys.length; i++) {
+            var items = DB.get(dbKeys[i]) || [];
+            if (items.length === 0) continue;
+            if (curRow > 0) curRow++;
+            var hLen = (headerMap[dbKeys[i]] || ['Name']).length;
+            ws['!merges'].push({ s: { r: curRow, c: 0 }, e: { r: curRow, c: hLen - 1 } });
+            curRow++;
+            curRow++;
+            curRow += items.length;
+        }
+        var wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Full Report');
+        XLSX.writeFile(wb, 'Full_Report_' + new Date().toISOString().slice(0,10) + '.xlsx');
+        APP.notify('Excel report downloaded', 'success');
+    } else {
+        var jsPDF = window.jspdf ? window.jspdf.jsPDF : null;
+        if (!jsPDF) { APP.notify('PDF library not loaded', 'error'); return; }
+        var doc = new jsPDF('p', 'mm', 'a4');
+        var pageW = doc.internal.pageSize.getWidth();
+        doc.setFillColor(26, 115, 232);
+        doc.rect(0, 0, pageW, 22, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.text('Stavya Intelligence', 14, 10);
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        doc.text('Full Report', 14, 17);
+        doc.setTextColor(80, 80, 80);
+        doc.setFontSize(8);
+        doc.text('Generated: ' + new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }), 14, 29);
+        var startY = 33;
+        for (var i = 0; i < dbKeys.length; i++) {
+            var key = dbKeys[i];
+            var items = DB.get(key) || [];
+            if (items.length === 0) continue;
+            doc.setFontSize(11);
+            doc.setTextColor(26, 115, 232);
+            doc.setFont(undefined, 'bold');
+            doc.text(labelMap[key] || key, 14, startY + 4);
+            startY += 8;
+            doc.autoTable({
+                head: [headerMap[key] || ['Name']],
+                body: items.map(rowMap[key] || (function(it) { return [it.name||it.title||'']; })),
+                startY: startY,
+                styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
+                headStyles: { fillColor: [26, 115, 232], textColor: 255, fontStyle: 'bold', fontSize: 7 },
+                alternateRowStyles: { fillColor: [240, 246, 255] },
+                margin: { left: 14, right: 14 },
+                didDrawPage: function(data) {
+                    doc.setFontSize(7);
+                    doc.setTextColor(160, 160, 160);
+                    var pg = doc.internal.getCurrentPageInfo().pageNumber;
+                    var total = doc.internal.getNumberOfPages();
+                    doc.text('Page ' + pg + ' of ' + total, pageW - 28, doc.internal.pageSize.getHeight() - 8);
+                    doc.text('HMS — Confidential', 14, doc.internal.pageSize.getHeight() - 8);
+                }
+            });
+            startY = doc.lastAutoTable.finalY + 10;
+            if (startY > 270) startY = 33;
+        }
+        doc.save('Full_Report_' + new Date().toISOString().slice(0,10) + '.pdf');
+        APP.notify('PDF report downloaded', 'success');
+    }
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -94,7 +94,9 @@ const Router = {
             { id: 'hod-dashboard', label: _t('nav_hod_dashboard'), icon: '👔', permission: 'hod-dashboard' },
             { id: 'employee-dashboard', label: _t('nav_employee_dashboard'), icon: '📊', permission: 'employee-dashboard' },
             { id: 'storekeeper-dashboard', label: _t('nav_storekeeper_dashboard'), icon: '🏪', permission: 'storekeeper-dashboard' },
-            { id: 'checklists', label: _t('nav_checklists'), icon: '✅', permission: 'checklists' }
+            { id: 'checklists', label: _t('nav_checklists'), icon: '✅', permission: 'checklists' },
+            { id: 'departmental-checklist', label: _t('nav_departmental_checklist'), icon: '📋', permission: 'departmental-checklist' },
+            { id: 'department-meetings', label: _t('nav_department_meetings'), icon: '🤝', permission: 'department-meetings' }
         ];
         let html = '';
         items.forEach(item => {
@@ -157,6 +159,8 @@ const Router = {
             complaints: 'nav_complaints', 'room-checklist': 'nav_room_checklist',
             admissions: 'nav_admissions', 'lost-found': 'nav_lost_found',
             'admin-checklists': 'nav_admin_checklists', checklists: 'nav_checklists',
+            'departmental-checklist': 'nav_departmental_checklist',
+            'department-meetings': 'nav_department_meetings',
             'material-requests': 'nav_material_requests', suggestions: 'nav_suggestions',
             budget: 'nav_budget',
             'quarterly-priorities': 'nav_quarterly',
@@ -195,6 +199,8 @@ const Router = {
             'lost-found': renderLostFound,
             'admin-checklists': renderAdminChecklists,
             checklists: renderChecklists,
+            'departmental-checklist': renderDeptChecklists,
+            'department-meetings': renderDeptMeetings,
             'material-requests': renderMaterialRequests,
             suggestions: renderSuggestions,
             budget: renderBudget,
@@ -209,7 +215,12 @@ const Router = {
         if (renderers[module]) {
             content.innerHTML = '<div style="text-align:center;padding:40px;"><div class="spinner"></div><p style="color:var(--gray);margin-top:8px;">Loading...</p></div>';
             setTimeout(() => {
-                if (renderers[module]) renderers[module](content);
+                try {
+                    if (renderers[module]) renderers[module](content);
+                } catch (e) {
+                    content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--danger);"><div style="font-size:40px;margin-bottom:8px;">⚠</div><p style="font-weight:600;">Page failed to load</p><p style="font-size:13px;margin-top:4px;">' + (e.message || e) + '</p><button class="btn btn-sm btn-primary" style="margin-top:12px;" onclick="Router.navigate(\'' + module + '\')">Retry</button></div>';
+                    console.error('[Router] render error:', e);
+                }
             }, 80);
         }
     },
