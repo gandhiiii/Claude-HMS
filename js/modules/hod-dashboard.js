@@ -376,6 +376,7 @@ function _hodOverview(el) {
         + '<button class="btn btn-outline" onclick="hodTabSwitch(\'team\')">👥 Add Member</button>'
         + '<button class="btn btn-outline" onclick="hodCreateRequest()">📦 Material Request</button>'
         + '<button class="btn btn-outline" onclick="hodShowReportForm()">📋 Send Report</button>'
+        + '<button class="btn btn-sm" style="background:#1a237e;color:#fff;border:none;" onclick="hodDownloadMasterReport()">📊 Master Report</button>'
         + '</div></div>';
 
     el.innerHTML = remHtml + html;
@@ -1873,7 +1874,8 @@ function _hodWorkReport(el) {
         + '<div><div style="font-size:18px;font-weight:700;">📊 Work Report — ' + (user.department || 'All') + '</div>'
         + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + combinedTotal + ' total items · ' + combinedDone + ' done (' + combinedRate + '%)</div></div>'
         + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
-        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadWorkReportPdf()">📄 Download PDF</button>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadWorkReportPdf()">📄 PDF</button>'
+        + '<button class="btn btn-sm" style="background:#1a237e;color:#fff;border:none;padding:6px 14px;font-size:12px;" onclick="hodDownloadMasterReport()">📊 Master Report</button>'
         + '<span class="badge badge-success" style="font-size:11px;padding:6px 12px;">✓ ' + combinedDone + ' done</span>'
         + '<span class="badge badge-danger" style="font-size:11px;padding:6px 12px;">⚠ ' + teamOverdue.length + ' overdue</span>'
         + '</div></div>';
@@ -2043,8 +2045,11 @@ function hodDownloadWorkReportPdf() {
 
     var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
     var pageW = doc.internal.pageSize.getWidth();
+    var pageH = doc.internal.pageSize.getHeight();
     var margin = 14;
     var y = 15;
+
+    // ── Page 1: Title + Summary + Charts ──
 
     // Title
     doc.setFontSize(16);
@@ -2069,10 +2074,88 @@ function hodDownloadWorkReportPdf() {
     // Separator line
     doc.setDrawColor(200);
     doc.line(margin, y, pageW - margin, y);
-    y += 6;
+    y += 8;
 
-    // Per-member breakdown table
+    // Progress bar (drawn using rect)
+    var barW = pageW - margin * 2;
+    var barH = 14;
+    var fillW = (combinedRate / 100) * barW;
+    doc.setDrawColor(200);
+    doc.setFillColor(230, 230, 230);
+    doc.roundedRect(margin, y, barW, barH, 3, 3, 'F');
+    doc.setFillColor(combinedRate >= 80 ? 52 : combinedRate >= 50 ? 251 : 234, combinedRate >= 80 ? 168 : combinedRate >= 50 ? 188 : 67, combinedRate >= 80 ? 83 : combinedRate >= 50 ? 4 : 53);
+    doc.roundedRect(margin, y, fillW, barH, 3, 3, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(255);
+    doc.text(combinedRate + '%', margin + 4, y + 10);
+    y += barH + 6;
+
+    // Stats bars for HOD TODO + Team
+    doc.setFontSize(8);
+    var stats = [
+        { label: 'HOD TODO', rate: hodTodoRate, done: hodTodoDone, total: hodTodos.length },
+        { label: 'Team Tasks', rate: teamRate, done: teamDone, total: teamTasks.length }
+    ];
+    stats.forEach(function (s) {
+        var sw = barW * (s.rate / 100);
+        doc.setDrawColor(200);
+        doc.setFillColor(230, 230, 230);
+        doc.roundedRect(margin, y, barW, 8, 2, 2, 'F');
+        doc.setFillColor(s.label === 'HOD TODO' ? 233 : 21, s.label === 'HOD TODO' ? 30 : 101, s.label === 'HOD TODO' ? 99 : 192);
+        doc.roundedRect(margin, y, sw, 8, 2, 2, 'F');
+        doc.setTextColor(60);
+        doc.text(s.label + ': ' + s.done + '/' + s.total + ' (' + s.rate + '%)', margin + barW + 4, y + 6);
+        y += 12;
+    });
+    y += 4;
+
+    // Capture charts from the DOM
+    var statusCanvas = document.getElementById('hodWrStatusChart');
+    var memberCanvas = document.getElementById('hodWrMemberChart');
+    var chartImgW = (pageW - margin * 2 - 8) / 2;
+    var chartImgH = 55;
+
+    function _addChartToDoc(canvas, x, yPos, w, h) {
+        if (!canvas) return;
+        try {
+            var dataUrl = canvas.toDataURL('image/png');
+            doc.addImage(dataUrl, 'PNG', x, yPos, w, h);
+        } catch(e) { /* skip if canvas fails */ }
+    }
+
+    // Check if charts fit on current page, add page if needed
+    if (y + 60 > pageH) { doc.addPage(); y = margin; }
+
+    if (statusCanvas || memberCanvas) {
+        doc.setDrawColor(200);
+        doc.setFillColor(245, 245, 250);
+        doc.roundedRect(margin, y, chartImgW + 8, chartImgH + 16, 3, 3, 'F');
+        doc.setTextColor(40);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Task Status Distribution', margin + 4, y + 8);
+        doc.setFont('helvetica', 'normal');
+        _addChartToDoc(statusCanvas, margin + 4, y + 10, chartImgW, chartImgH);
+
+        var x2 = margin + chartImgW + 16;
+        doc.setDrawColor(200);
+        doc.setFillColor(245, 245, 250);
+        doc.roundedRect(x2, y, chartImgW + 8, chartImgH + 16, 3, 3, 'F');
+        doc.setTextColor(40);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Per-Member Completion', x2 + 4, y + 8);
+        doc.setFont('helvetica', 'normal');
+        _addChartToDoc(memberCanvas, x2 + 4, y + 10, chartImgW, chartImgH);
+
+        y += chartImgH + 24;
+    }
+
+    // ── If not enough space for table, new page ──
     if (team.length > 0) {
+        var tableStartY = y + 6;
+        if (tableStartY + 40 > pageH) { doc.addPage(); tableStartY = margin; }
+
         var headers = [['Member', 'Total', 'Done', 'Pending', 'In-Progress', 'Overdue', 'Rate']];
         var rows = team.map(function (m) {
             var mt = teamTasks.filter(function (t) { return t.assignedTo === m.fullName; });
@@ -2083,13 +2166,12 @@ function hodDownloadWorkReportPdf() {
             var mtRate = mt.length > 0 ? Math.round(mtDone / mt.length * 100) : 0;
             return [m.fullName, mt.length, mtDone, mtPend, mtProg, mtOvd, mtRate + '%'];
         });
-        // Add HOD row
         rows.push([user.fullName + ' (HOD)', hodTodos.length, hodTodoDone, hodTodoPend, 0, 0, hodTodoRate + '%']);
 
         doc.autoTable({
             head: headers,
             body: rows,
-            startY: y,
+            startY: tableStartY,
             styles: { fontSize: 8, cellPadding: 2 },
             headStyles: { fillColor: [40, 53, 147], textColor: [255, 255, 255], fontStyle: 'bold' },
             alternateRowStyles: { fillColor: [240, 240, 248] },
@@ -2479,6 +2561,182 @@ function _hodPdfExport(title, headers, rows) {
     doc.autoTable({ head:[headers], body:rows, startY:27, styles:{fontSize:8}, headStyles:{fillColor:[106,27,154]} });
     doc.save(title.replace(/[^a-z0-9]/gi,'_')+'.pdf');
     APP.notify('PDF downloaded', 'success');
+}
+
+function hodDownloadMasterReport() {
+    var d = _hodData;
+    if (!d || !d.user) { APP.notify('Data not loaded', 'error'); return; }
+    var user = d.user;
+    try {
+        var wb = XLSX.utils.book_new();
+        var nowLabel = new Date().toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'});
+        var dept = d.dept || 'All';
+
+        // ── Data ──
+        var team = d.team || [];
+        var allDeptTasks = d.allDeptTasks || [];
+        var hodTodos = (DB.get('hodTodos') || []).filter(function (t) { return t.createdBy === user.username; });
+        var hodPurchases = d.deptPurchases || [];
+        var inventory = (DB.get('inventory') || []).filter(function (i) {
+            return (i.department || '').trim().toLowerCase() === (dept || '').trim().toLowerCase();
+        });
+        var matReqs = (DB.get('material_requests') || []).filter(function (r) {
+            return (r.department || '').trim().toLowerCase() === (dept || '').trim().toLowerCase();
+        });
+        var problems = d.routedProblems || [];
+        var reports = d.teamReports || [];
+        var qpAll = DB.get('quarterly_priorities') || [];
+        var hodQpAllotted = qpAll.filter(function (q) { return q.memberUsername === user.username && !q.selfOwn; });
+        var hodQpOwn = qpAll.filter(function (q) { return q.memberUsername === user.username && q.selfOwn; });
+        var empTodosAll = DB.get('employeeTodos') || [];
+
+        // ── Computed KPIs ──
+        var tDone = allDeptTasks.filter(function (t){return t.status==='completed';}).length;
+        var tTot  = allDeptTasks.length;
+        var tOver = d.overdueTasks.length;
+        var tOtat = d.overTatTasks.length;
+        var tRate = tTot > 0 ? Math.round(tDone/tTot*100) : 0;
+        var hDone = hodTodos.filter(function (t){return t.status==='completed';}).length;
+        var hTot  = hodTodos.length;
+        var hRate = hTot > 0 ? Math.round(hDone/hTot*100) : 0;
+        var pDone = problems.filter(function (p){return p.status==='resolved';}).length;
+        var pTot  = problems.length;
+        var pRate = pTot > 0 ? Math.round(pDone/pTot*100) : 0;
+        var invLow = inventory.filter(function (i){return parseFloat(i.quantity) <= 5;}).length;
+        var invTot = inventory.length;
+
+        var _bar = function(p){var f=Math.round(p/10);return '█'.repeat(f)+'░'.repeat(10-f)+' '+p+'%';};
+
+        // ══════════ SHEET 1: DASHBOARD ══════════
+        var dash = [
+            ['MASTER REPORT — ' + dept.toUpperCase() + ' DEPARTMENT'],
+            [''],
+            ['HOD', user.fullName || user.username],
+            ['Department', dept],
+            ['Generated', nowLabel],
+            ['Team Members', team.length],
+            [''],
+            ['── DEPARTMENT OVERVIEW ──'],
+            [''],
+            ['Metric','Value','Details'],
+            ['Total Tasks', tTot, tDone + ' done, ' + tOver + ' overdue, ' + tOtat + ' over TAT'],
+            ['Task Completion Rate', tRate + '%', _bar(tRate)],
+            ['HOD TODOs', hTot, hDone + ' done (' + hRate + '%)'],
+            ['Problems / Issues', pTot, pDone + ' resolved (' + pRate + '%)'],
+            ['Inventory Items', invTot, invLow + ' low stock'],
+            ['Material Requests', matReqs.length, matReqs.filter(function(r){return r.status==='pending';}).length + ' pending'],
+            ['Purchase Requests', hodPurchases.length, hodPurchases.filter(function(p){return p.status==='pending';}).length + ' pending'],
+            ['Employee Reports', reports.length, 'submitted'],
+            ['Q Goals (Allotted)', hodQpAllotted.reduce(function(s,q){return s+(q.items||[]).length;},0), hodQpAllotted.reduce(function(s,q){return s+(q.items||[]).filter(function(i){return i.status==='completed';}).length;},0) + ' done'],
+            ['Q Goals (Self)', hodQpOwn.reduce(function(s,q){return s+(q.items||[]).length;},0), hodQpOwn.reduce(function(s,q){return s+(q.items||[]).filter(function(i){return i.status==='completed';}).length;},0) + ' done'],
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dash), 'Dashboard');
+
+        // ══════════ SHEET 2: KPI ══════════
+        var kpiRows = [
+            ['KPI DASHBOARD — ' + dept],
+            [''],
+            ['Metric','Done','Total','Rate','Progress Bar'],
+            ['Task Completion', tDone, tTot, tRate+'%', _bar(tRate)],
+            ['HOD TODO Completion', hDone, hTot, hRate+'%', _bar(hRate)],
+            ['Problem Resolution', pDone, pTot, pRate+'%', _bar(pRate)],
+            ['Inventory Items', invTot - invLow, invTot, invTot>0?Math.round((invTot-invLow)/invTot*100)+'%':'0%', _bar(invTot>0?Math.round((invTot-invLow)/invTot*100):0)],
+            ['TAT Compliance', tTot>0?tTot-tOtat:0, tTot, tTot>0?Math.round((tTot-tOtat)/tTot*100)+'%':'0%', _bar(tTot>0?Math.round((tTot-tOtat)/tTot*100):0)],
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kpiRows), 'KPI');
+
+        // ══════════ SHEET 3: HOD WORK ══════════
+        var hodWRows = [['Section','Title','Status','Priority','Date/Deadline','Details']];
+        // HOD tasks assigned to HOD
+        var hodOwnTasks = allDeptTasks.filter(function (t){return t.assignedTo === user.fullName || t.assignedTo === user.username;});
+        hodOwnTasks.forEach(function(t){
+            hodWRows.push(['Task',t.title||'',t.status||'',t.priority||'',t.deadline||'','TAT: '+(t.tat||'-')+'h']);
+        });
+        hodTodos.forEach(function(t){
+            hodWRows.push(['TODO',t.title||'',t.status||'',t.priority||'',t.date||'',(t.reminder?'Reminder: '+t.reminder:'')]);
+        });
+        hodPurchases.forEach(function(p){
+            hodWRows.push(['Purchase',p.title||'',p.status||'','-',p.createdAt?APP.formatDate(p.createdAt):'','₹'+(p.total||p.amount||'0')]);
+        });
+        if (hodWRows.length === 1) hodWRows.push(['(No HOD work items found)','','','','','']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(hodWRows), 'HOD Work');
+
+        // ══════════ SHEET 4: Q GOALS ══════════
+        var qpRows = [['Type','Quarter','Goal / Item','Status','Note']];
+        hodQpAllotted.forEach(function(q){ (q.items||[]).forEach(function(it){ qpRows.push(['Allotted',(q.quarter||'')+'-'+(q.year||''), it.task||'', it.status||'pending', it.note||'']); }); });
+        hodQpOwn.forEach(function(q){ (q.items||[]).forEach(function(it){ qpRows.push(['Self Goal',(q.quarter||'')+'-'+(q.year||''), it.task||'', it.status||'pending', it.note||'']); }); });
+        if (hodQpAllotted.length===0 && hodQpOwn.length===0) qpRows.push(['(No quarterly goals)','','','','']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(qpRows), 'Q Goals');
+
+        // ══════════ SHEET 5: TEAM TASKS ══════════
+        var ttRows = [['Assigned To','Title','Status','Priority','Deadline','TAT','Source','Created At']];
+        allDeptTasks.forEach(function(t){
+            ttRows.push([t.assignedTo||'', t.title||'', t.status||'', t.priority||'', t.deadline||'', (t.tat||'-')+'h', t._source||'hod', t.createdAt?APP.formatDate(t.createdAt):'']);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ttRows), 'Team Tasks');
+
+        // ══════════ SHEET 6: PER-MEMBER BREAKDOWN ══════════
+        var mbRows = [['Member','Total Tasks','Done','Pending','In Progress','Overdue','Over TAT','Rate','TODOs','TODO Done','TODO Rate']];
+        team.forEach(function(m){
+            var mt = allDeptTasks.filter(function(t){return t.assignedTo===m.fullName;});
+            var md = mt.filter(function(t){return t.status==='completed';}).length;
+            var mp = mt.filter(function(t){return t.status==='pending';}).length;
+            var mg = mt.filter(function(t){return t.status==='in-progress';}).length;
+            var mo = mt.filter(function(t){return t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='completed';}).length;
+            var mtat = mt.filter(function(t){var ti=_tatInfo(t);return ti&&ti.overTAT&&t.status!=='completed';}).length;
+            var mr = mt.length>0?Math.round(md/mt.length*100):0;
+            var mempTodos = empTodosAll.filter(function(t){return t.createdBy===m.username;});
+            var med = mempTodos.filter(function(t){return t.status==='completed';}).length;
+            var mer = mempTodos.length>0?Math.round(med/mempTodos.length*100):0;
+            mbRows.push([m.fullName, mt.length, md, mp, mg, mo, mtat, mr+'%', mempTodos.length, med, mer+'%']);
+        });
+        // HOD row
+        var hodMed = hodTodos.filter(function(t){return t.status==='completed';}).length;
+        var hodMer = hodTodos.length>0?Math.round(hodMed/hodTodos.length*100):0;
+        mbRows.push([user.fullName+' (HOD)', hodOwnTasks.length, hodOwnTasks.filter(function(t){return t.status==='completed';}).length, hodOwnTasks.filter(function(t){return t.status==='pending';}).length, hodOwnTasks.filter(function(t){return t.status==='in-progress';}).length, 0, 0, Math.round(hodOwnTasks.length>0?hodOwnTasks.filter(function(t){return t.status==='completed';}).length/hodOwnTasks.length*100:0)+'%', hodTodos.length, hodMed, hodMer+'%']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(mbRows), 'Per-Member Breakdown');
+
+        // ══════════ SHEET 7: INVENTORY ══════════
+        var invRows = [['Name','Quantity','Unit','Price','Value','Expiry','Low Stock']];
+        inventory.forEach(function(i){
+            var q = parseFloat(i.quantity)||0;
+            var p = parseFloat(i.price)||0;
+            invRows.push([i.name||'', q, i.unit||'', p, q*p, i.expiry||'', q<=5?'YES':'']);
+        });
+        if (inventory.length===0) invRows.push(['(No inventory items)','','','','','','']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(invRows), 'Inventory');
+
+        // ══════════ SHEET 8: MATERIAL REQUESTS ══════════
+        var mrRows = [['Title','Requested By','Status','Created At','Items']];
+        matReqs.forEach(function(r){
+            var itemsStr = (r.items||[]).map(function(it){return (it.name||'')+' x'+(it.qty||1);}).join(', ');
+            mrRows.push([r.title||'', r.createdByName||r.createdBy||'', r.status||'', r.createdAt?APP.formatDate(r.createdAt):'', itemsStr]);
+        });
+        if (matReqs.length===0) mrRows.push(['(No material requests)','','','','']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(mrRows), 'Material Requests');
+
+        // ══════════ SHEET 9: PROBLEMS ══════════
+        var prRows = [['Title','Category','Status','Created By','Created At']];
+        problems.forEach(function(p){
+            prRows.push([p.title||'', p.category||'', p.status||'', p.createdBy||'', p.createdAt?APP.formatDate(p.createdAt):'']);
+        });
+        if (problems.length===0) prRows.push(['(No problems)','','','','']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(prRows), 'Problems');
+
+        // ══════════ SHEET 10: EMPLOYEE REPORTS ══════════
+        var repRows = [['Title','Employee','Category','Status','Sent To','Date']];
+        reports.forEach(function(r){
+            repRows.push([r.title||'', r.createdByName||r.createdBy||'', r.category||'', r.status||'', r.sentTo||'', r.createdAt?APP.formatDate(r.createdAt):'']);
+        });
+        if (reports.length===0) repRows.push(['(No reports)','','','','','']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(repRows), 'Employee Reports');
+
+        var fname = 'Master_Report_' + dept.replace(/[^a-z0-9]/gi,'_') + '_' + new Date().toISOString().slice(0,10) + '.xlsx';
+        XLSX.writeFile(wb, fname);
+        APP.notify('Master Report downloaded: ' + fname, 'success');
+    } catch(e) {
+        APP.notify('Master Report export failed: ' + e.message, 'error');
+    }
 }
 
 function hodExportEmployeeReport(employeeName) {
