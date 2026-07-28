@@ -1,0 +1,70 @@
+Entrance Ramp Camera Alignment (ALL)
+Entrance Ramp Speakers (ALL)
+Entrance Ramp Fire detector (ALL)
+Entrance Ramp Fire alarm (ALL)
+Entrance Ramp Wi-Fi Router (ALL)
+
+Medical GAS station side Camera Alignment (ALL)
+Medical GAS station side Speakers (ALL)
+Medical GAS station side Fire detector (ALL)
+Medical GAS station side Fire alarm (ALL)
+Medical GAS station side Wi-Fi Router (ALL)
+
+Back side Two Wheeler parking Side Camera Alignment (ALL)
+Back side Two Wheeler parking side Speakers (ALL)
+Back side Two Wheeler parking side Fire detector (ALL)
+Back side Two Wheeler parking side Fire alarm (ALL)
+Back side Two Wheeler parking side Wi-Fi Router (ALL)
+
+Phase 2 side Camera Alignment (ALL)
+Phase 2 side Speakers (ALL)
+Phase 2 side Fire detector (ALL)
+Phase 2 side Fire alarm (ALL)
+Phase 2 side Wi-Fi Router (ALL)
+
+Entrance Gate Camera Alignment (ALL)
+Entrance Gate Speakers (ALL)
+Entrance Gate Fire detector (ALL)
+Entrance Gate Fire alarm (ALL)
+Entrance Gate Wi-Fi Router (ALL)
+
+Reception & Lobby Camera Alignment (ALL)
+Reception & Lobby Speakers (ALL)
+Reception & Lobby Fire detector (ALL)
+Reception & Lobby Fire alarm (ALL)
+Reception & Lobby Wi-Fi Router (ALL)
+Reception & Lobby Internet (LAN) (ALL)
+Reception & Lobby Telephone (PRI)
+Reception & Lobby Telephone (LAN)
+Reception & Lobby Computers and Accessories ALL
+
+
+Medical Store Camera Alignment (ALL)
+Medical Store Speakers (ALL)
+Medical Store Fire detector (ALL)
+Medical Store Fire alarm (ALL)
+Medical Store Wi-Fi Router (ALL)
+Internet (LAN) (ALL)
+Telephone (PRI)
+Telephone (LAN)
+Medical Store Computers and Accessories ALL
+
+Physiotherapy & Gym Camera Alignment (ALL)
+Physiotherapy & Gym Speakers (ALL)
+Physiotherapy & Gym Fire detector (ALL)
+Physiotherapy & Gym Fire alarm (ALL)
+Physiotherapy & Gym Wi-Fi Router (ALL)
+Internet (LAN) (ALL)
+Telephone (PRI)
+Telephone (LAN)
+Physiotherapy Computers and Accessories ALL
+
+Canteen Camera Alignment (ALL)
+Canteen Store Speakers (ALL)
+Canteen Store Fire detector (ALL)
+Canteen Store Fire alarm (ALL)
+Canteen Store Wi-Fi Router (ALL)
+Internet (LAN) (ALL)
+Telephone (PRI)
+Telephone (LAN)
+Canteen Computers and Accessories ALL

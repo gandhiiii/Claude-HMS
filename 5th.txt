@@ -1,0 +1,31 @@
+Reception & Lobby Camera Alignment (ALL)
+Reception & Lobby Speakers (ALL)
+Reception & Lobby Fire detector (ALL)
+Reception & Lobby Fire alarm (ALL)
+Reception & Lobby Wi-Fi Router (ALL)
+Reception & Lobby Internet (LAN) (ALL)
+Reception & Lobby Telephone (PRI)
+Reception & Lobby Telephone (LAN)
+Reception & Lobby Computers and Accessories ALL
+
+Nursing Room Camera Alignment (ALL)
+Nursing Room Speakers (ALL)
+Nursing Room Fire detector (ALL)
+Nursing Room Fire alarm (ALL)
+Nursing Room Wi-Fi Router (ALL)
+Nursing Room Internet (LAN) (ALL)
+Nursing Room Telephone (PRI)
+Nursing Room Telephone (LAN)
+Nursing Room Computers and Accessories ALL
+
+Doctors Lift and Linen Passage Camera Alignment (ALL)
+Doctors Lift and Linen Passage Speakers (ALL)
+Doctors Lift and Linen Passage Fire detector (ALL)
+Doctors Lift and Linen Passage Fire alarm (ALL)
+Doctors Lift and Linen Passage Wi-Fi Router (ALL)
+
+Room Speakers (ALL)
+Room Fire detector (ALL)
+Room Wi-Fi Router (ALL)
+Room Internet (LAN) (ALL)
+Room Telephone (LAN)

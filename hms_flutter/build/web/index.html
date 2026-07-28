@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stavya Intelligence HMS - Flutter Web App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root {
+      --primary: #1E3A8A;
+      --primary-light: #3B82F6;
+      --secondary: #0D9488;
+      --accent: #06B6D4;
+      --bg: #F8FAFC;
+      --surface: #FFFFFF;
+      --text: #0F172A;
+      --text-muted: #64748B;
+      --border: #E2E8F0;
+      --success: #10B981;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08);
+      --radius: 16px;
+    }
+
+    [data-theme="dark"] {
+      --bg: #0F172A;
+      --surface: #1E293B;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --border: #334155;
+      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Outfit', sans-serif; transition: background-color 0.2s, border-color 0.2s; }
+    body { background-color: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+
+    /* Login View */
+    .login-container { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 100%); padding: 20px; }
+    .login-card { background: var(--surface); width: 100%; max-width: 440px; padding: 36px; border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); text-align: center; }
+    .login-icon { width: 72px; height: 72px; background: rgba(30, 58, 138, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: var(--primary); font-size: 36px; }
+    .form-group { text-align: left; margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text-muted); }
+    .form-control { width: 100%; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 15px; outline: none; }
+    .form-control:focus { border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+    .btn-primary { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 12px; font-weight: 600; font-size: 16px; cursor: pointer; margin-top: 8px; }
+    .btn-primary:hover { background: #1D4ED8; }
+
+    /* Main App Layout */
+    .app-shell { display: flex; height: 100vh; overflow: hidden; }
+    .sidebar { width: 260px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 24px 16px; }
+    .brand { display: flex; align-items: center; gap: 12px; padding: 0 12px 24px; border-bottom: 1px solid var(--border); }
+    .brand-icon { font-size: 28px; color: var(--primary-light); }
+    .brand-title { font-weight: 700; font-size: 18px; color: var(--text); }
+    .nav-list { list-style: none; margin-top: 16px; flex: 1; }
+    .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; color: var(--text-muted); font-weight: 500; cursor: pointer; margin-bottom: 4px; }
+    .nav-item:hover, .nav-item.active { background: rgba(59, 130, 246, 0.1); color: var(--primary-light); font-weight: 600; }
+    .nav-item i { font-size: 20px; }
+
+    .main-viewport { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+    .topbar { height: 70px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; }
+    .page-title { font-size: 20px; font-weight: 700; }
+    .topbar-actions { display: flex; align-items: center; gap: 16px; }
+
+    .content-area { padding: 24px; flex: 1; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { padding: 20px; border-radius: var(--radius); color: white; display: flex; flex-direction: column; justify-content: space-between; height: 130px; box-shadow: var(--shadow); cursor: pointer; }
+    .stat-card.blue { background: linear-gradient(135deg, #3B82F6, #1D4ED8); }
+    .stat-card.teal { background: linear-gradient(135deg, #0D9488, #047857); }
+    .stat-card.amber { background: linear-gradient(135deg, #F59E0B, #D97706); }
+    .stat-card.purple { background: linear-gradient(135deg, #8B5CF6, #6D28D9); }
+    .stat-val { font-size: 28px; font-weight: 700; }
+
+    .card { background: var(--surface); border-radius: var(--radius); padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); margin-bottom: 20px; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .badge.success { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+    .badge.warning { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+    .badge.danger { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+
+    .table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    .table th, .table td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .table th { color: var(--text-muted); font-weight: 600; }
+
+    /* Utility */
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Login Screen -->
+  <div id="loginView" class="login-container">
+    <div class="login-card">
+      <div class="login-icon"><i class="bi bi-hospital"></i></div>
+      <h2 style="color: var(--primary); font-weight:700;">Stavya Intelligence</h2>
+      <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 24px;">Flutter Mobile & Web Portal</p>
+      
+      <div class="form-group">
+        <label>Username / Staff ID</label>
+        <input type="text" id="loginUser" class="form-control" value="admin">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="loginPass" class="form-control" value="123456">
+      </div>
+      <div class="form-group">
+        <label>Role</label>
+        <select id="loginRole" class="form-control">
+          <option value="Hospital Administrator">Hospital Administrator</option>
+          <option value="Doctor / Medical Staff">Doctor / Medical Staff</option>
+          <option value="Head of Department (HOD)">Head of Department (HOD)</option>
+          <option value="Storekeeper / Inventory">Storekeeper / Inventory</option>
+        </select>
+      </div>
+      <button class="btn-primary" onclick="handleLogin()">SIGN IN TO PORTAL</button>
+    </div>
+  </div>
+
+  <!-- Main App View -->
+  <div id="appView" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <i class="bi bi-hospital brand-icon"></i>
+        <div>
+          <div class="brand-title">Stavya HMS</div>
+          <div style="font-size:11px; color:var(--text-muted);">Flutter Web App</div>
+        </div>
+      </div>
+      <ul class="nav-list">
+        <li class="nav-item active" onclick="showTab('dashboard', this)"><i class="bi bi-grid-1x2"></i> Dashboard</li>
+        <li class="nav-item" onclick="showTab('patients', this)"><i class="bi bi-person-heart"></i> Patients</li>
+        <li class="nav-item" onclick="showTab('checklists', this)"><i class="bi bi-check2-square"></i> Checklists</li>
+        <li class="nav-item" onclick="showTab('inventory', this)"><i class="bi bi-box-seam"></i> Inventory</li>
+        <li class="nav-item" onclick="showTab('tasks', this)"><i class="bi bi-card-checklist"></i> Tasks</li>
+        <li class="nav-item" onclick="showTab('settings', this)"><i class="bi bi-gear"></i> Settings</li>
+      </ul>
+    </aside>
+
+    <main class="main-viewport">
+      <header class="topbar">
+        <div id="headerTitle" class="page-title">Hospital Dashboard</div>
+        <div class="topbar-actions">
+          <button style="background:none; border:none; color:var(--text); font-size:20px; cursor:pointer;" onclick="toggleTheme()"><i class="bi bi-moon-stars"></i></button>
+          <div id="userBadge" style="font-size:13px; font-weight:600; padding:6px 12px; background:rgba(59,130,246,0.1); color:var(--primary-light); border-radius:20px;">Admin</div>
+        </div>
+      </header>
+
+      <div class="content-area">
+        <!-- Dashboard Tab -->
+        <div id="tab-dashboard" class="tab-pane">
+          <div class="stats-grid">
+            <div class="stat-card blue" onclick="showTab('patients', document.querySelectorAll('.nav-item')[1])">
+              <div>Total Admissions</div>
+              <div class="stat-val">4</div>
+              <div style="font-size:12px;">1 ICU Bed Occupied</div>
+            </div>
+            <div class="stat-card teal" onclick="showTab('checklists', document.querySelectorAll('.nav-item')[2])">
+              <div>Pending Checklists</div>
+              <div class="stat-val">2</div>
+              <div style="font-size:12px;">2 Inspections Complete</div>
+            </div>
+            <div class="stat-card amber" onclick="showTab('inventory', document.querySelectorAll('.nav-item')[3])">
+              <div>Low Stock Alerts</div>
+              <div class="stat-val">2</div>
+              <div style="font-size:12px;">Action Needed</div>
+            </div>
+            <div class="stat-card purple" onclick="showTab('tasks', document.querySelectorAll('.nav-item')[4])">
+              <div>Active Tasks</div>
+              <div class="stat-val">3</div>
+              <div style="font-size:12px;">Assigned to Depts</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Recent Patient Admissions</h3>
+            <table class="table">
+              <thead>
+                <tr><th>Patient Name</th><th>Ward / Room</th><th>Doctor</th><th>Status</th></tr>
+              </thead>
+              <tbody id="dashPatientTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Patients Tab -->
+        <div id="tab-patients" class="tab-pane hidden">
+          <div class="card">
+            <h3>Inpatient & Outpatient Records</h3>
+            <table class="table">
+              <thead>
+                <tr><th>ID</th><th>Name</th><th>Age/Gender</th><th>Ward & Room</th><th>Attending Doctor</th><th>Status</th></tr>
+              </thead>
+              <tbody id="patientListTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Checklists Tab -->
+        <div id="tab-checklists" class="tab-pane hidden">
+          <div class="card">
+            <h3>Daily Hospital Inspection Checklists</h3>
+            <ul id="checklistItems" style="list-style:none; margin-top:12px;"></ul>
+          </div>
+        </div>
+
+        <!-- Inventory Tab -->
+        <div id="tab-inventory" class="tab-pane hidden">
+          <div class="card">
+            <h3>Pharmacy & Equipment Inventory</h3>
+            <table class="table">
+              <thead>
+                <tr><th>Item Name</th><th>Category</th><th>Stock Level</th><th>Reorder Level</th><th>Status</th></tr>
+              </thead>
+              <tbody id="inventoryTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tasks Tab -->
+        <div id="tab-tasks" class="tab-pane hidden">
+          <div class="card">
+            <h3>Hospital Tasks & Maintenance Issues</h3>
+            <div id="tasksList" style="margin-top:12px;"></div>
+          </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="tab-settings" class="tab-pane hidden">
+          <div class="card">
+            <h3>System Settings & Profile</h3>
+            <p style="margin-top:8px; color:var(--text-muted);">Stavya Intelligence HMS Flutter Web App active.</p>
+            <button class="btn-primary" style="background:var(--danger); width:auto; padding:10px 20px; margin-top:16px;" onclick="handleLogout()">LOGOUT</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const patients = [
+      { id: 'PAT-1001', name: 'Rajesh Kumar', age: 45, gender: 'Male', ward: 'ICU Ward A', room: '102-A', doctor: 'Dr. A. Sharma', status: 'ICU' },
+      { id: 'PAT-1002', name: 'Priya Patel', age: 32, gender: 'Female', ward: 'General Ward B', room: '204', doctor: 'Dr. V. Mehta', status: 'Admitted' },
+      { id: 'PAT-1003', name: 'Sunil Verma', age: 61, gender: 'Male', ward: 'Deluxe Suite', room: '401', doctor: 'Dr. R. Gupta', status: 'Observation' },
+      { id: 'PAT-1004', name: 'Ananya Roy', age: 28, gender: 'Female', ward: 'Maternity Ward', room: '305', doctor: 'Dr. S. Kulkarni', status: 'Admitted' }
+    ];
+
+    const checklists = [
+      { id: 'CHK-01', title: 'Oxygen Cylinder Level Check', location: 'ICU Floor 1', done: true },
+      { id: 'CHK-02', title: 'Sanitization & Linen Change', location: 'Room 201 to 210', done: false },
+      { id: 'CHK-03', title: 'Emergency Crash Cart Audit', location: 'ER Room 2', done: false },
+      { id: 'CHK-04', title: 'Ventilator Pressure Calibration', location: 'ICU Ward A', done: true }
+    ];
+
+    const inventory = [
+      { name: 'Paracetamol 500mg', cat: 'Medicine', qty: 1200, min: 300, unit: 'Strips' },
+      { name: 'Surgical Gloves (L)', cat: 'Consumable', qty: 45, min: 100, unit: 'Boxes' },
+      { name: 'N95 Masks', cat: 'Consumable', qty: 200, min: 50, unit: 'Pieces' },
+      { name: 'IV Saline 500ml', cat: 'Medicine', qty: 28, min: 50, unit: 'Bottles' }
+    ];
+
+    const tasks = [
+      { title: 'Repair Cardiac Monitor Sensor', dept: 'Biomedical', priority: 'High', status: 'In Progress' },
+      { title: 'Monthly Department Meeting', dept: 'Admin', priority: 'Medium', status: 'Pending' },
+      { title: 'Restock Pharmacy Emergency Bay', dept: 'Pharmacy', priority: 'High', status: 'Pending' }
+    ];
+
+    function handleLogin() {
+      const user = document.getElementById('loginUser').value || 'Admin';
+      const role = document.getElementById('loginRole').value;
+      document.getElementById('userBadge').textContent = `${user} (${role})`;
+      document.getElementById('loginView').classList.add('hidden');
+      document.getElementById('appView').classList.remove('hidden');
+      renderData();
+    }
+
+    function handleLogout() {
+      document.getElementById('appView').classList.add('hidden');
+      document.getElementById('loginView').classList.remove('hidden');
+    }
+
+    function toggleTheme() {
+      const body = document.body;
+      if (body.getAttribute('data-theme') === 'dark') {
+        body.removeAttribute('data-theme');
+      } else {
+        body.setAttribute('data-theme', 'dark');
+      }
+    }
+
+    function showTab(tabId, el) {
+      document.querySelectorAll('.tab-pane').forEach(t => t.classList.add('hidden'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+      if (el) el.classList.add('active');
+      document.getElementById('headerTitle').textContent = el ? el.textContent.trim() : 'Dashboard';
+    }
+
+    function renderData() {
+      // Patients
+      const pRows = patients.map(p => `
+        <tr>
+          <td>${p.id}</td>
+          <td><strong>${p.name}</strong></td>
+          <td>${p.age} / ${p.gender}</td>
+          <td>${p.ward} (${p.room})</td>
+          <td>${p.doctor}</td>
+          <td><span class="badge ${p.status === 'ICU' ? 'danger' : p.status === 'Observation' ? 'warning' : 'success'}">${p.status}</span></td>
+        </tr>
+      `).join('');
+      document.getElementById('patientListTable').innerHTML = pRows;
+      document.getElementById('dashPatientTable').innerHTML = pRows;
+
+      // Checklists
+      document.getElementById('checklistItems').innerHTML = checklists.map((c, i) => `
+        <li style="padding:12px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px;">
+          <input type="checkbox" ${c.done ? 'checked' : ''} onchange="checklists[${i}].done = !checklists[${i}].done; renderData();">
+          <span style="${c.done ? 'text-decoration:line-through; color:var(--text-muted);' : ''}"><strong>${c.title}</strong> — ${c.location}</span>
+        </li>
+      `).join('');
+
+      // Inventory
+      document.getElementById('inventoryTable').innerHTML = inventory.map(i => {
+        const isLow = i.qty <= i.min;
+        return `
+          <tr>
+            <td><strong>${i.name}</strong></td>
+            <td>${i.cat}</td>
+            <td style="color:${isLow ? 'var(--danger)' : 'var(--success)'}; font-weight:bold;">${i.qty} ${i.unit}</td>
+            <td>${i.min} ${i.unit}</td>
+            <td><span class="badge ${isLow ? 'danger' : 'success'}">${isLow ? 'LOW STOCK' : 'OK'}</span></td>
+          </tr>
+        `;
+      }).join('');
+
+      // Tasks
+      document.getElementById('tasksList').innerHTML = tasks.map(t => `
+        <div style="padding:14px; border:1px solid var(--border); border-radius:12px; margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between;">
+            <strong>${t.title}</strong>
+            <span class="badge ${t.priority === 'High' ? 'danger' : 'warning'}">${t.priority}</span>
+          </div>
+          <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Dept: ${t.dept} • Status: ${t.status}</div>
+        </div>
+      `).join('');
+    }
+  </script>
+</body>
+</html>

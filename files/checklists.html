@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checklists</title>
+<style>
+    :root { --primary:#2563eb; --secondary:#16a34a; --danger:#dc2626; --gray:#6b7280; --border:#d5dbe3; --bg:#f3f6fb; }
+    * { box-sizing:border-box; margin:0; padding:0; font-family:system-ui,-apple-system,'Segoe UI',sans-serif; }
+    body { background:var(--bg); color:#111827; }
+    header { background:#fff; border-bottom:1px solid var(--border); padding:10px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    header h1 { font-size:18px; flex:1; }
+    header a { color:var(--primary); text-decoration:none; font-size:13px; }
+    .lang-switcher { display:flex; gap:6px; }
+    .lang-btn { border:1px solid var(--border); background:#fff; color:#4b5563; font-size:12px; font-weight:600; padding:3px 10px; border-radius:14px; cursor:pointer; }
+    .lang-btn.active { background:var(--primary); border-color:var(--primary); color:#fff; }
+    .tabs { display:flex; gap:4px; padding:10px 16px 0; }
+    .tab { padding:8px 16px; border:1px solid var(--border); border-bottom:none; background:#e8edf5; border-radius:8px 8px 0 0; cursor:pointer; font-size:14px; }
+    .tab.active { background:#fff; font-weight:600; }
+    main { padding:16px; max-width:960px; }
+    .card { background:#fff; border:1px solid var(--border); border-radius:0 8px 8px 8px; padding:16px; margin-bottom:16px; }
+    h2 { font-size:15px; margin-bottom:10px; }
+    h3 { font-size:14px; margin:14px 0 8px; }
+    label { font-size:13px; color:var(--gray); display:block; margin-bottom:4px; }
+    select, input[type=text], input[type=date] { padding:8px; border:1px solid var(--border); border-radius:6px; font-size:14px; }
+    button { padding:8px 14px; border:none; border-radius:6px; font-size:14px; cursor:pointer; background:var(--primary); color:#fff; }
+    button.secondary { background:#fff; color:var(--danger); border:1px solid var(--danger); padding:3px 10px; font-size:12px; }
+    button.success { background:var(--secondary); }
+    ul.points { list-style:none; margin-top:8px; }
+    ul.points li { display:flex; align-items:center; gap:8px; padding:7px 4px; border-bottom:1px solid #eef1f6; font-size:14px; }
+    .badge { font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; }
+    .badge.basic { background:#e0eaff; color:#1d4ed8; }
+    .badge.custom { background:#dcfce7; color:#15803d; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin:8px 0; }
+    .msg { font-size:13px; margin-top:8px; min-height:18px; }
+    .msg.ok { color:var(--secondary); } .msg.err { color:var(--danger); }
+    .fillrow { display:grid; grid-template-columns:auto 1fr 220px; gap:8px; align-items:center; padding:6px 0; border-bottom:1px solid #eef1f6; font-size:14px; }
+    .fillrow input[type=text] { width:100%; font-size:13px; padding:6px; }
+    .status-list div, .asg-list > div { padding:6px 4px; border-bottom:1px solid #eef1f6; font-size:14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .muted { color:var(--gray); font-size:13px; }
+    .flex1 { flex:1; }
+    .pointpick { max-height:280px; overflow:auto; border:1px solid var(--border); border-radius:6px; padding:8px; margin:8px 0; }
+    .pointpick h4 { font-size:13px; margin:8px 0 4px; color:var(--primary); }
+    .pointpick label.pt { display:flex; gap:6px; align-items:center; font-size:13px; color:#111827; margin:3px 0; }
+    .hidden { display:none; }
+</style>
+</head>
+<body>
+<header>
+    <h1 data-i18n="clPageTitle">Checklists</h1>
+    <a href="dashboard.html" data-i18n="clBackToDashboard">← Dashboard</a>
+    <div class="lang-switcher">
+        <button type="button" class="lang-btn" data-lang="en" onclick="changeLang('en')">English</button>
+        <button type="button" class="lang-btn" data-lang="hi" onclick="changeLang('hi')">हिंदी</button>
+        <button type="button" class="lang-btn" data-lang="gu" onclick="changeLang('gu')">ગુજરાતી</button>
+    </div>
+</header>
+
+<div class="tabs">
+    <div class="tab active" id="tabBtnChecklists" onclick="showTab('checklists')" data-i18n="clTabChecklists">Checklists</div>
+    <div class="tab" id="tabBtnAssignments" onclick="showTab('assignments')" data-i18n="clTabAssignments">Assignments</div>
+    <div class="tab hidden" id="tabBtnSetup" onclick="showTab('setup')" data-i18n="clTabSetup">Setup</div>
+</div>
+
+<main>
+<!-- ─────────────── CHECKLISTS TAB ─────────────── -->
+<section id="tabChecklists" class="card">
+    <div class="row">
+        <div><label data-i18n="clSelectChecklist">Select checklist</label>
+            <select id="tplSelect" onchange="renderTemplate()"></select></div>
+    </div>
+    <div id="noTpl" class="muted hidden" data-i18n="clNoTemplates">No checklists found for your department yet.</div>
+
+    <div id="tplArea" class="hidden">
+        <h2 data-i18n="clPoints">Points</h2>
+        <div class="row" id="addPointRow">
+            <input type="text" id="newPointLabel" class="flex1" placeholder="New checklist point…" data-i18n-placeholder="clAddPointPlaceholder">
+            <button onclick="addPoint()" data-i18n="clAdd">Add</button>
+        </div>
+        <ul class="points" id="pointList"></ul>
+
+        <h3 data-i18n="clFillForUnit">Fill for a unit</h3>
+        <div class="row">
+            <div><label data-i18n="clSelectUnit">Select unit</label><select id="unitSelect"></select></div>
+            <div><label data-i18n="clDate">Date</label><input type="date" id="fillDate"></div>
+            <button onclick="openFill()" data-i18n="clLoadChecklist">Open checklist</button>
+        </div>
+        <div id="fillArea" class="hidden">
+            <div id="fillRows"></div>
+            <button class="success" style="margin-top:10px" onclick="submitFill()" data-i18n="clSubmit">Submit</button>
+        </div>
+        <div class="msg" id="fillMsg"></div>
+
+        <h3 data-i18n="clUnitStatusTitle">Unit status for selected date</h3>
+        <div class="status-list" id="unitStatusList"></div>
+    </div>
+</section>
+
+<!-- ─────────────── ASSIGNMENTS TAB ─────────────── -->
+<section id="tabAssignments" class="card hidden">
+    <h2 data-i18n="clMyAssignments">My assigned checklists</h2>
+    <div id="myAsgList" class="asg-list"></div>
+    <div id="myFillArea" class="hidden">
+        <div id="myFillRows"></div>
+        <button class="success" style="margin-top:10px" onclick="submitMyFill()" data-i18n="clSubmit">Submit</button>
+    </div>
+    <div class="msg" id="asgMsg"></div>
+
+    <div id="manageAsgArea" class="hidden">
+        <h2 data-i18n="clCreateAssignment">Give checklist to employee</h2>
+        <div class="row">
+            <div id="asgDeptWrap" class="hidden"><label data-i18n="clDepartment">Department</label>
+                <select id="asgDept" onchange="renderPointPicker()"></select></div>
+            <div><label data-i18n="clSelectEmployee">Select employee</label><select id="asgEmployee"></select></div>
+            <input type="text" id="asgTitle" class="flex1" placeholder="Checklist name (e.g. Ravi — B3 round)" data-i18n-placeholder="clAssignmentTitlePlaceholder">
+        </div>
+        <label data-i18n="clSelectPoints">Select points from the basic checklists</label>
+        <div class="pointpick" id="pointPicker"></div>
+        <button onclick="createAssignment()" data-i18n="clAssign">Assign</button>
+
+        <h3 data-i18n="clExistingAssignments">Given checklists</h3>
+        <div id="asgList" class="asg-list"></div>
+        <h3 data-i18n="clTodayStatus">Today's status</h3>
+        <div id="asgStatus" class="status-list"></div>
+    </div>
+</section>
+
+<!-- ─────────────── SETUP TAB (admin) ─────────────── -->
+<section id="tabSetup" class="card hidden">
+    <h2 data-i18n="clFloors">Floors</h2>
+    <div class="row">
+        <input type="text" id="newFloor" placeholder="Floor name (e.g. GF)" data-i18n-placeholder="clAddFloorPlaceholder">
+        <button onclick="addFloorUI()" data-i18n="clAdd">Add</button>
+    </div>
+    <div id="floorList" class="status-list"></div>
+
+    <h2 style="margin-top:16px" data-i18n="clUnits">Hospital Units</h2>
+    <div class="row">
+        <input type="text" id="newUnit" placeholder="Unit name (e.g. ICU)" data-i18n-placeholder="clAddUnitPlaceholder">
+        <button onclick="addUnitUI()" data-i18n="clAdd">Add</button>
+    </div>
+    <div id="unitList" class="status-list"></div>
+
+    <h2 style="margin-top:16px">IT</h2>
+    <button onclick="runSeeder()" data-i18n="clRunSeeder">Load IT Basic Checklists (one-time)</button>
+    <div class="msg" id="seedMsg"></div>
+</section>
+</main>
+
+<!-- Match this script list to the one in dashboard.html, then add the last two. -->
+<script src="js/i18n.js?v=73"></script>
+<script src="js/data.js?v=73"></script>
+<script src="js/firebase-config.js?v=73"></script>
+<script src="js/checklists.js?v=73"></script>
+<script src="js/checklists-seed-it.js?v=73"></script>
+<script>
+    var user = null;
+    try { user = AUTH.currentUser(); } catch (e) {}
+    if (!user) { window.location.replace('index.html'); }
+
+    var C = CHECKLISTS;
+    var currentEntry = null;      // in-progress unit fill
+    var currentAsgEntry = null;   // in-progress assignment fill
+    var isAdminUser = (user.role === 'admin' || user.isSuperAdmin === true);
+
+    function t(k, v) { return I18N.t(k, v); }
+    function el(id) { return document.getElementById(id); }
+    function msg(id, text, ok) { var m = el(id); m.textContent = text || ''; m.className = 'msg ' + (ok ? 'ok' : 'err'); }
+    function changeLang(l) { I18N.setLang(l); rerenderDynamic(); }
+    function showTab(name) {
+        ['checklists','assignments','setup'].forEach(function (n) {
+            var cap = n.charAt(0).toUpperCase() + n.slice(1);
+            el('tab' + cap).classList.toggle('hidden', n !== name);
+            el('tabBtn' + cap).classList.toggle('active', n === name);
+        });
+    }
+
+    /* ── Checklists tab ── */
+    function loadTemplates() {
+        var tpls = C.listTemplates(user);
+        var sel = el('tplSelect'); sel.innerHTML = '';
+        tpls.forEach(function (tp) {
+            var o = document.createElement('option');
+            o.value = tp.id;
+            o.textContent = tp.title + (isAdminUser ? ' [' + tp.department + ']' : '');
+            sel.appendChild(o);
+        });
+        el('noTpl').classList.toggle('hidden', tpls.length > 0);
+        el('tplArea').classList.toggle('hidden', tpls.length === 0);
+        if (tpls.length) renderTemplate();
+    }
+    function selectedTpl() { return C.getTemplate(el('tplSelect').value); }
+    function renderTemplate() {
+        var tp = selectedTpl(); if (!tp) return;
+        var canEdit = C.canManageFixed(user, tp.department);
+        el('addPointRow').classList.toggle('hidden', !canEdit);
+        var ul = el('pointList'); ul.innerHTML = '';
+        tp.items.forEach(function (it) {
+            var li = document.createElement('li');
+            var b = document.createElement('span');
+            b.className = 'badge ' + (it.type === 'fixed' ? 'basic' : 'custom');
+            b.textContent = it.type === 'fixed' ? t('clBasicBadge') : t('clCustomBadge');
+            var s = document.createElement('span'); s.className = 'flex1'; s.textContent = it.label;
+            li.appendChild(b); li.appendChild(s);
+            if (canEdit) {
+                var rm = document.createElement('button'); rm.className = 'secondary';
+                rm.textContent = t('clRemove');
+                rm.onclick = function () {
+                    var r = C.removeItem(user, tp.id, it.id);
+                    if (!r.success) msg('fillMsg', r.message, false); else renderTemplate();
+                };
+                li.appendChild(rm);
+            }
+            ul.appendChild(li);
+        });
+        var us = el('unitSelect'); us.innerHTML = '';
+        C.listHospitalUnits().forEach(function (u) {
+            var o = document.createElement('option'); o.value = u.id; o.textContent = u.name; us.appendChild(o);
+        });
+        if (!el('fillDate').value) el('fillDate').value = new Date().toISOString().slice(0, 10);
+        el('fillArea').classList.add('hidden'); currentEntry = null;
+        renderUnitStatus();
+    }
+    function addPoint() {
+        var tp = selectedTpl(); if (!tp) return;
+        var r = C.addItem(user, tp.id, { label: el('newPointLabel').value });
+        if (!r.success) { msg('fillMsg', r.message, false); return; }
+        el('newPointLabel').value = ''; renderTemplate();
+    }
+    function openFill() {
+        var tp = selectedTpl(); if (!tp) return;
+        var r = C.startEntry(user, tp.id, el('unitSelect').value, el('fillDate').value);
+        if (!r.success) { msg('fillMsg', r.message, false); return; }
+        currentEntry = r.entry;
+        renderFillRows('fillRows', currentEntry);
+        el('fillArea').classList.remove('hidden'); msg('fillMsg', '', true);
+    }
+    function renderFillRows(containerId, entry) {
+        var c = el(containerId); c.innerHTML = '';
+        entry.items.forEach(function (it) {
+            var key = it.itemId || it.id;
+            var row = document.createElement('div'); row.className = 'fillrow';
+            var cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.k = key;
+            var lb = document.createElement('span');
+            lb.textContent = (it.floorName ? '[' + it.floorName + '] ' : '') + it.label;
+            var rm = document.createElement('input'); rm.type = 'text'; rm.dataset.k = key;
+            rm.placeholder = t('clRemarksPlaceholder');
+            row.appendChild(cb); row.appendChild(lb); row.appendChild(rm);
+            c.appendChild(row);
+        });
+    }
+    function collectResults(containerId, entry) {
+        var c = el(containerId);
+        var cbs = c.querySelectorAll('input[type=checkbox]');
+        var rms = c.querySelectorAll('input[type=text]');
+        cbs.forEach(function (cb, i) {
+            C.setItemResult(entry, cb.dataset.k, { checked: cb.checked, remarks: rms[i].value });
+        });
+    }
+    function submitFill() {
+        if (!currentEntry) return;
+        collectResults('fillRows', currentEntry);
+        var r = C.submitEntry(user, currentEntry);
+        msg('fillMsg', r.message === 'OK' ? '✓' : r.message, r.success);
+        if (r.success) { currentEntry = null; el('fillArea').classList.add('hidden'); renderUnitStatus(); }
+    }
+    function renderUnitStatus() {
+        var tp = selectedTpl(); if (!tp) return;
+        var r = C.unitStatus(user, tp.id, el('fillDate').value);
+        var c = el('unitStatusList'); c.innerHTML = '';
+        if (!r.success) return;
+        r.units.forEach(function (row) {
+            var d = document.createElement('div');
+            d.textContent = row.unit.name + ' — ' + (row.filled
+                ? '✓ ' + t('clFilledBy', { name: row.filledByName })
+                : '✗ ' + t('clNotFilled'));
+            c.appendChild(d);
+        });
+    }
+
+    /* ── Assignments tab ── */
+    function manageDept() {
+        if (!isAdminUser) return user.department;
+        var d = el('asgDept'); return d && d.value ? d.value : user.department;
+    }
+    function renderMyAssignments() {
+        var list = el('myAsgList'); list.innerHTML = '';
+        var mine = C.myAssignments(user);
+        if (mine.length === 0) {
+            var d = document.createElement('div'); d.className = 'muted';
+            d.textContent = t('clNoAssignments'); list.appendChild(d); return;
+        }
+        mine.forEach(function (a) {
+            var d = document.createElement('div');
+            var s = document.createElement('span'); s.className = 'flex1';
+            s.textContent = a.title + ' · ' + t('clPointsCount', { count: C.resolveAssignmentItems(a).length });
+            var dt = document.createElement('input'); dt.type = 'date';
+            dt.value = new Date().toISOString().slice(0, 10);
+            var b = document.createElement('button'); b.textContent = t('clFill');
+            b.onclick = function () {
+                var r = C.startAssignmentEntry(user, a.id, dt.value);
+                if (!r.success) { msg('asgMsg', r.message, false); return; }
+                currentAsgEntry = r.entry;
+                renderFillRows('myFillRows', currentAsgEntry);
+                el('myFillArea').classList.remove('hidden'); msg('asgMsg', '', true);
+            };
+            d.appendChild(s); d.appendChild(dt); d.appendChild(b);
+            list.appendChild(d);
+        });
+    }
+    function submitMyFill() {
+        if (!currentAsgEntry) return;
+        collectResults('myFillRows', currentAsgEntry);
+        var r = C.submitAssignmentEntry(user, currentAsgEntry);
+        msg('asgMsg', r.message === 'OK' ? '✓' : r.message, r.success);
+        if (r.success) { currentAsgEntry = null; el('myFillArea').classList.add('hidden'); renderAsgManage(); }
+    }
+    function renderAsgManage() {
+        var dept = manageDept();
+        var can = C.canManage(user, dept);
+        el('manageAsgArea').classList.toggle('hidden', !can);
+        if (!can) return;
+        // employees of the department (not HOD/admin)
+        var es = el('asgEmployee'); es.innerHTML = '';
+        (DB.get('users') || []).filter(function (u) {
+            return u.department === dept && u.role !== 'hod' && u.role !== 'admin' && !u.isSuperAdmin;
+        }).forEach(function (u) {
+            var o = document.createElement('option'); o.value = u.id;
+            o.textContent = (u.fullName || u.username); es.appendChild(o);
+        });
+        renderPointPicker();
+        // existing assignments + status
+        var list = el('asgList'); list.innerHTML = '';
+        C.listAssignments(user, {}).filter(function (a) { return a.department === dept; }).forEach(function (a) {
+            var d = document.createElement('div');
+            var s = document.createElement('span'); s.className = 'flex1';
+            s.textContent = a.title + ' → ' + a.employeeName + (a.active ? '' : ' (' + t('clRevoked') + ')');
+            d.appendChild(s);
+            if (a.active) {
+                var b = document.createElement('button'); b.className = 'secondary'; b.textContent = t('clRevoke');
+                b.onclick = function () { C.revokeAssignment(user, a.id); renderAsgManage(); renderMyAssignments(); };
+                d.appendChild(b);
+            }
+            list.appendChild(d);
+        });
+        var st = C.assignmentStatus(user, dept);
+        var sc = el('asgStatus'); sc.innerHTML = '';
+        if (st.success) st.assignments.forEach(function (row) {
+            var d = document.createElement('div');
+            d.textContent = row.assignment.title + ' (' + row.assignment.employeeName + ') — ' +
+                (row.filled ? '✓ ' + t('clFilledBy', { name: row.filledByName }) : '✗ ' + t('clNotFilled'));
+            sc.appendChild(d);
+        });
+    }
+    function renderPointPicker() {
+        var dept = manageDept();
+        var pk = el('pointPicker'); pk.innerHTML = '';
+        C.listTemplates(user).filter(function (tp) { return tp.department === dept; }).forEach(function (tp) {
+            var h = document.createElement('h4'); h.textContent = tp.title; pk.appendChild(h);
+            tp.items.forEach(function (it) {
+                var lb = document.createElement('label'); lb.className = 'pt';
+                var cb = document.createElement('input'); cb.type = 'checkbox';
+                cb.dataset.tpl = tp.id; cb.dataset.item = it.id;
+                lb.appendChild(cb); lb.appendChild(document.createTextNode(it.label));
+                pk.appendChild(lb);
+            });
+        });
+        if (isAdminUser) renderAsgManageEmployees(dept);
+    }
+    function renderAsgManageEmployees(dept) {
+        var es = el('asgEmployee'); es.innerHTML = '';
+        (DB.get('users') || []).filter(function (u) {
+            return u.department === dept && u.role !== 'hod' && u.role !== 'admin' && !u.isSuperAdmin;
+        }).forEach(function (u) {
+            var o = document.createElement('option'); o.value = u.id;
+            o.textContent = (u.fullName || u.username); es.appendChild(o);
+        });
+    }
+    function createAssignment() {
+        var refs = [];
+        el('pointPicker').querySelectorAll('input:checked').forEach(function (cb) {
+            refs.push({ templateId: cb.dataset.tpl, itemId: cb.dataset.item });
+        });
+        var r = C.assignToEmployee(user, {
+            employeeId: el('asgEmployee').value,
+            title: el('asgTitle').value,
+            refs: refs
+        });
+        msg('asgMsg', r.message === 'OK' ? '✓' : r.message, r.success);
+        if (r.success) { el('asgTitle').value = ''; renderAsgManage(); }
+    }
+
+    /* ── Setup tab (admin) ── */
+    function renderSetup() {
+        if (!isAdminUser) return;
+        var fl = el('floorList'); fl.innerHTML = '';
+        C.listFloors().forEach(function (f) {
+            var d = document.createElement('div');
+            var s = document.createElement('span'); s.className = 'flex1'; s.textContent = f.name;
+            var b = document.createElement('button'); b.className = 'secondary'; b.textContent = t('clRemove');
+            b.onclick = function () { var r = C.removeFloor(user, f.id); if (!r.success) msg('seedMsg', r.message, false); renderSetup(); };
+            d.appendChild(s); d.appendChild(b); fl.appendChild(d);
+        });
+        var ul2 = el('unitList'); ul2.innerHTML = '';
+        C.listHospitalUnits().forEach(function (u2) {
+            var d = document.createElement('div');
+            var s = document.createElement('span'); s.className = 'flex1'; s.textContent = u2.name;
+            var b = document.createElement('button'); b.className = 'secondary'; b.textContent = t('clRemove');
+            b.onclick = function () { var r = C.removeHospitalUnit(user, u2.id); if (!r.success) msg('seedMsg', r.message, false); renderSetup(); };
+            d.appendChild(s); d.appendChild(b); ul2.appendChild(d);
+        });
+    }
+    function addFloorUI() {
+        var r = C.addFloor(user, el('newFloor').value);
+        if (!r.success) msg('seedMsg', r.message, false); else { el('newFloor').value = ''; msg('seedMsg', '', true); }
+        renderSetup();
+    }
+    function addUnitUI() {
+        var r = C.addHospitalUnit(user, el('newUnit').value);
+        if (!r.success) msg('seedMsg', r.message, false); else { el('newUnit').value = ''; msg('seedMsg', '', true); }
+        renderSetup();
+    }
+    function runSeeder() {
+        msg('seedMsg', '…', true);
+        // 384 points = a few seconds on slower devices; one-time operation.
+        setTimeout(function () {
+            var s = SEED_IT_CHECKLIST.run(user);
+            var text = t('clSeedDone', { created: s.created.length, skipped: s.skipped.length });
+            if (s.errors.length) text += ' | ' + s.errors[0];
+            msg('seedMsg', text, s.errors.length === 0);
+            renderSetup(); loadTemplates(); renderAsgManage();
+        }, 30);
+    }
+
+    /* ── boot ── */
+    function rerenderDynamic() {
+        loadTemplates(); renderMyAssignments(); renderAsgManage(); renderSetup();
+    }
+    if (isAdminUser) {
+        el('tabBtnSetup').classList.remove('hidden');
+        // admin can pick which department's assignments to manage
+        el('asgDeptWrap').classList.remove('hidden');
+        var depts = {};
+        C.listTemplates(user).forEach(function (tp) { depts[tp.department] = true; });
+        var ds = el('asgDept');
+        Object.keys(depts).forEach(function (d) {
+            var o = document.createElement('option'); o.value = d; o.textContent = d; ds.appendChild(o);
+        });
+    }
+    I18N.applyTranslations();
+    I18N.highlightActiveLangButton();
+    rerenderDynamic();
+</script>
+</body>
+</html>

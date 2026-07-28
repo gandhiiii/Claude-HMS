@@ -1,0 +1,19 @@
+Parking Camera Alignment (ALL)
+Parking Speakers (ALL)
+Parking Fire detector (ALL)
+Parking Fire alarm (ALL)
+Parking Wi-Fi Router (ALL)
+
+Radiology Store room  camera Alignment (ALL)
+Radiology Store room  Access point 
+Radiology Store room  Fire alarm
+Radiology Store room  Speaker
+Radiology Store room  Telephone
+Radiology Store room Wi-Fi Router (ALL)
+
+Research Store room  camera Alignment (ALL)
+Research Store room  Access point 
+Research Store room  Fire alarm
+Research Store room  Speaker
+Research Store room  Telephone
+Research Store room Wi-Fi Router (ALL)

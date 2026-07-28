@@ -1,0 +1,39 @@
+Reception & Lobby Camera Alignment (ALL)
+Reception & Lobby Speakers (ALL)
+Reception & Lobby Fire detector (ALL)
+Reception & Lobby Fire alarm (ALL)
+Reception & Lobby Wi-Fi Router (ALL)
+Reception & Lobby Internet (LAN) (ALL)
+Reception & Lobby Telephone (PRI)
+Reception & Lobby Telephone (LAN)
+Reception & Lobby Computers and Accessories ALL
+
+OPD & Back side Speakers (ALL)
+OPD & Back side Fire detector (ALL)
+OPD & Back side Fire alarm (ALL)
+OPD & Back side Wi-Fi Router (ALL)
+OPD & Back side Internet (LAN) (ALL)
+OPD & Back side Telephone (PRI)
+OPD & Back side Telephone (LAN)
+OPD & Back side Computers and Accessories ALL
+
+Research Room Camera Alignment (ALL)
+Research Room Speakers (ALL)
+Research Room Fire detector (ALL)
+Research Room Fire alarm (ALL)
+Research Room Wi-Fi Router (ALL)
+Research Room Internet (LAN) (ALL)
+Research Room Telephone (PRI)
+Research Room Telephone (LAN)
+Research Room Computers and Accessories ALL
+
+
+Doctor Room Camera Alignment (ALL)
+Doctor Room Speakers (ALL)
+Doctor Room Fire detector (ALL)
+Doctor Room Fire alarm (ALL)
+Doctor Room Wi-Fi Router (ALL)
+Doctor Room Internet (LAN) (ALL)
+Doctor Room Telephone (PRI)
+Doctor Room Telephone (LAN)
+Doctor Room Computers and Accessories ALL

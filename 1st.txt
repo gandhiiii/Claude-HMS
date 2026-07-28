@@ -1,0 +1,56 @@
+Lobby Camera Alignment (ALL)
+Lobby Speakers (ALL)
+Lobby Fire detector (ALL)
+Lobby Fire alarm (ALL)
+Lobby Wi-Fi Router (ALL)
+
+Admission Camera Alignment (ALL)
+Admission Speakers (ALL)
+Admission Fire detector (ALL)
+Admission Fire alarm (ALL)
+Admission Wi-Fi Router (ALL)
+Internet (LAN) (ALL)
+Telephone (PRI)
+Telephone (LAN)
+Admission Computers and Accessories ALL
+
+Discharge Camera Alignment (ALL)
+Discharge Speakers (ALL)
+Discharge Fire detector (ALL)
+Discharge Fire alarm (ALL)
+Discharge Wi-Fi Router (ALL)
+Internet (LAN) (ALL)
+Telephone (PRI)
+Telephone (LAN)
+Discharge Computers and Accessories ALL
+
+Call center Camera Alignment (ALL)
+Call center Speakers (ALL)
+Call center Fire detector (ALL)
+Call center Fire alarm (ALL)
+Call center Wi-Fi Router (ALL)
+Internet (LAN) (ALL)
+Telephone (PRI)
+Telephone (LAN)
+Call center Computers and Accessories ALL
+
+Account & Other Department Camera Alignment (ALL)
+Account & Other Department Speakers (ALL)
+Account & Other Department Fire detector (ALL)
+Account & Other Department Fire alarm (ALL)
+Account & Other Department Wi-Fi Router (ALL)
+Internet (LAN) (ALL)
+Telephone (PRI)
+Telephone (LAN)
+Account & Other Department Computers and Accessories ALL
+
+
+Radiology Department Camera Alignment (ALL)
+Radiology Department Speakers (ALL)
+Radiology Department Fire detector (ALL)
+Radiology Department Fire alarm (ALL)
+Radiology Department Wi-Fi Router (ALL)
+Internet (LAN) (ALL)
+Telephone (PRI)
+Telephone (LAN)
+Radiology Department Computers and Accessories ALL

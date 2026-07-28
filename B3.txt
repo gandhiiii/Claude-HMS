@@ -1,0 +1,66 @@
+Parking Camera Alignment (ALL)
+Parking Speakers (ALL)
+Parking Fire detector (ALL)
+Parking Fire alarm (ALL)
+Parking Wi-Fi Router (ALL)
+
+Canteen Store room  camera Alignment (ALL)
+Canteen Store room  Access point 
+Canteen Store room  Fire alarm
+Canteen Store room  Speaker
+Canteen Store room  Telephone
+Canteen Store room Wi-Fi Router (ALL)
+
+Housekeeping & other Store room  camera Alignment (ALL)
+Housekeeping & other Store room  Access point 
+Housekeeping & other Store room  Fire alarm
+Housekeeping & other Store room  Speaker
+Housekeeping & other Store room  Telephone
+Housekeeping & other Store room Wi-Fi Router (ALL)
+
+
+stationery Store room  camera Alignment (ALL)
+stationery Store room  Access point
+stationery Store room  Fire alarm
+stationery Store room  Speaker
+stationery Store room  Telephone
+stationery Store room Wi-Fi Router (ALL)
+
+
+Linen Store room  camera Alignment (ALL)
+Linen Store room  Access point 
+Linen Store room  Fire alarm
+Linen Store room  Speaker
+Linen Store room  Telephone
+Linen Store room Wi-Fi Router (ALL)
+
+
+Account Store room camera Alignment (ALL)
+Account Store room Access point 
+Account Store room Fire alarm
+Account Store room Speaker
+Account Store room Telephone
+Account Store room Wi-Fi Router (ALL)
+
+Entrance Store room camera Alignment (ALL)
+Entrance Store room Access point 
+Entrance Store room Fire alarm
+Entrance Store room Speaker
+Entrance Store room Telephone
+Entrance Store room Wi-Fi Router (ALL)
+Entrance Store room Computers and Accessories (ALL)
+
+
+General Store room camera Alignment (ALL)
+General Store room Access point
+General Store room Fire alarm
+General Store room Speaker
+General Store room Telephone
+General Store room Wi-Fi Router (ALL)
+
+Maintenance & IT Store room camera Alignment (ALL)
+Maintenance & IT Store room Access point
+Maintenance & IT Store room Fire alarm
+Maintenance & IT Store room Speaker
+Maintenance & IT Store room Telephone
+Maintenance & IT Store room Wi-Fi Router (ALL)

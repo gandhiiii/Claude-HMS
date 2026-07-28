@@ -1,0 +1,27 @@
+Parking Camera Alignment (ALL)
+Parking Speakers (ALL)
+Parking Fire detector (ALL)
+Parking Fire alarm (ALL)
+Parking Wi-Fi Router (ALL)
+
+MEDICAL Store room  camera Alignment (ALL)
+MEDICAL Store room  Access point 
+MEDICAL Store room MEDICAL Fire alarm
+MEDICAL Store room  Speaker
+MEDICAL Store room Telephone
+MEDICAL Store room Wi-Fi Router (ALL)
+
+
+OT Store room  camera Alignment (ALL)
+OT Store room  Access point 
+OT Store room  Fire alarm
+OT Store room  Speaker
+OT Store room  Telephone
+OT Store room Wi-Fi Router (ALL)
+
+Physiotherapy Store room  camera Alignment (ALL)
+Physiotherapy Store room  Access point 
+Physiotherapy Store room  Fire alarm
+Physiotherapy Store room  Speaker
+Physiotherapy Store room  Telephone
+Physiotherapy Store room Wi-Fi Router (ALL)

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>App File Check</title>
+<style>
+    body { font-family:system-ui,sans-serif; background:#f3f6fb; padding:24px; max-width:760px; margin:auto; }
+    h1 { font-size:20px; margin-bottom:4px; }
+    p.sub { color:#6b7280; font-size:14px; margin-bottom:18px; }
+    .item { background:#fff; border:1px solid #d5dbe3; border-radius:8px; padding:12px 14px; margin-bottom:10px; font-size:15px; }
+    .ok { border-left:5px solid #16a34a; }
+    .bad { border-left:5px solid #dc2626; }
+    .fix { color:#b45309; font-size:14px; margin-top:6px; }
+    code { background:#eef1f6; padding:1px 5px; border-radius:4px; font-size:13px; }
+    #summary { font-size:16px; font-weight:600; padding:14px; border-radius:8px; margin-top:14px; }
+    #summary.good { background:#dcfce7; color:#15803d; }
+    #summary.problem { background:#fee2e2; color:#b91c1c; }
+</style>
+<script>
+    // Capture runtime/syntax errors thrown while each file loads.
+    var runErrors = {};
+    window.onerror = function (msg, src, line) {
+        var file = (src || '').split('/').slice(-1)[0].split('?')[0] || 'page';
+        if (!runErrors[file]) runErrors[file] = msg + ' (line ' + line + ')';
+        return false;
+    };
+    var loadFail = {};
+    function fileFail(name) { loadFail[name] = true; }
+</script>
+</head>
+<body>
+<h1>App File Check</h1>
+<p class="sub">This page tests your app's files. Take a screenshot of the results and send it.</p>
+<div id="results"></div>
+<div id="summary"></div>
+
+<!-- Load the same files the app uses. ?diag= skips the browser cache. -->
+<script src="js/i18n.js?diag=1" onerror="fileFail('i18n.js')"></script>
+<script src="js/data.js?diag=1" onerror="fileFail('data.js')"></script>
+<script src="js/firebase-config.js?diag=1" onerror="fileFail('firebase-config.js')"></script>
+<script src="js/checklists.js?diag=1" onerror="fileFail('checklists.js')"></script>
+<script src="js/checklists-seed-it.js?diag=1" onerror="fileFail('checklists-seed-it.js')"></script>
+
+<script>
+    var checks = [
+        { file: 'i18n.js', ok: function () { return typeof I18N !== 'undefined'; },
+          extra: function () {
+              if (typeof I18N === 'undefined') return '';
+              var v2 = typeof I18N.has === 'function' && I18N.has('nav_checklists');
+              return v2 ? ' — newest version ✓ (menu names included)'
+                        : ' — OLD version still loading! Copy the newest i18n.js and press Ctrl+F5.';
+          },
+          fix: 'Copy <code>i18n.js</code> into the <code>js</code> folder and press Ctrl+F5.' },
+        { file: 'data.js', ok: function () { return typeof DB !== 'undefined' && typeof AUTH !== 'undefined'; },
+          extra: function () { return ''; },
+          fix: '<strong>Important:</strong> this is your app\u2019s core file and it was never part of my updates. ' +
+               'If it is broken, the wrong file was probably replaced by mistake. Restore <code>data.js</code> ' +
+               'from your original app copy or backup \u2014 do NOT copy any of my files over it.' },
+        { file: 'firebase-config.js', ok: function () { return !loadFail['firebase-config.js'] && !runErrors['firebase-config.js']; },
+          extra: function () { return ''; },
+          fix: 'Restore <code>firebase-config.js</code> from your original app copy.' },
+        { file: 'checklists.js', ok: function () { return typeof CHECKLISTS !== 'undefined'; },
+          extra: function () { return ''; },
+          fix: 'Copy <code>checklists.js</code> into the <code>js</code> folder.' },
+        { file: 'checklists-seed-it.js', ok: function () { return typeof SEED_IT_CHECKLIST !== 'undefined'; },
+          extra: function () { return ''; },
+          fix: 'Copy <code>checklists-seed-it.js</code> into the <code>js</code> folder.' }
+    ];
+
+    var out = document.getElementById('results');
+    var problems = 0;
+    checks.forEach(function (c) {
+        var missing = !!loadFail[c.file];
+        var crashed = !!runErrors[c.file];
+        var good = !missing && !crashed && c.ok();
+        var div = document.createElement('div');
+        div.className = 'item ' + (good ? 'ok' : 'bad');
+        var status;
+        if (missing) status = '❌ FILE NOT FOUND in the js folder';
+        else if (crashed) status = '❌ FILE HAS AN ERROR: ' + runErrors[c.file];
+        else if (!good) status = '❌ FILE LOADED BUT SOMETHING IS WRONG';
+        else status = '✅ OK' + c.extra();
+        div.innerHTML = '<strong>js/' + c.file + '</strong><br>' + status +
+            (good ? '' : '<div class="fix">Fix: ' + c.fix + '</div>');
+        if (!good || (c.extra() || '').indexOf('OLD version') >= 0) problems++;
+        out.appendChild(div);
+    });
+
+    // Login check (only meaningful if data.js works)
+    if (typeof AUTH !== 'undefined') {
+        var div = document.createElement('div');
+        var u = null, authErr = null;
+        try { u = AUTH.currentUser(); } catch (e) { authErr = e.message || String(e); }
+        var good = !authErr;
+        div.className = 'item ' + (good ? 'ok' : 'bad');
+        div.innerHTML = '<strong>Login system</strong><br>' +
+            (authErr ? ('❌ ERROR: ' + authErr)
+                     : (u ? '✅ Logged in as: ' + (u.fullName || u.username)
+                          : '✅ Working (currently not logged in \u2014 that is fine)'));
+        if (!good) problems++;
+        out.appendChild(div);
+    }
+
+    var sum = document.getElementById('summary');
+    if (problems === 0) {
+        sum.className = 'good';
+        sum.textContent = '✅ All files are fine. If the app still does not load, the problem is inside dashboard.html \u2014 send a screenshot of this page anyway, plus F12 \u2192 Console on the page that fails.';
+    } else {
+        sum.className = 'problem';
+        sum.textContent = '❌ ' + problems + ' problem(s) found above. Follow the Fix line under each red item, press Ctrl+F5, then reload this page.';
+    }
+</script>
+</body>
+</html>

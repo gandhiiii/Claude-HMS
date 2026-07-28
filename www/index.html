@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Stavya Intelligence - Login</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <style>
+        .reset-section { display: none; }
+        .reset-section.active { display: block; }
+        .login-logo { text-align: center; margin-bottom: 12px; }
+        .login-logo img { max-width: 220px; height: auto; }
+        .setup-section { display: none; }
+        .setup-section.active { display: block; }
+        .setup-badge { background: var(--secondary); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; display: inline-block; margin-bottom: 8px; letter-spacing: 0.5px; }
+    </style>
+</head>
+<body>
+    <div class="login-page">
+        <div class="login-card">
+            <div class="login-logo">
+                <img id="loginLogo" src="assets/stavya-logo.png" alt="Hospital Logo">
+            </div>
+            <h1 id="loginHospitalName">Stavya Intelligence</h1>
+            <p class="subtitle">Login Portal</p>
+
+            <!-- Login Form — always visible immediately -->
+            <div id="loginForm">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="loginUser" class="form-control" placeholder="Enter username">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="loginPass" class="form-control" placeholder="Enter password">
+                </div>
+                <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleLogin()">Sign In</button>
+                <div class="login-footer" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;">
+                    <a href="#" onclick="showReset();return false;" style="font-size:13px;">Forgot Password?</a>
+                    <a href="#" onclick="showSetup();return false;" style="font-size:13px;">New device? Setup</a>
+                </div>
+                <div id="loginMsg" style="font-size:13px;margin-top:8px;text-align:center;min-height:18px;"></div>
+            </div>
+
+            <!-- Password Reset Form -->
+            <div id="resetForm" class="reset-section">
+                <h3 style="margin-bottom:8px;">Reset Password</h3>
+                <p style="font-size:13px;color:var(--gray);margin-bottom:16px;">Enter your username, email, or phone number.</p>
+                <div class="form-group">
+                    <label>Username / Email / Phone</label>
+                    <input type="text" id="resetIdentifier" class="form-control" placeholder="Enter username, email or phone">
+                </div>
+                <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleResetRequest()">Send Reset Link</button>
+                <div class="login-footer">
+                    <a href="#" onclick="showLogin();return false;" style="font-size:13px;">Back to Login</a>
+                </div>
+                <div id="resetResult" style="font-size:13px;margin-top:8px;text-align:center;"></div>
+                <div id="resetLinkBox" style="display:none;margin-top:12px;padding:12px;background:#f0f8ff;border-radius:8px;border:1px solid #c2d7f8;">
+                    <p style="font-size:13px;margin-bottom:8px;"><strong>Reset Token Generated</strong></p>
+                    <div id="resetLinkDisplay" style="font-size:12px;word-break:break-all;background:white;padding:8px;border-radius:4px;"></div>
+                    <div style="margin-top:12px;">
+                        <label>New Password</label>
+                        <input type="password" id="newPassword" class="form-control" placeholder="Enter new password" style="margin-bottom:8px;">
+                        <button class="btn btn-success" style="width:100%;" onclick="handlePasswordReset()">Set New Password</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Device Setup Form -->
+            <div id="setupForm" class="setup-section">
+                <div class="setup-badge">DEVICE SETUP</div>
+                <h3 style="margin-bottom:4px;">Set Up This Device</h3>
+                <p style="font-size:13px;color:var(--gray);margin-bottom:16px;">Enter the <strong>same username and password</strong> you use on your other device.</p>
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="setupName" class="form-control" placeholder="e.g. Hospital Administrator">
+                </div>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="setupUser" class="form-control" placeholder="Your username" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="setupPass" class="form-control" placeholder="Min 6 characters" autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label>Confirm Password</label>
+                    <input type="password" id="setupPass2" class="form-control" placeholder="Re-enter password" autocomplete="new-password">
+                </div>
+                <button class="btn btn-primary btn-lg" style="width:100%;" onclick="handleSetup()">Create &amp; Sign In</button>
+                <div style="margin-top:8px;text-align:center;">
+                    <a href="#" onclick="showLogin();return false;" style="font-size:12px;color:var(--gray);">← Back to login</a>
+                </div>
+                <div id="setupError" style="color:var(--danger);font-size:13px;margin-top:8px;text-align:center;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/data.js?v=73"></script>
+    <script src="js/firebase-config.js?v=73"></script>
+    <script>
+        // ── Import via QR / shared link: index.html#import=BASE64 ──
+        (function () {
+            try {
+                var m = window.location.hash.match(/[#&]import=([A-Za-z0-9+\/=%]+)/);
+                if (!m) return;
+                var data = JSON.parse(decodeURIComponent(atob(m[1])));
+                if (data && data.users && data.users.length > 0) {
+                    localStorage.setItem('hms_users', JSON.stringify(data.users));
+                    Object.keys(data).forEach(function (k) {
+                        if (k !== 'users') try { localStorage.setItem('hms_' + k, JSON.stringify(data[k])); } catch(e){}
+                    });
+                    try { history.replaceState(null, null, window.location.pathname); } catch(e){}
+                    setMsg('✅ Accounts imported! Please log in.', 'var(--secondary)');
+                }
+            } catch(e) {}
+        })();
+
+        // ── On load: redirect if already logged in, else pull from Firebase ──
+        (function () {
+            try {
+                // A password-reset link must take priority over the "already logged in" redirect —
+                // otherwise a logged-in user clicking a reset link is bounced to the dashboard and
+                // can never reach the reset form.
+                var hasResetToken = new URLSearchParams(window.location.search).has('reset');
+                if (!hasResetToken && AUTH.currentUser()) { window.location.replace('dashboard.html'); return; }
+            } catch(e){}
+
+            var localUsers = [];
+            try { localUsers = DB.get('users') || []; } catch(e){}
+
+            if (localUsers.length > 0) return; // have local data — nothing else needed
+
+            if (!window.FB_DB) {
+                setMsg('⚠ No cloud configured. Use "New device? Setup" below.', 'orange');
+                return;
+            }
+
+            setMsg('⏳ Loading accounts from cloud…', 'var(--gray)');
+
+            var _timer = setTimeout(function() {
+                setMsg('⚠ Cloud timeout. Check internet or use "New device? Setup".', 'orange');
+            }, 10000);
+
+            window.FB_DB.ref('hms').once('value').then(function(snap) {
+                clearTimeout(_timer);
+                var remote = snap.val();
+                if (!remote || !remote.users) {
+                    setMsg('⚠ No accounts in cloud yet. Use "New device? Setup".', 'orange');
+                    return;
+                }
+                // Convert Firebase object-arrays back to real arrays
+                Object.keys(remote).forEach(function(key) {
+                    try {
+                        var val = remote[key];
+                        if (val && typeof val === 'object' && !Array.isArray(val)) {
+                            var ks = Object.keys(val);
+                            if (ks.length > 0 && ks.every(function(k){ return /^\d+$/.test(k); })) {
+                                val = ks.map(function(k){ return val[k]; });
+                            }
+                        }
+                        localStorage.setItem('hms_' + key, JSON.stringify(val));
+                    } catch(e2){}
+                });
+                localStorage.setItem('hms_last_cloud_sync', new Date().toISOString());
+                var count = 0;
+                try {
+                    var u = JSON.parse(localStorage.getItem('hms_users'));
+                    count = Array.isArray(u) ? u.length : (u ? Object.keys(u).length : 0);
+                } catch(e3){}
+                setMsg('✅ ' + count + ' account(s) loaded. Please log in.', 'var(--secondary)');
+            }).catch(function(err) {
+                clearTimeout(_timer);
+                var msg = err && err.message ? err.message : 'unknown error';
+                setMsg('⚠ Cloud error: ' + msg + ' — use "New device? Setup".', 'orange');
+                console.error('[HMS] Firebase pull failed:', msg);
+            });
+        })();
+
+        function setMsg(text, color) {
+            var el = document.getElementById('loginMsg');
+            if (el) { el.textContent = text; el.style.color = color || 'var(--gray)'; }
+        }
+
+        /* ── Login ── */
+        function handleLogin() {
+            var username = document.getElementById('loginUser').value.trim();
+            var password = document.getElementById('loginPass').value.trim();
+            if (!username || !password) { setMsg('Please enter username and password.', 'var(--danger)'); return; }
+            setMsg('', '');
+            try {
+                var result = AUTH.login(username, password);
+                if (result.success) {
+                    window.location.replace('dashboard.html');
+                } else {
+                    setMsg(result.message, 'var(--danger)');
+                }
+            } catch(e) { setMsg('Login error: ' + (e.message || e), 'var(--danger)'); }
+        }
+
+        document.getElementById('loginPass').addEventListener('keydown', function(e){ if(e.key==='Enter') handleLogin(); });
+        document.getElementById('loginUser').addEventListener('keydown', function(e){ if(e.key==='Enter') handleLogin(); });
+
+        /* ── Section switching ── */
+        function showLogin() {
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('resetForm').classList.remove('active');
+            document.getElementById('setupForm').classList.remove('active');
+            setMsg('', '');
+        }
+        function showReset() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('resetForm').classList.add('active');
+            document.getElementById('setupForm').classList.remove('active');
+            document.getElementById('resetResult').textContent = '';
+            document.getElementById('resetLinkBox').style.display = 'none';
+        }
+        function showSetup() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('resetForm').classList.remove('active');
+            document.getElementById('setupForm').classList.add('active');
+        }
+
+        /* ── Device Setup ── */
+        function handleSetup() {
+            var name  = (document.getElementById('setupName').value  || '').trim();
+            var uname = (document.getElementById('setupUser').value  || '').trim();
+            var pass  = (document.getElementById('setupPass').value  || '').trim();
+            var pass2 = (document.getElementById('setupPass2').value || '').trim();
+            var errEl = document.getElementById('setupError');
+            errEl.textContent = '';
+            if (!name)                      { errEl.textContent = 'Full name is required.'; return; }
+            if (!uname || uname.length < 3) { errEl.textContent = 'Username must be at least 3 characters.'; return; }
+            if (!pass  || pass.length < 6)  { errEl.textContent = 'Password must be at least 6 characters.'; return; }
+            if (pass !== pass2)             { errEl.textContent = 'Passwords do not match.'; return; }
+            try {
+                var existing = DB.get('users') || [];
+                // Check if this username already exists — update password instead of creating duplicate
+                var idx = existing.findIndex(function(u){ return u.username === uname; });
+                if (idx >= 0) {
+                    existing[idx].password = pass;
+                    existing[idx].fullName = name || existing[idx].fullName;
+                    DB.set('users', existing);
+                } else if (existing.length === 0) {
+                    // No accounts exist anywhere yet — this is genuinely the very first
+                    // setup on this system, so it's safe to bootstrap the first super-admin.
+                    var admin = {
+                        id: 'admin_' + Date.now(), username: uname, password: pass,
+                        fullName: name, email: '', phone: '',
+                        role: 'admin', department: 'Administration',
+                        isSuperAdmin: true, permissions: ['all'],
+                        createdAt: new Date().toISOString()
+                    };
+                    existing.push(admin);
+                    DB.set('users', existing);
+                } else {
+                    // Accounts already exist (locally or in the cloud) but none match this
+                    // username. Do NOT silently mint a new super-admin here — the most likely
+                    // causes are a typo, or this device hasn't finished pulling the cloud
+                    // account list yet. Fail safely instead of creating a duplicate/rogue admin.
+                    errEl.textContent = 'No matching account found for "' + uname + '". Double-check the username and password, or wait a moment for cloud sync to finish and try again.';
+                    return;
+                }
+                var result = AUTH.login(uname, pass);
+                if (result.success) { window.location.replace('dashboard.html'); }
+                else { errEl.textContent = result.message; }
+            } catch(e) { errEl.textContent = 'Setup error: ' + (e.message || e); }
+        }
+
+        /* ── Password reset ── */
+        var currentResetToken = null;
+        function handleResetRequest() {
+            var identifier = document.getElementById('resetIdentifier').value.trim();
+            var resultEl = document.getElementById('resetResult');
+            resultEl.style.color = '';
+            if (!identifier) { resultEl.textContent = 'Please enter username, email or phone.'; return; }
+            try {
+                var users = DB.get('users') || [];
+                var user = users.find(function(u){ return u.username===identifier||u.email===identifier||u.phone===identifier; });
+                if (!user) { resultEl.textContent = 'No account found.'; return; }
+                if (user.role==='admin'||user.isSuperAdmin) {
+                    var result = AUTH.requestReset(identifier);
+                    resultEl.textContent = result.message;
+                    if (result.success) {
+                        document.getElementById('resetLinkBox').style.display = 'block';
+                        document.getElementById('resetLinkDisplay').textContent = 'Token: ' + result.token;
+                        currentResetToken = result.token;
+                    }
+                } else {
+                    var existing = (DB.get('pwResetRequests')||[]).find(function(r){ return r.userId===user.id&&r.status==='pending'; });
+                    if (existing) {
+                        resultEl.style.color='orange';
+                        resultEl.textContent='A request is already pending. Please wait for the administrator.';
+                    } else {
+                        DB.add('pwResetRequests',{userId:user.id,username:user.username,fullName:user.fullName||user.username,department:user.department||'',role:user.role,requestedAt:new Date().toISOString(),status:'pending'});
+                        resultEl.style.color='var(--secondary)';
+                        resultEl.textContent='Request sent to administrator.';
+                    }
+                }
+            } catch(e) { resultEl.textContent='Error: '+(e.message||e); }
+        }
+        function handlePasswordReset() {
+            var newPass = document.getElementById('newPassword').value.trim();
+            if (!newPass||newPass.length<4) { document.getElementById('resetResult').textContent='Password must be at least 4 characters.'; return; }
+            var result = AUTH.resetPassword(currentResetToken, newPass);
+            document.getElementById('resetResult').textContent = result.message;
+            if (result.success) { setTimeout(showLogin, 2000); }
+        }
+
+        /* Apply saved hospital branding on login page */
+        (function() {
+            try {
+                var raw = localStorage.getItem('hms_hospital_settings');
+                if (!raw) return;
+                var hs = JSON.parse(raw);
+                if (hs.logo) { var img = document.getElementById('loginLogo'); if (img) img.src = hs.logo; }
+                if (hs.name) { var nm = document.getElementById('loginHospitalName'); if (nm) nm.textContent = hs.name; document.title = hs.name + ' - Login'; }
+            } catch(e) {}
+        })();
+
+        window.addEventListener('load', function() {
+            var params = new URLSearchParams(window.location.search);
+            var resetToken = params.get('reset');
+            if (resetToken) {
+                var tokenData = AUTH.verifyResetToken(resetToken);
+                if (tokenData) {
+                    showReset();
+                    document.getElementById('resetIdentifier').value = tokenData.username;
+                    document.getElementById('resetLinkBox').style.display = 'block';
+                    document.getElementById('resetLinkDisplay').textContent = 'Token verified! Set your new password below.';
+                    currentResetToken = resetToken;
+                    document.getElementById('resetResult').style.color = 'var(--secondary)';
+                    document.getElementById('resetResult').textContent = 'Token verified successfully!';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+Doctor Room Camera Alignment (ALL)
+Doctor Room Speakers (ALL)
+Doctor Room Fire detector (ALL)
+Doctor Room Fire alarm (ALL)
+Doctor Room Wi-Fi Router (ALL)
+Doctor Room Internet (LAN) (ALL)
+Doctor Room Telephone (PRI)
+Doctor Room Telephone (LAN)
+Doctor Room Computers and Accessories ALL
+
+
+OT Speakers (ALL)
+OT Fire detector (ALL)
+OT Fire alarm (ALL)
+OT Wi-Fi Router (ALL)
+OT Internet (LAN) (ALL)
+OT Telephone (PRI)
+OT side Telephone (LAN)
+OT side Computers and Accessories ALL
+
+
+CSSD Speakers (ALL)
+CSSD Fire detector (ALL)
+CSSD Fire alarm (ALL)
+CSSD Wi-Fi Router (ALL)
+CSSD Internet (LAN) (ALL)
+CSSD Telephone (PRI)
+CSSD side Telephone (LAN)
+CSSD side Computers and Accessories ALL
+
+HDU Speakers (ALL)
+HDU Fire detector (ALL)
+HDU Fire alarm (ALL)
+HDU Wi-Fi Router (ALL)
+HDU Internet (LAN) (ALL)
+HDU Telephone (PRI)
+HDU side Telephone (LAN)
+HDU side Computers and Accessories ALL
+
+OT Staff Room Speakers (ALL)
+OT Staff Room Fire detector (ALL)
+OT Staff Room Fire alarm (ALL)
+OT Staff Room Wi-Fi Router (ALL)
+OT Staff Room Internet (LAN) (ALL)
+OT Staff Room Telephone (PRI)
+OT Staff Room side Telephone (LAN)
+OT Staff Room side Computers and Accessories ALL
+
+Forth floor
+
+Reception & Lobby Camera Alignment (ALL)
+Reception & Lobby Speakers (ALL)
+Reception & Lobby Fire detector (ALL)
+Reception & Lobby Fire alarm (ALL)
+Reception & Lobby Wi-Fi Router (ALL)
+Reception & Lobby Internet (LAN) (ALL)
+Reception & Lobby Telephone (PRI)
+Reception & Lobby Telephone (LAN)
+Reception & Lobby Computers and Accessories ALL
+
+Nursing Room Camera Alignment (ALL)
+Nursing Room Speakers (ALL)
+Nursing Room Fire detector (ALL)
+Nursing Room Fire alarm (ALL)
+Nursing Room Wi-Fi Router (ALL)
+Nursing Room Internet (LAN) (ALL)
+Nursing Room Telephone (PRI)
+Nursing Room Telephone (LAN)
+Nursing Room Computers and Accessories ALL
+
+Doctors Lift and Linen Passage Camera Alignment (ALL)
+Doctors Lift and Linen Passage Speakers (ALL)
+Doctors Lift and Linen Passage Fire detector (ALL)
+Doctors Lift and Linen Passage Fire alarm (ALL)
+Doctors Lift and Linen Passage Wi-Fi Router (ALL)
+
+Room Speakers (ALL)
+Room Fire detector (ALL)
+Room Wi-Fi Router (ALL)
+Room Internet (LAN) (ALL)
+Room Telephone (LAN)
