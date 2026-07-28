@@ -1010,7 +1010,7 @@ function _hodRequests(el) {
     d.pendingGateApprovals = gateApprovals;
 
     var routedProbs = (DB.get('problems') || []).filter(function (p) {
-        return (p.routedTo === dept || (!p.routedTo && p.department === dept)) && p.status !== 'resolved';
+        return (p.routedTo === dept || (!p.routedTo && p.department === dept)) && p.status !== 'resolved' && p.status !== 'closed';
     });
     d.routedProblems = routedProbs;
 
@@ -1124,7 +1124,9 @@ function _hodRequests(el) {
                 + (p.assignedToName ? '<div style="font-size:11px;color:var(--gray);margin-top:2px;">→ Assigned to: ' + p.assignedToName + '</div>' : '')
                 + '</div>'
                 + '<div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">'
-                + '<button class="btn btn-sm btn-success" onclick="hodSolveProb(\'' + p.id + '\')" style="font-size:11px;">✓ Solve</button>'
+                + (p.rca && p.rca.rootCauseDetails
+                    ? '<button class="btn btn-sm" style="background:#1a237e;color:#fff;font-size:11px;" onclick="hodViewRCA(\'' + p.id + '\')">📋 View RCA</button>'
+                    : '<button class="btn btn-sm" style="background:#2e7d32;color:#fff;font-size:11px;" onclick="hodShowRCAForm(\'' + p.id + '\')">🔍 RCA</button>')
                 + '<button class="btn btn-sm btn-warning" onclick="showAssignProbForm(\'' + p.id + '\')" style="font-size:11px;">Assign</button>'
                 + '</div></div></div>';
         });
@@ -1226,46 +1228,208 @@ function _hodRequests(el) {
     el.innerHTML = html;
 }
 
-function hodSolveProb(id) {
+function hodShowRCAForm(id) {
     var p = DB.getById('problems', id);
     if (!p) return;
     var tkt = p.ticketId || ('#' + p.id.slice(-6));
-    var form = '<form id="hodSolveProbForm">'
-        + '<input type="hidden" id="hodSolveProbId" value="' + id + '">'
+    var existing = p.rca || {};
+    var isEdit = existing && existing.rootCause;
+
+    var html = '<form id="hodRCAForm"><input type="hidden" id="hodRCAProbId" value="' + id + '">'
         + '<div style="background:#fff3e0;border-radius:8px;padding:10px 14px;margin-bottom:14px;">'
-        + '<div style="font-size:13px;font-weight:800;color:#e65100;margin-bottom:2px;">' + tkt + '</div>'
-        + '<div style="font-size:14px;font-weight:600;">' + (p.title || '') + '</div>'
-        + (p.source === 'checklist' ? '<div style="font-size:12px;color:var(--primary);margin-top:4px;">📋 From: ' + (p.checklistTitle || '') + ' — ' + (p.itemTask || '') + '</div>' : '')
+        + '<div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:13px;font-weight:800;color:#e65100;">' + tkt + '</span>'
+        + '<span style="font-size:11px;background:#e8eaf6;color:#1a237e;padding:2px 10px;border-radius:10px;">RCA & GEMBA</span></div>'
+        + '<div style="font-size:14px;font-weight:600;margin-top:4px;">' + (p.title || '') + '</div>'
+        + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">Category: ' + (p.category||'-') + ' · Reported: ' + APP.formatDate(p.createdAt) + ' · By: ' + (p.reportedBy||'-') + '</div>'
+        + (p.source === 'checklist' ? '<div style="font-size:11px;color:var(--primary);margin-top:2px;">📋 ' + (p.checklistTitle||'') + ' — ' + (p.itemTask||'') + '</div>' : '')
         + '</div>'
-        + '<div class="form-group"><label>Resolution / Solution *</label>'
-        + '<textarea id="hodSolveSolution" class="form-control" rows="3" required placeholder="Describe how the problem was resolved and what action was taken..."></textarea></div>'
+
+        // ─── GEMBA Section ───
+        + '<div style="background:#e8f5e9;border-radius:8px;padding:12px;margin-bottom:14px;">'
+        + '<div style="font-weight:700;font-size:14px;color:#2e7d32;margin-bottom:8px;">🏭 GEMBA — Go & See</div>'
+        + '<div class="form-group"><label>Gemba Date</label><input type="date" id="hodRCAgembaDate" class="form-control" value="' + (existing.gembaDate||new Date().toISOString().slice(0,10)) + '"></div>'
+        + '<div class="form-group"><label>Location / Area Observed *</label><input type="text" id="hodRCAgembaLocation" class="form-control" value="' + (existing.gembaLocation||'') + '" placeholder="e.g. 3rd Floor Nurse Station"></div>'
+        + '<div class="form-group"><label>Actual Condition Observed *</label><textarea id="hodRCAgembaObservation" class="form-control" rows="3" placeholder="Describe what you actually saw at the location...">' + (existing.gembaObservation||'') + '</textarea></div>'
+        + '</div>'
+
+        // ─── RCA Section ───
+        + '<div style="background:#e3f2fd;border-radius:8px;padding:12px;margin-bottom:14px;">'
+        + '<div style="font-weight:700;font-size:14px;color:#1565c0;margin-bottom:8px;">🔍 Root Cause Analysis</div>'
+        + '<div class="form-group"><label>Root Cause Category</label><select id="hodRCAcauseCat" class="form-control">'
+        + ['People','Process','Equipment','Material','Environment','Other'].map(function(c){
+            return '<option value="' + c + '"' + (existing.causeCategory===c?' selected':'') + '>' + c + '</option>';
+        }).join('') + '</select></div>'
+        + '<div class="form-group"><label>Immediate Cause *</label><textarea id="hodRCAimmCause" class="form-control" rows="2" placeholder="What directly caused the problem?">' + (existing.immediateCause||'') + '</textarea></div>'
+        + '<div class="form-group"><label>Root Cause (5 Whys) *</label><textarea id="hodRCArcDetails" class="form-control" rows="4" placeholder="Dig deeper &mdash; ask why 5 times to find the true root cause...">' + (existing.rootCauseDetails||'') + '</textarea></div>'
+        + '<div style="font-size:11px;color:var(--gray);margin-top:-8px;margin-bottom:10px;">💡 Ask <strong>Why</strong> repeatedly until the fundamental process or system failure is identified.</div>'
+        + '</div>'
+
+        // ─── Action Plan ───
+        + '<div style="background:#fff8e1;border-radius:8px;padding:12px;margin-bottom:14px;">'
+        + '<div style="font-weight:700;font-size:14px;color:#e65100;margin-bottom:8px;">📋 Corrective & Preventive Action (CAPA)</div>'
+        + '<div class="form-group"><label>Immediate Corrective Action *</label><textarea id="hodRCAimmAction" class="form-control" rows="2" placeholder="What was done right away to contain the problem?">' + (existing.immediateAction||'') + '</textarea></div>'
+        + '<div class="form-group"><label>Preventive Action *</label><textarea id="hodRCAprevAction" class="form-control" rows="3" placeholder="What systemic change prevents recurrence?">' + (existing.preventiveAction||'') + '</textarea></div>'
+        + '<div class="form-group"><label>Responsible Person</label><input type="text" id="hodRCArespPerson" class="form-control" value="' + (existing.responsiblePerson||'') + '" placeholder="Name of person responsible"></div>'
+        + '<div class="form-group"><label>Target Completion Date</label><input type="date" id="hodRCAtargetDate" class="form-control" value="' + (existing.targetDate||'') + '"></div>'
+        + '</div>'
+
         + '</form>';
-    openFormModal('Solve Problem — ' + tkt, form, 'hodSaveSolution()', false);
+    openFormModal((isEdit?'Edit':'New') + ' RCA Report — ' + tkt, html, 'hodSaveRCA()', false);
 }
 
-function hodSaveSolution() {
-    var id       = (document.getElementById('hodSolveProbId') || {}).value;
-    var solution = ((document.getElementById('hodSolveSolution') || {}).value || '').trim();
-    if (!solution) { APP.notify('Please describe the solution', 'error'); return false; }
+function hodSaveRCA() {
+    var id = (document.getElementById('hodRCAProbId') || {}).value;
+    if (!id) { APP.notify('Problem ID missing', 'error'); return false; }
+    var gembaDate = ((document.getElementById('hodRCAgembaDate') || {}).value || '').trim();
+    var gembaLocation = ((document.getElementById('hodRCAgembaLocation') || {}).value || '').trim();
+    var gembaObservation = ((document.getElementById('hodRCAgembaObservation') || {}).value || '').trim();
+    var causeCategory = ((document.getElementById('hodRCAcauseCat') || {}).value || '').trim();
+    var immediateCause = ((document.getElementById('hodRCAimmCause') || {}).value || '').trim();
+    var rootCauseDetails = ((document.getElementById('hodRCArcDetails') || {}).value || '').trim();
+    var immediateAction = ((document.getElementById('hodRCAimmAction') || {}).value || '').trim();
+    var preventiveAction = ((document.getElementById('hodRCAprevAction') || {}).value || '').trim();
+    var responsiblePerson = ((document.getElementById('hodRCArespPerson') || {}).value || '').trim();
+    var targetDate = ((document.getElementById('hodRCAtargetDate') || {}).value || '').trim();
+
+    if (!gembaLocation || !gembaObservation || !immediateCause || !rootCauseDetails || !immediateAction || !preventiveAction) {
+        APP.notify('Please fill all required fields (marked with *)', 'error'); return false;
+    }
+
     var user = AUTH.currentUser();
-    var p    = DB.getById('problems', id);
+    var p = DB.getById('problems', id);
+    var rcaData = {
+        gembaDate: gembaDate,
+        gembaLocation: gembaLocation,
+        gembaObservation: gembaObservation,
+        causeCategory: causeCategory,
+        immediateCause: immediateCause,
+        rootCauseDetails: rootCauseDetails,
+        immediateAction: immediateAction,
+        preventiveAction: preventiveAction,
+        responsiblePerson: responsiblePerson,
+        targetDate: targetDate,
+        rcaDoneBy: user ? user.fullName : '',
+        rcaDoneAt: new Date().toISOString()
+    };
+
     DB.update('problems', id, {
-        status: 'resolved',
-        solution: solution,
+        status: 'rca_completed',
+        solution: 'RCA completed. Root cause: ' + immediateCause + '. Action: ' + immediateAction,
         resolvedBy: user ? user.fullName : '',
-        resolvedAt: new Date().toISOString()
+        resolvedAt: new Date().toISOString(),
+        rca: rcaData
     });
+
     var tkt = p ? (p.ticketId || '#' + p.id.slice(-6)) : '';
-    APP.notify('Problem ' + tkt + ' solved ✓', 'success');
+    APP.notify('RCA report saved for ' + tkt + ' ✓', 'success');
     var modal = document.querySelector('.modal');
     if (modal) modal.remove();
-    // Refresh data and re-render
     var dept = _hodData.dept;
     _hodData.routedProblems = (DB.get('problems') || []).filter(function (pb) {
-        return (pb.routedTo === dept || (!pb.routedTo && pb.department === dept)) && pb.status !== 'resolved';
+        return (pb.routedTo === dept || (!pb.routedTo && pb.department === dept)) && pb.status !== 'resolved' && pb.status !== 'closed';
     });
     _renderHodTab('requests');
     return true;
+}
+
+function hodViewRCA(id) {
+    var p = DB.getById('problems', id);
+    if (!p) return;
+    var r = p.rca;
+    if (!r || !r.rootCauseDetails) { APP.notify('No RCA report found for this problem. Create one first.', 'info'); return; }
+    var tkt = p.ticketId || ('#' + p.id.slice(-6));
+
+    function _s(label, val) {
+        return '<div style="margin-bottom:6px;"><span style="font-size:11px;color:var(--gray);font-weight:600;">' + label + '</span><div style="font-size:13px;background:var(--light-gray);padding:6px 10px;border-radius:6px;margin-top:2px;">' + (val||'—') + '</div></div>';
+    }
+
+    var html = '<div style="max-height:70vh;overflow-y:auto;padding:4px;">'
+        + '<div style="background:linear-gradient(135deg,#1a237e,#283593);color:#fff;border-radius:10px;padding:16px;margin-bottom:14px;">'
+        + '<div style="font-size:16px;font-weight:700;">📋 RCA Report — ' + tkt + '</div>'
+        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + (p.title||'') + '</div></div>'
+
+        + '<div style="background:#e8f5e9;border-radius:8px;padding:12px;margin-bottom:12px;">'
+        + '<div style="font-weight:700;font-size:14px;color:#2e7d32;margin-bottom:6px;">🏭 GEMBA — Go & See</div>'
+        + _s('Date', r.gembaDate ? APP.formatDate(r.gembaDate) : '—')
+        + _s('Location', r.gembaLocation)
+        + _s('Observation', r.gembaObservation)
+        + '</div>'
+
+        + '<div style="background:#e3f2fd;border-radius:8px;padding:12px;margin-bottom:12px;">'
+        + '<div style="font-weight:700;font-size:14px;color:#1565c0;margin-bottom:6px;">🔍 Root Cause Analysis</div>'
+        + _s('Category', r.causeCategory)
+        + _s('Immediate Cause', r.immediateCause)
+        + _s('Root Cause (5 Whys)', r.rootCauseDetails)
+        + _s('RCA Done By', r.rcaDoneBy)
+        + _s('RCA Date', r.rcaDoneAt ? APP.formatDate(r.rcaDoneAt) : '—')
+        + '</div>'
+
+        + '<div style="background:#fff8e1;border-radius:8px;padding:12px;margin-bottom:12px;">'
+        + '<div style="font-weight:700;font-size:14px;color:#e65100;margin-bottom:6px;">📋 CAPA — Corrective & Preventive Action</div>'
+        + _s('Immediate Action', r.immediateAction)
+        + _s('Preventive Action', r.preventiveAction)
+        + _s('Responsible', r.responsiblePerson)
+        + _s('Target Date', r.targetDate ? APP.formatDate(r.targetDate) : '—')
+        + '</div>'
+
+        + '<div style="display:flex;gap:8px;margin-top:8px;">'
+        + '<button class="btn btn-sm btn-primary" onclick="document.querySelector(\'.modal\').remove();hodShowRCAForm(\'' + id + '\')">✏️ Edit</button>'
+        + '<button class="btn btn-sm" style="background:#1e7e34;color:#fff;" onclick="document.querySelector(\'.modal\').remove();hodDownloadRCAReport(\'' + id + '\')">📥 Download</button>'
+        + '</div></div>';
+    openFormModal('RCA Report — ' + tkt, html, null, false);
+}
+
+function hodDownloadRCAReport(id) {
+    var p = DB.getById('problems', id);
+    if (!p || !p.rca) { APP.notify('No RCA data found', 'error'); return; }
+    var r = p.rca;
+    var user = AUTH.currentUser();
+    var tkt = p.ticketId || ('#' + p.id.slice(-6));
+    try {
+        var wb = XLSX.utils.book_new();
+
+        var info = [
+            ['RCA & GEMBA REPORT'],
+            [''],
+            ['Ticket', tkt],
+            ['Problem', p.title||''],
+            ['Category', p.category||''],
+            ['Reported By', p.reportedBy||''],
+            ['Department', p.department||''],
+            ['Location', p.location||''],
+            ['Reported Date', p.createdAt ? APP.formatDate(p.createdAt) : ''],
+            ['Status', p.status||''],
+            [''],
+            ['── GEMBA ──'],
+            ['Gemba Date', r.gembaDate ? APP.formatDate(r.gembaDate) : ''],
+            ['Location Observed', r.gembaLocation||''],
+            ['Actual Condition', r.gembaObservation||''],
+            [''],
+            ['── ROOT CAUSE ANALYSIS ──'],
+            ['Cause Category', r.causeCategory||''],
+            ['Immediate Cause', r.immediateCause||''],
+            ['Root Cause (5 Whys)', r.rootCauseDetails||''],
+            ['RCA Done By', r.rcaDoneBy||''],
+            ['RCA Date', r.rcaDoneAt ? APP.formatDate(r.rcaDoneAt) : ''],
+            [''],
+            ['── CORRECTIVE & PREVENTIVE ACTION ──'],
+            ['Immediate Action', r.immediateAction||''],
+            ['Preventive Action', r.preventiveAction||''],
+            ['Responsible Person', r.responsiblePerson||''],
+            ['Target Date', r.targetDate ? APP.formatDate(r.targetDate) : ''],
+            [''],
+            ['── RESOLUTION ──'],
+            ['Resolved By', p.resolvedBy||''],
+            ['Resolved At', p.resolvedAt ? APP.formatDate(p.resolvedAt) : ''],
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(info), 'RCA Report');
+
+        var fname = 'RCA_Report_' + tkt.replace(/[^a-z0-9]/gi,'_') + '.xlsx';
+        XLSX.writeFile(wb, fname);
+        APP.notify('RCA report downloaded: ' + fname, 'success');
+    } catch(e) {
+        APP.notify('RCA download failed: ' + e.message, 'error');
+    }
 }
 
 function hodCreateRequest() {
@@ -1309,7 +1473,7 @@ function _hodRefreshAndShow() {
     }).map(function(dv){ return Object.assign({}, dv, {_gateType:'doctor'}); });
     _hodData.pendingGateApprovals = rg.concat(rd);
     _hodData.routedProblems = (DB.get('problems') || []).filter(function (p) {
-        return (p.routedTo === dept || (!p.routedTo && p.department === dept)) && p.status !== 'resolved';
+        return (p.routedTo === dept || (!p.routedTo && p.department === dept)) && p.status !== 'resolved' && p.status !== 'closed';
     });
     _hodData.myReqs = (DB.get('hodRequests') || []).filter(function (r) { return r.department === dept; });
     _renderHodTab('requests');
