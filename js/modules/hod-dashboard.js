@@ -2084,6 +2084,18 @@ function _hodInventoryReport(el) {
     }, 0);
     var lowStock = items.filter(function (i) { return parseFloat(i.quantity) <= 5; });
 
+    // Movements for this department
+    var allMoves = (DB.get('inventory_movements') || []).filter(function (m) {
+        return (m.dept || '').trim().toLowerCase() === dept;
+    });
+    var movesIn = allMoves.filter(function (m) { return m.type === 'in'; });
+    var movesOut = allMoves.filter(function (m) { return m.type === 'out'; });
+    var totalInQty = movesIn.reduce(function (s, m) { return s + (parseFloat(m.qty) || 0); }, 0);
+    var totalOutQty = movesOut.reduce(function (s, m) { return s + (parseFloat(m.qty) || 0); }, 0);
+    var totalInVal = movesIn.reduce(function (s, m) { return s + (parseFloat(m.totalValue) || 0); }, 0);
+    var totalOutVal = movesOut.reduce(function (s, m) { return s + (parseFloat(m.totalValue) || 0); }, 0);
+    var recentMoves = allMoves.slice().reverse().slice(0, 20);
+
     // Material requests for this department
     var matReqs = (DB.get('material_requests') || []).filter(function (r) {
         return (r.department || '').trim().toLowerCase() === dept;
@@ -2112,10 +2124,18 @@ function _hodInventoryReport(el) {
         + '<div class="hod-kpi"><div class="hod-kpi-icon" style="background:#e0f2f1;color:#00796b;">📦</div><div><div class="hod-kpi-val">' + totalItems + '</div><div class="hod-kpi-lbl">Total Items</div></div></div>'
         + '<div class="hod-kpi"><div class="hod-kpi-icon" style="background:#e8f5e9;color:#2e7d32;">🔢</div><div><div class="hod-kpi-val">' + totalQty + '</div><div class="hod-kpi-lbl">Total Quantity</div></div></div>'
         + '<div class="hod-kpi"><div class="hod-kpi-icon" style="background:#fff3e0;color:#e65100;">💰</div><div><div class="hod-kpi-val">₹' + totalValue.toFixed(2) + '</div><div class="hod-kpi-lbl">Total Value</div></div></div>'
-        + '<div class="hod-kpi" style="cursor:default;"><div class="hod-kpi-icon" style="background:' + (lowStock.length > 0 ? '#ffebee;#c62828' : '#e8f5e9;#2e7d32') + ';">' + (lowStock.length > 0 ? '⚠️' : '✅') + '</div><div><div class="hod-kpi-val">' + lowStock.length + '</div><div class="hod-kpi-lbl">Low Stock Items</div></div></div>'
+        + '<div class="hod-kpi" style="cursor:default;"><div class="hod-kpi-icon" style="background:' + (lowStock.length > 0 ? '#ffebee;#c62828' : '#e8f5e9;#2e7d32') + ';">' + (lowStock.length > 0 ? '⚠️' : '✅') + '</div><div><div class="hod-kpi-val">' + lowStock.length + '</div><div class="hod-kpi-lbl">Low Stock</div></div></div>'
+        + '<div class="hod-kpi" style="cursor:default;"><div class="hod-kpi-icon" style="background:#e8f5e9;color:#2e7d32;">📥</div><div><div class="hod-kpi-val" style="color:#2e7d32;">' + totalInQty + '</div><div class="hod-kpi-lbl">Total Stock In</div></div></div>'
+        + '<div class="hod-kpi" style="cursor:default;"><div class="hod-kpi-icon" style="background:#ffebee;color:#c62828;">📤</div><div><div class="hod-kpi-val" style="color:#c62828;">' + totalOutQty + '</div><div class="hod-kpi-lbl">Total Stock Out</div></div></div>'
         + '</div>';
 
-    // Category breakdown
+    // Charts row
+    html += '<div class="grid-2" style="gap:16px;margin-bottom:16px;">'
+        + '<div class="card"><div class="card-header"><h3>📊 Category Distribution</h3></div><div style="padding:8px;"><canvas id="hodInvCatChart" height="200"></canvas></div></div>'
+        + '<div class="card"><div class="card-header"><h3>📊 Stock In vs Out</h3></div><div style="padding:8px;"><canvas id="hodInvMovChart" height="200"></canvas></div></div>'
+        + '</div>';
+
+    // Category breakdown table
     if (catKeys.length > 0) {
         html += '<div class="card" style="margin-bottom:16px;"><div class="card-header"><h3>📊 Category Breakdown</h3></div>'
             + '<div class="table-responsive"><table><thead><tr><th>Category</th><th>Items</th><th>Quantity</th><th>Value</th></tr></thead><tbody>'
@@ -2126,6 +2146,26 @@ function _hodInventoryReport(el) {
             }).join('')
             + '</tbody></table></div></div>';
     }
+
+    // In & Out movements
+    html += '<div class="card" style="margin-bottom:16px;"><div class="card-header"><h3>📥 In & Out Movements <span style="font-size:12px;color:var(--gray);font-weight:400;">(last 20)</span></h3></div>'
+        + '<div class="table-responsive"><table><thead><tr><th>Date</th><th>Type</th><th>Item</th><th>Qty</th><th>Value</th><th>By</th></tr></thead><tbody>'
+        + (recentMoves.length === 0
+            ? '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No movements found for this department.</td></tr>'
+            : recentMoves.map(function (m) {
+                var isIn = m.type === 'in';
+                var bg = isIn ? '#e8f5e9' : '#fff5f5';
+                var lbl = isIn ? '📥 IN' : '📤 OUT';
+                var clr = isIn ? '#2e7d32' : '#c62828';
+                return '<tr style="background:' + bg + ';">'
+                    + '<td>' + APP.formatDate(m.date || m.createdAt) + '</td>'
+                    + '<td><span style="color:' + clr + ';font-weight:600;">' + lbl + '</span></td>'
+                    + '<td>' + (m.itemName || '-') + '</td>'
+                    + '<td><strong>' + (parseFloat(m.qty) || 0) + '</strong> ' + (m.unit || '') + '</td>'
+                    + '<td>₹' + (parseFloat(m.totalValue) || 0).toFixed(2) + '</td>'
+                    + '<td>' + (m.by || '-') + '</td></tr>';
+            }).join(''))
+        + '</tbody></table></div></div>';
 
     // Inventory table
     html += '<div class="card" style="margin-bottom:16px;"><div class="card-header"><h3>📋 Item Details</h3></div>'
@@ -2149,7 +2189,7 @@ function _hodInventoryReport(el) {
         + '</tbody></table></div></div>';
 
     // Recent material requests
-    html += '<div class="card"><div class="card-header"><h3>📥 Recent Material Requests</h3></div>'
+    html += '<div class="card" style="margin-bottom:16px;"><div class="card-header"><h3>📥 Recent Material Requests</h3></div>'
         + '<div class="table-responsive"><table><thead><tr><th>#</th><th>Item</th><th>Qty</th><th>Status</th><th>Date</th></tr></thead><tbody>'
         + (matReqs.length === 0
             ? '<tr><td colspan="5" style="text-align:center;color:var(--gray);padding:20px;">No material requests found.</td></tr>'
@@ -2175,6 +2215,43 @@ function _hodInventoryReport(el) {
         s.textContent = '.hod-inv-low td{border-bottom:1px solid #ffcdd2;}';
         document.head.appendChild(s);
     }
+
+    // Charts
+    setTimeout(function () {
+        if (typeof Chart === 'undefined') return;
+        var catCanvas = document.getElementById('hodInvCatChart');
+        if (catCanvas && catKeys.length > 0) {
+            var catColors = ['#00796b','#2e7d32','#e65100','#1565c0','#6a1b9a','#c62828','#283593','#00838f','#f57f17','#4e342e'];
+            new Chart(catCanvas.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: catKeys,
+                    datasets: [{ data: catKeys.map(function (k) { return catMap[k].value; }), backgroundColor: catColors.slice(0, catKeys.length) }]
+                },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 10 } } } }
+            });
+        }
+        var movCanvas = document.getElementById('hodInvMovChart');
+        if (movCanvas) {
+            new Chart(movCanvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['Stock In', 'Stock Out'],
+                    datasets: [{
+                        label: 'Quantity',
+                        data: [totalInQty, totalOutQty],
+                        backgroundColor: ['#2e7d32', '#c62828'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, grid: { display: false } } }
+                }
+            });
+        }
+    }, 100);
 }
 
 function _hodInvFilter(val) {
