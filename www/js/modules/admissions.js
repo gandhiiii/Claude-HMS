@@ -1047,14 +1047,15 @@ function renderCleaningAdmin(container) {
 
     if (done.length > 0) {
         html += '<div style="margin-top:16px;"><h4 style="margin-bottom:8px;font-size:14px;color:var(--gray);">✅ ' + T('admmod_recently_completed') + '</h4>'
-            + '<div class="table-responsive"><table><thead><tr><th>' + T('admmod_room_col') + '</th><th>' + T('admmod_floor') + '</th><th>' + T('admmod_th_patient') + '</th><th>' + T('admmod_f_discharged').replace(':','') + '</th><th>' + T('admmod_th_completed') + '</th><th>' + T('admmod_th_completed_by') + '</th></tr></thead><tbody>';
+            + '<div class="table-responsive"><table><thead><tr><th>' + T('admmod_room_col') + '</th><th>' + T('admmod_floor') + '</th><th>' + T('admmod_th_patient') + '</th><th>' + T('admmod_f_discharged').replace(':','') + '</th><th>' + T('admmod_th_completed') + '</th><th>' + T('admmod_th_completed_by') + '</th><th style="width:40px;">🗑️</th></tr></thead><tbody>';
         done.slice().reverse().slice(0, 15).forEach(function(t) {
             html += '<tr><td><strong>' + esc(t.roomNo) + '</strong></td>'
                 + '<td>' + esc(t.floor || '—') + '</td>'
                 + '<td>' + esc(t.patientName) + '</td>'
                 + '<td>' + (t.dischargedAt ? new Date(t.dischargedAt).toLocaleDateString('en-IN') : '—') + '</td>'
                 + '<td>' + (t.completedAt ? APP.formatDateTime(t.completedAt) : '—') + '</td>'
-                + '<td>' + esc(t.completedBy || '—') + '</td></tr>';
+                + '<td>' + esc(t.completedBy || '—') + '</td>'
+                + '<td><button class="btn btn-sm btn-danger" style="font-size:10px;padding:2px 6px;" onclick="deleteCleaningRecord(\'' + t.id + '\');if(admFilter===\'cleaning\')renderCleaningAdmin(document.getElementById(\'admContent\'))">🗑️</button></td></tr>';
         });
         html += '</tbody></table></div></div>';
     }
@@ -1115,4 +1116,15 @@ function updateCleaningBadge() {
     var tasks = DB.get('roomCleaningTasks') || [];
     var pending = tasks.filter(function(t){ return t.status !== 'done'; }).length;
     badge.textContent = pending > 0 ? pending : '';
+}
+
+/* Admin: delete a completed room cleaning history record */
+function deleteCleaningRecord(taskId, containerId) {
+    if (!confirm('Delete this cleaning history record permanently?')) return;
+    DB.delete('roomCleaningTasks', taskId);
+    APP.notify('Cleaning record deleted', 'info');
+    if (typeof admFilter !== 'undefined' && admFilter === 'cleaning') {
+        var content = document.getElementById('admContent');
+        if (content) renderCleaningAdmin(content);
+    }
 }
