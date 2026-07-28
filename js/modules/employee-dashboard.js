@@ -1714,6 +1714,58 @@ function empExportReportExcel(id) {
         });
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(todoRows), 'TODO');
 
+        // Sheet 6: KPI Dashboard
+        var tTot=d.myTasks.length, tDone=d.myTasks.filter(function(t){return t.status==='completed';}).length, tRate=tTot>0?Math.round(tDone/tTot*100):0;
+        var pTot=d.myProblems.length, pRes=d.myProblems.filter(function(p){return p.status==='resolved';}).length, pRate=pTot>0?Math.round(pRes/pTot*100):0;
+        var cTot=d.myChecklists.length, cDone=d.myChecklists.filter(function(c){return c.status==='completed';}).length, cRate=cTot>0?Math.round(cDone/cTot*100):0;
+        var rTot=d.myRequests.length, rApp=d.myRequests.filter(function(r){return r.status==='approved';}).length, rRate=rTot>0?Math.round(rApp/rTot*100):0;
+        var tdTot=myTodos.length, tdDone=myTodos.filter(function(t){return t.status==='completed';}).length, tdRate=tdTot>0?Math.round(tdDone/tdTot*100):0;
+        var _bar=function(p){var f=Math.round(p/10);return '█'.repeat(f)+'░'.repeat(10-f)+' '+p+'%';};
+        var kpiRows = [
+            ['KPI DASHBOARD'],
+            [''],
+            ['Metric','Done','Total','Rate','Progress Bar'],
+            ['Task Completion',tDone,tTot,tRate+'%',_bar(tRate)],
+            ['Problem Resolution',pRes,pTot,pRate+'%',_bar(pRate)],
+            ['Checklist Compliance',cDone,cTot,cRate+'%',_bar(cRate)],
+            ['Request Approval',rApp,rTot,rRate+'%',_bar(rRate)],
+            ['TODO Completion',tdDone,tdTot,tdRate+'%',_bar(tdRate)],
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kpiRows), 'KPI Dashboard');
+
+        // Sheet 7: Today's Checklist with Status
+        var _today = new Date().toISOString().slice(0,10);
+        var _cls = d.myChecklists||[];
+        var clRows = [['Checklist','Item','Status','Value/Unit']];
+        _cls.forEach(function(cl){
+            (cl.items||[]).forEach(function(item){
+                var v = (item.value!==undefined&&item.value!=='')?' = '+item.value+(item.unit?' '+item.unit:''):'';
+                clRows.push([cl.title, item.task||'', item.status||'pending', v]);
+            });
+            if (!cl.items||cl.items.length===0) clRows.push([cl.title,'(no items)','-','']);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(clRows), 'Today Checklists');
+
+        // Sheet 8: Tasks with TAT
+        var _tatTasks = d.myTasks.filter(function(t){ return t.tat; });
+        var tatRows = [['Title','TAT (hours)','Status','Priority','Deadline','Elapsed (est.)']];
+        _tatTasks.forEach(function(t) {
+            var el = t.createdAt ? ((new Date() - new Date(t.createdAt)) / 3600000).toFixed(1)+'h' : '-';
+            tatRows.push([t.title||'', t.tat, t.status||'', t.priority||'', t.deadline||'', t.status==='completed'?'Done':el]);
+        });
+        if (_tatTasks.length===0) tatRows.push(['(No tasks with TAT)','','','','','']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tatRows), 'Tasks with TAT');
+
+        // Sheet 9: Q Goals (Allotted + Own)
+        var _qpAll = DB.get('quarterly_priorities')||[];
+        var _allotted = _qpAll.filter(function(q){ return q.memberUsername===d.user.username && !q.selfOwn; });
+        var _own = _qpAll.filter(function(q){ return q.memberUsername===d.user.username && q.selfOwn; });
+        var qpRows = [['Type','Quarter','Goal / Item','Status','Note']];
+        _allotted.forEach(function(q){ (q.items||[]).forEach(function(it){ qpRows.push(['Allotted',(q.quarter||'')+'-'+(q.year||''), it.task||'', it.status||'pending', it.note||'']); }); });
+        _own.forEach(function(q){ (q.items||[]).forEach(function(it){ qpRows.push(['Own Goal',(q.quarter||'')+'-'+(q.year||''), it.task||'', it.status||'pending', it.note||'']); }); });
+        if (_allotted.length===0 && _own.length===0) qpRows.push(['(No quarterly goals found)','','','','']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(qpRows), 'Q Goals');
+
         var fname = ((r.title||'Work_Report').replace(/[^a-z0-9]/gi,'_')) + '.xlsx';
         XLSX.writeFile(wb, fname);
         APP.notify('Excel downloaded: ' + fname, 'success');
@@ -1786,6 +1838,56 @@ function empDownloadFullReport() {
         var reqRows = [['Title','Status','Created At']];
         d.myRequests.forEach(function(r){ reqRows.push([r.title||'', r.status||'', r.createdAt?APP.formatDate(r.createdAt):'']); });
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(reqRows), 'Material Requests');
+
+        // Sheet 7: KPI Dashboard
+        var tTot=d.myTasks.length, tDone=d.myTasks.filter(function(t){return t.status==='completed';}).length, tRate=tTot>0?Math.round(tDone/tTot*100):0;
+        var pTot=d.myProblems.length, pRes=d.myProblems.filter(function(p){return p.status==='resolved';}).length, pRate=pTot>0?Math.round(pRes/pTot*100):0;
+        var cTot=d.myChecklists.length, cDone=d.myChecklists.filter(function(c){return c.status==='completed';}).length, cRate=cTot>0?Math.round(cDone/cTot*100):0;
+        var rTot=d.myRequests.length, rApp=d.myRequests.filter(function(r){return r.status==='approved';}).length, rRate=rTot>0?Math.round(rApp/rTot*100):0;
+        var tdTot=myTodos.length, tdDone=myTodos.filter(function(t){return t.status==='completed';}).length, tdRate=tdTot>0?Math.round(tdDone/tdTot*100):0;
+        var _bar=function(p){var f=Math.round(p/10);return '█'.repeat(f)+'░'.repeat(10-f)+' '+p+'%';};
+        var kpiRows = [
+            ['KPI DASHBOARD'],
+            [''],
+            ['Metric','Done','Total','Rate','Progress Bar'],
+            ['Task Completion',tDone,tTot,tRate+'%',_bar(tRate)],
+            ['Problem Resolution',pRes,pTot,pRate+'%',_bar(pRate)],
+            ['Checklist Compliance',cDone,cTot,cRate+'%',_bar(cRate)],
+            ['Request Approval',rApp,rTot,rRate+'%',_bar(rRate)],
+            ['TODO Completion',tdDone,tdTot,tdRate+'%',_bar(tdRate)],
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kpiRows), 'KPI Dashboard');
+
+        // Sheet 8: Today's Checklist with Status
+        var clRows = [['Checklist','Item','Status','Value/Unit']];
+        (d.myChecklists||[]).forEach(function(cl){
+            (cl.items||[]).forEach(function(item){
+                var v = (item.value!==undefined&&item.value!=='')?' = '+item.value+(item.unit?' '+item.unit:''):'';
+                clRows.push([cl.title, item.task||'', item.status||'pending', v]);
+            });
+            if (!cl.items||cl.items.length===0) clRows.push([cl.title,'(no items)','-','']);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(clRows), 'Today Checklists');
+
+        // Sheet 9: Tasks with TAT
+        var _tatTasks = d.myTasks.filter(function(t){ return t.tat; });
+        var tatRows = [['Title','TAT (hours)','Status','Priority','Deadline','Elapsed (est.)']];
+        _tatTasks.forEach(function(t) {
+            var el = t.createdAt ? ((new Date() - new Date(t.createdAt)) / 3600000).toFixed(1)+'h' : '-';
+            tatRows.push([t.title||'', t.tat, t.status||'', t.priority||'', t.deadline||'', t.status==='completed'?'Done':el]);
+        });
+        if (_tatTasks.length===0) tatRows.push(['(No tasks with TAT)','','','','','']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tatRows), 'Tasks with TAT');
+
+        // Sheet 10: Q Goals (Allotted + Own)
+        var _qpAll = DB.get('quarterly_priorities')||[];
+        var _allotted = _qpAll.filter(function(q){ return q.memberUsername===user.username && !q.selfOwn; });
+        var _own = _qpAll.filter(function(q){ return q.memberUsername===user.username && q.selfOwn; });
+        var qpRows = [['Type','Quarter','Goal / Item','Status','Note']];
+        _allotted.forEach(function(q){ (q.items||[]).forEach(function(it){ qpRows.push(['Allotted',(q.quarter||'')+'-'+(q.year||''), it.task||'', it.status||'pending', it.note||'']); }); });
+        _own.forEach(function(q){ (q.items||[]).forEach(function(it){ qpRows.push(['Own Goal',(q.quarter||'')+'-'+(q.year||''), it.task||'', it.status||'pending', it.note||'']); }); });
+        if (_allotted.length===0 && _own.length===0) qpRows.push(['(No quarterly goals found)','','','','']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(qpRows), 'Q Goals');
 
         var fname = 'Work_Report_' + user.username + '_' + today + '.xlsx';
         XLSX.writeFile(wb, fname);

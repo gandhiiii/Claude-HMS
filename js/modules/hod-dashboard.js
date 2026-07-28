@@ -33,6 +33,7 @@
 var _hodTab    = 'overview';
 var _hodData   = {};
 var _hodFilter = 'all';
+var _hodInvDeptFilter = null; // null = current HOD dept, '__all__' = all departments
 
 /* ═══════════════════════════════════════════════
    HELPERS
@@ -173,10 +174,18 @@ function renderHodDashboard(container) {
         routedProblems: routedProblems,
         cleaning: cleaning,
         allAdm: allAdm,
-        teamReports: teamReports
+        teamReports: teamReports,
+        deptPurchases: deptPurchases,
+        pendingPurchases: pendingPurchases,
+        hodTodosList: hodTodosList,
+        hodPendingTodos: hodPendingTodos
     };
 
     var pendingCl  = myCl.filter(function (c) { return c.status !== 'completed'; }).length;
+    var hodTodosList = (DB.get('hodTodos') || []).filter(function (t) { return t.createdBy === u || t.department === dept; });
+    var hodPendingTodos = hodTodosList.filter(function (t) { return t.status !== 'completed'; }).length;
+    var deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return p.department === dept; });
+    var pendingPurchases = deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
     var pendingReq = myReqs.filter(function (r) { return r.status === 'pending'; }).length + pendingMatApprovals.length + pendingGateApprovals.length;
     var openProblems = routedProblems.length;
     var deptInventory = (DB.get('inventory') || []).filter(function (i) {
@@ -198,7 +207,10 @@ function renderHodDashboard(container) {
         { id: 'requests',    label: '🔧 Problems & Requests', badge: pendingReq + openProblems, bc: 'badge-danger' },
         { id: 'performance', label: 'Performance' },
         { id: 'hodreports',  label: '📤 Reports', badge: teamReports.length, bc: 'badge-danger' },
-        { id: 'hodqp',       label: '🎯 Q Priorities' }
+        { id: 'hodqp',       label: '🎯 Q Priorities' },
+        { id: 'purchases',   label: '💰 Purchases', badge: pendingPurchases, bc: 'badge-warning' },
+        { id: 'hodtodo',     label: '📋 My TODOs', badge: hodPendingTodos, bc: 'badge-danger' },
+        { id: 'hodworkreport', label: '📊 Work Report' }
     ];
 
     var html = ''
@@ -220,6 +232,8 @@ function renderHodDashboard(container) {
         + _hKpi('✅', 'Checklists Due', pendingCl,                            '#e8f5e9', 'var(--secondary)', 'checklists')
         + _hKpi('📦', 'Inventory Items', deptInventory.length,                '#e0f2f1', '#00796b', 'inventory')
         + _hKpi('🧹', 'Rooms to Clean', cleaning.length,                      '#fce4ec', 'var(--danger)', 'admissions')
+        + _hKpi('💰', 'Purchase Requests', deptPurchases.length,               '#e8f5e9', '#2e7d32', 'purchases')
+        + _hKpi('📋', 'My TODOs', hodPendingTodos,                             '#fce4ec', '#e91e63', 'hodtodo')
         + '</div>'
 
         // Cleaning / overdue alert
@@ -278,7 +292,10 @@ function _renderHodTab(tab) {
                 team: _hodTeam, checklists: _hodChecklists, requests: _hodRequests,
                 performance: _hodPerformance, hodreports: _hodReports, hodqp: _hodQP,
                 inventory: _hodInventoryReport,
-                'dept-checklist': _hodDeptChecklists };
+                'dept-checklist': _hodDeptChecklists,
+                purchases: _hodPurchases,
+                hodtodo: _hodTodo,
+                hodworkreport: _hodWorkReport };
     if (map[tab]) map[tab](el);
 }
 
@@ -1386,6 +1403,705 @@ function hodConfirmReceipt(id) {
 }
 
 /* ═══════════════════════════════════════════════
+   PURCHASES TAB — Daily Purchase & Expense Requests
+═══════════════════════════════════════════════ */
+function _hodPurchases(el) {
+    var user = AUTH.currentUser();
+    if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
+    var dept = user.department || '';
+
+    var allPurchases = DB.get('hodPurchases') || [];
+    var purchases = allPurchases.filter(function (p) { return p.department === dept; }).slice().reverse();
+    var pendingP = purchases.filter(function (p) { return p.status === 'pending'; });
+    var approved = purchases.filter(function (p) { return p.status === 'approved'; });
+    var rejected = purchases.filter(function (p) { return p.status === 'rejected'; });
+
+    var totalVal = purchases.reduce(function (s, p) { return s + (parseFloat(p.total) || 0); }, 0);
+
+    function pBadge(status) {
+        if (status === 'approved') return '<span class="badge badge-success" style="font-size:10px;">✓ Approved</span>';
+        if (status === 'rejected') return '<span class="badge badge-danger" style="font-size:10px;">✗ Rejected</span>';
+        return '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>';
+    }
+
+    var html = ''
+
+        // Header
+        + '<div style="background:linear-gradient(135deg,#1b5e20,#2e7d32);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
+        + '<div><div style="font-size:18px;font-weight:700;">💰 Daily Purchases & Expenses — ' + dept + '</div>'
+        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + purchases.length + ' requests · ₹' + totalVal.toFixed(2) + ' total</div></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodCreatePurchase()">+ New Purchase Request</button>'
+        + '</div></div>'
+
+        // KPI cards
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;">'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#2e7d32;">' + purchases.length + '</div><div style="font-size:11px;color:var(--gray);">Total Requests</div></div>'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#e65100;">' + pendingP.length + '</div><div style="font-size:11px;color:var(--gray);">Pending</div></div>'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#2e7d32;">' + approved.length + '</div><div style="font-size:11px;color:var(--gray);">Approved</div></div>'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#c62828;">' + rejected.length + '</div><div style="font-size:11px;color:var(--gray);">Rejected</div></div>'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#6a1b9a;">₹' + totalVal.toFixed(2) + '</div><div style="font-size:11px;color:var(--gray);">Total Value</div></div>'
+        + '</div>';
+
+    if (purchases.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
+            + '<div style="font-size:32px;margin-bottom:8px;">💰</div>'
+            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No purchase requests yet</div>'
+            + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Click "+ New Purchase Request" to submit one for approval.</div>'
+            + '<button class="btn btn-primary" onclick="hodCreatePurchase()">+ New Purchase Request</button></div>';
+    } else {
+        // Pending section
+        if (pendingP.length > 0) {
+            html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px;">⏳ Pending Approval (' + pendingP.length + ')</div>';
+            pendingP.forEach(function (p) { html += _hodPurchaseCard(p, user); });
+        }
+        // Approved section
+        if (approved.length > 0) {
+            html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px;">✓ Approved (' + approved.length + ')</div>';
+            approved.forEach(function (p) { html += _hodPurchaseCard(p, user); });
+        }
+        // Rejected section
+        if (rejected.length > 0) {
+            html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px;">✗ Rejected (' + rejected.length + ')</div>';
+            rejected.forEach(function (p) { html += _hodPurchaseCard(p, user); });
+        }
+    }
+
+    el.innerHTML = html;
+}
+
+function _hodPurchaseCard(p, user) {
+    var canManage = user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin');
+    var isOwner = p.createdBy === user.username;
+    var statusBadge = p.status === 'approved' ? '<span class="badge badge-success" style="font-size:10px;">✓ Approved</span>'
+        : p.status === 'rejected' ? '<span class="badge badge-danger" style="font-size:10px;">✗ Rejected</span>'
+        : '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>';
+
+    return '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid '
+        + (p.status === 'approved' ? 'var(--success)' : p.status === 'rejected' ? 'var(--danger)' : 'var(--warning)')
+        + ';border-radius:10px;padding:14px;margin-bottom:10px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">'
+        + '<div style="flex:1;min-width:180px;">'
+        + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'
+        + '<span style="font-size:14px;font-weight:700;">' + (p.title || 'Purchase') + '</span>'
+        + statusBadge
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-top:6px;font-size:13px;">'
+        + '<div><span style="color:var(--gray);">Item:</span> <strong>' + (p.itemName || '-') + '</strong></div>'
+        + '<div><span style="color:var(--gray);">Qty:</span> <strong>' + (p.quantity || 1) + '</strong></div>'
+        + '<div><span style="color:var(--gray);">Price:</span> <strong>₹' + (parseFloat(p.price) || 0).toFixed(2) + '</strong></div>'
+        + '<div><span style="color:var(--gray);">Total:</span> <strong>₹' + (parseFloat(p.total) || parseFloat(p.price) * (p.quantity || 1)).toFixed(2) + '</strong></div>'
+        + (p.location ? '<div><span style="color:var(--gray);">Location:</span> <strong>' + p.location + '</strong></div>' : '')
+        + (p.vendor ? '<div><span style="color:var(--gray);">Vendor:</span> <strong>' + p.vendor + '</strong></div>' : '')
+        + '</div>'
+        + (p.description ? '<div style="font-size:12px;color:var(--text);margin-top:6px;background:var(--light-gray);padding:6px 10px;border-radius:6px;">📝 ' + p.description + '</div>' : '')
+        + '<div style="font-size:11px;color:var(--gray);margin-top:6px;">👤 ' + (p.createdByName || p.createdBy || '-') + ' · ' + APP.formatDate(p.createdAt)
+        + (p.approvedBy ? ' · ✓ Approved by ' + p.approvedBy : '')
+        + (p.rejectedBy ? ' · ✗ Rejected by ' + p.rejectedBy : '')
+        + '</div></div>'
+        + '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">'
+        + (canManage && p.status === 'pending'
+            ? '<button class="btn btn-sm btn-success" onclick="hodApprovePurchase(\'' + p.id + '\')">✓ Approve</button>'
+              + '<button class="btn btn-sm btn-danger" onclick="hodRejectPurchase(\'' + p.id + '\')">✗ Reject</button>'
+            : '')
+        + ((isOwner || canManage) && p.status === 'pending'
+            ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--danger);border-color:var(--danger);" onclick="hodDeletePurchase(\'' + p.id + '\')">🗑 Delete</button>'
+            : '')
+        + '</div></div></div>';
+}
+
+function hodPurchaseCalcTotal() {
+    var qty = document.querySelector('#hodPurchaseForm [name="quantity"]');
+    var prc = document.querySelector('#hodPurchaseForm [name="price"]');
+    var tot = document.getElementById('hodPurchaseTotal');
+    if (!qty || !prc || !tot) return;
+    var q = parseFloat(qty.value) || 1;
+    var p = parseFloat(prc.value) || 0;
+    tot.value = '₹' + (q * p).toFixed(2);
+}
+
+function hodCreatePurchase() {
+    var form = '<form id="hodPurchaseForm">'
+        + '<div class="form-group"><label>Request Title *</label><input type="text" name="title" class="form-control" required placeholder="e.g. Purchase of cleaning supplies"></div>'
+        + '<div class="form-group"><label>Item / Goods Name *</label><input type="text" name="itemName" class="form-control" required placeholder="e.g. Floor disinfectant 5L"></div>'
+        + '<div class="grid-3" style="gap:10px;">'
+        + '<div class="form-group"><label>Quantity</label><input type="number" name="quantity" class="form-control" min="1" value="1" oninput="hodPurchaseCalcTotal()"></div>'
+        + '<div class="form-group"><label>Price per Unit (₹) *</label><input type="number" name="price" class="form-control" step="0.01" min="0" required placeholder="e.g. 450" oninput="hodPurchaseCalcTotal()"></div>'
+        + '<div class="form-group"><label>Total (auto-calc)</label><input type="text" id="hodPurchaseTotal" class="form-control" readonly style="background:var(--light-gray);font-weight:700;"></div>'
+        + '</div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Location / Store *</label><input type="text" name="location" class="form-control" required placeholder="e.g. General Store, Counter 3"></div>'
+        + '<div class="form-group"><label>Vendor / Supplier</label><input type="text" name="vendor" class="form-control" placeholder="e.g. ABC Traders"></div>'
+        + '</div>'
+        + '<div class="form-group"><label>Description / Purpose *</label><textarea name="description" class="form-control" rows="3" required placeholder="Why is this purchase needed? How will it be used?"></textarea></div>'
+        + '</form>';
+    openFormModal('💰 New Purchase / Expense Request', form, 'hodSavePurchase()', false);
+}
+
+function hodSavePurchase() {
+    var user = AUTH.currentUser();
+    if (!user) return false;
+    var data = getFormData('hodPurchaseForm');
+    if (!data.title || !data.itemName || !data.price || !data.location || !data.description) {
+        APP.notify('Please fill all required fields', 'error'); return false;
+    }
+    var qty = parseFloat(data.quantity) || 1;
+    var price = parseFloat(data.price) || 0;
+    if (price <= 0) { APP.notify('Enter a valid price', 'error'); return false; }
+    DB.add('hodPurchases', {
+        title: data.title,
+        itemName: data.itemName,
+        quantity: qty,
+        price: price,
+        total: qty * price,
+        location: data.location,
+        vendor: data.vendor || '',
+        description: data.description,
+        department: user.department,
+        status: 'pending',
+        createdBy: user.username,
+        createdByName: user.fullName,
+        createdAt: new Date().toISOString()
+    });
+    APP.notify('Purchase request submitted for approval!', 'success');
+    _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return p.department === user.department; });
+    _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
+    _renderHodTab('purchases');
+    return true;
+}
+
+function hodApprovePurchase(id) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    confirmAction('Approve this purchase request?', function () {
+        DB.update('hodPurchases', id, {
+            status: 'approved',
+            approvedBy: user.fullName,
+            approvedAt: new Date().toISOString()
+        });
+        APP.notify('Purchase request approved', 'success');
+        _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return p.department === user.department; });
+        _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
+        _renderHodTab('purchases');
+    });
+}
+
+function hodRejectPurchase(id) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var reason = prompt('Reason for rejection (optional):');
+    if (reason === null) return;
+    DB.update('hodPurchases', id, {
+        status: 'rejected',
+        rejectedBy: user.fullName,
+        rejectedAt: new Date().toISOString(),
+        rejectionReason: reason || ''
+    });
+    APP.notify('Purchase request rejected', 'info');
+    _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return p.department === user.department; });
+    _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
+    _renderHodTab('purchases');
+}
+
+function hodDeletePurchase(id) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var p = DB.getById('hodPurchases', id);
+    if (!p) { APP.notify('Request not found', 'error'); return; }
+    if (p.createdBy !== user.username && !user.isSuperAdmin && user.role !== 'admin' && user.role !== 'super_admin') {
+        APP.notify('You can only delete your own requests', 'error'); return;
+    }
+    confirmAction('Delete this purchase request?', function () {
+        DB.delete('hodPurchases', id);
+        APP.notify('Purchase request deleted', 'success');
+        _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return p.department === user.department; });
+        _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
+        _renderHodTab('purchases');
+    });
+}
+
+/* ═══════════════════════════════════════════════
+   HOD TODO TAB — HOD's own personal work tasks
+═══════════════════════════════════════════════ */
+function _hodTodo(el) {
+    var user = AUTH.currentUser();
+    if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
+    var todos = (DB.get('hodTodos') || []).filter(function (t) { return t.createdBy === user.username; });
+    var today = new Date().toISOString().slice(0, 10);
+
+    var dailyTodos = todos.filter(function (t) { return t.category === 'daily' || t.date === today; });
+    var futureTodos = todos.filter(function (t) { return t.category === 'future' && t.date !== today; });
+    var pendingDaily = dailyTodos.filter(function (t) { return t.status !== 'completed'; });
+    var completedDaily = dailyTodos.filter(function (t) { return t.status === 'completed'; });
+    var pendingFuture = futureTodos.filter(function (t) { return t.status !== 'completed'; });
+
+    function todoCard(t, isFuture) {
+        var priColor = { low: 'var(--secondary)', medium: '#e65100', high: 'var(--danger)' }[t.priority] || 'var(--gray)';
+        var checked = t.status === 'completed' ? 'checked' : '';
+        var opacity = t.status === 'completed' ? 'opacity:0.55;' : '';
+        var dueLabel = isFuture ? '<span style="font-size:10px;color:var(--gray);margin-left:6px;">📅 ' + APP.formatDate(t.date) + '</span>' : '';
+        var remLabel = t.reminder ? '<span style="font-size:10px;color:var(--primary);margin-left:4px;">🔔 ' + t.reminderMinutes + 'min</span>' : '';
+        var descHtml = t.description ? '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + t.description.substring(0, 100) + '</div>' : '';
+        return '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;' + opacity + '">'
+            + '<input type="checkbox" ' + checked + ' onchange="hodToggleTodo(\'' + t.id + '\')" style="margin-top:3px;cursor:pointer;width:16px;height:16px;">'
+            + '<div style="flex:1;min-width:0;">'
+            + '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">'
+            + '<span style="font-size:13px;font-weight:' + (t.status === 'completed' ? '400' : '600') + ';' + (t.status === 'completed' ? 'text-decoration:line-through;' : '') + '">' + t.title + '</span>'
+            + '<span style="width:8px;height:8px;border-radius:50%;background:' + priColor + ';display:inline-block;"></span>'
+            + dueLabel + remLabel
+            + '</div>' + descHtml
+            + '</div>'
+            + '<button class="btn btn-sm" style="background:transparent;color:var(--danger);padding:2px 8px;font-size:14px;" onclick="hodDeleteTodo(\'' + t.id + '\')" title="Delete">✕</button>'
+            + '</div>';
+    }
+
+    var html = '';
+
+    // ── Header ──
+    html += '<div style="background:linear-gradient(135deg,#ad1457,#e91e63);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
+        + '<div><div style="font-size:18px;font-weight:700;">📋 HOD TODO — ' + (user.fullName || user.username) + '</div>'
+        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + todos.length + ' total · ' + pendingDaily.length + ' pending today</div></div>'
+        + '<div style="display:flex;gap:6px;"><span class="badge badge-danger" style="font-size:11px;padding:6px 12px;">' + pendingDaily.length + ' due today</span></div></div>';
+
+    // ── Daily TODO section ──
+    html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
+        + '<div style="font-weight:700;font-size:15px;">📌 Today — ' + new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' }) + '</div>'
+        + '<span style="font-size:11px;color:var(--gray);">' + pendingDaily.length + ' pending</span>'
+        + '</div>'
+        // Quick add
+        + '<div style="display:flex;gap:6px;margin-bottom:12px;">'
+        + '<input type="text" id="hodTodoInput" placeholder="Add a task for today…" style="flex:1;padding:8px 12px;border:2px solid var(--border);border-radius:8px;font-size:13px;outline:none;" onkeydown="if(event.key===\'Enter\')hodAddTodo()">'
+        + '<button class="btn btn-sm" style="background:#e91e63;color:#fff;padding:8px 16px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" onclick="hodAddTodo()">+ Add</button>'
+        + '</div>';
+
+    if (pendingDaily.length === 0 && completedDaily.length === 0) {
+        html += '<div style="color:var(--gray);font-size:13px;text-align:center;padding:20px;">Nothing for today yet. Add a task above!</div>';
+    } else {
+        pendingDaily.forEach(function (t) { html += todoCard(t, false); });
+        if (completedDaily.length > 0) {
+            html += '<div style="margin-top:10px;font-size:11px;color:var(--gray);cursor:pointer;" onclick="var n=this.nextElementSibling;n.style.display=n.style.display===\'none\'?\'block\':\'none\'">▼ ' + completedDaily.length + ' completed</div>'
+                + '<div style="display:none;margin-top:4px;">';
+            completedDaily.forEach(function (t) { html += todoCard(t, false); });
+            html += '</div>';
+        }
+    }
+    html += '</div>';
+
+    // ── Future TODO section ──
+    html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">'
+        + '<div style="font-weight:700;font-size:15px;margin-bottom:12px;">📅 Future Tasks (' + pendingFuture.length + ')</div>'
+        // Add form
+        + '<div style="background:var(--light-gray);border-radius:8px;padding:12px;margin-bottom:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+        + '<input type="text" id="hodFutureTodoTitle" placeholder="Task title…" style="grid-column:1/-1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none;">'
+        + '<textarea id="hodFutureTodoDesc" placeholder="Description (optional)…" style="grid-column:1/-1;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;outline:none;resize:vertical;min-height:50px;"></textarea>'
+        + '<div><label style="font-size:11px;color:var(--gray);display:block;margin-bottom:2px;">Due Date</label><input type="date" id="hodFutureTodoDate" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;"></div>'
+        + '<div><label style="font-size:11px;color:var(--gray);display:block;margin-bottom:2px;">Priority</label><select id="hodFutureTodoPriority" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">'
+        + '<option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></div>'
+        + '<div style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="hodFutureTodoReminder" style="cursor:pointer;"> <label for="hodFutureTodoReminder" style="font-size:12px;cursor:pointer;">Set reminder</label></div>'
+        + '<div><select id="hodFutureTodoReminderMin" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">'
+        + '<option value="15">15 min before</option><option value="30" selected>30 min before</option><option value="60">1 hr before</option><option value="1440">1 day before</option></select></div>'
+        + '<button class="btn btn-sm" style="grid-column:1/-1;background:#e91e63;color:#fff;padding:8px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" onclick="hodSaveFutureTodo()">+ Add Future Task</button>'
+        + '</div>';
+
+    if (pendingFuture.length === 0) {
+        html += '<div style="color:var(--gray);font-size:13px;text-align:center;padding:16px;">No future tasks planned.</div>';
+    } else {
+        var dateGroups = {};
+        pendingFuture.concat(futureTodos.filter(function (t) { return t.status === 'completed'; })).forEach(function (t) {
+            var g = t.date || 'unscheduled';
+            if (!dateGroups[g]) dateGroups[g] = { label: g, items: [] };
+            dateGroups[g].items.push(t);
+        });
+        Object.keys(dateGroups).sort().forEach(function (d) {
+            if (d === 'unscheduled') return;
+            var grp = dateGroups[d];
+            var grpDone = grp.items.filter(function (t) { return t.status === 'completed'; }).length;
+            html += '<div style="margin-bottom:8px;"><div style="font-size:12px;font-weight:600;color:var(--gray);margin-bottom:4px;">📅 ' + APP.formatDate(d) + ' (' + grpDone + '/' + grp.items.length + ' done)</div>';
+            grp.items.forEach(function (t) { html += todoCard(t, true); });
+            html += '</div>';
+        });
+    }
+    html += '</div>';
+
+    el.innerHTML = html;
+}
+
+function hodAddTodo() {
+    var inp = document.getElementById('hodTodoInput');
+    if (!inp) return;
+    var title = inp.value.trim();
+    if (!title) { APP.notify('Enter a task title', 'error'); return; }
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var today = new Date().toISOString().slice(0, 10);
+    DB.add('hodTodos', {
+        title: title,
+        description: '',
+        date: today,
+        dueDate: today,
+        priority: 'medium',
+        status: 'pending',
+        category: 'daily',
+        reminder: false,
+        reminderMinutes: 0,
+        createdBy: user.username,
+        createdByName: user.fullName,
+        department: user.department,
+        completedAt: null,
+        sortOrder: Date.now()
+    });
+    inp.value = '';
+    APP.notify('TODO added ✓', 'success');
+    var el = document.getElementById('hodTabContent');
+    if (el) _hodTodo(el);
+}
+
+function hodToggleTodo(id) {
+    var todo = DB.getById('hodTodos', id);
+    if (!todo) return;
+    var newStatus = todo.status === 'completed' ? 'pending' : 'completed';
+    var updates = { status: newStatus };
+    if (newStatus === 'completed') updates.completedAt = new Date().toISOString();
+    else updates.completedAt = null;
+    DB.update('hodTodos', id, updates);
+    APP.notify(newStatus === 'completed' ? '✓ Marked done' : 'Reopened', newStatus === 'completed' ? 'success' : 'info');
+    var el = document.getElementById('hodTabContent');
+    if (el) _hodTodo(el);
+}
+
+function hodDeleteTodo(id) {
+    if (!confirm('Delete this TODO?')) return;
+    DB.delete('hodTodos', id);
+    APP.notify('Deleted', 'info');
+    var el = document.getElementById('hodTabContent');
+    if (el) _hodTodo(el);
+}
+
+function hodSaveFutureTodo() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var title = (document.getElementById('hodFutureTodoTitle') || {}).value || '';
+    var desc = (document.getElementById('hodFutureTodoDesc') || {}).value || '';
+    var date = (document.getElementById('hodFutureTodoDate') || {}).value || '';
+    var priority = (document.getElementById('hodFutureTodoPriority') || {}).value || 'medium';
+    var reminder = (document.getElementById('hodFutureTodoReminder') || {}).checked || false;
+    var reminderMin = parseInt((document.getElementById('hodFutureTodoReminderMin') || {}).value) || 30;
+    if (!title.trim()) { APP.notify('Enter a title', 'error'); return; }
+    if (!date) { APP.notify('Select a due date', 'error'); return; }
+    DB.add('hodTodos', {
+        title: title.trim(),
+        description: desc.trim(),
+        date: date,
+        dueDate: date,
+        priority: priority,
+        status: 'pending',
+        category: 'future',
+        reminder: reminder,
+        reminderMinutes: reminderMin,
+        createdBy: user.username,
+        createdByName: user.fullName,
+        department: user.department,
+        completedAt: null,
+        sortOrder: Date.now()
+    });
+    APP.notify('Future task saved ✓', 'success');
+    var el = document.getElementById('hodTabContent');
+    if (el) _hodTodo(el);
+}
+
+/* ═══════════════════════════════════════════════
+   HOD WORK REPORT TAB — HOD + Team KPI dashboard
+═══════════════════════════════════════════════ */
+function _hodWorkReport(el) {
+    var user = AUTH.currentUser();
+    if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
+
+    var d = _hodData;
+
+    // ── HOD's own TODO data ──
+    var hodTodos = (DB.get('hodTodos') || []).filter(function (t) { return t.createdBy === user.username; });
+    var hodTodoDone = hodTodos.filter(function (t) { return t.status === 'completed'; }).length;
+    var hodTodoPend = hodTodos.filter(function (t) { return t.status !== 'completed'; }).length;
+    var hodTodoRate = hodTodos.length > 0 ? Math.round(hodTodoDone / hodTodos.length * 100) : 0;
+
+    // ── Team task data ──
+    var teamTasks = d.allDeptTasks || [];
+    var teamDone = teamTasks.filter(function (t) { return t.status === 'completed'; }).length;
+    var teamPend = teamTasks.filter(function (t) { return t.status === 'pending'; }).length;
+    var teamProg = teamTasks.filter(function (t) { return t.status === 'in-progress'; }).length;
+    var teamOverdue = d.overdueTasks || [];
+    var teamRate = teamTasks.length > 0 ? Math.round(teamDone / teamTasks.length * 100) : 0;
+
+    // ── Combined ──
+    var combinedTotal = hodTodos.length + teamTasks.length;
+    var combinedDone = hodTodoDone + teamDone;
+    var combinedRate = combinedTotal > 0 ? Math.round(combinedDone / combinedTotal * 100) : 0;
+
+    // ── Per-member breakdown ──
+    var team = d.team || [];
+    var memberRows = team.map(function (m) {
+        var mt = teamTasks.filter(function (t) { return t.assignedTo === m.fullName; });
+        var mtDone = mt.filter(function (t) { return t.status === 'completed'; }).length;
+        var mtPend = mt.filter(function (t) { return t.status === 'pending'; }).length;
+        var mtProg = mt.filter(function (t) { return t.status === 'in-progress'; }).length;
+        var mtOvd = mt.filter(function (t) { return t.deadline && new Date(t.deadline) < new Date() && t.status !== 'completed'; }).length;
+        var mtRate = mt.length > 0 ? Math.round(mtDone / mt.length * 100) : 0;
+        return { name: m.fullName, total: mt.length, done: mtDone, pend: mtPend, prog: mtProg, overdue: mtOvd, rate: mtRate };
+    });
+
+    // CSS for charts canvas
+    var s = document.getElementById('hodWorkReportCss');
+    if (!s) {
+        s = document.createElement('style');
+        s.id = 'hodWorkReportCss';
+        s.textContent = '#hodWorkReportTab .wr-canvas-wrap{position:relative;width:100%;max-height:200px;}';
+        document.head.appendChild(s);
+    }
+
+    function kBox(val, label, color) {
+        return '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">'
+            + '<div style="font-size:22px;font-weight:700;color:' + color + ';">' + val + '</div>'
+            + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">' + label + '</div></div>';
+    }
+
+    var html = '';
+
+    // ── Header ──
+    html += '<div id="hodWorkReportTab" style="min-height:200px;">'
+        + '<div style="background:linear-gradient(135deg,#283593,#1565c0);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
+        + '<div><div style="font-size:18px;font-weight:700;">📊 Work Report — ' + (user.department || 'All') + '</div>'
+        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + combinedTotal + ' total items · ' + combinedDone + ' done (' + combinedRate + '%)</div></div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadWorkReportPdf()">📄 Download PDF</button>'
+        + '<span class="badge badge-success" style="font-size:11px;padding:6px 12px;">✓ ' + combinedDone + ' done</span>'
+        + '<span class="badge badge-danger" style="font-size:11px;padding:6px 12px;">⚠ ' + teamOverdue.length + ' overdue</span>'
+        + '</div></div>';
+
+    // ── KPI cards ──
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;">'
+        + kBox(combinedTotal, 'Total Work Items', 'var(--text)')
+        + kBox(combinedDone, 'Completed', 'var(--success)')
+        + kBox(combinedRate + '%', 'Overall Rate', combinedRate >= 80 ? 'var(--success)' : combinedRate >= 50 ? '#e65100' : 'var(--danger)')
+        + kBox(teamTasks.length, 'Team Tasks', '#1565c0')
+        + kBox(hodTodos.length, 'HOD TODOs', '#e91e63')
+        + kBox(teamOverdue.length, 'Overdue Tasks', 'var(--danger)')
+        + '</div>';
+
+    // ── HOD's own TODO card ──
+    html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;border-left:4px solid #e91e63;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-size:15px;font-weight:700;">👤 HOD Work Summary — ' + (user.fullName || user.username) + '</div>'
+        + '<span class="badge badge-info" style="font-size:10px;">' + hodTodoRate + '% completion</span></div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;">'
+        + kBox(hodTodos.length, 'Total TODOs', '#e91e63')
+        + kBox(hodTodoDone, 'Done', 'var(--success)')
+        + kBox(hodTodoPend, 'Pending', '#e65100')
+        + kBox(hodTodoRate + '%', 'Completion Rate', hodTodoRate >= 80 ? 'var(--success)' : hodTodoRate >= 50 ? '#e65100' : 'var(--danger)')
+        + '</div>'
+        + '<div style="margin-top:10px;"><div class="hq-bar" style="height:10px;"><div class="hq-fill" style="width:' + hodTodoRate + '%;background:' + (hodTodoRate >= 80 ? 'var(--success)' : hodTodoRate >= 50 ? '#e65100' : 'var(--danger)') + ';"></div></div></div>'
+        + '</div>';
+
+    // ── Team work summary card ──
+    html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;border-left:4px solid #1565c0;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-size:15px;font-weight:700;">👥 Team Work Summary — ' + (user.department || '') + '</div>'
+        + '<span class="badge badge-info" style="font-size:10px;">' + teamRate + '% completion</span></div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;">'
+        + kBox(teamTasks.length, 'Total Tasks', '#1565c0')
+        + kBox(teamDone, 'Completed', 'var(--success)')
+        + kBox(teamPend, 'Pending', '#e65100')
+        + kBox(teamProg, 'In Progress', '#ff6f00')
+        + kBox(teamOverdue.length, 'Overdue', 'var(--danger)')
+        + kBox(teamRate + '%', 'Completion Rate', teamRate >= 80 ? 'var(--success)' : teamRate >= 50 ? '#e65100' : 'var(--danger)')
+        + '</div>'
+        + '<div style="margin-top:10px;"><div class="hq-bar" style="height:10px;"><div class="hq-fill" style="width:' + teamRate + '%;background:' + (teamRate >= 80 ? 'var(--success)' : teamRate >= 50 ? '#e65100' : 'var(--danger)') + ';"></div></div></div>'
+        + '</div>';
+
+    // ── Combined progress bar ──
+    html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">'
+        + '<div style="font-size:15px;font-weight:700;margin-bottom:8px;">📊 Overall Progress</div>'
+        + '<div style="display:flex;align-items:center;gap:12px;">'
+        + '<div class="hq-bar" style="flex:1;height:14px;"><div class="hq-fill" style="width:' + combinedRate + '%;background:' + (combinedRate >= 80 ? 'var(--success)' : combinedRate >= 50 ? '#e65100' : 'var(--danger)') + ';"></div></div>'
+        + '<span style="font-size:16px;font-weight:700;color:' + (combinedRate >= 80 ? 'var(--success)' : combinedRate >= 50 ? '#e65100' : 'var(--danger)') + ';min-width:50px;">' + combinedRate + '%</span>'
+        + '</div>'
+        + '<div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--gray);">'
+        + '<span>📋 HOD TODO: ' + hodTodoDone + '/' + hodTodos.length + ' (' + hodTodoRate + '%)</span>'
+        + '<span>👥 Team: ' + teamDone + '/' + teamTasks.length + ' (' + teamRate + '%)</span>'
+        + '</div></div>';
+
+    // ── Charts row ──
+    html += '<div class="grid-2" style="gap:16px;margin-bottom:16px;">'
+        + '<div class="card"><div class="card-header"><h3>📊 Task Status Distribution</h3></div><div style="padding:8px;"><canvas id="hodWrStatusChart" height="200"></canvas></div></div>'
+        + '<div class="card"><div class="card-header"><h3>📊 Per-Member Completion</h3></div><div style="padding:8px;"><canvas id="hodWrMemberChart" height="200"></canvas></div></div>'
+        + '</div>';
+
+    // ── Per-member breakdown table ──
+    if (memberRows.length > 0) {
+        html += '<div class="card" style="margin-bottom:16px;"><div class="card-header"><h3>👥 Per-Member Task Breakdown</h3></div>'
+            + '<div class="table-responsive"><table><thead><tr><th>Member</th><th>Total</th><th>Done</th><th>Pending</th><th>In Progress</th><th>Overdue</th><th>Rate</th></tr></thead><tbody>'
+            + memberRows.map(function (m) {
+                return '<tr>'
+                    + '<td><strong>' + m.name + '</strong></td>'
+                    + '<td>' + m.total + '</td>'
+                    + '<td style="color:var(--success);font-weight:600;">' + m.done + '</td>'
+                    + '<td>' + m.pend + '</td>'
+                    + '<td>' + m.prog + '</td>'
+                    + '<td style="color:' + (m.overdue > 0 ? 'var(--danger)' : 'var(--gray)') + ';">' + m.overdue + '</td>'
+                    + '<td><div style="display:flex;align-items:center;gap:6px;"><div class="hq-bar" style="width:50px;"><div class="hq-fill" style="width:' + m.rate + '%;background:' + (m.rate >= 80 ? 'var(--success)' : m.rate >= 50 ? '#e65100' : 'var(--danger)') + ';"></div></div><span style="font-size:11px;">' + m.rate + '%</span></div></td>'
+                    + '</tr>';
+            }).join('')
+            + '<tr style="background:#e8eaf6;font-weight:700;"><td>HOD (You)</td><td>' + hodTodos.length + '</td><td style="color:var(--success);">' + hodTodoDone + '</td><td>' + hodTodoPend + '</td><td>0</td><td>0</td><td><div style="display:flex;align-items:center;gap:6px;"><div class="hq-bar" style="width:50px;"><div class="hq-fill" style="width:' + hodTodoRate + '%;background:' + (hodTodoRate >= 80 ? 'var(--success)' : hodTodoRate >= 50 ? '#e65100' : 'var(--danger)') + ';"></div></div><span style="font-size:11px;">' + hodTodoRate + '%</span></div></td></tr>'
+            + '</tbody></table></div></div>';
+    }
+
+    html += '</div>';
+
+    el.innerHTML = html;
+
+    // ── Render charts ──
+    setTimeout(function () {
+        if (typeof Chart === 'undefined') return;
+
+        // Status distribution doughnut
+        var statusCanvas = document.getElementById('hodWrStatusChart');
+        if (statusCanvas) {
+            var ctx = statusCanvas.getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Done', 'In Progress', 'Pending', 'Overdue'],
+                    datasets: [{
+                        data: [combinedDone, teamProg, (combinedTotal - combinedDone - teamProg), teamOverdue.length],
+                        backgroundColor: ['#2e7d32', '#ff8f00', '#ffa000', '#c62828'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 10, padding: 8 } }
+                    }
+                }
+            });
+        }
+
+        // Per-member completion bar chart
+        var memberCanvas = document.getElementById('hodWrMemberChart');
+        if (memberCanvas && memberRows.length > 0) {
+            var labels = memberRows.map(function (m) { return m.name.split(' ')[0]; });
+            var doneData = memberRows.map(function (m) { return m.done; });
+            var pendData = memberRows.map(function (m) { return m.pend; });
+            var ctx2 = memberCanvas.getContext('2d');
+            new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Done', data: doneData, backgroundColor: '#2e7d32', borderRadius: 3 },
+                        { label: 'Pending', data: pendData, backgroundColor: '#ffa000', borderRadius: 3 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: true,
+                    scales: {
+                        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 9 } } },
+                        y: { stacked: true, beginAtZero: true, grid: { display: false } }
+                    },
+                    plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 10 } } }
+                }
+            });
+        }
+    }, 150);
+}
+
+function hodDownloadWorkReportPdf() {
+    if (typeof window.jspdf === 'undefined') { APP.notify('PDF library not loaded', 'error'); return; }
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var d = _hodData;
+    if (!d) { APP.notify('Data not loaded', 'error'); return; }
+
+    var hodTodos = (DB.get('hodTodos') || []).filter(function (t) { return t.createdBy === user.username; });
+    var hodTodoDone = hodTodos.filter(function (t) { return t.status === 'completed'; }).length;
+    var hodTodoPend = hodTodos.filter(function (t) { return t.status !== 'completed'; }).length;
+    var hodTodoRate = hodTodos.length > 0 ? Math.round(hodTodoDone / hodTodos.length * 100) : 0;
+
+    var teamTasks = d.allDeptTasks || [];
+    var teamDone = teamTasks.filter(function (t) { return t.status === 'completed'; }).length;
+    var teamPend = teamTasks.filter(function (t) { return t.status === 'pending'; }).length;
+    var teamProg = teamTasks.filter(function (t) { return t.status === 'in-progress'; }).length;
+    var teamOverdue = (d.overdueTasks || []).length;
+    var teamRate = teamTasks.length > 0 ? Math.round(teamDone / teamTasks.length * 100) : 0;
+
+    var combinedTotal = hodTodos.length + teamTasks.length;
+    var combinedDone = hodTodoDone + teamDone;
+    var combinedRate = combinedTotal > 0 ? Math.round(combinedDone / combinedTotal * 100) : 0;
+
+    var team = d.team || [];
+    var today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
+    var pageW = doc.internal.pageSize.getWidth();
+    var margin = 14;
+    var y = 15;
+
+    // Title
+    doc.setFontSize(16);
+    doc.setTextColor(40, 53, 147);
+    doc.text('Work Report — ' + (user.department || 'All'), margin, y);
+    y += 7;
+    doc.setFontSize(9);
+    doc.setTextColor(100);
+    doc.text('HOD: ' + (user.fullName || user.username) + '   Generated: ' + today, margin, y);
+    y += 12;
+
+    // Summary stats
+    doc.setFontSize(11);
+    doc.setTextColor(60);
+    doc.text('Total Items: ' + combinedTotal + '   Completed: ' + combinedDone + '   Rate: ' + combinedRate + '%', margin, y);
+    y += 6;
+    doc.text('HOD TODOs: ' + hodTodos.length + ' (' + hodTodoDone + ' done, ' + hodTodoPend + ' pending, ' + hodTodoRate + '%)', margin, y);
+    y += 6;
+    doc.text('Team Tasks: ' + teamTasks.length + ' (' + teamDone + ' done, ' + teamPend + ' pending, ' + teamProg + ' in-progress, ' + teamOverdue + ' overdue, ' + teamRate + '%)', margin, y);
+    y += 10;
+
+    // Separator line
+    doc.setDrawColor(200);
+    doc.line(margin, y, pageW - margin, y);
+    y += 6;
+
+    // Per-member breakdown table
+    if (team.length > 0) {
+        var headers = [['Member', 'Total', 'Done', 'Pending', 'In-Progress', 'Overdue', 'Rate']];
+        var rows = team.map(function (m) {
+            var mt = teamTasks.filter(function (t) { return t.assignedTo === m.fullName; });
+            var mtDone = mt.filter(function (t) { return t.status === 'completed'; }).length;
+            var mtPend = mt.filter(function (t) { return t.status === 'pending'; }).length;
+            var mtProg = mt.filter(function (t) { return t.status === 'in-progress'; }).length;
+            var mtOvd = mt.filter(function (t) { return t.deadline && new Date(t.deadline) < new Date() && t.status !== 'completed'; }).length;
+            var mtRate = mt.length > 0 ? Math.round(mtDone / mt.length * 100) : 0;
+            return [m.fullName, mt.length, mtDone, mtPend, mtProg, mtOvd, mtRate + '%'];
+        });
+        // Add HOD row
+        rows.push([user.fullName + ' (HOD)', hodTodos.length, hodTodoDone, hodTodoPend, 0, 0, hodTodoRate + '%']);
+
+        doc.autoTable({
+            head: headers,
+            body: rows,
+            startY: y,
+            styles: { fontSize: 8, cellPadding: 2 },
+            headStyles: { fillColor: [40, 53, 147], textColor: [255, 255, 255], fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [240, 240, 248] },
+            margin: { left: margin, right: margin }
+        });
+    }
+
+    doc.save('Work_Report_' + (user.department || 'All').replace(/[^a-z0-9]/gi, '_') + '_' + new Date().toISOString().slice(0, 10) + '.pdf');
+    APP.notify('Work Report PDF downloaded!', 'success');
+}
+
+/* ═══════════════════════════════════════════════
    PERFORMANCE TAB
 ═══════════════════════════════════════════════ */
 function _hodPerformance(el) {
@@ -1782,8 +2498,13 @@ function hodExportEmployeeReport(employeeName) {
         var empProbs = (d.routedProblems||[]).filter(function(p){ return p.createdBy === emp.username || p.createdBy === emp.fullName; });
         var empCl = (d.myCl||[]).filter(function(c){ return c.assignedTo === emp.fullName; });
         var empTodos = (DB.get('employeeTodos')||[]).filter(function(t){ return t.createdBy === emp.username; });
+        var empReqs = (DB.get('material_requests')||[]).filter(function(r){ return r.createdBy === emp.username || r.createdByName === emp.fullName; });
 
-        // Sheet 1: Cover
+        // Sheet 1: Cover / Summary
+        var empDone = empTasks.filter(function(t){return t.status==='completed';}).length;
+        var empTotal = empTasks.length;
+        var empOver = empTasks.filter(function(t){return t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='completed';}).length;
+        var empRate = empTotal > 0 ? Math.round(empDone/empTotal*100) : 0;
         var cover = [
             ['EMPLOYEE REPORT — ' + employeeName],
             [''],
@@ -1792,41 +2513,99 @@ function hodExportEmployeeReport(employeeName) {
             ['Report Date', nowLabel],
             [''],
             ['── OVERVIEW ──'],
-            ['Tasks: ' + empTasks.length + ' total, ' + empTasks.filter(function(t){return t.status==='completed';}).length + ' done, ' + empTasks.filter(function(t){return t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='completed';}).length + ' overdue'],
+            ['Tasks: ' + empTotal + ' total, ' + empDone + ' done, ' + empOver + ' overdue (' + empRate + '%)'],
             ['Problems: ' + empProbs.length + ' total'],
             ['Checklists: ' + empCl.length + ' total'],
             ['TODO: ' + empTodos.length + ' total, ' + empTodos.filter(function(t){return t.status==='completed';}).length + ' done'],
+            ['Material Requests: ' + empReqs.length + ' total'],
             ['Reports Submitted: ' + empReports.length],
         ];
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cover), 'Summary');
 
-        // Sheet 2: Tasks
+        // Sheet 2: KPI Dashboard
+        var pTot=empProbs.length, pRes=empProbs.filter(function(p){return p.status==='resolved';}).length, pRate=pTot>0?Math.round(pRes/pTot*100):0;
+        var cTot=empCl.length, cDone=empCl.filter(function(c){return c.status==='completed';}).length, cRate=cTot>0?Math.round(cDone/cTot*100):0;
+        var rTot=empReqs.length, rApp=empReqs.filter(function(r){return r.status==='approved';}).length, rRate=rTot>0?Math.round(rApp/rTot*100):0;
+        var tdTot=empTodos.length, tdDone=empTodos.filter(function(t){return t.status==='completed';}).length, tdRate=tdTot>0?Math.round(tdDone/tdTot*100):0;
+        var _bar=function(p){var f=Math.round(p/10);return '█'.repeat(f)+'░'.repeat(10-f)+' '+p+'%';};
+        var kpiRows = [
+            ['KPI DASHBOARD'],
+            [''],
+            ['Metric','Done','Total','Rate','Progress Bar'],
+            ['Task Completion',empDone,empTotal,empRate+'%',_bar(empRate)],
+            ['Problem Resolution',pRes,pTot,pRate+'%',_bar(pRate)],
+            ['Checklist Compliance',cDone,cTot,cRate+'%',_bar(cRate)],
+            ['Request Approval',rApp,rTot,rRate+'%',_bar(rRate)],
+            ['TODO Completion',tdDone,tdTot,tdRate+'%',_bar(tdRate)],
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kpiRows), 'KPI Dashboard');
+
+        // Sheet 3: Tasks
         var tRows = [['Title','Priority','Status','Deadline','Source']];
         empTasks.forEach(function(t){
             tRows.push([t.title||'', t.priority||'', t.status||'', t.deadline||'', t._source||'']);
         });
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tRows), 'Tasks');
 
-        // Sheet 3: Problems
+        // Sheet 4: Tasks with TAT
+        var _tatTasks = empTasks.filter(function(t){ return t.tat; });
+        var tatRows = [['Title','TAT (hours)','Status','Priority','Deadline','Elapsed (est.)']];
+        _tatTasks.forEach(function(t) {
+            var el = t.createdAt ? ((new Date() - new Date(t.createdAt)) / 3600000).toFixed(1)+'h' : '-';
+            tatRows.push([t.title||'', t.tat, t.status||'', t.priority||'', t.deadline||'', t.status==='completed'?'Done':el]);
+        });
+        if (_tatTasks.length===0) tatRows.push(['(No tasks with TAT)','','','','','']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tatRows), 'Tasks with TAT');
+
+        // Sheet 5: Problems
         var pRows = [['Title','Category','Status','Created At']];
         empProbs.forEach(function(p){
             pRows.push([p.title||'', p.category||'', p.status||'', p.createdAt?APP.formatDate(p.createdAt):'']);
         });
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pRows), 'Problems');
 
-        // Sheet 4: TODO
+        // Sheet 6: Material Requests
+        var reqRows = [['Title','Status','Created At','Department']];
+        empReqs.forEach(function(req){
+            reqRows.push([req.title||'', req.status||'', req.createdAt?APP.formatDate(req.createdAt):'', req.department||'']);
+        });
+        if (empReqs.length===0) reqRows.push(['(No material requests)','','','']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(reqRows), 'Material Requests');
+
+        // Sheet 7: TODO
         var todoRows = [['Title','Date','Priority','Status','Completed At']];
         empTodos.forEach(function(t){
             todoRows.push([t.title||'', t.date||'', t.priority||'', t.status||'', t.completedAt?APP.formatDate(t.completedAt):'']);
         });
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(todoRows), 'TODO');
 
-        // Sheet 5: Reports
+        // Sheet 8: Reports
         var repRows = [['Title','Category','Sent To','Date']];
         empReports.forEach(function(r){
             repRows.push([r.title||'', r.category||'', r.sentTo||'', r.createdAt?APP.formatDate(r.createdAt):'']);
         });
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(repRows), 'Reports');
+
+        // Sheet 9: Today's Checklist with Status
+        var clRows = [['Checklist','Item','Status','Value/Unit']];
+        empCl.forEach(function(cl){
+            (cl.items||[]).forEach(function(item){
+                var v = (item.value!==undefined&&item.value!=='')?' = '+item.value+(item.unit?' '+item.unit:''):'';
+                clRows.push([cl.title, item.task||'', item.status||'pending', v]);
+            });
+            if (!cl.items||cl.items.length===0) clRows.push([cl.title,'(no items)','-','']);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(clRows), 'Today Checklists');
+
+        // Sheet 10: Q Goals (Allotted + Own)
+        var _qpAll = DB.get('quarterly_priorities')||[];
+        var _allotted = _qpAll.filter(function(q){ return q.memberUsername===emp.username && !q.selfOwn; });
+        var _own = _qpAll.filter(function(q){ return q.memberUsername===emp.username && q.selfOwn; });
+        var qpRows = [['Type','Quarter','Goal / Item','Status','Note']];
+        _allotted.forEach(function(q){ (q.items||[]).forEach(function(it){ qpRows.push(['Allotted',(q.quarter||'')+'-'+(q.year||''), it.task||'', it.status||'pending', it.note||'']); }); });
+        _own.forEach(function(q){ (q.items||[]).forEach(function(it){ qpRows.push(['Own Goal',(q.quarter||'')+'-'+(q.year||''), it.task||'', it.status||'pending', it.note||'']); }); });
+        if (_allotted.length===0 && _own.length===0) qpRows.push(['(No quarterly goals found)','','','','']);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(qpRows), 'Q Goals');
 
         var fname = employeeName.replace(/[^a-z0-9]/gi,'_') + '_Report.xlsx';
         XLSX.writeFile(wb, fname);
@@ -2071,22 +2850,59 @@ function hodSaveReturn() {
 ═══════════════════════════════════════════════ */
 function _hodInventoryReport(el) {
     var user = AUTH.currentUser();
-    var dept = (user.department || '').trim().toLowerCase();
+    var myDept = (user.department || '').trim().toLowerCase();
     var allInv = DB.get('inventory') || [];
-    var items = allInv.filter(function (i) {
-        return (i.department || '').trim().toLowerCase() === dept;
-    });
+
+    // Determine which department(s) to show
+    var filter = _hodInvDeptFilter; // null=my dept, '__all__'=all, otherwise a dept name
+    var activeDept = filter === '__all__' ? '__all__' : (filter || myDept);
+    var items = activeDept === '__all__'
+        ? allInv
+        : allInv.filter(function (i) { return (i.department || '').trim().toLowerCase() === activeDept; });
+    var isAllDepts = activeDept === '__all__';
+
+    var now = new Date().toISOString();
+
+    function daysBetween(from, to) {
+        if (!from || !to) return null;
+        var d1 = new Date(from), d2 = new Date(to);
+        return Math.round((d2 - d1) / 86400000);
+    }
+
+    function stockStatus(item) {
+        var qty = parseInt(item.quantity) || 0;
+        if (qty === 0) return { label: 'NO STOCK', color: '#212121', bg: '#f5f5f5' };
+        if (qty <= 10) return { label: 'LOW STOCK', color: '#e65100', bg: '#fff3e0' };
+        return { label: 'IN STOCK', color: '#2e7d32', bg: '#e8f5e9' };
+    }
+
+    function expStatus(item) {
+        if (!item.expiryDate) return null;
+        var days = daysBetween(now, item.expiryDate);
+        if (days < 0) return { label: 'EXPIRED', color: '#c62828', bg: '#ffebee' };
+        if (days <= 30) return { label: 'NEAR EXPIRE', color: '#e65100', bg: '#fff3e0' };
+        return { label: 'VALID', color: '#2e7d32', bg: '#e8f5e9' };
+    }
 
     var totalItems = items.length;
     var totalQty = items.reduce(function (s, i) { return s + (parseFloat(i.quantity) || 0); }, 0);
     var totalValue = items.reduce(function (s, i) {
         return s + (parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0);
     }, 0);
-    var lowStock = items.filter(function (i) { return parseFloat(i.quantity) <= 5; });
+    var lowStock = items.filter(function (i) { return parseInt(i.quantity) > 0 && parseInt(i.quantity) <= 10; });
+    var noStock = items.filter(function (i) { return parseInt(i.quantity) === 0; });
+    var expired = items.filter(function (i) {
+        return i.expiryDate && daysBetween(now, i.expiryDate) < 0;
+    });
+    var nearExpire = items.filter(function (i) {
+        var d = i.expiryDate ? daysBetween(now, i.expiryDate) : null;
+        return d !== null && d >= 0 && d <= 30;
+    });
 
-    // Movements for this department
+    // Movements (filtered by selected dept or all)
+    var targetDept = activeDept === '__all__' ? null : activeDept;
     var allMoves = (DB.get('inventory_movements') || []).filter(function (m) {
-        return (m.dept || '').trim().toLowerCase() === dept;
+        return !targetDept || (m.dept || '').trim().toLowerCase() === targetDept;
     });
     var movesIn = allMoves.filter(function (m) { return m.type === 'in'; });
     var movesOut = allMoves.filter(function (m) { return m.type === 'out'; });
@@ -2096,11 +2912,32 @@ function _hodInventoryReport(el) {
     var totalOutVal = movesOut.reduce(function (s, m) { return s + (parseFloat(m.totalValue) || 0); }, 0);
     var recentMoves = allMoves.slice().reverse().slice(0, 20);
 
-    // Material requests for this department
+    // Material requests
     var matReqs = (DB.get('material_requests') || []).filter(function (r) {
-        return (r.department || '').trim().toLowerCase() === dept;
+        return !targetDept || (r.department || '').trim().toLowerCase() === targetDept;
     }).slice().reverse().slice(0, 20);
 
+    // Department-wise inventory summary (all depts)
+    var deptSummary = {};
+    allInv.forEach(function (i) {
+        var d = i.department || 'Unassigned';
+        if (!deptSummary[d]) deptSummary[d] = { items: 0, qty: 0, value: 0, low: 0, noStock: 0, expired: 0, nearExpire: 0 };
+        deptSummary[d].items++;
+        var q = parseFloat(i.quantity) || 0;
+        deptSummary[d].qty += q;
+        deptSummary[d].value += q * (parseFloat(i.price) || 0);
+        if (q > 0 && q <= 10) deptSummary[d].low++;
+        if (q === 0) deptSummary[d].noStock++;
+        if (i.expiryDate && daysBetween(now, i.expiryDate) < 0) deptSummary[d].expired++;
+    });
+    var deptKeys = Object.keys(deptSummary).sort();
+
+    // Global totals
+    var globalTotalItems = allInv.length;
+    var globalTotalQty = allInv.reduce(function (s, i) { return s + (parseFloat(i.quantity) || 0); }, 0);
+    var globalTotalValue = allInv.reduce(function (s, i) { return s + (parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0); }, 0);
+
+    // Category map for charts
     var catMap = {};
     items.forEach(function (i) {
         var cat = i.category || 'Uncategorized';
@@ -2109,57 +2946,138 @@ function _hodInventoryReport(el) {
         catMap[cat].qty += parseFloat(i.quantity) || 0;
         catMap[cat].value += (parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0);
     });
-
     var catKeys = Object.keys(catMap);
 
+    // All departments for filter dropdown
+    var allDeptNames = deptKeys.slice();
+
+    var s = document.getElementById('hodInvCss');
+    if (!s) {
+        s = document.createElement('style');
+        s.id = 'hodInvCss';
+        s.textContent = '.inv-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;}.inv-stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;align-items:center;gap:10px;}.inv-stat-icon{width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}.inv-stat-val{font-size:20px;font-weight:700;line-height:1;}.inv-stat-lbl{font-size:11px;color:var(--gray);margin-top:2px;}';
+        document.head.appendChild(s);
+    }
+
+    // Build dept filter dropdown
+    var deptOpts = '<option value="__all__">🏢 All Departments</option>'
+        + allDeptNames.map(function (d) {
+            var sel = d.trim().toLowerCase() === activeDept ? ' selected' : '';
+            return '<option value="' + d.replace(/"/g, '&quot;') + '"' + sel + '>' + d + '</option>';
+        }).join('');
+
+    var displayDeptName = isAllDepts ? 'All Departments' : (activeDept.charAt(0).toUpperCase() + activeDept.slice(1));
+    var displaySubtitle = isAllDepts
+        ? globalTotalItems + ' items across ' + allDeptNames.length + ' departments'
+        : items.length + ' items in ' + activeDept;
+
     var html = ''
-        + '<h3 style="margin-bottom:12px;">📦 Inventory Report — ' + (user.department || '') + '</h3>'
-        // Download buttons
-        + '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">'
-        + '<button class="btn btn-sm" style="background:#1e7e34;color:#fff;padding:6px 14px;font-size:12px;" onclick="hodDownloadInvExcel()">📥 Download Excel</button>'
-        + '<button class="btn btn-sm" style="background:#c82333;color:#fff;padding:6px 14px;font-size:12px;" onclick="hodDownloadInvPdf()">📥 Download PDF</button>'
+        // ═══════════ DASHBOARD HEADER ═══════════
+        + '<div style="background:linear-gradient(135deg,#004d40,#00695c);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
+        + '<div><div style="font-size:18px;font-weight:700;">📦 Inventory Dashboard</div>'
+        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + displayDeptName + ' · ' + displaySubtitle + ' · ' + new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + '</div></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+        + '<select id="hodInvDeptSelect" class="form-control" style="padding:6px 10px;font-size:12px;border-radius:6px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.15);color:#fff;min-width:160px;" onchange="hodInvDeptChanged(this.value)">'
+        + deptOpts
+        + '</select>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadInvExcel()">📥 Excel</button>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadInvPdf()">📄 PDF</button>'
+        + '</div></div>'
+
+        // ═══════════ GLOBAL / DEPT KPI CARDS ═══════════
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;">'
+        + '<div class="inv-stat-card"><div class="inv-stat-icon" style="background:#e0f2f1;color:#00796b;">📦</div><div><div class="inv-stat-val">' + totalItems + '</div><div class="inv-stat-lbl">' + (isAllDepts ? 'Total Items (All)' : 'Total Items') + '</div></div></div>'
+        + '<div class="inv-stat-card"><div class="inv-stat-icon" style="background:#e8f5e9;color:#2e7d32;">🔢</div><div><div class="inv-stat-val">' + totalQty + '</div><div class="inv-stat-lbl">Total Quantity</div></div></div>'
+        + '<div class="inv-stat-card"><div class="inv-stat-icon" style="background:#fff3e0;color:#e65100;">💰</div><div><div class="inv-stat-val">₹' + totalValue.toFixed(2) + '</div><div class="inv-stat-lbl">Total Value</div></div></div>'
+        + '<div class="inv-stat-card"><div class="inv-stat-icon" style="background:#e8f5e9;color:#2e7d32;">📥</div><div><div class="inv-stat-val">' + totalInQty + '</div><div class="inv-stat-lbl">Stock IN</div></div></div>'
+        + '<div class="inv-stat-card"><div class="inv-stat-icon" style="background:#ffebee;color:#c62828;">📤</div><div><div class="inv-stat-val">' + totalOutQty + '</div><div class="inv-stat-lbl">Stock OUT</div></div></div>'
         + '</div>'
-        // Summary cards
-        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px;">'
-        + '<div class="hod-kpi"><div class="hod-kpi-icon" style="background:#e0f2f1;color:#00796b;">📦</div><div><div class="hod-kpi-val">' + totalItems + '</div><div class="hod-kpi-lbl">Total Items</div></div></div>'
-        + '<div class="hod-kpi"><div class="hod-kpi-icon" style="background:#e8f5e9;color:#2e7d32;">🔢</div><div><div class="hod-kpi-val">' + totalQty + '</div><div class="hod-kpi-lbl">Total Quantity</div></div></div>'
-        + '<div class="hod-kpi"><div class="hod-kpi-icon" style="background:#fff3e0;color:#e65100;">💰</div><div><div class="hod-kpi-val">₹' + totalValue.toFixed(2) + '</div><div class="hod-kpi-lbl">Total Value</div></div></div>'
-        + '<div class="hod-kpi" style="cursor:default;"><div class="hod-kpi-icon" style="background:' + (lowStock.length > 0 ? '#ffebee;#c62828' : '#e8f5e9;#2e7d32') + ';">' + (lowStock.length > 0 ? '⚠️' : '✅') + '</div><div><div class="hod-kpi-val">' + lowStock.length + '</div><div class="hod-kpi-lbl">Low Stock</div></div></div>'
-        + '<div class="hod-kpi" style="cursor:default;"><div class="hod-kpi-icon" style="background:#e8f5e9;color:#2e7d32;">📥</div><div><div class="hod-kpi-val" style="color:#2e7d32;">' + totalInQty + '</div><div class="hod-kpi-lbl">Total Stock In</div></div></div>'
-        + '<div class="hod-kpi" style="cursor:default;"><div class="hod-kpi-icon" style="background:#ffebee;color:#c62828;">📤</div><div><div class="hod-kpi-val" style="color:#c62828;">' + totalOutQty + '</div><div class="hod-kpi-lbl">Total Stock Out</div></div></div>'
+
+        // ═══════════ STATUS WARNING CARDS ═══════════
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px;">'
+        + '<div style="background:#fff3e0;border:1px solid #ffb300;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:13px;font-weight:700;color:#e65100;">⚠️ Low Stock</div><div style="font-size:22px;font-weight:700;margin:4px 0;">' + lowStock.length + '</div><div style="font-size:11px;color:var(--gray);">Items with quantity ≤ 10</div></div>'
+        + '<div style="background:#f5f5f5;border:1px solid #9e9e9e;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:13px;font-weight:700;color:#212121;">⛔ No Stock</div><div style="font-size:22px;font-weight:700;margin:4px 0;">' + noStock.length + '</div><div style="font-size:11px;color:var(--gray);">Items with quantity = 0</div></div>'
+        + '<div style="background:#fff8e1;border:1px solid #ff6f00;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:13px;font-weight:700;color:#e65100;">⏳ Near Expire</div><div style="font-size:22px;font-weight:700;margin:4px 0;">' + nearExpire.length + '</div><div style="font-size:11px;color:var(--gray);">Expiring within 30 days</div></div>'
+        + '<div style="background:#ffebee;border:1px solid #ef5350;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:13px;font-weight:700;color:#c62828;">❌ Expired</div><div style="font-size:22px;font-weight:700;margin:4px 0;">' + expired.length + '</div><div style="font-size:11px;color:var(--gray);">Past expiry date</div></div>'
         + '</div>';
 
-    // Charts row
+    // ═══════════ GLOBAL DASHBOARD (when viewing all depts) ═══════════
+    if (isAllDepts) {
+        var totalLowAll = allInv.filter(function (i) { return parseInt(i.quantity) > 0 && parseInt(i.quantity) <= 10; }).length;
+        var totalNoStockAll = allInv.filter(function (i) { return parseInt(i.quantity) === 0; }).length;
+        var totalExpiredAll = allInv.filter(function (i) { return i.expiryDate && daysBetween(now, i.expiryDate) < 0; }).length;
+        var totalNearExpireAll = allInv.filter(function (i) {
+            var d = i.expiryDate ? daysBetween(now, i.expiryDate) : null;
+            return d !== null && d >= 0 && d <= 30;
+        }).length;
+
+        html += '<div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border:2px solid #2e7d32;">'
+            + '<div class="card-header"><h3>🌐 Global Inventory Overview</h3></div>'
+            + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;padding:12px;">'
+            + '<div style="text-align:center;padding:10px;background:var(--card);border-radius:8px;"><div style="font-size:24px;font-weight:700;color:#004d40;">' + globalTotalItems + '</div><div style="font-size:11px;color:var(--gray);">Total Items (All Depts)</div></div>'
+            + '<div style="text-align:center;padding:10px;background:var(--card);border-radius:8px;"><div style="font-size:24px;font-weight:700;color:#2e7d32;">' + globalTotalQty + '</div><div style="font-size:11px;color:var(--gray);">Total Quantity</div></div>'
+            + '<div style="text-align:center;padding:10px;background:var(--card);border-radius:8px;"><div style="font-size:24px;font-weight:700;color:#e65100;">₹' + globalTotalValue.toFixed(2) + '</div><div style="font-size:11px;color:var(--gray);">Total Value</div></div>'
+            + '<div style="text-align:center;padding:10px;background:var(--card);border-radius:8px;"><div style="font-size:24px;font-weight:700;color:#e65100;">' + totalLowAll + '</div><div style="font-size:11px;color:var(--gray);">Low Stock</div></div>'
+            + '<div style="text-align:center;padding:10px;background:var(--card);border-radius:8px;"><div style="font-size:24px;font-weight:700;color:#212121;">' + totalNoStockAll + '</div><div style="font-size:11px;color:var(--gray);">No Stock</div></div>'
+            + '<div style="text-align:center;padding:10px;background:var(--card);border-radius:8px;"><div style="font-size:24px;font-weight:700;color:#e65100;">' + totalNearExpireAll + '</div><div style="font-size:11px;color:var(--gray);">Near Expire</div></div>'
+            + '<div style="text-align:center;padding:10px;background:var(--card);border-radius:8px;"><div style="font-size:24px;font-weight:700;color:#c62828;">' + totalExpiredAll + '</div><div style="font-size:11px;color:var(--gray);">Expired</div></div>'
+            + '</div></div>';
+    }
+
+    // ═══════════ DEPARTMENT-WISE SUMMARY ═══════════
+    html += '<div class="card" style="margin-bottom:16px;"><div class="card-header"><h3>🏢 Department-wise Inventory</h3></div>'
+        + '<div class="table-responsive"><table><thead><tr><th>Department</th><th>Items</th><th>Total Qty</th><th>Total Value</th><th>Low Stock</th><th>No Stock</th><th>Near Expire</th><th>Expired</th></tr></thead><tbody>'
+        + deptKeys.map(function (d) {
+            var ds = deptSummary[d];
+            var isActive = d.trim().toLowerCase() === activeDept;
+            var nearExp = allInv.filter(function (i) {
+                if ((i.department || '').trim().toLowerCase() !== d.trim().toLowerCase()) return false;
+                var dd = i.expiryDate ? daysBetween(now, i.expiryDate) : null;
+                return dd !== null && dd >= 0 && dd <= 30;
+            }).length;
+            return '<tr' + (isActive ? ' style="background:#e0f2f1;font-weight:600;cursor:pointer;"' : ' style="cursor:pointer;"') + ' onclick="hodInvDeptChanged(\'' + d.replace(/'/g, "\\'") + '\')">'
+                + '<td><strong>' + d + '</strong>' + (isActive ? ' <span style="font-size:10px;color:#00796b;">(viewing)</span>' : '') + '</td>'
+                + '<td>' + ds.items + '</td>'
+                + '<td>' + ds.qty + '</td>'
+                + '<td>₹' + ds.value.toFixed(2) + '</td>'
+                + '<td>' + (ds.low > 0 ? '<span class="inv-badge" style="background:#fff3e0;color:#e65100;">' + ds.low + '</span>' : '0') + '</td>'
+                + '<td>' + (ds.noStock > 0 ? '<span class="inv-badge" style="background:#f5f5f5;color:#212121;">' + ds.noStock + '</span>' : '0') + '</td>'
+                + '<td>' + (nearExp > 0 ? '<span class="inv-badge" style="background:#fff8e1;color:#e65100;">' + nearExp + '</span>' : '0') + '</td>'
+                + '<td>' + (ds.expired > 0 ? '<span class="inv-badge" style="background:#ffebee;color:#c62828;">' + ds.expired + '</span>' : '0') + '</td></tr>';
+        }).join('')
+        + '</tbody></table></div></div>';
+
+    // ═══════════ CHARTS ROW ═══════════
     html += '<div class="grid-2" style="gap:16px;margin-bottom:16px;">'
-        + '<div class="card"><div class="card-header"><h3>📊 Category Distribution</h3></div><div style="padding:8px;"><canvas id="hodInvCatChart" height="200"></canvas></div></div>'
-        + '<div class="card"><div class="card-header"><h3>📊 Stock In vs Out</h3></div><div style="padding:8px;"><canvas id="hodInvMovChart" height="200"></canvas></div></div>'
+        + '<div class="card"><div class="card-header"><h3>📊 Category Distribution (Value)</h3></div><div style="padding:8px;"><canvas id="hodInvCatChart" height="200"></canvas></div></div>'
+        + '<div class="card"><div class="card-header"><h3>📊 Stock In vs Out (Qty)</h3></div><div style="padding:8px;"><canvas id="hodInvMovChart" height="200"></canvas></div></div>'
         + '</div>';
 
-    // Category breakdown table
+    // ═══════════ CATEGORY BREAKDOWN ═══════════
     if (catKeys.length > 0) {
         html += '<div class="card" style="margin-bottom:16px;"><div class="card-header"><h3>📊 Category Breakdown</h3></div>'
-            + '<div class="table-responsive"><table><thead><tr><th>Category</th><th>Items</th><th>Quantity</th><th>Value</th></tr></thead><tbody>'
+            + '<div class="table-responsive"><table><thead><tr><th>Category</th><th>Items</th><th>Quantity</th><th>Value</th><th>% of Total</th></tr></thead><tbody>'
             + catKeys.map(function (cat) {
                 var c = catMap[cat];
                 var pct = totalValue > 0 ? (c.value / totalValue * 100).toFixed(1) : 0;
-                return '<tr><td><strong>' + cat + '</strong></td><td>' + c.count + '</td><td>' + c.qty + '</td><td>₹' + c.value.toFixed(2) + ' <span style="font-size:11px;color:var(--gray);">(' + pct + '%)</span></td></tr>';
+                return '<tr><td><strong>' + cat + '</strong></td><td>' + c.count + '</td><td>' + c.qty + '</td><td>₹' + c.value.toFixed(2) + '</td><td><div style="display:flex;align-items:center;gap:6px;"><div class="hq-bar" style="width:60px;"><div class="hq-fill" style="width:' + pct + '%;background:#00796b;"></div></div><span style="font-size:11px;color:var(--gray);">' + pct + '%</span></div></td></tr>';
             }).join('')
             + '</tbody></table></div></div>';
     }
 
-    // In & Out movements
+    // ═══════════ IN & OUT MOVEMENTS ═══════════
     html += '<div class="card" style="margin-bottom:16px;"><div class="card-header"><h3>📥 In & Out Movements <span style="font-size:12px;color:var(--gray);font-weight:400;">(last 20)</span></h3></div>'
         + '<div class="table-responsive"><table><thead><tr><th>Date</th><th>Type</th><th>Item</th><th>Qty</th><th>Value</th><th>By</th></tr></thead><tbody>'
         + (recentMoves.length === 0
-            ? '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No movements found for this department.</td></tr>'
+            ? '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No movements found.</td></tr>'
             : recentMoves.map(function (m) {
                 var isIn = m.type === 'in';
-                var bg = isIn ? '#e8f5e9' : '#fff5f5';
-                var lbl = isIn ? '📥 IN' : '📤 OUT';
+                var lbl = isIn ? 'IN' : 'OUT';
                 var clr = isIn ? '#2e7d32' : '#c62828';
+                var bg = isIn ? '#e8f5e9' : '#ffebee';
                 return '<tr style="background:' + bg + ';">'
                     + '<td>' + APP.formatDate(m.date || m.createdAt) + '</td>'
-                    + '<td><span style="color:' + clr + ';font-weight:600;">' + lbl + '</span></td>'
+                    + '<td><span class="inv-badge" style="background:' + clr + ';color:#fff;">' + lbl + '</span></td>'
                     + '<td>' + (m.itemName || '-') + '</td>'
                     + '<td><strong>' + (parseFloat(m.qty) || 0) + '</strong> ' + (m.unit || '') + '</td>'
                     + '<td>₹' + (parseFloat(m.totalValue) || 0).toFixed(2) + '</td>'
@@ -2167,54 +3085,73 @@ function _hodInventoryReport(el) {
             }).join(''))
         + '</tbody></table></div></div>';
 
-    // Inventory table
-    html += '<div class="card" style="margin-bottom:16px;"><div class="card-header"><h3>📋 Item Details</h3></div>'
-        + '<div style="margin-bottom:8px;"><input type="text" id="hodInvSearch" class="form-control" placeholder="🔍 Search items..." style="max-width:300px;padding:6px 10px;font-size:13px;" oninput="_hodInvFilter(this.value)"></div>'
-        + '<div class="table-responsive"><table id="hodInvTable"><thead><tr><th>#</th><th>Item Name</th><th>Category</th><th>Quantity</th><th>Unit</th><th>Price/Unit</th><th>Total Value</th></tr></thead><tbody>'
+    // ═══════════ ITEM DETAILS TABLE (color-coded) ═══════════
+    html += '<div class="card" style="margin-bottom:16px;"><div class="card-header"><h3>📋 Item Details — Color-Coded</h3></div>'
+        + '<div style="margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
+        + '<input type="text" id="hodInvSearch" class="form-control" placeholder="🔍 Search items..." style="max-width:250px;padding:6px 10px;font-size:13px;" oninput="_hodInvFilter(this.value)">'
+        + '<span class="inv-badge" style="background:#e8f5e9;color:#2e7d32;font-size:11px;padding:4px 10px;">IN STOCK</span>'
+        + '<span class="inv-badge" style="background:#fff3e0;color:#e65100;font-size:11px;padding:4px 10px;">LOW STOCK</span>'
+        + '<span class="inv-badge" style="background:#f5f5f5;color:#212121;font-size:11px;padding:4px 10px;">NO STOCK</span>'
+        + '<span class="inv-badge" style="background:#fff8e1;color:#e65100;font-size:11px;padding:4px 10px;">NEAR EXPIRE</span>'
+        + '<span class="inv-badge" style="background:#ffebee;color:#c62828;font-size:11px;padding:4px 10px;">EXPIRED</span>'
+        + '</div>'
+        + '<div class="table-responsive"><table id="hodInvTable"><thead><tr><th>#</th><th>Barcode</th><th>Item Name</th><th>Category</th><th>Dept</th><th>Qty</th><th>Unit</th><th>Price</th><th>Value</th><th>Stock</th><th>Expiry</th></tr></thead><tbody>'
         + (items.length === 0
-            ? '<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No inventory items found for this department.</td></tr>'
+            ? '<tr><td colspan="11" style="text-align:center;color:var(--gray);padding:20px;">No inventory items found for this department.</td></tr>'
             : items.map(function (i, idx) {
-                var qty = parseFloat(i.quantity) || 0;
+                var qty = parseInt(i.quantity) || 0;
                 var price = parseFloat(i.price) || 0;
-                var isLow = qty <= 5;
-                return '<tr class="' + (isLow ? 'hod-inv-low' : '') + '" style="' + (isLow ? 'background:#fff5f5;' : '') + '">'
+                var ss = stockStatus(i);
+                var es = expStatus(i);
+                var rowBg = qty === 0 ? '#f5f5f5' : (qty <= 10 ? '#fff3e0' : '');
+                if (es && es.label === 'EXPIRED') rowBg = '#ffebee';
+                else if (es && es.label === 'NEAR EXPIRE' && rowBg !== '#fff3e0') rowBg = '#fff8e1';
+                var expBadge = es ? '<span class="inv-badge" style="background:' + es.bg + ';color:' + es.color + ';">' + es.label + '</span>' : '<span style="font-size:11px;color:var(--gray);">—</span>';
+                return '<tr style="background:' + rowBg + ';">'
                     + '<td>' + (idx + 1) + '</td>'
-                    + '<td>' + (i.name || '-') + '</td>'
+                    + '<td style="font-size:10px;font-family:monospace;color:var(--gray);">' + (i.barcode || i.id.slice(-10)) + '</td>'
+                    + '<td><strong>' + (i.name || '-') + '</strong></td>'
                     + '<td>' + (i.category || '-') + '</td>'
-                    + '<td><strong>' + qty + '</strong> ' + (isLow ? '<span class="badge badge-danger" style="font-size:9px;">LOW</span>' : '') + '</td>'
+                    + '<td><span class="badge badge-info" style="font-size:9px;">' + (i.department || '-') + '</span></td>'
+                    + '<td><strong>' + qty + '</strong></td>'
                     + '<td>' + (i.unit || 'pcs') + '</td>'
                     + '<td>₹' + price.toFixed(2) + '</td>'
-                    + '<td>₹' + (qty * price).toFixed(2) + '</td></tr>';
+                    + '<td>₹' + (qty * price).toFixed(2) + '</td>'
+                    + '<td><span class="inv-badge" style="background:' + ss.bg + ';color:' + ss.color + ';border:1px solid ' + ss.color + ';">' + ss.label + '</span></td>'
+                    + '<td>' + expBadge + '</td></tr>';
             }).join(''))
         + '</tbody></table></div></div>';
 
-    // Recent material requests
+    // ═══════════ RECENT MATERIAL REQUESTS ═══════════
     html += '<div class="card" style="margin-bottom:16px;"><div class="card-header"><h3>📥 Recent Material Requests</h3></div>'
-        + '<div class="table-responsive"><table><thead><tr><th>#</th><th>Item</th><th>Qty</th><th>Status</th><th>Date</th></tr></thead><tbody>'
+        + '<div class="table-responsive"><table><thead><tr><th>#</th><th>Title</th><th>Item</th><th>Qty</th><th>Status</th><th>Date</th></tr></thead><tbody>'
         + (matReqs.length === 0
-            ? '<tr><td colspan="5" style="text-align:center;color:var(--gray);padding:20px;">No material requests found.</td></tr>'
+            ? '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No material requests found.</td></tr>'
             : matReqs.map(function (r, idx) {
                 var stCls = r.status === 'approved' ? 'badge-success' : r.status === 'rejected' ? 'badge-danger' : 'badge-warning';
-                return '<tr><td>' + (idx + 1) + '</td><td>' + (r.itemName || r.item || '-') + '</td><td>' + (r.quantity || 0) + '</td><td><span class="badge ' + stCls + '">' + (r.status || 'pending') + '</span></td><td>' + APP.formatDate(r.createdAt) + '</td></tr>';
+                var itemsStr = (r.items || []).map(function (it) { return it.name + ' ×' + it.qty; }).join(', ') || (r.itemName || r.item || '-');
+                return '<tr><td>' + (idx + 1) + '</td><td>' + (r.title || '-') + '</td><td>' + itemsStr + '</td><td>' + (r.quantity || (r.items || []).reduce(function (s, it) { return s + (parseInt(it.qty) || 0); }, 0)) + '</td><td><span class="badge ' + stCls + '">' + (r.status || 'pending') + '</span></td><td>' + APP.formatDate(r.createdAt) + '</td></tr>';
             }).join(''))
         + '</tbody></table></div></div>';
 
-    // Low stock alert
-    if (lowStock.length > 0) {
-        html = '<div style="background:#ffebee;border:1px solid #ef5350;border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">'
-            + '<span style="font-size:13px;font-weight:600;color:#c62828;">⚠️ ' + lowStock.length + ' item(s) with low stock (≤5) need replenishment</span>'
+    // ═══════════ ALERTS ═══════════
+    var alerts = [];
+    if (lowStock.length > 0) alerts.push('⚠️ ' + lowStock.length + ' item(s) with low stock (≤10) need replenishment');
+    if (noStock.length > 0) alerts.push('⛔ ' + noStock.length + ' item(s) are out of stock');
+    if (nearExpire.length > 0) alerts.push('⏳ ' + nearExpire.length + ' item(s) expiring within 30 days');
+    if (expired.length > 0) alerts.push('❌ ' + expired.length + ' item(s) have expired');
+
+    if (alerts.length > 0) {
+        html = '<div style="margin-bottom:12px;">'
+            + alerts.map(function (a) {
+                var bg = a.indexOf('❌') >= 0 ? '#ffebee' : a.indexOf('⛔') >= 0 ? '#f5f5f5' : a.indexOf('⏳') >= 0 ? '#fff8e1' : '#fff3e0';
+                var bd = a.indexOf('❌') >= 0 ? '#ef5350' : a.indexOf('⛔') >= 0 ? '#9e9e9e' : a.indexOf('⏳') >= 0 ? '#ff6f00' : '#ffb300';
+                return '<div style="background:' + bg + ';border:1px solid ' + bd + ';border-radius:8px;padding:8px 14px;margin-bottom:4px;font-size:13px;font-weight:600;color:#333;">' + a + '</div>';
+            }).join('')
             + '</div>' + html;
     }
 
     el.innerHTML = html;
-
-    // Inject style for low-stock rows
-    if (!document.getElementById('hodInvStyle')) {
-        var s = document.createElement('style');
-        s.id = 'hodInvStyle';
-        s.textContent = '.hod-inv-low td{border-bottom:1px solid #ffcdd2;}';
-        document.head.appendChild(s);
-    }
 
     // Charts
     setTimeout(function () {
@@ -2254,6 +3191,13 @@ function _hodInventoryReport(el) {
     }, 100);
 }
 
+function hodInvDeptChanged(val) {
+    _hodInvDeptFilter = val === '__all__' ? '__all__' : val.toLowerCase();
+    var el = document.getElementById('hodTabContent');
+    if (el) _hodInventoryReport(el);
+    // Also update the download function's dept filter reference
+}
+
 function _hodInvFilter(val) {
     var tbody = document.querySelector('#hodInvTable tbody');
     if (!tbody) return;
@@ -2265,18 +3209,124 @@ function _hodInvFilter(val) {
 
 function hodDownloadInvExcel() {
     var user = AUTH.currentUser();
-    var dept = (user.department || '').trim().toLowerCase();
-    var items = (DB.get('inventory') || []).filter(function (i) {
-        return (i.department || '').trim().toLowerCase() === dept;
-    });
+    var deptFilter = _hodInvDeptFilter || (user.department || '');
+    var allInv = DB.get('inventory') || [];
+    var items = deptFilter === '__all__'
+        ? allInv
+        : allInv.filter(function (i) { return (i.department || '').trim().toLowerCase() === deptFilter.trim().toLowerCase(); });
     if (items.length === 0) { APP.notify('No inventory data to download', 'info'); return; }
-    var headers = ['#', 'Item Name', 'Category', 'Quantity', 'Unit', 'Price/Unit', 'Total Value'];
-    var rows = items.map(function (i, idx) {
+    if (typeof XLSX === 'undefined') { APP.notify('Excel library not loaded', 'error'); return; }
+
+    var now = new Date().toISOString();
+    function daysBetween(from, to) {
+        if (!from || !to) return null;
+        return Math.round((new Date(to) - new Date(from)) / 86400000);
+    }
+    function stockLabel(qty) {
+        qty = parseInt(qty) || 0;
+        if (qty === 0) return 'NO STOCK';
+        if (qty <= 10) return 'LOW STOCK';
+        return 'IN STOCK';
+    }
+    function expiryLabel(expDate) {
+        if (!expDate) return '—';
+        var d = daysBetween(now, expDate);
+        if (d === null) return '—';
+        if (d < 0) return 'EXPIRED';
+        if (d <= 30) return 'NEAR EXPIRE';
+        return 'VALID';
+    }
+
+    // ── Sheet 1: Items (color-coded statuses) ──
+    var headers1 = ['#', 'Barcode', 'Item Name', 'Category', 'Department', 'Quantity', 'Unit', 'Price/Unit', 'Total Value', 'Stock Status', 'Expiry Date', 'Expiry Status'];
+    var rows1 = items.map(function (i, idx) {
         var qty = parseFloat(i.quantity) || 0;
         var price = parseFloat(i.price) || 0;
-        return [idx + 1, i.name || '-', i.category || '-', qty, i.unit || 'pcs', price, qty * price];
+        var ss = stockLabel(qty);
+        var es = expiryLabel(i.expiryDate);
+        return [idx + 1, i.barcode || i.id.slice(-10), i.name || '-', i.category || '-', i.department || '-', qty, i.unit || 'pcs', price, qty * price, ss, i.expiryDate ? APP.formatDate(i.expiryDate) : '-', es];
     });
-    _hodExcelExport(dept + ' Inventory Report', headers, rows);
+
+    var wb = XLSX.utils.book_new();
+    var ws1 = XLSX.utils.aoa_to_sheet([headers1].concat(rows1));
+    ws1['!cols'] = headers1.map(function (h, ci) {
+        var max = h.length;
+        rows1.forEach(function (r) { var v = r[ci] != null ? String(r[ci]) : ''; if (v.length > max) max = v.length; });
+        return { wch: Math.min(max + 3, 45) };
+    });
+    XLSX.utils.book_append_sheet(wb, ws1, 'Items');
+
+    // ── Sheet 2: Department-wise Summary ──
+    var deptSummary = {};
+    var filterDepts = deptFilter === '__all__' ? allInv : items;
+    filterDepts.forEach(function (i) {
+        var d = i.department || 'Unassigned';
+        if (!deptSummary[d]) deptSummary[d] = { items: 0, qty: 0, value: 0, low: 0, noStock: 0, expired: 0, nearExpire: 0 };
+        deptSummary[d].items++;
+        var q = parseFloat(i.quantity) || 0;
+        deptSummary[d].qty += q;
+        deptSummary[d].value += q * (parseFloat(i.price) || 0);
+        if (q > 0 && q <= 10) deptSummary[d].low++;
+        if (q === 0) deptSummary[d].noStock++;
+        if (i.expiryDate) {
+            var d2 = daysBetween(now, i.expiryDate);
+            if (d2 !== null && d2 < 0) deptSummary[d].expired++;
+            if (d2 !== null && d2 >= 0 && d2 <= 30) deptSummary[d].nearExpire++;
+        }
+    });
+    var deptKeys = Object.keys(deptSummary).sort();
+    var headers2 = ['Department', 'Items', 'Total Qty', 'Total Value', 'Low Stock', 'No Stock', 'Near Expire', 'Expired'];
+    var rows2 = deptKeys.map(function (d) {
+        var ds = deptSummary[d];
+        return [d, ds.items, ds.qty, Math.round(ds.value * 100) / 100, ds.low, ds.noStock, ds.nearExpire, ds.expired];
+    });
+    // Grand total row
+    var gt = { items: 0, qty: 0, value: 0, low: 0, noStock: 0, expired: 0, nearExpire: 0 };
+    deptKeys.forEach(function (d) { var ds = deptSummary[d]; gt.items += ds.items; gt.qty += ds.qty; gt.value += ds.value; gt.low += ds.low; gt.noStock += ds.noStock; gt.expired += ds.expired; gt.nearExpire += ds.nearExpire; });
+    rows2.push(['GRAND TOTAL', gt.items, gt.qty, Math.round(gt.value * 100) / 100, gt.low, gt.noStock, gt.nearExpire, gt.expired]);
+
+    var ws2 = XLSX.utils.aoa_to_sheet([headers2].concat(rows2));
+    ws2['!cols'] = headers2.map(function (h, ci) {
+        var max = h.length;
+        rows2.forEach(function (r) { var v = r[ci] != null ? String(r[ci]) : ''; if (v.length > max) max = v.length; });
+        return { wch: Math.min(max + 3, 30) };
+    });
+    XLSX.utils.book_append_sheet(wb, ws2, 'Dept Summary');
+
+    // ── Sheet 3: Movements (IN / OUT color-coded) ──
+    var allMoves = (DB.get('inventory_movements') || []).slice().reverse().slice(0, 100);
+    if (deptFilter !== '__all__') {
+        var dfl = deptFilter.trim().toLowerCase();
+        allMoves = allMoves.filter(function (m) { return (m.dept || '').trim().toLowerCase() === dfl; });
+    }
+    var headers3 = ['Date', 'Type', 'Item', 'Quantity', 'Unit', 'Unit Price', 'Total Value', 'Department', 'By', 'Notes'];
+    var rows3 = allMoves.map(function (m) {
+        var isIn = m.type === 'in';
+        return [
+            APP.formatDate(m.date || m.createdAt),
+            isIn ? 'IN' : 'OUT',
+            m.itemName || '-',
+            parseFloat(m.qty) || 0,
+            m.unit || 'pcs',
+            parseFloat(m.unitPrice) || 0,
+            parseFloat(m.totalValue) || 0,
+            m.dept || '-',
+            m.by || '-',
+            m.notes || '-'
+        ];
+    });
+    if (rows3.length === 0) rows3 = [['No movements data available']];
+    var ws3 = XLSX.utils.aoa_to_sheet([headers3].concat(rows3));
+    ws3['!cols'] = headers3.map(function (h, ci) {
+        var max = h.length;
+        rows3.forEach(function (r) { var v = r[ci] != null ? String(r[ci]) : ''; if (v.length > max) max = v.length; });
+        return { wch: Math.min(max + 3, 30) };
+    });
+    XLSX.utils.book_append_sheet(wb, ws3, 'Movements');
+
+    var title = (deptFilter === '__all__' ? 'All_Departments' : deptFilter) + '_Inventory_Report_' + new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, title + '.xlsx');
+    APP.notify('Color-coded inventory report downloaded!', 'success');
 }
 
 function hodDownloadInvPdf() {
