@@ -1,0 +1,19 @@
+{
+  "appId": "com.stavya.hms",
+  "appName": "Stavya Intelligence",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true,
+    "allowNavigation": [
+      "*.firebaseio.com",
+      "*.firebaseapp.com",
+      "*.googleapis.com"
+    ]
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "useLegacyBridge": false
+  }
+}

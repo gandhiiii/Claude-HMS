@@ -1,2 +1,8 @@
 .claude/
 *.log
+node_modules/
+android/
+dist/
+.vscode/
+*.apk
+*.exe

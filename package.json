@@ -1,0 +1,43 @@
+{
+  "name": "stavya-intelligence-hms",
+  "version": "1.0.0",
+  "description": "Stavya Intelligence HMS - Hospital Management System",
+  "main": "electron/main.js",
+  "scripts": {
+    "electron:dev": "electron .",
+    "electron:build": "electron-builder --win portable",
+    "build:exe": "npm run electron:build",
+    "build:www": "if exist www rmdir /s /q www && mkdir www && xcopy css www\\css /E /I /Y && xcopy js www\\js /E /I /Y && xcopy assets www\\assets /E /I /Y && copy index.html www\\ && copy dashboard.html www\\",
+    "capacitor:sync": "npm run build:www && npx cap sync android",
+    "capacitor:open": "npx cap open android",
+    "build:apk": "npm run capacitor:sync && cd android && .\\gradlew assembleDebug"
+  },
+  "build": {
+    "appId": "com.stavya.hms",
+    "productName": "Stavya Intelligence HMS",
+    "asar": false,
+    "directories": {
+      "output": "dist/exe"
+    },
+    "files": [
+      "electron/**/*",
+      "hms_flutter/build/web/**/*",
+      "assets/**/*",
+      "css/**/*",
+      "js/**/*",
+      "*.html",
+      "package.json"
+    ],
+    "win": {
+      "target": ["dir"],
+      "icon": "assets/stavya-logo.png"
+    }
+  },
+  "devDependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}

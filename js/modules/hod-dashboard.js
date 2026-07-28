@@ -179,6 +179,13 @@ function renderHodDashboard(container) {
     var pendingCl  = myCl.filter(function (c) { return c.status !== 'completed'; }).length;
     var pendingReq = myReqs.filter(function (r) { return r.status === 'pending'; }).length + pendingMatApprovals.length + pendingGateApprovals.length;
     var openProblems = routedProblems.length;
+    var deptInventory = (DB.get('inventory') || []).filter(function (i) {
+        return (i.department || '').trim().toLowerCase() === (dept || '').trim().toLowerCase();
+    });
+    var lowStockCount = deptInventory.filter(function (i) { return parseFloat(i.quantity) <= 5; }).length;
+    var invTotalValue = deptInventory.reduce(function (sum, i) {
+        return sum + (parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0);
+    }, 0);
 
     var tabs = [
         { id: 'overview',    label: 'Overview' },
@@ -187,6 +194,7 @@ function renderHodDashboard(container) {
         { id: 'team',        label: '👥 My Team', badge: team.length, bc: 'badge-success' },
         { id: 'checklists',  label: 'Checklists', badge: pendingCl, bc: 'badge-info' },
         { id: 'dept-checklist', label: '📋 Dept Checklists' },
+        { id: 'inventory',   label: '📦 Inventory', badge: lowStockCount, bc: 'badge-warning' },
         { id: 'requests',    label: '🔧 Problems & Requests', badge: pendingReq + openProblems, bc: 'badge-danger' },
         { id: 'performance', label: 'Performance' },
         { id: 'hodreports',  label: '📤 Reports', badge: teamReports.length, bc: 'badge-danger' },
@@ -210,6 +218,7 @@ function renderHodDashboard(container) {
         + _hKpi('⚠️', 'Overdue',        _hodData.overdueTasks.length,         '#ffebee', 'var(--danger)', 'tasks')
         + _hKpi('⏱️', 'Over TAT',       _hodData.overTatTasks.length,         '#fff8e1', '#ff6f00', 'tasks')
         + _hKpi('✅', 'Checklists Due', pendingCl,                            '#e8f5e9', 'var(--secondary)', 'checklists')
+        + _hKpi('📦', 'Inventory Items', deptInventory.length,                '#e0f2f1', '#00796b', 'inventory')
         + _hKpi('🧹', 'Rooms to Clean', cleaning.length,                      '#fce4ec', 'var(--danger)', 'admissions')
         + '</div>'
 
@@ -268,6 +277,7 @@ function _renderHodTab(tab) {
     var map = { overview: _hodOverview, admissions: _hodAdmissions, tasks: _hodTasks,
                 team: _hodTeam, checklists: _hodChecklists, requests: _hodRequests,
                 performance: _hodPerformance, hodreports: _hodReports, hodqp: _hodQP,
+                inventory: _hodInventoryReport,
                 'dept-checklist': _hodDeptChecklists };
     if (map[tab]) map[tab](el);
 }
@@ -2054,6 +2064,121 @@ function hodSaveReturn() {
     }).slice().reverse();
     _renderHodTab('requests');
     return true;
+}
+
+/* ═══════════════════════════════════════════════
+   INVENTORY REPORT TAB
+═══════════════════════════════════════════════ */
+function _hodInventoryReport(el) {
+    var user = AUTH.currentUser();
+    var dept = (user.department || '').trim().toLowerCase();
+    var allInv = DB.get('inventory') || [];
+    var items = allInv.filter(function (i) {
+        return (i.department || '').trim().toLowerCase() === dept;
+    });
+
+    var totalItems = items.length;
+    var totalQty = items.reduce(function (s, i) { return s + (parseFloat(i.quantity) || 0); }, 0);
+    var totalValue = items.reduce(function (s, i) {
+        return s + (parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0);
+    }, 0);
+    var lowStock = items.filter(function (i) { return parseFloat(i.quantity) <= 5; });
+
+    // Material requests for this department
+    var matReqs = (DB.get('material_requests') || []).filter(function (r) {
+        return (r.department || '').trim().toLowerCase() === dept;
+    }).slice().reverse().slice(0, 20);
+
+    var catMap = {};
+    items.forEach(function (i) {
+        var cat = i.category || 'Uncategorized';
+        if (!catMap[cat]) catMap[cat] = { count: 0, qty: 0, value: 0 };
+        catMap[cat].count++;
+        catMap[cat].qty += parseFloat(i.quantity) || 0;
+        catMap[cat].value += (parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0);
+    });
+
+    var catKeys = Object.keys(catMap);
+
+    var html = ''
+        + '<h3 style="margin-bottom:12px;">📦 Inventory Report — ' + (user.department || '') + '</h3>'
+        // Summary cards
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px;">'
+        + '<div class="hod-kpi"><div class="hod-kpi-icon" style="background:#e0f2f1;color:#00796b;">📦</div><div><div class="hod-kpi-val">' + totalItems + '</div><div class="hod-kpi-lbl">Total Items</div></div></div>'
+        + '<div class="hod-kpi"><div class="hod-kpi-icon" style="background:#e8f5e9;color:#2e7d32;">🔢</div><div><div class="hod-kpi-val">' + totalQty + '</div><div class="hod-kpi-lbl">Total Quantity</div></div></div>'
+        + '<div class="hod-kpi"><div class="hod-kpi-icon" style="background:#fff3e0;color:#e65100;">💰</div><div><div class="hod-kpi-val">₹' + totalValue.toFixed(2) + '</div><div class="hod-kpi-lbl">Total Value</div></div></div>'
+        + '<div class="hod-kpi" style="cursor:default;"><div class="hod-kpi-icon" style="background:' + (lowStock.length > 0 ? '#ffebee;#c62828' : '#e8f5e9;#2e7d32') + ';">' + (lowStock.length > 0 ? '⚠️' : '✅') + '</div><div><div class="hod-kpi-val">' + lowStock.length + '</div><div class="hod-kpi-lbl">Low Stock Items</div></div></div>'
+        + '</div>';
+
+    // Category breakdown
+    if (catKeys.length > 0) {
+        html += '<div class="card" style="margin-bottom:16px;"><div class="card-header"><h3>📊 Category Breakdown</h3></div>'
+            + '<div class="table-responsive"><table><thead><tr><th>Category</th><th>Items</th><th>Quantity</th><th>Value</th></tr></thead><tbody>'
+            + catKeys.map(function (cat) {
+                var c = catMap[cat];
+                var pct = totalValue > 0 ? (c.value / totalValue * 100).toFixed(1) : 0;
+                return '<tr><td><strong>' + cat + '</strong></td><td>' + c.count + '</td><td>' + c.qty + '</td><td>₹' + c.value.toFixed(2) + ' <span style="font-size:11px;color:var(--gray);">(' + pct + '%)</span></td></tr>';
+            }).join('')
+            + '</tbody></table></div></div>';
+    }
+
+    // Inventory table
+    html += '<div class="card" style="margin-bottom:16px;"><div class="card-header"><h3>📋 Item Details</h3></div>'
+        + '<div style="margin-bottom:8px;"><input type="text" id="hodInvSearch" class="form-control" placeholder="🔍 Search items..." style="max-width:300px;padding:6px 10px;font-size:13px;" oninput="_hodInvFilter(this.value)"></div>'
+        + '<div class="table-responsive"><table id="hodInvTable"><thead><tr><th>#</th><th>Item Name</th><th>Category</th><th>Quantity</th><th>Unit</th><th>Price/Unit</th><th>Total Value</th></tr></thead><tbody>'
+        + (items.length === 0
+            ? '<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No inventory items found for this department.</td></tr>'
+            : items.map(function (i, idx) {
+                var qty = parseFloat(i.quantity) || 0;
+                var price = parseFloat(i.price) || 0;
+                var isLow = qty <= 5;
+                return '<tr class="' + (isLow ? 'hod-inv-low' : '') + '" style="' + (isLow ? 'background:#fff5f5;' : '') + '">'
+                    + '<td>' + (idx + 1) + '</td>'
+                    + '<td>' + (i.name || '-') + '</td>'
+                    + '<td>' + (i.category || '-') + '</td>'
+                    + '<td><strong>' + qty + '</strong> ' + (isLow ? '<span class="badge badge-danger" style="font-size:9px;">LOW</span>' : '') + '</td>'
+                    + '<td>' + (i.unit || 'pcs') + '</td>'
+                    + '<td>₹' + price.toFixed(2) + '</td>'
+                    + '<td>₹' + (qty * price).toFixed(2) + '</td></tr>';
+            }).join(''))
+        + '</tbody></table></div></div>';
+
+    // Recent material requests
+    html += '<div class="card"><div class="card-header"><h3>📥 Recent Material Requests</h3></div>'
+        + '<div class="table-responsive"><table><thead><tr><th>#</th><th>Item</th><th>Qty</th><th>Status</th><th>Date</th></tr></thead><tbody>'
+        + (matReqs.length === 0
+            ? '<tr><td colspan="5" style="text-align:center;color:var(--gray);padding:20px;">No material requests found.</td></tr>'
+            : matReqs.map(function (r, idx) {
+                var stCls = r.status === 'approved' ? 'badge-success' : r.status === 'rejected' ? 'badge-danger' : 'badge-warning';
+                return '<tr><td>' + (idx + 1) + '</td><td>' + (r.itemName || r.item || '-') + '</td><td>' + (r.quantity || 0) + '</td><td><span class="badge ' + stCls + '">' + (r.status || 'pending') + '</span></td><td>' + APP.formatDate(r.createdAt) + '</td></tr>';
+            }).join(''))
+        + '</tbody></table></div></div>';
+
+    // Low stock alert
+    if (lowStock.length > 0) {
+        html = '<div style="background:#ffebee;border:1px solid #ef5350;border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+            + '<span style="font-size:13px;font-weight:600;color:#c62828;">⚠️ ' + lowStock.length + ' item(s) with low stock (≤5) need replenishment</span>'
+            + '</div>' + html;
+    }
+
+    el.innerHTML = html;
+
+    // Inject style for low-stock rows
+    if (!document.getElementById('hodInvStyle')) {
+        var s = document.createElement('style');
+        s.id = 'hodInvStyle';
+        s.textContent = '.hod-inv-low td{border-bottom:1px solid #ffcdd2;}';
+        document.head.appendChild(s);
+    }
+}
+
+function _hodInvFilter(val) {
+    var tbody = document.querySelector('#hodInvTable tbody');
+    if (!tbody) return;
+    var q = val.toLowerCase().trim();
+    tbody.querySelectorAll('tr').forEach(function (tr) {
+        tr.style.display = q === '' ? '' : (tr.textContent.toLowerCase().indexOf(q) !== -1 ? '' : 'none');
+    });
 }
 
 /* ═══════════════════════════════════════════════
