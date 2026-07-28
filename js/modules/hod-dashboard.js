@@ -2102,6 +2102,11 @@ function _hodInventoryReport(el) {
 
     var html = ''
         + '<h3 style="margin-bottom:12px;">📦 Inventory Report — ' + (user.department || '') + '</h3>'
+        // Download buttons
+        + '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm" style="background:#1e7e34;color:#fff;padding:6px 14px;font-size:12px;" onclick="hodDownloadInvExcel()">📥 Download Excel</button>'
+        + '<button class="btn btn-sm" style="background:#c82333;color:#fff;padding:6px 14px;font-size:12px;" onclick="hodDownloadInvPdf()">📥 Download PDF</button>'
+        + '</div>'
         // Summary cards
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px;">'
         + '<div class="hod-kpi"><div class="hod-kpi-icon" style="background:#e0f2f1;color:#00796b;">📦</div><div><div class="hod-kpi-val">' + totalItems + '</div><div class="hod-kpi-lbl">Total Items</div></div></div>'
@@ -2179,6 +2184,38 @@ function _hodInvFilter(val) {
     tbody.querySelectorAll('tr').forEach(function (tr) {
         tr.style.display = q === '' ? '' : (tr.textContent.toLowerCase().indexOf(q) !== -1 ? '' : 'none');
     });
+}
+
+function hodDownloadInvExcel() {
+    var user = AUTH.currentUser();
+    var dept = (user.department || '').trim().toLowerCase();
+    var items = (DB.get('inventory') || []).filter(function (i) {
+        return (i.department || '').trim().toLowerCase() === dept;
+    });
+    if (items.length === 0) { APP.notify('No inventory data to download', 'info'); return; }
+    var headers = ['#', 'Item Name', 'Category', 'Quantity', 'Unit', 'Price/Unit', 'Total Value'];
+    var rows = items.map(function (i, idx) {
+        var qty = parseFloat(i.quantity) || 0;
+        var price = parseFloat(i.price) || 0;
+        return [idx + 1, i.name || '-', i.category || '-', qty, i.unit || 'pcs', price, qty * price];
+    });
+    _hodExcelExport(dept + ' Inventory Report', headers, rows);
+}
+
+function hodDownloadInvPdf() {
+    var user = AUTH.currentUser();
+    var dept = (user.department || '').trim().toLowerCase();
+    var items = (DB.get('inventory') || []).filter(function (i) {
+        return (i.department || '').trim().toLowerCase() === dept;
+    });
+    if (items.length === 0) { APP.notify('No inventory data to download', 'info'); return; }
+    var headers = ['#', 'Item Name', 'Category', 'Quantity', 'Unit', 'Price/Unit', 'Total Value'];
+    var rows = items.map(function (i, idx) {
+        var qty = parseFloat(i.quantity) || 0;
+        var price = parseFloat(i.price) || 0;
+        return [idx + 1, i.name || '-', i.category || '-', qty, i.unit || 'pcs', '₹' + price, '₹' + (qty * price).toFixed(2)];
+    });
+    _hodPdfExport(dept + ' Inventory Report', headers, rows);
 }
 
 /* ═══════════════════════════════════════════════
