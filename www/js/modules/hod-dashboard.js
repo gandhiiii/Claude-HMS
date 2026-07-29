@@ -39,6 +39,11 @@ var HOD_PURCHASE_DEPTS = ['IT', 'Facility'];
 var HOD_SERVICE_DEPTS = ['IT', 'Facility'];
 var HOD_BACKDOWN_DEPTS = ['IT', 'Facility'];
 
+function _hodInDeptList(dept, list) {
+    var d = (dept || '').trim().toLowerCase();
+    return list.some(function(x){ return x.toLowerCase() === d; });
+}
+
 /* ═══════════════════════════════════════════════
    HELPERS
 ═══════════════════════════════════════════════ */
@@ -200,9 +205,9 @@ function renderHodDashboard(container) {
         return sum + (parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0);
     }, 0);
 
-    var canPurchases = HOD_PURCHASE_DEPTS.indexOf(dept) !== -1;
-    var canService = HOD_SERVICE_DEPTS.indexOf(dept) !== -1;
-    var canBackdown = HOD_BACKDOWN_DEPTS.indexOf(dept) !== -1;
+    var canPurchases = _hodInDeptList(dept, HOD_PURCHASE_DEPTS);
+    var canService = _hodInDeptList(dept, HOD_SERVICE_DEPTS);
+    var canBackdown = _hodInDeptList(dept, HOD_BACKDOWN_DEPTS);
     var equipServices = canService ? (DB.get('hodEquipmentServices') || []) : [];
     var dueServices = equipServices.filter(function(e){ return e.status !== 'done' && e.nextServiceDue && new Date(e.nextServiceDue) <= new Date(); });
     var upcomingServices = equipServices.filter(function(e){ return e.status !== 'done' && e.nextServiceDue && new Date(e.nextServiceDue) > new Date(); });
@@ -1597,7 +1602,7 @@ function _hodPurchases(el) {
     var user = AUTH.currentUser();
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = user.department || '';
-    if (HOD_PURCHASE_DEPTS.indexOf(dept) === -1) {
+    if (!_hodInDeptList(dept, HOD_PURCHASE_DEPTS)) {
         el.innerHTML = '<div class="empty-state">Purchases module is only available for IT and Facility departments.</div>';
         return;
     }
@@ -1981,7 +1986,7 @@ function hodDownloadPurchasesReport() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
-    if (HOD_PURCHASE_DEPTS.indexOf(dept) === -1) return;
+    if (!_hodInDeptList(dept, HOD_PURCHASE_DEPTS)) return;
     var allPurchases = (DB.get('hodPurchases') || []).filter(function(p){ return p.department === dept; });
 
     var todayStr = new Date().toISOString().slice(0,10);
@@ -2050,7 +2055,7 @@ function _hodEquipService(el) {
     var user = AUTH.currentUser();
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = user.department || '';
-    if (HOD_SERVICE_DEPTS.indexOf(dept) === -1) {
+    if (!_hodInDeptList(dept, HOD_SERVICE_DEPTS)) {
         el.innerHTML = '<div class="empty-state">Equipment Service is only available for IT and Facility departments.</div>';
         return;
     }
@@ -2268,7 +2273,7 @@ function _hodEquipBackdown(el) {
     var user = AUTH.currentUser();
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = user.department || '';
-    if (HOD_BACKDOWN_DEPTS.indexOf(dept) === -1) {
+    if (!_hodInDeptList(dept, HOD_BACKDOWN_DEPTS)) {
         el.innerHTML = '<div class="empty-state">Backdowns are only available for IT and Facility departments.</div>';
         return;
     }
@@ -2452,7 +2457,7 @@ function hodDownloadServiceReport() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
-    if (HOD_SERVICE_DEPTS.indexOf(dept) === -1) return;
+    if (!_hodInDeptList(dept, HOD_SERVICE_DEPTS)) return;
     var all = DB.get('hodEquipmentServices') || [];
     var wb = XLSX.utils.book_new();
     var dashData = [
@@ -2481,7 +2486,7 @@ function hodDownloadBackdownReport() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
-    if (HOD_BACKDOWN_DEPTS.indexOf(dept) === -1) return;
+    if (!_hodInDeptList(dept, HOD_BACKDOWN_DEPTS)) return;
     var all = DB.get('hodEquipmentBackdowns') || [];
     var wb = XLSX.utils.book_new();
     var dashData = [

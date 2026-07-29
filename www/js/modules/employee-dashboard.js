@@ -259,7 +259,7 @@ function renderEmployeeDashboard(container) {
     var todoPend = allTodos.filter(function(t){ return t.status!=='completed'; }).length;
 
     var BACKDOWN_DEPTS = ['IT', 'Facility'];
-    var canBackdown = BACKDOWN_DEPTS.indexOf(dept) !== -1;
+    var canBackdown = BACKDOWN_DEPTS.some(function(x){ return x.toLowerCase() === (dept||'').trim().toLowerCase(); });
 
     var tabs = [
         { id: 'overview',    label: T('empd2_tab_overview') },
@@ -2189,7 +2189,7 @@ function renderEmpBackdownTab(el) {
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = user.department || '';
     var BACKDOWN_DEPTS = ['IT', 'Facility'];
-    if (BACKDOWN_DEPTS.indexOf(dept) === -1) {
+    if (!BACKDOWN_DEPTS.some(function(x){ return x.toLowerCase() === (dept||'').trim().toLowerCase(); })) {
         el.innerHTML = '<div class="empty-state">Not available for your department</div>';
         return;
     }
