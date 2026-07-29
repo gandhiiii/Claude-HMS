@@ -1690,6 +1690,9 @@ function _hodPurchaseCard(p, user) {
             ? '<button class="btn btn-sm btn-success" onclick="hodApprovePurchase(\'' + p.id + '\')">✓ Approve</button>'
               + '<button class="btn btn-sm btn-danger" onclick="hodRejectPurchase(\'' + p.id + '\')">✗ Reject</button>'
             : '')
+        + (canManage || isOwner
+            ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--primary);border-color:var(--primary);" onclick="hodEditPurchase(\'' + p.id + '\')">✎ Edit</button>'
+            : '')
         + ((isOwner || canManage) && p.status === 'pending'
             ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--danger);border-color:var(--danger);" onclick="hodDeletePurchase(\'' + p.id + '\')">🗑 Delete</button>'
             : '')
@@ -1804,6 +1807,65 @@ function hodDeletePurchase(id) {
         _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
         _renderHodTab('purchases');
     });
+}
+
+function hodEditPurchase(id) {
+    var p = DB.getById('hodPurchases', id);
+    if (!p) { APP.notify('Request not found', 'error'); return; }
+    var form = '<form id="hodPurchaseEditForm">'
+        + '<div class="form-group"><label>Request Title *</label><input type="text" name="title" class="form-control" required value="' + APP.encodeHtml(p.title||'') + '"></div>'
+        + '<div class="form-group"><label>Item / Goods Name *</label><input type="text" name="itemName" class="form-control" required value="' + APP.encodeHtml(p.itemName||'') + '"></div>'
+        + '<div class="grid-3" style="gap:10px;">'
+        + '<div class="form-group"><label>Quantity</label><input type="number" name="quantity" class="form-control" min="1" value="' + (p.quantity||1) + '" oninput="hodPurchaseCalcTotalEdit()"></div>'
+        + '<div class="form-group"><label>Price per Unit (₹) *</label><input type="number" name="price" class="form-control" step="0.01" min="0" required value="' + (parseFloat(p.price)||0) + '" oninput="hodPurchaseCalcTotalEdit()"></div>'
+        + '<div class="form-group"><label>Total (auto-calc)</label><input type="text" id="hodPurchaseEditTotal" class="form-control" readonly style="background:var(--light-gray);font-weight:700;" value="₹' + (parseFloat(p.total)||0).toFixed(2) + '"></div>'
+        + '</div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Location / Store *</label><input type="text" name="location" class="form-control" required value="' + APP.encodeHtml(p.location||'') + '"></div>'
+        + '<div class="form-group"><label>Vendor / Supplier</label><input type="text" name="vendor" class="form-control" value="' + APP.encodeHtml(p.vendor||'') + '"></div>'
+        + '</div>'
+        + '<div class="form-group"><label>Description / Purpose *</label><textarea name="description" class="form-control" rows="3" required>' + APP.encodeHtml(p.description||'') + '</textarea></div>'
+        + '</form>';
+    openFormModal('✎ Edit Purchase / Expense Request', form, 'hodUpdatePurchase("' + id + '")', false);
+}
+
+function hodPurchaseCalcTotalEdit() {
+    var qty = document.querySelector('#hodPurchaseEditForm [name="quantity"]');
+    var prc = document.querySelector('#hodPurchaseEditForm [name="price"]');
+    var tot = document.getElementById('hodPurchaseEditTotal');
+    if (!qty || !prc || !tot) return;
+    var q = parseFloat(qty.value) || 1;
+    var p = parseFloat(prc.value) || 0;
+    tot.value = '₹' + (q * p).toFixed(2);
+}
+
+function hodUpdatePurchase(id) {
+    var user = AUTH.currentUser();
+    if (!user) return false;
+    var data = getFormData('hodPurchaseEditForm');
+    if (!data.title || !data.itemName || !data.price || !data.location || !data.description) {
+        APP.notify('Please fill all required fields', 'error'); return false;
+    }
+    var qty = parseFloat(data.quantity) || 1;
+    var price = parseFloat(data.price) || 0;
+    if (price <= 0) { APP.notify('Enter a valid price', 'error'); return false; }
+    DB.update('hodPurchases', id, {
+        title: data.title,
+        itemName: data.itemName,
+        quantity: qty,
+        price: price,
+        total: qty * price,
+        location: data.location,
+        vendor: data.vendor || '',
+        description: data.description,
+        editedAt: new Date().toISOString(),
+        editedBy: user.fullName
+    });
+    APP.notify('Purchase request updated!', 'success');
+    _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return p.department === user.department; });
+    _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
+    _renderHodTab('purchases');
+    return true;
 }
 
 /* Download Daily Purchases & Expenses Report as Excel */
