@@ -259,7 +259,8 @@ function renderEmployeeDashboard(container) {
     var allTodos = (DB.get('employeeTodos')||[]).filter(function(t){ return t.createdBy===u; });
     var todoPend = allTodos.filter(function(t){ return t.status!=='completed'; }).length;
 
-    var canBreakdown = true;
+    var deptData = (DB.get('departments') || []).find(function(d){ return (d.name||'').trim().toLowerCase() === (dept||'').trim().toLowerCase(); });
+    var canBreakdown = isAdmin || (deptData && deptData.features && deptData.features.indexOf('equipment-breakdown') !== -1);
 
     var tabs = [
         { id: 'overview',    label: T('empd2_tab_overview') },
@@ -2190,9 +2191,12 @@ function renderEmpBreakdownTab(el) {
         if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
         var dept = user.department || '';
     var _isAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
-    if (!_isAdmin && false) {
-        el.innerHTML = '<div class="empty-state">Not available for your department</div>';
-        return;
+    if (!_isAdmin) {
+        var deptData = (DB.get('departments') || []).find(function(d){ return (d.name||'').trim().toLowerCase() === (dept||'').trim().toLowerCase(); });
+        if (!deptData || !deptData.features || deptData.features.indexOf('equipment-breakdown') === -1) {
+            el.innerHTML = '<div class="empty-state">Not available for your department</div>';
+            return;
+        }
     }
     var all = (DB.get('hodEquipmentBackdowns') || []).filter(function(b){ return _isAdmin || (b.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
 

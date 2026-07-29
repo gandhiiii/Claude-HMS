@@ -35,12 +35,12 @@ var _hodData   = {};
 var _hodFilter = 'all';
 var _hodInvDeptFilter = null; // null = current HOD dept, '__all__' = all departments
 var _hodEditingPurchaseId;
-var HOD_PURCHASE_DEPTS = ['IT', 'Facility', 'Maintenance'];
-var HOD_SERVICE_DEPTS = ['IT', 'Facility', 'Maintenance'];
-var HOD_BACKDOWN_DEPTS = ['IT', 'Facility', 'Maintenance'];
 
-function _hodInDeptList(dept, list) {
-    return true;
+function _hodInDeptList(dept, feature) {
+    var u = AUTH.currentUser();
+    if (u && (u.isSuperAdmin || u.role === 'admin' || u.role === 'super_admin')) return true;
+    var deptData = (DB.get('departments') || []).find(function(d){ return (d.name||'').trim().toLowerCase() === (dept||'').trim().toLowerCase(); });
+    return deptData && deptData.features && deptData.features.indexOf(feature) !== -1;
 }
 
 /* ═══════════════════════════════════════════════
@@ -210,9 +210,9 @@ function renderHodDashboard(container) {
         return sum + (parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0);
     }, 0);
 
-    var canPurchases = _hodInDeptList(dept, HOD_PURCHASE_DEPTS);
-    var canService = _hodInDeptList(dept, HOD_SERVICE_DEPTS);
-    var canBreakdown = _hodInDeptList(dept, HOD_BACKDOWN_DEPTS);
+    var canPurchases = _hodInDeptList(dept, 'purchases');
+    var canService = _hodInDeptList(dept, 'equipment-service');
+    var canBreakdown = _hodInDeptList(dept, 'equipment-breakdown');
     var equipServices = canService ? (DB.get('hodEquipmentServices') || []) : [];
     var dueServices = equipServices.filter(function(e){ return e.status !== 'done' && e.nextServiceDue && new Date(e.nextServiceDue) <= new Date(); });
     var upcomingServices = equipServices.filter(function(e){ return e.status !== 'done' && e.nextServiceDue && new Date(e.nextServiceDue) > new Date(); });
@@ -1619,8 +1619,8 @@ function _hodPurchases(el) {
     var user = AUTH.currentUser();
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = user.department || '';
-    if (!_hodInDeptList(dept, HOD_PURCHASE_DEPTS)) {
-        el.innerHTML = '<div class="empty-state">Purchases module is only available for IT, Facility and Maintenance departments.</div>';
+    if (!_hodInDeptList(dept, 'purchases')) {
+        el.innerHTML = '<div class="empty-state">Purchases module not enabled for your department.</div>';
         return;
     }
 
@@ -2003,7 +2003,7 @@ function hodDownloadPurchasesReport() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
-    if (!_hodInDeptList(dept, HOD_PURCHASE_DEPTS)) return;
+    if (!_hodInDeptList(dept, 'purchases')) return;
     var allPurchases = (DB.get('hodPurchases') || []).filter(function(p){ return p.department === dept; });
 
     var todayStr = new Date().toISOString().slice(0,10);
@@ -2072,8 +2072,8 @@ function _hodEquipService(el) {
     var user = AUTH.currentUser();
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = user.department || '';
-    if (!_hodInDeptList(dept, HOD_SERVICE_DEPTS)) {
-        el.innerHTML = '<div class="empty-state">Equipment Service is only available for IT, Facility and Maintenance departments.</div>';
+    if (!_hodInDeptList(dept, 'equipment-service')) {
+        el.innerHTML = '<div class="empty-state">Equipment Service not enabled for your department.</div>';
         return;
     }
 
@@ -2303,8 +2303,8 @@ function _hodEquipBreakdown(el) {
     var user = AUTH.currentUser();
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = user.department || '';
-    if (!_hodInDeptList(dept, HOD_BACKDOWN_DEPTS)) {
-        el.innerHTML = '<div class="empty-state">Breakdowns are only available for IT, Facility and Maintenance departments.</div>';
+    if (!_hodInDeptList(dept, 'equipment-breakdown')) {
+        el.innerHTML = '<div class="empty-state">Breakdowns not enabled for your department.</div>';
         return;
     }
 
@@ -2593,7 +2593,7 @@ function hodDownloadServiceReport() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
-    if (!_hodInDeptList(dept, HOD_SERVICE_DEPTS)) return;
+    if (!_hodInDeptList(dept, 'equipment-service')) return;
     var all = DB.get('hodEquipmentServices') || [];
     var wb = XLSX.utils.book_new();
     var dashData = [
@@ -2622,7 +2622,7 @@ function hodDownloadBreakdownReport() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
-    if (!_hodInDeptList(dept, HOD_BACKDOWN_DEPTS)) return;
+    if (!_hodInDeptList(dept, 'equipment-breakdown')) return;
     var all = DB.get('hodEquipmentBackdowns') || [];
     var wb = XLSX.utils.book_new();
     var dashData = [
@@ -2647,7 +2647,7 @@ function hodDownloadBreakdownPdf() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
-    if (!_hodInDeptList(dept, HOD_BACKDOWN_DEPTS)) return;
+    if (!_hodInDeptList(dept, 'equipment-breakdown')) return;
     if (typeof window.jspdf==='undefined'){ APP.notify('PDF library not loaded','error'); return; }
     var all = DB.get('hodEquipmentBackdowns') || [];
     var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
