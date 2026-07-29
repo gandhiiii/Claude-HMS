@@ -2270,18 +2270,22 @@ function empBreakdownAdd() {
     var dept = user.department || '';
     var services = (DB.get('hodEquipmentServices') || []).filter(function(s){ return s.department === dept && s.status !== 'backdown'; });
     var today = new Date().toISOString().slice(0,10);
+    if (services.length === 0) {
+        APP.notify('No equipment service records available for breakdown', 'error');
+        return;
+    }
     var form = '<form id="empBreakdownForm">'
-        + '<div class="form-group"><label>Select Equipment (from Service Records)</label>'
-        + '<select class="form-control" onchange="empBreakdownSelectService(this)">'
-        + '<option value="">— Manual Entry —</option>';
+        + '<div class="form-group"><label>Select Equipment (from Service Records) *</label>'
+        + '<select class="form-control" required onchange="empBreakdownSelectService(this)">'
+        + '<option value="">— Select Equipment —</option>';
     services.forEach(function(s){
         form += '<option value="' + s.id + '">' + APP.encodeHtml(s.assetName || '') + ' (' + APP.encodeHtml(s.assetCode || '') + ')</option>';
     });
     form += '</select></div>'
-        + '<div class="form-group"><label>Asset Code *</label><input type="text" name="assetCode" class="form-control" required placeholder="e.g. EQ-001"></div>'
-        + '<div class="form-group"><label>Asset Name *</label><input type="text" name="assetName" class="form-control" required placeholder="e.g. MRI Machine"></div>'
+        + '<div class="form-group"><label>Asset Code</label><input type="text" name="assetCode" class="form-control" readonly style="background:var(--light-gray);" placeholder="Auto-filled from selection"></div>'
+        + '<div class="form-group"><label>Asset Name</label><input type="text" name="assetName" class="form-control" readonly style="background:var(--light-gray);" placeholder="Auto-filled from selection"></div>'
         + '<div class="form-group"><label>Service Type</label>'
-        + '<select name="serviceType" class="form-control">'
+        + '<select name="serviceType" class="form-control" disabled style="background:var(--light-gray);">'
         + '<option value="">N/A</option>'
         + '<option value="weekly">Weekly</option>'
         + '<option value="monthly">Monthly</option>'
@@ -2290,8 +2294,8 @@ function empBreakdownAdd() {
         + '<option value="custom">Custom</option>'
         + '</select></div>'
         + '<div class="grid-2" style="gap:10px;">'
-        + '<div class="form-group"><label>Last Service Date</label><input type="date" name="lastServiceDate" class="form-control"></div>'
-        + '<div class="form-group"><label>Next Service Due</label><input type="date" name="nextServiceDue" class="form-control"></div>'
+        + '<div class="form-group"><label>Last Service Date</label><input type="date" name="lastServiceDate" class="form-control" readonly style="background:var(--light-gray);"></div>'
+        + '<div class="form-group"><label>Next Service Due</label><input type="date" name="nextServiceDue" class="form-control" readonly style="background:var(--light-gray);"></div>'
         + '</div>'
         + '<hr style="margin:12px 0;border-color:var(--border);">'
         + '<div class="form-group"><label>Breakdown Date *</label><input type="date" name="backdownDate" class="form-control" required value="' + today + '"></div>'
@@ -2318,8 +2322,8 @@ function empBreakdownSave() {
     var user = AUTH.currentUser();
     if (!user) return false;
     var data = getFormData('empBreakdownForm');
-    if (!data.assetCode || !data.assetName || !data.backdownDate || !data.reason) {
-        APP.notify('Fill all required fields', 'error'); return false;
+    if (!data.serviceId || !data.assetCode || !data.assetName || !data.backdownDate || !data.reason) {
+        APP.notify('Select equipment and fill all required fields', 'error'); return false;
     }
     DB.add('hodEquipmentBackdowns', {
         assetCode: data.assetCode,
