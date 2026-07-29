@@ -2103,14 +2103,14 @@ function _hodEquipService(el) {
 
     function equipCard(e) {
         var dueDate = e.nextServiceDate || e.nextServiceDue || '';
-        var statusColor = e.status === 'done' ? 'var(--success)' : (overdue.indexOf(e)!==-1 ? 'var(--danger)' : 'var(--warning)');
+        var statusColor = e.status === 'done' ? 'var(--success)' : (e.status === 'backdown' ? '#6a1b9a' : (overdue.indexOf(e)!==-1 ? 'var(--danger)' : 'var(--warning)'));
         return '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid ' + statusColor + ';border-radius:10px;padding:14px;margin-bottom:10px;">'
             + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">'
             + '<div style="flex:1;min-width:180px;">'
             + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'
             + '<span style="font-size:14px;font-weight:700;">' + (e.assetName || 'Equipment') + '</span>'
             + '<span class="badge badge-secondary" style="font-size:10px;">' + (e.assetCode || '-') + '</span>'
-            + '<span class="badge" style="font-size:10px;background:' + statusColor + ';color:#fff;">' + (e.status==='done'?'Done': overdue.indexOf(e)!==-1?'Overdue':'Upcoming') + '</span>'
+            + '<span class="badge" style="font-size:10px;background:' + statusColor + ';color:#fff;">' + (e.status==='done'?'Done': e.status==='backdown'?'Backdown': overdue.indexOf(e)!==-1?'Overdue':'Upcoming') + '</span>'
             + '<span style="font-size:10px;color:var(--gray);background:var(--light-gray);padding:2px 8px;border-radius:8px;">' + (e.serviceType || 'N/A') + '</span>'
             + '</div>'
             + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-top:6px;font-size:13px;">'
@@ -2118,6 +2118,7 @@ function _hodEquipService(el) {
             + '<div><span style="color:var(--gray);">Service:</span> <strong>' + (e.serviceType || '-') + '</strong></div>'
             + '<div><span style="color:var(--gray);">Due:</span> <strong>' + (dueDate ? APP.formatDate(dueDate) : 'Not set') + '</strong></div>'
             + (e.notes ? '<div style="grid-column:1/-1;"><span style="color:var(--gray);">Notes:</span> ' + e.notes + '</div>' : '')
+            + (e.status === 'backdown' ? '<div style="grid-column:1/-1;color:#6a1b9a;font-weight:600;font-size:12px;">⬇ Backdown — ' + APP.formatDate(e.lastServiceDate || e.completedAt) + '</div>' : '')
             + '</div>'
             + serviceBar(e)
             + '<div style="font-size:11px;color:var(--gray);margin-top:6px;">👤 ' + (e.createdByName || e.createdBy || '-') + ' · ' + APP.formatDate(e.createdAt) + '</div>'
@@ -2372,9 +2373,45 @@ function hodBackdownFromService(serviceId) {
     openFormModal('⬇ Backdown Equipment — ' + svc.assetName, form, 'hodBackdownSave()', false);
 }
 
+function hodBackdownSelectService(sel) {
+    var id = sel && sel.value;
+    var f = document.getElementById('hodBackdownForm');
+    if (!f) return;
+    if (!id) {
+        f.querySelector('[name="assetCode"]').value = '';
+        f.querySelector('[name="assetName"]').value = '';
+        f.querySelector('[name="serviceType"]').value = '';
+        f.querySelector('[name="lastServiceDate"]').value = '';
+        f.querySelector('[name="nextServiceDue"]').value = '';
+        f.querySelector('[name="serviceId"]').value = '';
+        return;
+    }
+    var all = DB.get('hodEquipmentServices') || [];
+    var svc = null;
+    for (var i = 0; i < all.length; i++) { if (all[i].id === id) { svc = all[i]; break; } }
+    if (!svc) return;
+    f.querySelector('[name="assetCode"]').value = svc.assetCode || '';
+    f.querySelector('[name="assetName"]').value = svc.assetName || '';
+    f.querySelector('[name="serviceType"]').value = svc.serviceType || '';
+    f.querySelector('[name="lastServiceDate"]').value = svc.lastServiceDate || '';
+    f.querySelector('[name="nextServiceDue"]').value = svc.nextServiceDue || '';
+    f.querySelector('[name="serviceId"]').value = svc.id || '';
+}
+
 function hodBackdownAdd() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = user.department || '';
+    var services = (DB.get('hodEquipmentServices') || []).filter(function(s){ return s.department === dept && s.status !== 'backdown'; });
     var today = new Date().toISOString().slice(0,10);
     var form = '<form id="hodBackdownForm">'
+        + '<div class="form-group"><label>Select Equipment (from Service Records)</label>'
+        + '<select class="form-control" onchange="hodBackdownSelectService(this)">'
+        + '<option value="">— Manual Entry —</option>';
+    services.forEach(function(s){
+        form += '<option value="' + s.id + '">' + APP.encodeHtml(s.assetName || '') + ' (' + APP.encodeHtml(s.assetCode || '') + ')</option>';
+    });
+    form += '</select></div>'
         + '<div class="form-group"><label>Asset Code *</label><input type="text" name="assetCode" class="form-control" required placeholder="e.g. EQ-001"></div>'
         + '<div class="form-group"><label>Asset Name *</label><input type="text" name="assetName" class="form-control" required placeholder="e.g. MRI Machine"></div>'
         + '<div class="form-group"><label>Service Type</label>'

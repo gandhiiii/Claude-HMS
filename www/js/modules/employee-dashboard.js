@@ -2232,9 +2232,45 @@ function renderEmpBackdownTab(el) {
     el.innerHTML = html;
 }
 
+function empBackdownSelectService(sel) {
+    var id = sel && sel.value;
+    var f = document.getElementById('empBackdownForm');
+    if (!f) return;
+    if (!id) {
+        f.querySelector('[name="assetCode"]').value = '';
+        f.querySelector('[name="assetName"]').value = '';
+        f.querySelector('[name="serviceType"]').value = '';
+        f.querySelector('[name="lastServiceDate"]').value = '';
+        f.querySelector('[name="nextServiceDue"]').value = '';
+        f.querySelector('[name="serviceId"]').value = '';
+        return;
+    }
+    var all = DB.get('hodEquipmentServices') || [];
+    var svc = null;
+    for (var i = 0; i < all.length; i++) { if (all[i].id === id) { svc = all[i]; break; } }
+    if (!svc) return;
+    f.querySelector('[name="assetCode"]').value = svc.assetCode || '';
+    f.querySelector('[name="assetName"]').value = svc.assetName || '';
+    f.querySelector('[name="serviceType"]').value = svc.serviceType || '';
+    f.querySelector('[name="lastServiceDate"]').value = svc.lastServiceDate || '';
+    f.querySelector('[name="nextServiceDue"]').value = svc.nextServiceDue || '';
+    f.querySelector('[name="serviceId"]').value = svc.id || '';
+}
+
 function empBackdownAdd() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = user.department || '';
+    var services = (DB.get('hodEquipmentServices') || []).filter(function(s){ return s.department === dept && s.status !== 'backdown'; });
     var today = new Date().toISOString().slice(0,10);
     var form = '<form id="empBackdownForm">'
+        + '<div class="form-group"><label>Select Equipment (from Service Records)</label>'
+        + '<select class="form-control" onchange="empBackdownSelectService(this)">'
+        + '<option value="">— Manual Entry —</option>';
+    services.forEach(function(s){
+        form += '<option value="' + s.id + '">' + APP.encodeHtml(s.assetName || '') + ' (' + APP.encodeHtml(s.assetCode || '') + ')</option>';
+    });
+    form += '</select></div>'
         + '<div class="form-group"><label>Asset Code *</label><input type="text" name="assetCode" class="form-control" required placeholder="e.g. EQ-001"></div>'
         + '<div class="form-group"><label>Asset Name *</label><input type="text" name="assetName" class="form-control" required placeholder="e.g. MRI Machine"></div>'
         + '<div class="form-group"><label>Service Type</label>'
@@ -2296,6 +2332,9 @@ function empBackdownSave() {
         createdByName: user.fullName,
         createdAt: new Date().toISOString()
     });
+    if (data.serviceId) {
+        DB.update('hodEquipmentServices', data.serviceId, { status: 'backdown' });
+    }
     APP.notify('Backdown record saved!', 'success');
     renderEmpBackdownTab();
     return true;
