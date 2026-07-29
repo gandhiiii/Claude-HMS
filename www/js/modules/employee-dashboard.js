@@ -2228,6 +2228,10 @@ function renderEmpBreakdownTab(el) {
             + (b.servicePeriod ? '<div><span style="color:var(--gray);">Service Period:</span> <strong>' + b.servicePeriod + '</strong></div>' : '')
             + (b.notes ? '<div style="grid-column:1/-1;"><span style="color:var(--gray);">Notes:</span> ' + b.notes + '</div>' : '')
             + '</div>'
+            + '<div style="display:flex;gap:4px;margin-top:6px;">'
+            + '<button class="btn btn-sm btn-outline" style="font-size:10px;color:var(--primary);border-color:var(--primary);padding:2px 8px;" onclick="empBreakdownEdit(\'' + b.id + '\')">✏️ Edit</button>'
+            + '<button class="btn btn-sm btn-outline" style="font-size:10px;color:var(--danger);border-color:var(--danger);padding:2px 8px;" onclick="empBreakdownDelete(\'' + b.id + '\')">🗑 Delete</button>'
+            + '</div>'
             + '</div>';
     });
 
@@ -2341,6 +2345,80 @@ function empBreakdownSave() {
     APP.notify('Breakdown record saved!', 'success');
     renderEmpBreakdownTab();
     return true;
+}
+
+function empBreakdownEdit(id) {
+    var b = DB.getById('hodEquipmentBackdowns', id);
+    if (!b) { APP.notify('Record not found', 'error'); return; }
+    var today = new Date().toISOString().slice(0,10);
+    var form = '<form id="empBreakdownForm">'
+        + '<div class="form-group"><label>Asset Code *</label><input type="text" name="assetCode" class="form-control" required value="' + APP.encodeHtml(b.assetCode||'') + '"></div>'
+        + '<div class="form-group"><label>Asset Name *</label><input type="text" name="assetName" class="form-control" required value="' + APP.encodeHtml(b.assetName||'') + '"></div>'
+        + '<div class="form-group"><label>Service Type</label>'
+        + '<select name="serviceType" class="form-control">'
+        + '<option value="">N/A</option>'
+        + '<option value="weekly"' + (b.serviceType==='weekly'?' selected':'') + '>Weekly</option>'
+        + '<option value="monthly"' + (b.serviceType==='monthly'?' selected':'') + '>Monthly</option>'
+        + '<option value="quarterly"' + (b.serviceType==='quarterly'?' selected':'') + '>Quarterly</option>'
+        + '<option value="yearly"' + (b.serviceType==='yearly'?' selected':'') + '>Yearly</option>'
+        + '<option value="custom"' + (b.serviceType==='custom'?' selected':'') + '>Custom</option>'
+        + '</select></div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Last Service Date</label><input type="date" name="lastServiceDate" class="form-control" value="' + (b.lastServiceDate||'') + '"></div>'
+        + '<div class="form-group"><label>Next Service Due</label><input type="date" name="nextServiceDue" class="form-control" value="' + (b.nextServiceDue||'') + '"></div>'
+        + '</div>'
+        + '<hr style="margin:12px 0;border-color:var(--border);">'
+        + '<div class="form-group"><label>Breakdown Date *</label><input type="date" name="backdownDate" class="form-control" required value="' + (b.backdownDate||today) + '"></div>'
+        + '<div class="form-group"><label>Warranty Info</label><input type="text" name="warrantyInfo" class="form-control" value="' + APP.encodeHtml(b.warrantyInfo||'') + '"></div>'
+        + '<div class="form-group"><label>Service Period</label><input type="text" name="servicePeriod" class="form-control" value="' + APP.encodeHtml(b.servicePeriod||'') + '"></div>'
+        + '<div class="form-group"><label>Reason for Breakdown *</label>'
+        + '<select name="reason" class="form-control" required>'
+        + '<option value="">Select reason...</option>'
+        + '<option value="End of life"' + (b.reason==='End of life'?' selected':'') + '>End of life</option>'
+        + '<option value="Upgraded / Replaced"' + (b.reason==='Upgraded / Replaced'?' selected':'') + '>Upgraded / Replaced</option>'
+        + '<option value="Damaged / Beyond repair"' + (b.reason==='Damaged / Beyond repair'?' selected':'') + '>Damaged / Beyond repair</option>'
+        + '<option value="No longer needed"' + (b.reason==='No longer needed'?' selected':'') + '>No longer needed</option>'
+        + '<option value="Transferred to another department"' + (b.reason==='Transferred to another department'?' selected':'') + '>Transferred to another department</option>'
+        + '<option value="Lost / Stolen"' + (b.reason==='Lost / Stolen'?' selected':'') + '>Lost / Stolen</option>'
+        + '<option value="other"' + (b.reason!=='End of life'&&b.reason!=='Upgraded / Replaced'&&b.reason!=='Damaged / Beyond repair'&&b.reason!=='No longer needed'&&b.reason!=='Transferred to another department'&&b.reason!=='Lost / Stolen'?' selected':'') + '>Other</option>'
+        + '</select></div>'
+        + '<div class="form-group"><label>Additional Notes</label><textarea name="notes" class="form-control" rows="2">' + APP.encodeHtml(b.notes||'') + '</textarea></div>'
+        + '<input type="hidden" name="serviceId" value="' + (b.serviceId||'') + '">'
+        + '</form>';
+    openFormModal('✏️ Edit Breakdown Record', form, 'empBreakdownUpdate(\'' + id + '\')', false);
+}
+
+function empBreakdownUpdate(id) {
+    var user = AUTH.currentUser();
+    if (!user) return false;
+    var data = getFormData('empBreakdownForm');
+    if (!data.assetCode || !data.assetName || !data.backdownDate || !data.reason) {
+        APP.notify('Fill all required fields', 'error'); return false;
+    }
+    DB.update('hodEquipmentBackdowns', id, {
+        assetCode: data.assetCode,
+        assetName: data.assetName,
+        serviceType: data.serviceType || '',
+        lastServiceDate: data.lastServiceDate || '',
+        nextServiceDue: data.nextServiceDue || '',
+        backdownDate: data.backdownDate,
+        warrantyInfo: data.warrantyInfo || '',
+        servicePeriod: data.servicePeriod || '',
+        reason: data.reason === 'other' ? (data.notes || 'Other') : data.reason,
+        notes: data.reason === 'other' ? (data.notes || '') : (data.notes || ''),
+        serviceId: data.serviceId || ''
+    });
+    APP.notify('Breakdown record updated!', 'success');
+    renderEmpBreakdownTab();
+    return true;
+}
+
+function empBreakdownDelete(id) {
+    confirmAction('Delete this breakdown record?', function(){
+        DB.delete('hodEquipmentBackdowns', id);
+        APP.notify('Breakdown record deleted', 'success');
+        renderEmpBreakdownTab();
+    });
 }
 
 function empDownloadBreakdownReport() {
