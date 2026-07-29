@@ -36,10 +36,16 @@ var _hodFilter = 'all';
 var _hodInvDeptFilter = null; // null = current HOD dept, '__all__' = all departments
 var _hodEditingPurchaseId;
 
+var HOD_DEFAULT_DEPTS = ['IT', 'Facility', 'Maintenance'];
+
 function _hodInDeptList(dept, feature) {
     var u = AUTH.currentUser();
     if (u && (u.isSuperAdmin || u.role === 'admin' || u.role === 'super_admin')) return true;
-    var deptData = (DB.get('departments') || []).find(function(d){ return (d.name||'').trim().toLowerCase() === (dept||'').trim().toLowerCase(); });
+    var d = (dept || '').trim().toLowerCase();
+    // If the dept is in the default list, always allow
+    if (HOD_DEFAULT_DEPTS.some(function(x){ return x.toLowerCase() === d; })) return true;
+    // Otherwise check the department's per-feature setting
+    var deptData = (DB.get('departments') || []).find(function(x){ return (x.name||'').trim().toLowerCase() === d; });
     return deptData && deptData.features && deptData.features.indexOf(feature) !== -1;
 }
 

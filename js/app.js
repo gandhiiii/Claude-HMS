@@ -16,25 +16,23 @@ const Router = {
         const startModule = saved || defaultModule;
         this.navigate(startModule);
 
-        // Mobile: hamburger toggle
-        const menuToggle = document.getElementById('menuToggle');
-        if (menuToggle) {
-            menuToggle.onclick = () => {
-                const sidebar = document.getElementById('sidebar');
-                sidebar.classList.toggle('open');
-                const overlay = document.getElementById('sidebarOverlay');
-                if (overlay) overlay.classList.toggle('active');
-            };
-        }
-
         // Mobile: overlay click closes sidebar
         const overlay = document.getElementById('sidebarOverlay');
         if (overlay) {
-            overlay.onclick = () => {
-                document.getElementById('sidebar').classList.remove('open');
-                overlay.classList.remove('active');
-            };
+            overlay.onclick = () => { Router.closeMobileMenu(); };
         }
+    },
+    toggleMobileMenu() {
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) sidebar.classList.toggle('open');
+        const overlay = document.getElementById('sidebarOverlay');
+        if (overlay) overlay.classList.toggle('active');
+    },
+    closeMobileMenu() {
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) sidebar.classList.remove('open');
+        const overlay = document.getElementById('sidebarOverlay');
+        if (overlay) overlay.classList.remove('active');
     },
     renderHeader() {
         const user = AUTH.currentUser();
@@ -43,7 +41,7 @@ const Router = {
         const hs = getHospitalSettings();
         header.innerHTML = `
             <div class="header-left">
-                <button id="menuToggle" class="menu-toggle" aria-label="Toggle menu">&#9776;</button>
+                <button id="menuToggle" class="menu-toggle" aria-label="Toggle menu" onclick="Router.toggleMobileMenu()">&#9776;</button>
                 <div style="display:flex;flex-direction:column;gap:1px;">
                     <span id="headerHospitalName" style="font-size:11px;color:var(--primary);font-weight:700;letter-spacing:0.3px;line-height:1;">${hs.name || 'Stavya Intelligence'}</span>
                     <h3 id="pageTitle" style="font-size:17px;font-weight:600;margin:0;">Dashboard</h3>
@@ -51,7 +49,7 @@ const Router = {
             </div>
             <div class="header-right">
                 <span id="liveIndicator" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--success);padding:3px 8px;border-radius:12px;background:rgba(52,168,83,0.1);border:1px solid rgba(52,168,83,0.3);"><span style="width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 1.5s infinite;"></span>${typeof T === 'function' ? T('ui_live') : 'LIVE'}</span>
-                ${(user.role === 'admin' || user.isSuperAdmin) ? `<button id="syncNowBtn" class="btn btn-sm" style="font-size:11px;padding:4px 10px;background:rgba(52,168,83,0.1);border:1px solid rgba(52,168,83,0.4);color:var(--secondary);" onclick="APP._syncNow()" title="Upload all local data to cloud database">☁ Sync</button><button class="btn btn-sm" style="font-size:11px;padding:4px 10px;" onclick="APP._mobileSetup()" title="Get QR code to set up login on mobile">📱 Mobile</button>` : ''}
+                ${(user.role === 'admin' || user.isSuperAdmin) ? `<button id="syncNowBtn" class="btn btn-sm" style="font-size:11px;padding:4px 10px;background:rgba(52,168,83,0.1);border:1px solid rgba(52,168,83,0.4);color:var(--secondary);" onclick="APP._syncNow()" title="Upload all local data to cloud database">☁ Sync</button><button class="btn btn-sm btn-mobile-setup" style="font-size:11px;padding:4px 10px;" onclick="APP._mobileSetup()" title="Get QR code to set up login on mobile">📱 Mobile</button>` : ''}
                 ${typeof LANG !== 'undefined' ? LANG.switcher() : ''}
                 ${typeof WS_NOTIFY !== 'undefined' ? WS_NOTIFY.bellHTML() : ''}
                 <span class="role-badge" style="font-size:13px;color:var(--gray);">${user.role.toUpperCase()}</span>

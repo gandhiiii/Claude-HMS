@@ -2190,7 +2190,8 @@ function renderEmpBreakdownTab(el) {
         if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
         var dept = user.department || '';
     var _isAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
-    var _canManage = _isAdmin;
+    var _EMP_ALLOWED = ['IT', 'Facility', 'Maintenance'];
+    var _canManage = _isAdmin || _EMP_ALLOWED.some(function(x){ return x.toLowerCase() === (dept||'').trim().toLowerCase(); });
     if (!_canManage) {
         var _dd = (DB.get('departments') || []).find(function(d){ return (d.name||'').trim().toLowerCase() === (dept||'').trim().toLowerCase(); });
         if (_dd && _dd.features && _dd.features.indexOf('equipment-breakdown') !== -1) _canManage = true;
@@ -2275,14 +2276,16 @@ function empBreakdownAdd() {
     var dept = user.department || '';
     var _isAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
     if (!_isAdmin) {
-        var _dd = (DB.get('departments') || []).find(function(d){ return (d.name||'').trim().toLowerCase() === (dept||'').trim().toLowerCase(); });
-        if (!_dd || !_dd.features || _dd.features.indexOf('equipment-breakdown') === -1) {
-            APP.notify('This feature is not available for your department', 'error');
-            return;
+        var _EMP_ALLOWED = ['IT', 'Facility', 'Maintenance'];
+        var _allowed = _EMP_ALLOWED.some(function(x){ return x.toLowerCase() === (dept||'').trim().toLowerCase(); });
+        if (!_allowed) {
+            var _dd = (DB.get('departments') || []).find(function(d){ return (d.name||'').trim().toLowerCase() === (dept||'').trim().toLowerCase(); });
+            if (!_dd || !_dd.features || _dd.features.indexOf('equipment-breakdown') === -1) {
+                APP.notify('This feature is not available for your department', 'error');
+                return;
+            }
         }
     }
-    var dept = user.department || '';
-    var _isAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
     var services = (DB.get('hodEquipmentServices') || []).filter(function(s){ return (_isAdmin || (s.department||'').trim().toLowerCase() === dept.trim().toLowerCase()) && s.status !== 'backdown'; });
     var today = new Date().toISOString().slice(0,10);
     var form = '<form id="empBreakdownForm">'

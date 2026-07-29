@@ -16,9 +16,12 @@ echo [2/2] Compiling Debug APK with Gradle...
 cd /d "%~dp0android"
 call gradlew.bat assembleDebug
 
+copy /y "%~dp0android\app\build\outputs\apk\debug\app-debug.apk" "%~dp0Stavya-Intelligence-HMS.apk"
+
 echo ========================================================
 echo APK Build Completed!
 echo Output APK path:
+echo d:\HMS TRIAL\Stavya-Intelligence-HMS.apk
 echo d:\HMS TRIAL\android\app\build\outputs\apk\debug\app-debug.apk
 echo ========================================================
 pause
