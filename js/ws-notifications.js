@@ -14,7 +14,8 @@ var WS_NOTIFY = (function () {
     var WATCHED_KEYS = [
         'tasks', 'complaints', 'problems',
         'material_requests', 'hodRequests', 'suggestions',
-        'ambulance', 'admissions', 'lostfound'
+        'ambulance', 'admissions', 'lostfound',
+        'hodEquipmentServices', 'hodEquipmentBackdowns'
     ];
 
     /* ── State ── */
@@ -77,6 +78,8 @@ var WS_NOTIFY = (function () {
         if (key === 'ambulance')        return true;
         if (key === 'admissions')       return true;
         if (key === 'lostfound')        return true;
+        if (key === 'hodEquipmentServices')  return ['IT', 'Facility', 'Maintenance'].some(function(x){ return x.toLowerCase() === (user.department||'').trim().toLowerCase(); });
+        if (key === 'hodEquipmentBackdowns') return ['IT', 'Facility', 'Maintenance'].some(function(x){ return x.toLowerCase() === (user.department||'').trim().toLowerCase(); });
         return false;
     }
 
@@ -90,7 +93,9 @@ var WS_NOTIFY = (function () {
             suggestions:       { icon: '💡', title: 'New Suggestion',      body: item.subject || item.text || 'Suggestion received' },
             ambulance:         { icon: '🚑', title: 'Ambulance Alert',     body: item.patientName || item.destination || 'Ambulance call' },
             admissions:        { icon: '🏥', title: 'New Admission',       body: item.patientName || 'Patient admitted' },
-            lostfound:         { icon: '🔍', title: 'Lost & Found',        body: item.itemName || item.description || 'Item reported' }
+            lostfound:         { icon: '🔍', title: 'Lost & Found',        body: item.itemName || item.description || 'Item reported' },
+            hodEquipmentServices:  { icon: '🔧', title: 'Equipment Service',  body: (item.assetName||'Equipment') + ' — ' + (item.serviceType||'service') + ' record added' },
+            hodEquipmentBackdowns: { icon: '📉', title: 'Breakdown Alert',    body: (item.assetName||'Equipment') + ' — ' + (item.reason||'Breakdown reported') }
         };
         var m = map[key] || { icon: '🔔', title: 'Update', body: 'New data received' };
         return { title: m.icon + ' ' + m.title, body: m.body };

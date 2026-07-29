@@ -259,8 +259,7 @@ function renderEmployeeDashboard(container) {
     var allTodos = (DB.get('employeeTodos')||[]).filter(function(t){ return t.createdBy===u; });
     var todoPend = allTodos.filter(function(t){ return t.status!=='completed'; }).length;
 
-    var deptData = (DB.get('departments') || []).find(function(d){ return (d.name||'').trim().toLowerCase() === (dept||'').trim().toLowerCase(); });
-    var canBreakdown = isAdmin || (deptData && deptData.features && deptData.features.indexOf('equipment-breakdown') !== -1);
+    var canBreakdown = true;
 
     var tabs = [
         { id: 'overview',    label: T('empd2_tab_overview') },
@@ -2191,19 +2190,17 @@ function renderEmpBreakdownTab(el) {
         if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
         var dept = user.department || '';
     var _isAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
-    if (!_isAdmin) {
-        var deptData = (DB.get('departments') || []).find(function(d){ return (d.name||'').trim().toLowerCase() === (dept||'').trim().toLowerCase(); });
-        if (!deptData || !deptData.features || deptData.features.indexOf('equipment-breakdown') === -1) {
-            el.innerHTML = '<div class="empty-state">Not available for your department</div>';
-            return;
-        }
+    var _canManage = _isAdmin;
+    if (!_canManage) {
+        var _dd = (DB.get('departments') || []).find(function(d){ return (d.name||'').trim().toLowerCase() === (dept||'').trim().toLowerCase(); });
+        if (_dd && _dd.features && _dd.features.indexOf('equipment-breakdown') !== -1) _canManage = true;
     }
-    var all = (DB.get('hodEquipmentBackdowns') || []).filter(function(b){ return _isAdmin || (b.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+    var all = (DB.get('hodEquipmentBackdowns') || []).filter(function(b){ return _isAdmin || true; });
 
         var html = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
-            + '<div style="font-weight:700;font-size:16px;">📉 Equipment Breakdowns — ' + dept + '</div>'
+            + '<div style="font-weight:700;font-size:16px;">📉 Equipment Breakdowns</div>'
             + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
-            + '<button class="btn btn-sm btn-primary" onclick="empBreakdownAdd()">+ Record Breakdown</button>'
+            + (_canManage ? '<button class="btn btn-sm btn-primary" onclick="empBreakdownAdd()">+ Record Breakdown</button>' : '')
             + '<button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="empDownloadBreakdownReport()">📥 Excel</button>'
             + '<button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="empDownloadBreakdownPdf()">📕 PDF</button>'
             + '<span style="font-size:12px;color:var(--gray);line-height:30px;">' + all.length + ' record(s)</span>'
@@ -2213,7 +2210,7 @@ function renderEmpBreakdownTab(el) {
             html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
                 + '<div style="font-size:32px;margin-bottom:8px;">📉</div>'
                 + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No breakdown records yet</div>'
-                + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Click the button above to record a breakdown.</div>'
+                + (_canManage ? '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Click the button above to record a breakdown.</div>' : '')
                 + '</div>';
             el.innerHTML = html;
             return;
@@ -2234,8 +2231,8 @@ function renderEmpBreakdownTab(el) {
                 + (b.notes ? '<div style="grid-column:1/-1;"><span style="color:var(--gray);">Notes:</span> ' + b.notes + '</div>' : '')
                 + '</div>'
                 + '<div style="display:flex;gap:4px;margin-top:6px;">'
-                + '<button class="btn btn-sm btn-outline" style="font-size:10px;color:var(--primary);border-color:var(--primary);padding:2px 8px;" onclick="empBreakdownEdit(\'' + b.id + '\')">✏️ Edit</button>'
-                + '<button class="btn btn-sm btn-outline" style="font-size:10px;color:var(--danger);border-color:var(--danger);padding:2px 8px;" onclick="empBreakdownDelete(\'' + b.id + '\')">🗑 Delete</button>'
+                + (_canManage ? '<button class="btn btn-sm btn-outline" style="font-size:10px;color:var(--primary);border-color:var(--primary);padding:2px 8px;" onclick="empBreakdownEdit(\'' + b.id + '\')">✏️ Edit</button>' : '')
+                + (_canManage ? '<button class="btn btn-sm btn-outline" style="font-size:10px;color:var(--danger);border-color:var(--danger);padding:2px 8px;" onclick="empBreakdownDelete(\'' + b.id + '\')">🗑 Delete</button>' : '')
                 + '</div>'
                 + '</div>';
         });
@@ -2275,6 +2272,15 @@ function empBreakdownSelectService(sel) {
 function empBreakdownAdd() {
     var user = AUTH.currentUser();
     if (!user) return;
+    var dept = user.department || '';
+    var _isAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+    if (!_isAdmin) {
+        var _dd = (DB.get('departments') || []).find(function(d){ return (d.name||'').trim().toLowerCase() === (dept||'').trim().toLowerCase(); });
+        if (!_dd || !_dd.features || _dd.features.indexOf('equipment-breakdown') === -1) {
+            APP.notify('This feature is not available for your department', 'error');
+            return;
+        }
+    }
     var dept = user.department || '';
     var _isAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
     var services = (DB.get('hodEquipmentServices') || []).filter(function(s){ return (_isAdmin || (s.department||'').trim().toLowerCase() === dept.trim().toLowerCase()) && s.status !== 'backdown'; });
