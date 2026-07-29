@@ -258,6 +258,9 @@ function renderEmployeeDashboard(container) {
     var allTodos = (DB.get('employeeTodos')||[]).filter(function(t){ return t.createdBy===u; });
     var todoPend = allTodos.filter(function(t){ return t.status!=='completed'; }).length;
 
+    var BACKDOWN_DEPTS = ['IT', 'Facility'];
+    var canBackdown = BACKDOWN_DEPTS.indexOf(dept) !== -1;
+
     var tabs = [
         { id: 'overview',    label: T('empd2_tab_overview') },
         { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
@@ -268,6 +271,9 @@ function renderEmployeeDashboard(container) {
         { id: 'performance', label: T('empd2_tab_performance') },
         { id: 'qgoals',      label: T('empd2_tab_qgoals') }
     ];
+    if (canBackdown) {
+        tabs.push({ id: 'equipbackdown', label: '📉 Backdowns', badge: (DB.get('hodEquipmentBackdowns')||[]).length, badgeClass: 'badge-secondary' });
+    }
 
     var html = ''
         // ── Profile header ──
@@ -368,6 +374,7 @@ function _renderEmpTab(tab) {
     if (tab === 'cleaning')    { renderEmpCleaningSection(el); return; }
     if (tab === 'performance') { renderEmpPerformanceTab(el); return; }
     if (tab === 'qgoals')     { renderEmpQGoalsTab(el); return; }
+    if (tab === 'equipbackdown') { renderEmpBackdownTab(el); return; }
 }
 
 function renderEmpQGoalsTab(el) {
@@ -2170,4 +2177,53 @@ function empSaveReturn() {
 
     APP.notify('Return request submitted to Storekeeper!', 'success');
     return true;
+}
+
+/* ═══════════════════════════════════════════════
+   EMPLOYEE BACKDOWN TAB
+═══════════════════════════════════════════════ */
+function renderEmpBackdownTab(el) {
+    if (!el) el = document.getElementById('empTabContent');
+    if (!el) return;
+    var user = AUTH.currentUser();
+    if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
+    var dept = user.department || '';
+    var BACKDOWN_DEPTS = ['IT', 'Facility'];
+    if (BACKDOWN_DEPTS.indexOf(dept) === -1) {
+        el.innerHTML = '<div class="empty-state">Not available for your department</div>';
+        return;
+    }
+    var all = (DB.get('hodEquipmentBackdowns') || []).filter(function(b){ return b.department === dept; });
+
+    if (all.length === 0) {
+        el.innerHTML = '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
+            + '<div style="font-size:32px;margin-bottom:8px;">📉</div>'
+            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No backdown records</div>'
+            + '<div style="font-size:13px;color:var(--gray);">Backdown records will appear here once equipment is decommissioned.</div></div>';
+        return;
+    }
+
+    var html = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
+        + '<div style="font-weight:700;font-size:16px;">📉 Equipment Backdowns — ' + dept + '</div>'
+        + '<span style="font-size:12px;color:var(--gray);">' + all.length + ' record(s)</span>'
+        + '</div>';
+
+    all.slice().sort(function(a,b){ return (b.backdownDate||'').localeCompare(a.backdownDate||''); }).forEach(function(b){
+        html += '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid #6a1b9a;border-radius:10px;padding:14px;margin-bottom:10px;">'
+            + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'
+            + '<span style="font-size:14px;font-weight:700;">' + (b.assetName || 'Equipment') + '</span>'
+            + '<span class="badge badge-secondary" style="font-size:10px;">' + (b.assetCode || '-') + '</span>'
+            + '<span style="font-size:10px;color:#fff;background:#6a1b9a;padding:2px 8px;border-radius:8px;">Backdown</span>'
+            + '</div>'
+            + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;font-size:13px;">'
+            + '<div><span style="color:var(--gray);">Date:</span> <strong>' + (b.backdownDate ? APP.formatDate(b.backdownDate) : '-') + '</strong></div>'
+            + '<div><span style="color:var(--gray);">Reason:</span> <strong>' + (b.reason || '-') + '</strong></div>'
+            + (b.warrantyInfo ? '<div><span style="color:var(--gray);">Warranty:</span> <strong>' + b.warrantyInfo + '</strong></div>' : '')
+            + (b.servicePeriod ? '<div><span style="color:var(--gray);">Service Period:</span> <strong>' + b.servicePeriod + '</strong></div>' : '')
+            + (b.notes ? '<div style="grid-column:1/-1;"><span style="color:var(--gray);">Notes:</span> ' + b.notes + '</div>' : '')
+            + '</div>'
+            + '</div>';
+    });
+
+    el.innerHTML = html;
 }
