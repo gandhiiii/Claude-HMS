@@ -2268,10 +2268,10 @@ function empBreakdownAdd() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
-    var services = (DB.get('hodEquipmentServices') || []).filter(function(s){ return s.department === dept && s.status !== 'backdown'; });
+    var services = (DB.get('hodEquipmentServices') || []).filter(function(s){ return (s.department||'').trim().toLowerCase() === dept.trim().toLowerCase() && s.status !== 'backdown'; });
     var today = new Date().toISOString().slice(0,10);
     if (services.length === 0) {
-        APP.notify('No equipment service records available for breakdown', 'error');
+        APP.notify('No equipment service records found for your department', 'error');
         return;
     }
     var form = '<form id="empBreakdownForm">'
