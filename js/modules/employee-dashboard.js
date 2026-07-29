@@ -2195,18 +2195,22 @@ function renderEmpBackdownTab(el) {
     }
     var all = (DB.get('hodEquipmentBackdowns') || []).filter(function(b){ return b.department === dept; });
 
-    if (all.length === 0) {
-        el.innerHTML = '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
-            + '<div style="font-size:32px;margin-bottom:8px;">📉</div>'
-            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No backdown records</div>'
-            + '<div style="font-size:13px;color:var(--gray);">Backdown records will appear here once equipment is decommissioned.</div></div>';
-        return;
-    }
-
     var html = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
         + '<div style="font-weight:700;font-size:16px;">📉 Equipment Backdowns — ' + dept + '</div>'
-        + '<span style="font-size:12px;color:var(--gray);">' + all.length + ' record(s)</span>'
-        + '</div>';
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm btn-primary" onclick="empBackdownAdd()">+ Record Backdown</button>'
+        + '<span style="font-size:12px;color:var(--gray);line-height:30px;">' + all.length + ' record(s)</span>'
+        + '</div></div>';
+
+    if (all.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
+            + '<div style="font-size:32px;margin-bottom:8px;">📉</div>'
+            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No backdown records yet</div>'
+            + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Click the button above to record a backdown.</div>'
+            + '</div>';
+        el.innerHTML = html;
+        return;
+    }
 
     all.slice().sort(function(a,b){ return (b.backdownDate||'').localeCompare(a.backdownDate||''); }).forEach(function(b){
         html += '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid #6a1b9a;border-radius:10px;padding:14px;margin-bottom:10px;">'
@@ -2226,4 +2230,73 @@ function renderEmpBackdownTab(el) {
     });
 
     el.innerHTML = html;
+}
+
+function empBackdownAdd() {
+    var today = new Date().toISOString().slice(0,10);
+    var form = '<form id="empBackdownForm">'
+        + '<div class="form-group"><label>Asset Code *</label><input type="text" name="assetCode" class="form-control" required placeholder="e.g. EQ-001"></div>'
+        + '<div class="form-group"><label>Asset Name *</label><input type="text" name="assetName" class="form-control" required placeholder="e.g. MRI Machine"></div>'
+        + '<div class="form-group"><label>Service Type</label>'
+        + '<select name="serviceType" class="form-control">'
+        + '<option value="">N/A</option>'
+        + '<option value="weekly">Weekly</option>'
+        + '<option value="monthly">Monthly</option>'
+        + '<option value="quarterly">Quarterly</option>'
+        + '<option value="yearly">Yearly</option>'
+        + '<option value="custom">Custom</option>'
+        + '</select></div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Last Service Date</label><input type="date" name="lastServiceDate" class="form-control"></div>'
+        + '<div class="form-group"><label>Next Service Due</label><input type="date" name="nextServiceDue" class="form-control"></div>'
+        + '</div>'
+        + '<hr style="margin:12px 0;border-color:var(--border);">'
+        + '<div class="form-group"><label>Backdown Date *</label><input type="date" name="backdownDate" class="form-control" required value="' + today + '"></div>'
+        + '<div class="form-group"><label>Warranty Info</label><input type="text" name="warrantyInfo" class="form-control" placeholder="e.g. Warranty valid until 2028-01-01"></div>'
+        + '<div class="form-group"><label>Service Period</label><input type="text" name="servicePeriod" class="form-control" placeholder="e.g. Jan 2023 - Jun 2026"></div>'
+        + '<div class="form-group"><label>Reason for Backdown *</label>'
+        + '<select name="reason" class="form-control" required>'
+        + '<option value="">Select reason...</option>'
+        + '<option value="End of life">End of life</option>'
+        + '<option value="Upgraded / Replaced">Upgraded / Replaced</option>'
+        + '<option value="Damaged / Beyond repair">Damaged / Beyond repair</option>'
+        + '<option value="No longer needed">No longer needed</option>'
+        + '<option value="Transferred to another department">Transferred to another department</option>'
+        + '<option value="Lost / Stolen">Lost / Stolen</option>'
+        + '<option value="other">Other</option>'
+        + '</select></div>'
+        + '<div class="form-group"><label>Additional Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="Any additional details"></textarea></div>'
+        + '<input type="hidden" name="serviceId" value="">'
+        + '</form>';
+    openFormModal('📉 Record Equipment Backdown', form, 'empBackdownSave()', false);
+}
+
+function empBackdownSave() {
+    var user = AUTH.currentUser();
+    if (!user) return false;
+    var data = getFormData('empBackdownForm');
+    if (!data.assetCode || !data.assetName || !data.backdownDate || !data.reason) {
+        APP.notify('Fill all required fields', 'error'); return false;
+    }
+    DB.add('hodEquipmentBackdowns', {
+        assetCode: data.assetCode,
+        assetName: data.assetName,
+        serviceType: data.serviceType || '',
+        lastServiceDate: data.lastServiceDate || '',
+        nextServiceDue: data.nextServiceDue || '',
+        backdownDate: data.backdownDate,
+        warrantyInfo: data.warrantyInfo || '',
+        servicePeriod: data.servicePeriod || '',
+        reason: data.reason === 'other' ? (data.notes || 'Other') : data.reason,
+        notes: data.reason === 'other' ? (data.notes || '') : (data.notes || ''),
+        serviceId: data.serviceId || '',
+        status: 'backdown',
+        department: user.department,
+        createdBy: user.username,
+        createdByName: user.fullName,
+        createdAt: new Date().toISOString()
+    });
+    APP.notify('Backdown record saved!', 'success');
+    renderEmpBackdownTab();
+    return true;
 }
