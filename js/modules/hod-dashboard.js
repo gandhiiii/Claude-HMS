@@ -40,6 +40,8 @@ var HOD_SERVICE_DEPTS = ['IT', 'Facility'];
 var HOD_BACKDOWN_DEPTS = ['IT', 'Facility'];
 
 function _hodInDeptList(dept, list) {
+    var u = AUTH.currentUser();
+    if (u && (u.isSuperAdmin || u.role === 'admin' || u.role === 'super_admin')) return true;
     var d = (dept || '').trim().toLowerCase();
     return list.some(function(x){ return x.toLowerCase() === d; });
 }
@@ -2417,7 +2419,8 @@ function hodBreakdownAdd() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
-    var services = (DB.get('hodEquipmentServices') || []).filter(function(s){ return (s.department||'').trim().toLowerCase() === dept.trim().toLowerCase() && s.status !== 'backdown'; });
+    var isAdmin = user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin');
+    var services = (DB.get('hodEquipmentServices') || []).filter(function(s){ return (isAdmin || (s.department||'').trim().toLowerCase() === dept.trim().toLowerCase()) && s.status !== 'backdown'; });
     var today = new Date().toISOString().slice(0,10);
     var form = '<form id="hodBreakdownForm">'
         + '<div class="form-group"><label>Select Equipment (from Service Records)</label>'

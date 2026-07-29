@@ -187,6 +187,7 @@ function renderEmployeeDashboard(container) {
     var user = AUTH.currentUser();
     if (!user) { container.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = user.department || '';
+    var isAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
     var u    = user.fullName || user.username;
     var q    = _getQuarter();
 
@@ -259,7 +260,7 @@ function renderEmployeeDashboard(container) {
     var todoPend = allTodos.filter(function(t){ return t.status!=='completed'; }).length;
 
     var BACKDOWN_DEPTS = ['IT', 'Facility'];
-    var canBreakdown = BACKDOWN_DEPTS.some(function(x){ return x.toLowerCase() === (dept||'').trim().toLowerCase(); });
+    var canBreakdown = isAdmin || BACKDOWN_DEPTS.some(function(x){ return x.toLowerCase() === (dept||'').trim().toLowerCase(); });
 
     var tabs = [
         { id: 'overview',    label: T('empd2_tab_overview') },
@@ -2189,12 +2190,13 @@ function renderEmpBreakdownTab(el) {
         var user = AUTH.currentUser();
         if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
         var dept = user.department || '';
-        var BACKDOWN_DEPTS = ['IT', 'Facility'];
-        if (!BACKDOWN_DEPTS.some(function(x){ return x.toLowerCase() === (dept||'').trim().toLowerCase(); })) {
-            el.innerHTML = '<div class="empty-state">Not available for your department</div>';
-            return;
-        }
-        var all = (DB.get('hodEquipmentBackdowns') || []).filter(function(b){ return (b.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+    var BACKDOWN_DEPTS = ['IT', 'Facility'];
+    var _isAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+    if (!_isAdmin && !BACKDOWN_DEPTS.some(function(x){ return x.toLowerCase() === (dept||'').trim().toLowerCase(); })) {
+        el.innerHTML = '<div class="empty-state">Not available for your department</div>';
+        return;
+    }
+    var all = (DB.get('hodEquipmentBackdowns') || []).filter(function(b){ return _isAdmin || (b.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
 
         var html = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
             + '<div style="font-weight:700;font-size:16px;">📉 Equipment Breakdowns — ' + dept + '</div>'
@@ -2272,7 +2274,8 @@ function empBreakdownAdd() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
-    var services = (DB.get('hodEquipmentServices') || []).filter(function(s){ return (s.department||'').trim().toLowerCase() === dept.trim().toLowerCase() && s.status !== 'backdown'; });
+    var _isAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+    var services = (DB.get('hodEquipmentServices') || []).filter(function(s){ return (_isAdmin || (s.department||'').trim().toLowerCase() === dept.trim().toLowerCase()) && s.status !== 'backdown'; });
     var today = new Date().toISOString().slice(0,10);
     var form = '<form id="empBreakdownForm">'
         + '<div class="form-group"><label>Select Equipment (from Service Records)</label>'
