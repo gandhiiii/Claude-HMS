@@ -36,6 +36,7 @@ var _hodFilter = 'all';
 var _hodInvDeptFilter = null; // null = current HOD dept, '__all__' = all departments
 var _hodEditingPurchaseId;
 var HOD_PURCHASE_DEPTS = ['IT', 'Facility'];
+var HOD_SERVICE_DEPTS = ['IT', 'Facility'];
 
 /* ═══════════════════════════════════════════════
    HELPERS
@@ -199,6 +200,10 @@ function renderHodDashboard(container) {
     }, 0);
 
     var canPurchases = HOD_PURCHASE_DEPTS.indexOf(dept) !== -1;
+    var canService = HOD_SERVICE_DEPTS.indexOf(dept) !== -1;
+    var equipServices = canService ? (DB.get('hodEquipmentServices') || []) : [];
+    var dueServices = equipServices.filter(function(e){ return e.status !== 'done' && e.nextServiceDue && new Date(e.nextServiceDue) <= new Date(); });
+    var upcomingServices = equipServices.filter(function(e){ return e.status !== 'done' && e.nextServiceDue && new Date(e.nextServiceDue) > new Date(); });
 
     var tabs = [
         { id: 'overview',    label: 'Overview' },
@@ -217,6 +222,9 @@ function renderHodDashboard(container) {
     ];
     if (canPurchases) {
         tabs.splice(12, 0, { id: 'purchases', label: '💰 Purchases', badge: pendingPurchases, bc: 'badge-warning' });
+    }
+    if (canService) {
+        tabs.splice(13, 0, { id: 'equipservice', label: '🔧 Equipment Service', badge: dueServices.length, bc: 'badge-danger' });
     }
 
     var html = ''
@@ -239,6 +247,7 @@ function renderHodDashboard(container) {
         + _hKpi('📦', 'Inventory Items', deptInventory.length,                '#e0f2f1', '#00796b', 'inventory')
         + _hKpi('🧹', 'Rooms to Clean', cleaning.length,                      '#fce4ec', 'var(--danger)', 'admissions')
         + (canPurchases ? _hKpi('💰', 'Purchase Requests', deptPurchases.length, '#e8f5e9', '#2e7d32', 'purchases') : '')
+        + (canService ? _hKpi('🔧', 'Service Due', dueServices.length, '#ffebee', 'var(--danger)', 'equipservice') : '')
         + _hKpi('📋', 'My TODOs', hodPendingTodos,                             '#fce4ec', '#e91e63', 'hodtodo')
         + '</div>'
 
@@ -300,6 +309,7 @@ function _renderHodTab(tab) {
                 inventory: _hodInventoryReport,
                 'dept-checklist': _hodDeptChecklists,
                 purchases: _hodPurchases,
+                equipservice: _hodEquipService,
                 hodtodo: _hodTodo,
                 hodworkreport: _hodWorkReport };
     if (map[tab]) map[tab](el);
@@ -2024,6 +2034,222 @@ function hodDownloadPurchasesReport() {
 
     XLSX.writeFile(wb, 'Daily_Purchases_Report_' + dept + '_' + todayStr + '.xlsx');
     APP.notify('Daily Purchases Report downloaded!', 'success');
+}
+
+/* ═══════════════════════════════════════════════
+   EQUIPMENT SERVICE TAB — Service records & tracking
+═══════════════════════════════════════════════ */
+function _hodEquipService(el) {
+    var user = AUTH.currentUser();
+    if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
+    var dept = user.department || '';
+    if (HOD_SERVICE_DEPTS.indexOf(dept) === -1) {
+        el.innerHTML = '<div class="empty-state">Equipment Service is only available for IT and Facility departments.</div>';
+        return;
+    }
+
+    var all = DB.get('hodEquipmentServices') || [];
+    var done = all.filter(function(e){ return e.status === 'done'; });
+    var overdue = all.filter(function(e){ return e.status !== 'done' && e.nextServiceDue && new Date(e.nextServiceDue) < new Date(); });
+    var upcoming = all.filter(function(e){ return e.status !== 'done' && e.nextServiceDue && new Date(e.nextServiceDue) >= new Date(); });
+    var noDate = all.filter(function(e){ return e.status !== 'done' && !e.nextServiceDue; });
+    var today = new Date();
+
+    function serviceBar(e) {
+        var daysUntil = 365;
+        if (e.nextServiceDue) {
+            var due = new Date(e.nextServiceDue);
+            daysUntil = Math.ceil((due - today) / (1000*60*60*24));
+        }
+        var pct, color;
+        if (e.status === 'done') {
+            pct = 100;
+            color = '#2e7d32';
+        } else if (daysUntil <= 0) {
+            pct = 100;
+            color = '#c62828';
+        } else if (daysUntil <= 7) {
+            pct = 75 + Math.round((1 - daysUntil/7) * 25);
+            color = '#e65100';
+        } else if (daysUntil <= 30) {
+            pct = 50 + Math.round((1 - (daysUntil-7)/23) * 25);
+            color = '#f9a825';
+        } else {
+            pct = Math.min(Math.round((1 - daysUntil/365) * 50), 50);
+            color = '#2e7d32';
+        }
+        return '<div style="margin-top:6px;background:#e0e0e0;border-radius:6px;height:8px;overflow:hidden;position:relative;">'
+            + '<div style="width:' + pct + '%;height:100%;background:' + color + ';border-radius:6px;transition:width .3s;"></div>'
+            + '</div>'
+            + '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--gray);margin-top:2px;">'
+            + '<span>' + (e.lastServiceDate ? 'Last: ' + APP.formatDate(e.lastServiceDate) : 'No record') + '</span>'
+            + '<span style="font-weight:600;color:' + color + ';">'
+            + (e.status === 'done' ? '✓ Done' : daysUntil <= 0 ? Math.abs(daysUntil)+' day(s) overdue' : daysUntil + ' day(s) left')
+            + '</span>'
+            + '</div>';
+    }
+
+    function equipCard(e) {
+        var dueDate = e.nextServiceDate || e.nextServiceDue || '';
+        var statusColor = e.status === 'done' ? 'var(--success)' : (overdue.indexOf(e)!==-1 ? 'var(--danger)' : 'var(--warning)');
+        return '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid ' + statusColor + ';border-radius:10px;padding:14px;margin-bottom:10px;">'
+            + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">'
+            + '<div style="flex:1;min-width:180px;">'
+            + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'
+            + '<span style="font-size:14px;font-weight:700;">' + (e.assetName || 'Equipment') + '</span>'
+            + '<span class="badge badge-secondary" style="font-size:10px;">' + (e.assetCode || '-') + '</span>'
+            + '<span class="badge" style="font-size:10px;background:' + statusColor + ';color:#fff;">' + (e.status==='done'?'Done': overdue.indexOf(e)!==-1?'Overdue':'Upcoming') + '</span>'
+            + '<span style="font-size:10px;color:var(--gray);background:var(--light-gray);padding:2px 8px;border-radius:8px;">' + (e.serviceType || 'N/A') + '</span>'
+            + '</div>'
+            + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-top:6px;font-size:13px;">'
+            + '<div><span style="color:var(--gray);">Asset Code:</span> <strong>' + (e.assetCode || '-') + '</strong></div>'
+            + '<div><span style="color:var(--gray);">Service:</span> <strong>' + (e.serviceType || '-') + '</strong></div>'
+            + '<div><span style="color:var(--gray);">Due:</span> <strong>' + (dueDate ? APP.formatDate(dueDate) : 'Not set') + '</strong></div>'
+            + (e.notes ? '<div style="grid-column:1/-1;"><span style="color:var(--gray);">Notes:</span> ' + e.notes + '</div>' : '')
+            + '</div>'
+            + serviceBar(e)
+            + '<div style="font-size:11px;color:var(--gray);margin-top:6px;">👤 ' + (e.createdByName || e.createdBy || '-') + ' · ' + APP.formatDate(e.createdAt) + '</div>'
+            + '</div>'
+            + '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">'
+            + (e.status !== 'done' ? '<button class="btn btn-sm btn-success" style="font-size:11px;" onclick="hodServiceMarkDone(\'' + e.id + '\')">✓ Mark Done</button>' : '')
+            + '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--danger);border-color:var(--danger);" onclick="hodServiceDelete(\'' + e.id + '\')">🗑 Delete</button>'
+            + '</div></div></div>';
+    }
+
+    var html = ''
+        + '<div style="background:linear-gradient(135deg,#0d47a1,#1565c0);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
+        + '<div><div style="font-size:18px;font-weight:700;">🔧 Equipment Service Records — ' + dept + '</div>'
+        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + all.length + ' equipment · ' + overdue.length + ' overdue · ' + upcoming.length + ' upcoming</div></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodServiceAdd()">+ Add Equipment</button>'
+        + '</div></div>'
+
+        // KPI cards
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px;">'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#1565c0;">' + all.length + '</div><div style="font-size:11px;color:var(--gray);">Total Equipment</div></div>'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#c62828;">' + overdue.length + '</div><div style="font-size:11px;color:var(--gray);">Overdue Service</div></div>'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#f9a825;">' + upcoming.length + '</div><div style="font-size:11px;color:var(--gray);">Upcoming</div></div>'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#2e7d32;">' + done.length + '</div><div style="font-size:11px;color:var(--gray);">Completed</div></div>'
+        + '</div>';
+
+    if (all.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
+            + '<div style="font-size:32px;margin-bottom:8px;">🔧</div>'
+            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No equipment registered yet</div>'
+            + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Add equipment to start tracking service schedules.</div>'
+            + '<button class="btn btn-primary" onclick="hodServiceAdd()">+ Add Equipment</button></div>';
+        el.innerHTML = html;
+        return;
+    }
+
+    // Overdue section
+    if (overdue.length > 0) {
+        html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px;">🔴 Overdue Service (' + overdue.length + ')</div>';
+        overdue.forEach(function(e){ html += equipCard(e); });
+    }
+
+    // Upcoming section
+    if (upcoming.length > 0) {
+        html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px;">🟡 Upcoming Service (' + upcoming.length + ')</div>';
+        upcoming.forEach(function(e){ html += equipCard(e); });
+    }
+
+    // No date section
+    if (noDate.length > 0) {
+        html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px;">⚪ No Due Date Set (' + noDate.length + ')</div>';
+        noDate.forEach(function(e){ html += equipCard(e); });
+    }
+
+    // Completed section
+    if (done.length > 0) {
+        html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px;">✅ Completed Service (' + done.length + ')</div>';
+        done.slice().reverse().forEach(function(e){ html += equipCard(e); });
+    }
+
+    el.innerHTML = html;
+}
+
+function hodServiceAdd() {
+    var today = new Date().toISOString().slice(0,10);
+    var form = '<form id="hodServiceForm">'
+        + '<div class="form-group"><label>Asset Code *</label><input type="text" name="assetCode" class="form-control" required placeholder="e.g. EQ-001"></div>'
+        + '<div class="form-group"><label>Asset Name *</label><input type="text" name="assetName" class="form-control" required placeholder="e.g. MRI Machine"></div>'
+        + '<div class="form-group"><label>Service Type *</label>'
+        + '<select name="serviceType" class="form-control" required>'
+        + '<option value="weekly">Weekly</option>'
+        + '<option value="monthly">Monthly</option>'
+        + '<option value="yearly">Yearly</option>'
+        + '<option value="quarterly">Quarterly</option>'
+        + '<option value="custom">Custom</option>'
+        + '</select></div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Last Service Date</label><input type="date" name="lastServiceDate" class="form-control" value="' + today + '"></div>'
+        + '<div class="form-group"><label>Next Service Due Date *</label><input type="date" name="nextServiceDue" class="form-control" required></div>'
+        + '</div>'
+        + '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="e.g. Service contract details, vendor info"></textarea></div>'
+        + '</form>';
+    openFormModal('🔧 Add Equipment Service Record', form, 'hodServiceSave()', false);
+}
+
+function hodServiceSave() {
+    var user = AUTH.currentUser();
+    if (!user) return false;
+    var data = getFormData('hodServiceForm');
+    if (!data.assetCode || !data.assetName || !data.serviceType || !data.nextServiceDue) {
+        APP.notify('Fill all required fields', 'error'); return false;
+    }
+    DB.add('hodEquipmentServices', {
+        assetCode: data.assetCode,
+        assetName: data.assetName,
+        serviceType: data.serviceType,
+        lastServiceDate: data.lastServiceDate || '',
+        nextServiceDue: data.nextServiceDue,
+        status: 'upcoming',
+        notes: data.notes || '',
+        department: user.department,
+        createdBy: user.username,
+        createdByName: user.fullName,
+        createdAt: new Date().toISOString()
+    });
+    APP.notify('Equipment service record added!', 'success');
+    _renderHodTab('equipservice');
+    return true;
+}
+
+function hodServiceMarkDone(id) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var p = DB.getById('hodEquipmentServices', id);
+    if (!p) { APP.notify('Record not found', 'error'); return; }
+    var today = new Date().toISOString().slice(0,10);
+    var nextDue = '';
+    if (p.serviceType === 'weekly') {
+        var d = new Date(); d.setDate(d.getDate() + 7); nextDue = d.toISOString().slice(0,10);
+    } else if (p.serviceType === 'monthly') {
+        var d = new Date(); d.setMonth(d.getMonth() + 1); nextDue = d.toISOString().slice(0,10);
+    } else if (p.serviceType === 'quarterly') {
+        var d = new Date(); d.setMonth(d.getMonth() + 3); nextDue = d.toISOString().slice(0,10);
+    } else if (p.serviceType === 'yearly') {
+        var d = new Date(); d.setFullYear(d.getFullYear() + 1); nextDue = d.toISOString().slice(0,10);
+    }
+    var upd = {
+        status: 'done',
+        lastServiceDate: today,
+        completedAt: new Date().toISOString(),
+        completedBy: user.fullName
+    };
+    if (nextDue) upd.nextServiceDue = nextDue;
+    DB.update('hodEquipmentServices', id, upd);
+    APP.notify('Service marked as done! Next due: ' + (nextDue || 'not set'), 'success');
+    _renderHodTab('equipservice');
+}
+
+function hodServiceDelete(id) {
+    confirmAction('Delete this equipment service record?', function(){
+        DB.delete('hodEquipmentServices', id);
+        APP.notify('Record deleted', 'success');
+        _renderHodTab('equipservice');
+    });
 }
 
 /* ═══════════════════════════════════════════════
