@@ -269,6 +269,20 @@ function showUserForm(user) {
            </select>`
         : `<input type="text" name="department" class="form-control" value="${userDept}" placeholder="${T('usrmod_placeholder_dept_example')}">`;
 
+    const userManagedDepts = user?.managedDepartments || [];
+    var managedDeptHtml = '';
+    if (depts.length > 0) {
+        managedDeptHtml = '<div id="managedDeptSection" style="' + ((user?.role || 'employee') === 'hod' ? '' : 'display:none;') + '">'
+            + '<div class="form-group"><label>Managed Departments (HOD can switch between these)</label>'
+            + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">';
+        depts.forEach(function(d) {
+            var checked = userManagedDepts.indexOf(d.name) !== -1 ? 'checked' : '';
+            managedDeptHtml += '<label style="display:flex;align-items:center;gap:4px;font-size:13px;background:var(--light-gray);border-radius:6px;padding:4px 10px;cursor:pointer;">'
+                + '<input type="checkbox" name="managedDept" value="' + d.name + '" ' + checked + '> ' + d.name + '</label>';
+        });
+        managedDeptHtml += '</div></div></div>';
+    }
+
     const form = `
         <form id="userForm">
             <input type="hidden" name="id" value="${user?.id || ''}">
@@ -304,6 +318,7 @@ function showUserForm(user) {
                     ${deptField}
                 </div>
             </div>
+            ${managedDeptHtml}
             <div class="form-group">
                 <label>${T('usrmod_label_permissions')}</label>
                 <div style="font-size:12px;color:var(--gray);margin-bottom:8px;">
@@ -374,11 +389,12 @@ function onRoleChange(select) {
     };
     const perms = rolePerms[role];
     if (perms) {
-        // ADD role defaults on top of existing selection, never uncheck user's choices
         allCbs.forEach(function(cb) {
             if (perms.indexOf(cb.value) !== -1) cb.checked = true;
         });
     }
+    var section = document.getElementById('managedDeptSection');
+    if (section) section.style.display = role === 'hod' ? '' : 'none';
 }
 
 function saveUser() {
@@ -389,6 +405,7 @@ function saveUser() {
     });
     // Only save non-disabled checkboxes (disabled = inherited from dept, not user-specific)
     data.permissions = Array.from(form.querySelectorAll('[name="permissions"]:checked:not([disabled])')).map(cb => cb.value);
+    var managedDepts = Array.from(form.querySelectorAll('[name="managedDept"]:checked')).map(function(cb) { return cb.value; });
 
     if (!data.fullName || !data.username) {
         APP.notify(T('usrmod_msg_username_fullname_required'), 'error'); return false;
@@ -398,6 +415,7 @@ function saveUser() {
     if (data.id) {
         const updateData = { fullName: data.fullName, email: data.email, phone: data.phone, role: data.role, department: data.department, permissions: data.permissions };
         if (data.password) updateData.password = data.password;
+        updateData.managedDepartments = managedDepts;
         DB.update('users', data.id, updateData);
         APP.notify(T('usrmod_msg_user_updated'), 'success');
     } else {
@@ -409,6 +427,7 @@ function saveUser() {
             username: data.username, password: data.password,
             fullName: data.fullName, email: data.email, phone: data.phone,
             role: data.role, department: data.department, permissions: data.permissions,
+            managedDepartments: managedDepts,
             isSuperAdmin: false
         });
         APP.notify(T('usrmod_msg_user_created_prefix') + data.username + ' / ' + data.password, 'success');

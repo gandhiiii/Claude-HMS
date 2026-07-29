@@ -66,7 +66,11 @@ function renderInvItemsTab() {
                 </div>
                 <button class="btn btn-sm btn-outline" onclick="setInvDeptFilter('')" style="${!invDeptFilter ? 'display:none;' : ''}">${T('invmod_btn_clear')}</button>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="showInvForm()">${T('invmod_btn_add_item')}</button>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button class="btn btn-primary btn-sm" onclick="showInvForm()">${T('invmod_btn_add_item')}</button>
+                <button class="btn btn-sm" style="background:#1e7e34;color:#fff;" onclick="invDownloadExcel()">📥 Excel</button>
+                <button class="btn btn-sm" style="background:#c82333;color:#fff;" onclick="invDownloadPdf()">📄 PDF</button>
+            </div>
         </div>
 
         <div class="card" style="padding:12px 16px;margin-bottom:16px;background:#f0f6ff;border:1px solid #c2d7f8;">
@@ -690,6 +694,50 @@ function deleteInv(id) {
         APP.notify(T('invmod_msg_item_deleted'), 'success');
         renderInvList();
     });
+}
+
+/* ═══ DOWNLOAD ═══ */
+function invDownloadExcel() {
+    const items = DB.get('inventory');
+    if (!items || items.length === 0) { APP.notify('No inventory data', 'info'); return; }
+    if (typeof XLSX === 'undefined') { APP.notify('Excel library not loaded', 'error'); return; }
+    const headers = ['Barcode', 'Item Name', 'Category', 'Department', 'Quantity', 'Unit', 'Price/Unit', 'Total Value', 'Expiry', 'Status'];
+    const rows = items.map(function (i) {
+        var qty = parseFloat(i.quantity) || 0;
+        var price = parseFloat(i.price) || 0;
+        return [i.barcode || '', i.name || '', i.category || '', i.department || '', qty, i.unit || 'pcs', price, (qty * price).toFixed(2), i.expiry ? new Date(i.expiry).toLocaleDateString('en-IN') : '-', i.status || 'in-stock'];
+    });
+    var title = 'Inventory_Report_' + new Date().toISOString().slice(0, 10);
+    var wb = XLSX.utils.book_new();
+    var ws = XLSX.utils.aoa_to_sheet([headers].concat(rows));
+    ws['!cols'] = headers.map(function (h, ci) {
+        var max = h.length;
+        rows.forEach(function (r) { var v = r[ci] != null ? String(r[ci]) : ''; if (v.length > max) max = v.length; });
+        return { wch: Math.min(max + 3, 40) };
+    });
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
+    XLSX.writeFile(wb, title + '.xlsx');
+    APP.notify('Inventory Excel downloaded!', 'success');
+}
+
+function invDownloadPdf() {
+    const items = DB.get('inventory');
+    if (!items || items.length === 0) { APP.notify('No inventory data', 'info'); return; }
+    if (typeof window.jspdf === 'undefined') { APP.notify('PDF library not loaded', 'error'); return; }
+    var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14);
+    doc.text('Inventory Report', 14, 15);
+    doc.setFontSize(9);
+    doc.text('Generated: ' + new Date().toLocaleDateString('en-IN'), 14, 22);
+    var headers = [['Barcode', 'Item Name', 'Category', 'Department', 'Qty', 'Unit', 'Price', 'Value', 'Expiry', 'Status']];
+    var rows = items.map(function (i) {
+        var qty = parseFloat(i.quantity) || 0;
+        var price = parseFloat(i.price) || 0;
+        return [i.barcode || '', i.name || '', i.category || '', i.department || '', qty, i.unit || 'pcs', '₹' + price, '₹' + (qty * price).toFixed(2), i.expiry ? new Date(i.expiry).toLocaleDateString('en-IN') : '-', i.status || 'in-stock'];
+    });
+    doc.autoTable({ head: headers, body: rows, startY: 27, styles: { fontSize: 7 }, headStyles: { fillColor: [30, 126, 52] } });
+    doc.save('Inventory_Report_' + new Date().toISOString().slice(0, 10) + '.pdf');
+    APP.notify('Inventory PDF downloaded!', 'success');
 }
 
 function printBarcode(id) {

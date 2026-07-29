@@ -78,3 +78,8 @@ var firebaseConfig = {
         window.FB_CONFIGURED = false;
     }
 })();
+
+// ── WebSocket Notification Server URL ───────────────────────────────
+// Points to the local ws-server.js running on the same machine.
+// Change to wss://your-domain.com if deploying to a remote server.
+window.WS_SERVER_URL = 'ws://localhost:8765';

@@ -652,7 +652,10 @@ function adminServiceAdd() {
         + '<div class="form-group"><label>Warranty Expiry</label><input type="date" name="warrantyExpiry" class="form-control"></div>'
         + '<div class="form-group"><label>Warranty Provider</label><input type="text" name="warrantyProvider" class="form-control" placeholder="e.g. Siemens"></div>'
         + '</div>'
-        + '<input type="hidden" name="department" value="' + (AUTH.currentUser()?.department || 'IT') + '">'
+        + '<div class="form-group"><label>Department *</label><select name="department" class="form-control" required>'
+        + '<option value="">Select department…</option>'
+        + (DB.get('departments') || []).filter(function(d){ return d.active !== false; }).map(function(d){ return '<option value="' + d.name + '">' + d.name + '</option>'; }).join('')
+        + '</select></div>'
         + '</form>';
     openFormModal('🔧 Add Equipment Service Record', form, 'adminServiceSave()', false);
 }
@@ -760,7 +763,10 @@ function adminBreakdownAdd() {
         + '<option value="other">Other</option></select></div>'
         + '<div class="form-group"><label>Additional Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="Any additional details"></textarea></div>'
         + '<input type="hidden" name="serviceId" value="">'
-        + '<input type="hidden" name="department" value="' + (AUTH.currentUser()?.department || 'IT') + '">'
+        + '<div class="form-group"><label>Department *</label><select name="department" class="form-control" required>'
+        + '<option value="">Select department…</option>'
+        + (DB.get('departments') || []).filter(function(d){ return d.active !== false; }).map(function(d){ return '<option value="' + d.name + '">' + d.name + '</option>'; }).join('')
+        + '</select></div>'
         + '</form>';
     openFormModal('📉 Record Equipment Breakdown', form, 'adminBreakdownSave()', false);
 }

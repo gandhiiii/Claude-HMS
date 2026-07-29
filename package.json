@@ -4,6 +4,7 @@
   "description": "Stavya Intelligence HMS - Hospital Management System",
   "main": "electron/main.js",
   "scripts": {
+    "server:start": "node server/ws-server.js",
     "electron:dev": "electron .",
     "electron:build": "electron-builder --win portable",
     "build:exe": "npm run electron:build",
@@ -29,9 +30,14 @@
       "package.json"
     ],
     "win": {
-      "target": ["dir"],
+      "target": [
+        "dir"
+      ],
       "icon": "assets/stavya-logo.png"
     }
+  },
+  "dependencies": {
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@capacitor/android": "^7.0.0",

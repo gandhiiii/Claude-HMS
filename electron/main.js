@@ -71,10 +71,10 @@ function createWindow() {
         }
     });
 
-    const flutterDir = path.join(__dirname, '..', 'hms_flutter', 'build', 'web');
+    const wwwDir = path.join(__dirname, '..', 'www');
     const htmlDir = path.join(__dirname, '..');
 
-    const webDir = fs.existsSync(flutterDir) ? flutterDir : htmlDir;
+    const webDir = fs.existsSync(path.join(wwwDir, 'index.html')) ? wwwDir : htmlDir;
 
     startLocalServer(webDir, (port) => {
         mainWindow.loadURL(`http://127.0.0.1:${port}`);

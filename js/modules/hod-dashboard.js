@@ -101,7 +101,13 @@ function _avatar(name, size) {
 function renderHodDashboard(container) {
     var user = AUTH.currentUser();
     if (!user) { container.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
-    var dept = user.department || '';
+    if (!window._hodActiveDept) {
+        try { window._hodActiveDept = localStorage.getItem('hodActiveDept') || ''; } catch(e) { window._hodActiveDept = ''; }
+    }
+    var managedDepts = user.managedDepartments || [];
+    if (window._hodActiveDept && managedDepts.indexOf(window._hodActiveDept) === -1) window._hodActiveDept = '';
+    if (!window._hodActiveDept && managedDepts.length > 0) window._hodActiveDept = managedDepts[0];
+    var dept = window._hodActiveDept || user.department || '';
     var u    = user.fullName || user.username;
 
     var team        = _getHodTeam(user);
@@ -245,7 +251,13 @@ function renderHodDashboard(container) {
         + '<div style="display:flex;align-items:center;gap:14px;">'
         + '<div style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:26px;">👔</div>'
         + '<div><div style="font-size:20px;font-weight:700;">' + u + '</div>'
-        + '<div style="font-size:13px;opacity:.85;">' + (dept || 'No Department') + ' In-Charge (HOD)</div></div></div>'
+        + '<div style="font-size:13px;opacity:.85;">' + (dept || 'No Department') + ' In-Charge (HOD)</div>'
+        + (managedDepts.length > 1
+            ? '<div style="margin-top:6px;"><select class="form-control" style="font-size:12px;padding:3px 8px;border:none;border-radius:6px;background:rgba(255,255,255,.2);color:#fff;font-weight:600;" onchange="hodSwitchDept(this.value)">'
+              + managedDepts.map(function(d){ return '<option value="' + d + '" ' + (d === dept ? 'selected' : '') + '>' + d + '</option>'; }).join('')
+              + '</select></div>'
+            : '')
+        + '</div></div>'
         + '<div style="text-align:right;font-size:12px;opacity:.8;">'
         + new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
         + '<div style="margin-top:2px;">Team: ' + team.length + ' member' + (team.length !== 1 ? 's' : '') + '</div></div></div>'
@@ -311,6 +323,12 @@ function hodTabSwitch(tab) {
         el.classList.toggle('active', el.dataset.tab === tab);
     });
     _renderHodTab(tab);
+}
+
+function hodSwitchDept(dept) {
+    window._hodActiveDept = dept;
+    try { localStorage.setItem('hodActiveDept', dept); } catch(e) {}
+    location.reload();
 }
 
 function _renderHodTab(tab) {

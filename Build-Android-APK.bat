@@ -4,8 +4,9 @@ echo ========================================================
 echo Building Android APK for Stavya Intelligence HMS...
 echo ========================================================
 
-set JAVA_HOME=C:\Program Files\Android\Android Studio\jbr
-set ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk
+set "JAVA_HOME=C:\Program Files\Android\Android Studio\jbr"
+set "ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk"
+set "PATH=%JAVA_HOME%\bin;%PATH%"
 
 cd /d "%~dp0"
 echo [1/2] Syncing Web Assets to Android project...
