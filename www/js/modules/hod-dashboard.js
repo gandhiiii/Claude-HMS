@@ -2326,7 +2326,8 @@ function _hodEquipBackdown(el) {
         + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + all.length + ' total backdown(s)</div></div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodBackdownAdd()">+ Record Backdown</button>'
-        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadBackdownReport()">📥 Report</button>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadBackdownReport()">📥 Excel</button>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadBackdownPdf()">📕 PDF</button>'
         + '</div></div>'
 
         // KPI cards
@@ -2555,6 +2556,27 @@ function hodDownloadBackdownReport() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(rows)), 'All Backdowns');
     XLSX.writeFile(wb, 'Equipment_Backdown_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
     APP.notify('Equipment Backdown Report downloaded!', 'success');
+}
+
+function hodDownloadBackdownPdf() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = user.department || '';
+    if (!_hodInDeptList(dept, HOD_BACKDOWN_DEPTS)) return;
+    if (typeof window.jspdf==='undefined'){ APP.notify('PDF library not loaded','error'); return; }
+    var all = DB.get('hodEquipmentBackdowns') || [];
+    var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14);
+    doc.text('Equipment Backdown Report — ' + dept, 14, 15);
+    doc.setFontSize(9);
+    doc.text('Generated: ' + new Date().toLocaleString('en-IN') + '   Total Records: ' + all.length, 14, 22);
+    var headers = ['Asset Code','Asset Name','Service Type','Backdown Date','Reason','Warranty Info','Service Period','Last Service','Next Service Due','Notes','Created By'];
+    var rows = all.map(function(b){
+        return [b.assetCode||'', b.assetName||'', b.serviceType||'', b.backdownDate||'', b.reason||'', b.warrantyInfo||'', b.servicePeriod||'', b.lastServiceDate||'', b.nextServiceDue||'', b.notes||'', b.createdByName||''];
+    });
+    doc.autoTable({ head:[headers], body:rows, startY:27, styles:{fontSize:7}, headStyles:{fillColor:[106,27,154]} });
+    doc.save('Equipment_Backdown_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+    APP.notify('PDF downloaded', 'success');
 }
 
 /* ═══════════════════════════════════════════════

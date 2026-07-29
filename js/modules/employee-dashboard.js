@@ -2199,6 +2199,8 @@ function renderEmpBackdownTab(el) {
         + '<div style="font-weight:700;font-size:16px;">📉 Equipment Backdowns — ' + dept + '</div>'
         + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
         + '<button class="btn btn-sm btn-primary" onclick="empBackdownAdd()">+ Record Backdown</button>'
+        + '<button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="empDownloadBackdownReport()">📥 Excel</button>'
+        + '<button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="empDownloadBackdownPdf()">📕 PDF</button>'
         + '<span style="font-size:12px;color:var(--gray);line-height:30px;">' + all.length + ' record(s)</span>'
         + '</div></div>';
 
@@ -2339,4 +2341,48 @@ function empBackdownSave() {
     APP.notify('Backdown record saved!', 'success');
     renderEmpBackdownTab();
     return true;
+}
+
+function empDownloadBackdownReport() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = user.department || '';
+    var all = (DB.get('hodEquipmentBackdowns') || []).filter(function(b){ return b.department === dept; });
+    var wb = XLSX.utils.book_new();
+    var dashData = [
+        ['Equipment Backdown Report'],
+        ['Department', dept],
+        ['Generated', new Date().toLocaleString('en-IN')],
+        [],
+        ['Metric', 'Value'],
+        ['Total Backdowns', all.length]
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dashData), 'Dashboard');
+    var headers = ['Asset Code','Asset Name','Service Type','Backdown Date','Reason','Warranty Info','Service Period','Last Service','Next Service Due','Notes','Created By','Created At'];
+    var rows = all.map(function(b){
+        return [b.assetCode||'', b.assetName||'', b.serviceType||'', b.backdownDate||'', b.reason||'', b.warrantyInfo||'', b.servicePeriod||'', b.lastServiceDate||'', b.nextServiceDue||'', b.notes||'', b.createdByName||'', b.createdAt?APP.formatDate(b.createdAt):''];
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(rows)), 'All Backdowns');
+    XLSX.writeFile(wb, 'Backdown_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
+    APP.notify('Backdown Report downloaded!', 'success');
+}
+
+function empDownloadBackdownPdf() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = user.department || '';
+    if (typeof window.jspdf==='undefined'){ APP.notify('PDF library not loaded','error'); return; }
+    var all = (DB.get('hodEquipmentBackdowns') || []).filter(function(b){ return b.department === dept; });
+    var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14);
+    doc.text('Equipment Backdown Report — ' + dept, 14, 15);
+    doc.setFontSize(9);
+    doc.text('Generated: ' + new Date().toLocaleString('en-IN') + '   Total Records: ' + all.length, 14, 22);
+    var headers = ['Asset Code','Asset Name','Service Type','Backdown Date','Reason','Warranty Info','Service Period','Last Service','Next Service Due','Notes','Created By'];
+    var rows = all.map(function(b){
+        return [b.assetCode||'', b.assetName||'', b.serviceType||'', b.backdownDate||'', b.reason||'', b.warrantyInfo||'', b.servicePeriod||'', b.lastServiceDate||'', b.nextServiceDue||'', b.notes||'', b.createdByName||''];
+    });
+    doc.autoTable({ head:[headers], body:rows, startY:27, styles:{fontSize:7}, headStyles:{fillColor:[106,27,154]} });
+    doc.save('Backdown_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+    APP.notify('PDF downloaded', 'success');
 }
