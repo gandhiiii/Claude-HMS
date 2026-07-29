@@ -1673,6 +1673,19 @@ function _hodPurchaseCard(p, user) {
         : p.status === 'rejected' ? '<span class="badge badge-danger" style="font-size:10px;">✗ Rejected</span>'
         : '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>';
 
+    var approvalHtml = '';
+    if (p.approvalType === 'none') {
+        approvalHtml = '<span style="font-size:11px;color:var(--gray);">✅ No approval needed</span>';
+    } else if (p.approvalType === 'pre-approved') {
+        approvalHtml = '<span style="font-size:11px;color:#2e7d32;">✅ Pre-approved by ' + (p.preApprovedBy || 'Unknown') + '</span>';
+    } else if (p.status === 'pending') {
+        var label = p.approvalOther || p.approvalType || 'Unknown';
+        approvalHtml = '<span style="font-size:11px;color:#e65100;">⏳ Awaiting: ' + label + '</span>';
+    } else {
+        var label = p.approvalOther || p.approvalType || '';
+        approvalHtml = '<span style="font-size:11px;color:#2e7d32;">✓ Approved' + (label ? ' by ' + label : '') + '</span>';
+    }
+
     return '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid '
         + (p.status === 'approved' ? 'var(--success)' : p.status === 'rejected' ? 'var(--danger)' : 'var(--warning)')
         + ';border-radius:10px;padding:14px;margin-bottom:10px;">'
@@ -1690,9 +1703,10 @@ function _hodPurchaseCard(p, user) {
         + (p.location ? '<div><span style="color:var(--gray);">Location:</span> <strong>' + p.location + '</strong></div>' : '')
         + (p.vendor ? '<div><span style="color:var(--gray);">Vendor:</span> <strong>' + p.vendor + '</strong></div>' : '')
         + '</div>'
-        + (p.description ? '<div style="font-size:12px;color:var(--text);margin-top:6px;background:var(--light-gray);padding:6px 10px;border-radius:6px;">📝 ' + p.description + '</div>' : '')
+        + '<div style="margin-top:6px;">' + approvalHtml + '</div>'
+        + (p.description ? '<div style="font-size:12px;color:var(--text);margin-top:4px;background:var(--light-gray);padding:6px 10px;border-radius:6px;">📝 ' + p.description + '</div>' : '')
         + '<div style="font-size:11px;color:var(--gray);margin-top:6px;">👤 ' + (p.createdByName || p.createdBy || '-') + ' · ' + APP.formatDate(p.createdAt)
-        + (p.approvedBy ? ' · ✓ Approved by ' + p.approvedBy : '')
+        + (p.approvedBy && p.approvalType !== 'none' && p.approvalType !== 'pre-approved' ? ' · ✓ Approved by ' + p.approvedBy : '')
         + (p.rejectedBy ? ' · ✗ Rejected by ' + p.rejectedBy : '')
         + '</div></div>'
         + '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">'
@@ -1719,6 +1733,16 @@ function hodPurchaseCalcTotal() {
     tot.value = '₹' + (q * p).toFixed(2);
 }
 
+function hodToggleApprovalFields() {
+    var sel = document.querySelector('#hodPurchaseForm [name="approvalType"], #hodPurchaseEditForm [name="approvalType"]');
+    if (!sel) return;
+    var v = sel.value;
+    var otherWrap = document.getElementById('hodApprovalOtherWrap');
+    var preWrap = document.getElementById('hodPreApprovedWrap');
+    if (otherWrap) otherWrap.style.display = v === 'other' ? '' : 'none';
+    if (preWrap) preWrap.style.display = v === 'pre-approved' ? '' : 'none';
+}
+
 function hodCreatePurchase() {
     var form = '<form id="hodPurchaseForm">'
         + '<div class="form-group"><label>Request Title *</label><input type="text" name="title" class="form-control" required placeholder="e.g. Purchase of cleaning supplies"></div>'
@@ -1733,8 +1757,25 @@ function hodCreatePurchase() {
         + '<div class="form-group"><label>Vendor / Supplier</label><input type="text" name="vendor" class="form-control" placeholder="e.g. ABC Traders"></div>'
         + '</div>'
         + '<div class="form-group"><label>Description / Purpose *</label><textarea name="description" class="form-control" rows="3" required placeholder="Why is this purchase needed? How will it be used?"></textarea></div>'
+        + '<hr style="margin:12px 0;border-color:var(--border);">'
+        + '<div class="form-group"><label>Approval Required <span style="font-size:11px;color:var(--gray);">(who needs to approve this?)</span></label>'
+        + '<select name="approvalType" class="form-control" onchange="hodToggleApprovalFields()" style="margin-bottom:8px;">'
+        + '<option value="none">No approval needed (direct purchase)</option>'
+        + '<option value="pre-approved">Already approved — enter who approved</option>'
+        + '<option value="MD">MD</option>'
+        + '<option value="Chairman">Chairman</option>'
+        + '<option value="Vice Chairman">Vice Chairman</option>'
+        + '<option value="MD+Chairman">MD + Chairman</option>'
+        + '<option value="MD+Vice Chairman">MD + Vice Chairman</option>'
+        + '<option value="Chairman+Vice Chairman">Chairman + Vice Chairman</option>'
+        + '<option value="All">All (MD, Chairman, Vice Chairman)</option>'
+        + '<option value="other">Other (specify)</option>'
+        + '</select>'
+        + '<div id="hodApprovalOtherWrap" style="display:none;"><input type="text" name="approvalOther" class="form-control" placeholder="e.g. Board of Directors"></div>'
+        + '<div id="hodPreApprovedWrap" style="display:none;"><input type="text" name="preApprovedBy" class="form-control" placeholder="Who already approved this? e.g. MD"></div>'
+        + '</div>'
         + '</form>';
-    openFormModal('💰 New Purchase / Expense Request', form, 'hodSavePurchase()', false);
+    openFormModal('💰 New Purchase / Expense Request', form, 'hodSavePurchase()', true);
 }
 
 function hodSavePurchase() {
@@ -1747,6 +1788,10 @@ function hodSavePurchase() {
     var qty = parseFloat(data.quantity) || 1;
     var price = parseFloat(data.price) || 0;
     if (price <= 0) { APP.notify('Enter a valid price', 'error'); return false; }
+    var approvalType = data.approvalType || 'none';
+    var approvalOther = data.approvalOther || '';
+    var preApprovedBy = data.preApprovedBy || '';
+    var recStatus = approvalType === 'none' ? 'approved' : (approvalType === 'pre-approved' ? 'approved' : 'pending');
     DB.add('hodPurchases', {
         title: data.title,
         itemName: data.itemName,
@@ -1757,7 +1802,12 @@ function hodSavePurchase() {
         vendor: data.vendor || '',
         description: data.description,
         department: user.department,
-        status: 'pending',
+        status: recStatus,
+        approvalType: approvalType,
+        approvalOther: approvalOther,
+        preApprovedBy: preApprovedBy,
+        approvedBy: recStatus === 'approved' ? (preApprovedBy || (approvalType === 'none' ? 'No approval needed' : '')) : '',
+        approvedAt: recStatus === 'approved' ? new Date().toISOString() : '',
         createdBy: user.username,
         createdByName: user.fullName,
         createdAt: new Date().toISOString()
@@ -1837,6 +1887,23 @@ function hodEditPurchase(id) {
         + '<div class="form-group"><label>Vendor / Supplier</label><input type="text" name="vendor" class="form-control" value="' + esc(p.vendor) + '"></div>'
         + '</div>'
         + '<div class="form-group"><label>Description / Purpose *</label><textarea name="description" class="form-control" rows="3" required>' + esc(p.description) + '</textarea></div>'
+        + '<hr style="margin:12px 0;border-color:var(--border);">'
+        + '<div class="form-group"><label>Approval Required</label>'
+        + '<select name="approvalType" class="form-control" onchange="hodToggleApprovalFields()" style="margin-bottom:8px;">'
+        + '<option value="none"' + (p.approvalType==='none'?' selected':'') + '>No approval needed (direct purchase)</option>'
+        + '<option value="pre-approved"' + (p.approvalType==='pre-approved'?' selected':'') + '>Already approved — enter who approved</option>'
+        + '<option value="MD"' + (p.approvalType==='MD'?' selected':'') + '>MD</option>'
+        + '<option value="Chairman"' + (p.approvalType==='Chairman'?' selected':'') + '>Chairman</option>'
+        + '<option value="Vice Chairman"' + (p.approvalType==='Vice Chairman'?' selected':'') + '>Vice Chairman</option>'
+        + '<option value="MD+Chairman"' + (p.approvalType==='MD+Chairman'?' selected':'') + '>MD + Chairman</option>'
+        + '<option value="MD+Vice Chairman"' + (p.approvalType==='MD+Vice Chairman'?' selected':'') + '>MD + Vice Chairman</option>'
+        + '<option value="Chairman+Vice Chairman"' + (p.approvalType==='Chairman+Vice Chairman'?' selected':'') + '>Chairman + Vice Chairman</option>'
+        + '<option value="All"' + (p.approvalType==='All'?' selected':'') + '>All (MD, Chairman, Vice Chairman)</option>'
+        + '<option value="other"' + (p.approvalType==='other'?' selected':'') + '>Other (specify)</option>'
+        + '</select>'
+        + '<div id="hodApprovalOtherWrap" style="display:' + (p.approvalType==='other'?'':'none') + ';"><input type="text" name="approvalOther" class="form-control" placeholder="e.g. Board of Directors" value="' + esc(p.approvalOther) + '"></div>'
+        + '<div id="hodPreApprovedWrap" style="display:' + (p.approvalType==='pre-approved'?'':'none') + ';"><input type="text" name="preApprovedBy" class="form-control" placeholder="Who already approved this?" value="' + esc(p.preApprovedBy) + '"></div>'
+        + '</div>'
         + '</form>';
     openFormModal('✎ Edit Purchase / Expense Request', form, 'hodUpdatePurchase()', false);
 }
@@ -1861,7 +1928,10 @@ function hodUpdatePurchase() {
     var qty = parseFloat(data.quantity) || 1;
     var price = parseFloat(data.price) || 0;
     if (price <= 0) { APP.notify('Enter a valid price', 'error'); return false; }
-    DB.update('hodPurchases', id, {
+    var approvalType = data.approvalType || 'none';
+    var approvalOther = data.approvalOther || '';
+    var preApprovedBy = data.preApprovedBy || '';
+    var upd = {
         title: data.title,
         itemName: data.itemName,
         quantity: qty,
@@ -1870,9 +1940,18 @@ function hodUpdatePurchase() {
         location: data.location,
         vendor: data.vendor || '',
         description: data.description,
+        approvalType: approvalType,
+        approvalOther: approvalOther,
+        preApprovedBy: preApprovedBy,
         editedAt: new Date().toISOString(),
         editedBy: user.fullName
-    });
+    };
+    if (approvalType === 'none' || approvalType === 'pre-approved') {
+        upd.status = 'approved';
+        upd.approvedBy = preApprovedBy || 'No approval needed';
+        upd.approvedAt = new Date().toISOString();
+    }
+    DB.update('hodPurchases', id, upd);
     APP.notify('Purchase request updated!', 'success');
     _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return p.department === user.department; });
     _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
@@ -1922,13 +2001,16 @@ function hodDownloadPurchasesReport() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dashData), 'Dashboard');
 
     // ── All Records sheet ──
-    var headers = ['Date','Title','Item','Qty','Unit Price','Total','Location','Vendor','Status','Created By','Approved/Rejected By','Description'];
+    var headers = ['Date','Title','Item','Qty','Unit Price','Total','Location','Vendor','Status','Approval','Created By','Approved/Rejected By','Description'];
     var rows = allPurchases.map(function(p){
         var approvedBy = p.approvedBy || p.rejectedBy || '';
+        var approvalLabel = p.approvalType === 'none' ? 'No approval needed'
+            : p.approvalType === 'pre-approved' ? 'Pre-approved by ' + (p.preApprovedBy||'')
+            : p.approvalOther || p.approvalType || '';
         return [
             APP.formatDate(p.createdAt), p.title||'', p.itemName||'', p.quantity||1,
             parseFloat(p.price)||0, parseFloat(p.total)||0, p.location||'', p.vendor||'',
-            p.status, p.createdByName||p.createdBy||'', approvedBy, p.description||''
+            p.status, approvalLabel, p.createdByName||p.createdBy||'', approvedBy, p.description||''
         ];
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(rows)), 'All Records');
@@ -2980,7 +3062,10 @@ function hodDownloadMasterReport() {
             hodWRows.push(['TODO',t.title||'',t.status||'',t.priority||'',t.date||'',(t.reminder?'Reminder: '+t.reminder:'')]);
         });
         hodPurchases.forEach(function(p){
-            hodWRows.push(['Purchase',p.title||'',p.status||'','-',p.createdAt?APP.formatDate(p.createdAt):'','₹'+(p.total||p.amount||'0')]);
+            var approvalLabel = p.approvalType === 'none' ? 'Direct'
+                : p.approvalType === 'pre-approved' ? 'Pre-approved by '+ (p.preApprovedBy||'')
+                : p.approvalOther || p.approvalType || '-';
+            hodWRows.push(['Purchase',p.title||'',p.status||'',approvalLabel,p.createdAt?APP.formatDate(p.createdAt):'','₹'+(p.total||p.amount||'0')]);
         });
         if (hodWRows.length === 1) hodWRows.push(['(No HOD work items found)','','','','','']);
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(hodWRows), 'HOD Work');
