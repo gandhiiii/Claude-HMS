@@ -259,7 +259,7 @@ function renderEmployeeDashboard(container) {
     var todoPend = allTodos.filter(function(t){ return t.status!=='completed'; }).length;
 
     var BACKDOWN_DEPTS = ['IT', 'Facility'];
-    var canBackdown = BACKDOWN_DEPTS.some(function(x){ return x.toLowerCase() === (dept||'').trim().toLowerCase(); });
+    var canBreakdown = BACKDOWN_DEPTS.some(function(x){ return x.toLowerCase() === (dept||'').trim().toLowerCase(); });
 
     var tabs = [
         { id: 'overview',    label: T('empd2_tab_overview') },
@@ -271,8 +271,8 @@ function renderEmployeeDashboard(container) {
         { id: 'performance', label: T('empd2_tab_performance') },
         { id: 'qgoals',      label: T('empd2_tab_qgoals') }
     ];
-    if (canBackdown) {
-        tabs.push({ id: 'equipbackdown', label: '📉 Backdowns', badge: (DB.get('hodEquipmentBackdowns')||[]).length, badgeClass: 'badge-secondary' });
+    if (canBreakdown) {
+        tabs.push({ id: 'equipbackdown', label: '📉 Breakdowns', badge: (DB.get('hodEquipmentBackdowns')||[]).length, badgeClass: 'badge-secondary' });
     }
 
     var html = ''
@@ -374,7 +374,7 @@ function _renderEmpTab(tab) {
     if (tab === 'cleaning')    { renderEmpCleaningSection(el); return; }
     if (tab === 'performance') { renderEmpPerformanceTab(el); return; }
     if (tab === 'qgoals')     { renderEmpQGoalsTab(el); return; }
-    if (tab === 'equipbackdown') { renderEmpBackdownTab(el); return; }
+    if (tab === 'equipbackdown') { renderEmpBreakdownTab(el); return; }
 }
 
 function renderEmpQGoalsTab(el) {
@@ -2180,9 +2180,9 @@ function empSaveReturn() {
 }
 
 /* ═══════════════════════════════════════════════
-   EMPLOYEE BACKDOWN TAB
+   EMPLOYEE BREAKDOWN TAB
 ═══════════════════════════════════════════════ */
-function renderEmpBackdownTab(el) {
+function renderEmpBreakdownTab(el) {
     if (!el) el = document.getElementById('empTabContent');
     if (!el) return;
     var user = AUTH.currentUser();
@@ -2196,19 +2196,19 @@ function renderEmpBackdownTab(el) {
     var all = (DB.get('hodEquipmentBackdowns') || []).filter(function(b){ return b.department === dept; });
 
     var html = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
-        + '<div style="font-weight:700;font-size:16px;">📉 Equipment Backdowns — ' + dept + '</div>'
+        + '<div style="font-weight:700;font-size:16px;">📉 Equipment Breakdowns — ' + dept + '</div>'
         + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
-        + '<button class="btn btn-sm btn-primary" onclick="empBackdownAdd()">+ Record Backdown</button>'
-        + '<button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="empDownloadBackdownReport()">📥 Excel</button>'
-        + '<button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="empDownloadBackdownPdf()">📕 PDF</button>'
+        + '<button class="btn btn-sm btn-primary" onclick="empBreakdownAdd()">+ Record Breakdown</button>'
+        + '<button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="empDownloadBreakdownReport()">📥 Excel</button>'
+        + '<button class="btn btn-sm btn-outline" style="font-size:11px;" onclick="empDownloadBreakdownPdf()">📕 PDF</button>'
         + '<span style="font-size:12px;color:var(--gray);line-height:30px;">' + all.length + ' record(s)</span>'
         + '</div></div>';
 
     if (all.length === 0) {
         html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
             + '<div style="font-size:32px;margin-bottom:8px;">📉</div>'
-            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No backdown records yet</div>'
-            + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Click the button above to record a backdown.</div>'
+            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No breakdown records yet</div>'
+            + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Click the button above to record a breakdown.</div>'
             + '</div>';
         el.innerHTML = html;
         return;
@@ -2219,7 +2219,7 @@ function renderEmpBackdownTab(el) {
             + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'
             + '<span style="font-size:14px;font-weight:700;">' + (b.assetName || 'Equipment') + '</span>'
             + '<span class="badge badge-secondary" style="font-size:10px;">' + (b.assetCode || '-') + '</span>'
-            + '<span style="font-size:10px;color:#fff;background:#6a1b9a;padding:2px 8px;border-radius:8px;">Backdown</span>'
+            + '<span style="font-size:10px;color:#fff;background:#6a1b9a;padding:2px 8px;border-radius:8px;">Breakdown</span>'
             + '</div>'
             + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;font-size:13px;">'
             + '<div><span style="color:var(--gray);">Date:</span> <strong>' + (b.backdownDate ? APP.formatDate(b.backdownDate) : '-') + '</strong></div>'
@@ -2234,9 +2234,9 @@ function renderEmpBackdownTab(el) {
     el.innerHTML = html;
 }
 
-function empBackdownSelectService(sel) {
+function empBreakdownSelectService(sel) {
     var id = sel && sel.value;
-    var f = document.getElementById('empBackdownForm');
+    var f = document.getElementById('empBreakdownForm');
     if (!f) return;
     if (!id) {
         f.querySelector('[name="assetCode"]').value = '';
@@ -2260,15 +2260,15 @@ function empBackdownSelectService(sel) {
     f.querySelector('[name="warrantyInfo"]').value = svc.warrantyInfo || '';
 }
 
-function empBackdownAdd() {
+function empBreakdownAdd() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
     var services = (DB.get('hodEquipmentServices') || []).filter(function(s){ return s.department === dept && s.status !== 'backdown'; });
     var today = new Date().toISOString().slice(0,10);
-    var form = '<form id="empBackdownForm">'
+    var form = '<form id="empBreakdownForm">'
         + '<div class="form-group"><label>Select Equipment (from Service Records)</label>'
-        + '<select class="form-control" onchange="empBackdownSelectService(this)">'
+        + '<select class="form-control" onchange="empBreakdownSelectService(this)">'
         + '<option value="">— Manual Entry —</option>';
     services.forEach(function(s){
         form += '<option value="' + s.id + '">' + APP.encodeHtml(s.assetName || '') + ' (' + APP.encodeHtml(s.assetCode || '') + ')</option>';
@@ -2290,10 +2290,10 @@ function empBackdownAdd() {
         + '<div class="form-group"><label>Next Service Due</label><input type="date" name="nextServiceDue" class="form-control"></div>'
         + '</div>'
         + '<hr style="margin:12px 0;border-color:var(--border);">'
-        + '<div class="form-group"><label>Backdown Date *</label><input type="date" name="backdownDate" class="form-control" required value="' + today + '"></div>'
+        + '<div class="form-group"><label>Breakdown Date *</label><input type="date" name="backdownDate" class="form-control" required value="' + today + '"></div>'
         + '<div class="form-group"><label>Warranty Info</label><input type="text" name="warrantyInfo" class="form-control" placeholder="e.g. Warranty valid until 2028-01-01"></div>'
         + '<div class="form-group"><label>Service Period</label><input type="text" name="servicePeriod" class="form-control" placeholder="e.g. Jan 2023 - Jun 2026"></div>'
-        + '<div class="form-group"><label>Reason for Backdown *</label>'
+        + '<div class="form-group"><label>Reason for Breakdown *</label>'
         + '<select name="reason" class="form-control" required>'
         + '<option value="">Select reason...</option>'
         + '<option value="End of life">End of life</option>'
@@ -2307,13 +2307,13 @@ function empBackdownAdd() {
         + '<div class="form-group"><label>Additional Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="Any additional details"></textarea></div>'
         + '<input type="hidden" name="serviceId" value="">'
         + '</form>';
-    openFormModal('📉 Record Equipment Backdown', form, 'empBackdownSave()', false);
+    openFormModal('📉 Record Equipment Breakdown', form, 'empBreakdownSave()', false);
 }
 
-function empBackdownSave() {
+function empBreakdownSave() {
     var user = AUTH.currentUser();
     if (!user) return false;
-    var data = getFormData('empBackdownForm');
+    var data = getFormData('empBreakdownForm');
     if (!data.assetCode || !data.assetName || !data.backdownDate || !data.reason) {
         APP.notify('Fill all required fields', 'error'); return false;
     }
@@ -2338,36 +2338,36 @@ function empBackdownSave() {
     if (data.serviceId) {
         DB.update('hodEquipmentServices', data.serviceId, { status: 'backdown' });
     }
-    APP.notify('Backdown record saved!', 'success');
-    renderEmpBackdownTab();
+    APP.notify('Breakdown record saved!', 'success');
+    renderEmpBreakdownTab();
     return true;
 }
 
-function empDownloadBackdownReport() {
+function empDownloadBreakdownReport() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
     var all = (DB.get('hodEquipmentBackdowns') || []).filter(function(b){ return b.department === dept; });
     var wb = XLSX.utils.book_new();
     var dashData = [
-        ['Equipment Backdown Report'],
+        ['Equipment Breakdown Report'],
         ['Department', dept],
         ['Generated', new Date().toLocaleString('en-IN')],
         [],
         ['Metric', 'Value'],
-        ['Total Backdowns', all.length]
+        ['Total Breakdowns', all.length]
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dashData), 'Dashboard');
-    var headers = ['Asset Code','Asset Name','Service Type','Backdown Date','Reason','Warranty Info','Service Period','Last Service','Next Service Due','Notes','Created By','Created At'];
+    var headers = ['Asset Code','Asset Name','Service Type','Breakdown Date','Reason','Warranty Info','Service Period','Last Service','Next Service Due','Notes','Created By','Created At'];
     var rows = all.map(function(b){
         return [b.assetCode||'', b.assetName||'', b.serviceType||'', b.backdownDate||'', b.reason||'', b.warrantyInfo||'', b.servicePeriod||'', b.lastServiceDate||'', b.nextServiceDue||'', b.notes||'', b.createdByName||'', b.createdAt?APP.formatDate(b.createdAt):''];
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(rows)), 'All Backdowns');
-    XLSX.writeFile(wb, 'Backdown_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
-    APP.notify('Backdown Report downloaded!', 'success');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(rows)), 'All Breakdowns');
+    XLSX.writeFile(wb, 'Breakdown_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
+    APP.notify('Breakdown Report downloaded!', 'success');
 }
 
-function empDownloadBackdownPdf() {
+function empDownloadBreakdownPdf() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
@@ -2375,14 +2375,16 @@ function empDownloadBackdownPdf() {
     var all = (DB.get('hodEquipmentBackdowns') || []).filter(function(b){ return b.department === dept; });
     var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
     doc.setFontSize(14);
-    doc.text('Equipment Backdown Report — ' + dept, 14, 15);
+    doc.text('Equipment Breakdown Report — ' + dept, 14, 15);
     doc.setFontSize(9);
     doc.text('Generated: ' + new Date().toLocaleString('en-IN') + '   Total Records: ' + all.length, 14, 22);
-    var headers = ['Asset Code','Asset Name','Service Type','Backdown Date','Reason','Warranty Info','Service Period','Last Service','Next Service Due','Notes','Created By'];
+    var headers = ['Asset Code','Asset Name','Service Type','Breakdown Date','Reason','Warranty Info','Service Period','Last Service','Next Service Due','Notes','Created By'];
     var rows = all.map(function(b){
         return [b.assetCode||'', b.assetName||'', b.serviceType||'', b.backdownDate||'', b.reason||'', b.warrantyInfo||'', b.servicePeriod||'', b.lastServiceDate||'', b.nextServiceDue||'', b.notes||'', b.createdByName||''];
     });
     doc.autoTable({ head:[headers], body:rows, startY:27, styles:{fontSize:7}, headStyles:{fillColor:[106,27,154]} });
-    doc.save('Backdown_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+    doc.save('Breakdown_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.pdf');
     APP.notify('PDF downloaded', 'success');
 }
+
+

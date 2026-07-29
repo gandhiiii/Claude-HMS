@@ -207,11 +207,11 @@ function renderHodDashboard(container) {
 
     var canPurchases = _hodInDeptList(dept, HOD_PURCHASE_DEPTS);
     var canService = _hodInDeptList(dept, HOD_SERVICE_DEPTS);
-    var canBackdown = _hodInDeptList(dept, HOD_BACKDOWN_DEPTS);
+    var canBreakdown = _hodInDeptList(dept, HOD_BACKDOWN_DEPTS);
     var equipServices = canService ? (DB.get('hodEquipmentServices') || []) : [];
     var dueServices = equipServices.filter(function(e){ return e.status !== 'done' && e.nextServiceDue && new Date(e.nextServiceDue) <= new Date(); });
     var upcomingServices = equipServices.filter(function(e){ return e.status !== 'done' && e.nextServiceDue && new Date(e.nextServiceDue) > new Date(); });
-    var backdowns = canBackdown ? (DB.get('hodEquipmentBackdowns') || []) : [];
+    var backdowns = canBreakdown ? (DB.get('hodEquipmentBackdowns') || []) : [];
 
     var tabs = [
         { id: 'overview',    label: 'Overview' },
@@ -234,8 +234,8 @@ function renderHodDashboard(container) {
     if (canService) {
         tabs.splice(13, 0, { id: 'equipservice', label: '🔧 Equipment Service', badge: dueServices.length, bc: 'badge-danger' });
     }
-    if (canBackdown) {
-        tabs.splice(14, 0, { id: 'equipbackdown', label: '📉 Backdowns', badge: backdowns.length, bc: 'badge-secondary' });
+    if (canBreakdown) {
+        tabs.splice(14, 0, { id: 'equipbackdown', label: '📉 Breakdowns', badge: backdowns.length, bc: 'badge-secondary' });
     }
 
     var html = ''
@@ -321,7 +321,7 @@ function _renderHodTab(tab) {
                 'dept-checklist': _hodDeptChecklists,
                 purchases: _hodPurchases,
                 equipservice: _hodEquipService,
-                equipbackdown: _hodEquipBackdown,
+                equipbackdown: _hodEquipBreakdown,
                 hodtodo: _hodTodo,
                 hodworkreport: _hodWorkReport };
     if (map[tab]) map[tab](el);
@@ -2110,7 +2110,7 @@ function _hodEquipService(el) {
             + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'
             + '<span style="font-size:14px;font-weight:700;">' + (e.assetName || 'Equipment') + '</span>'
             + '<span class="badge badge-secondary" style="font-size:10px;">' + (e.assetCode || '-') + '</span>'
-            + '<span class="badge" style="font-size:10px;background:' + statusColor + ';color:#fff;">' + (e.status==='done'?'Done': e.status==='backdown'?'Backdown': overdue.indexOf(e)!==-1?'Overdue':'Upcoming') + '</span>'
+            + '<span class="badge" style="font-size:10px;background:' + statusColor + ';color:#fff;">' + (e.status==='done'?'Done': e.status==='backdown'?'Breakdown': overdue.indexOf(e)!==-1?'Overdue':'Upcoming') + '</span>'
             + '<span style="font-size:10px;color:var(--gray);background:var(--light-gray);padding:2px 8px;border-radius:8px;">' + (e.serviceType || 'N/A') + '</span>'
             + '</div>'
             + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-top:6px;font-size:13px;">'
@@ -2119,14 +2119,14 @@ function _hodEquipService(el) {
             + '<div><span style="color:var(--gray);">Due:</span> <strong>' + (dueDate ? APP.formatDate(dueDate) : 'Not set') + '</strong></div>'
             + (e.warrantyInfo || e.warrantyExpiry || e.warrantyProvider ? '<div style="grid-column:1/-1;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;padding:6px 10px;font-size:12px;margin-top:4px;">🔒 <strong>Warranty:</strong> ' + (e.warrantyInfo||'') + (e.warrantyExpiry ? ' &middot; Expires: ' + APP.formatDate(e.warrantyExpiry) : '') + (e.warrantyProvider ? ' &middot; Provider: ' + e.warrantyProvider : '') + '</div>' : '')
             + (e.notes ? '<div style="grid-column:1/-1;"><span style="color:var(--gray);">Notes:</span> ' + e.notes + '</div>' : '')
-            + (e.status === 'backdown' ? '<div style="grid-column:1/-1;color:#6a1b9a;font-weight:600;font-size:12px;">⬇ Backdown — ' + APP.formatDate(e.lastServiceDate || e.completedAt) + '</div>' : '')
+            + (e.status === 'backdown' ? '<div style="grid-column:1/-1;color:#6a1b9a;font-weight:600;font-size:12px;">⬇ Breakdown — ' + APP.formatDate(e.lastServiceDate || e.completedAt) + '</div>' : '')
             + '</div>'
             + serviceBar(e)
             + '<div style="font-size:11px;color:var(--gray);margin-top:6px;">👤 ' + (e.createdByName || e.createdBy || '-') + ' · ' + APP.formatDate(e.createdAt) + '</div>'
             + '</div>'
             + '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">'
             + (e.status !== 'done' && e.status !== 'backdown' ? '<button class="btn btn-sm btn-success" style="font-size:11px;" onclick="hodServiceMarkDone(\'' + e.id + '\')">✓ Mark Done</button>' : '')
-            + (e.status !== 'backdown' ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:#6a1b9a;border-color:#6a1b9a;" onclick="hodBackdownFromService(\'' + e.id + '\')">⬇ Backdown</button>' : '')
+            + (e.status !== 'backdown' ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:#6a1b9a;border-color:#6a1b9a;" onclick="hodBreakdownFromService(\'' + e.id + '\')">⬇ Breakdown</button>' : '')
             + '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--danger);border-color:var(--danger);" onclick="hodServiceDelete(\'' + e.id + '\')">🗑 Delete</button>'
             + '</div></div></div>';
     }
@@ -2280,14 +2280,14 @@ function hodServiceDelete(id) {
 }
 
 /* ═══════════════════════════════════════════════
-   EQUIPMENT BACKDOWN TAB
+   EQUIPMENT BREAKDOWN TAB
 ═══════════════════════════════════════════════ */
-function _hodEquipBackdown(el) {
+function _hodEquipBreakdown(el) {
     var user = AUTH.currentUser();
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = user.department || '';
     if (!_hodInDeptList(dept, HOD_BACKDOWN_DEPTS)) {
-        el.innerHTML = '<div class="empty-state">Backdowns are only available for IT and Facility departments.</div>';
+        el.innerHTML = '<div class="empty-state">Breakdowns are only available for IT and Facility departments.</div>';
         return;
     }
 
@@ -2300,12 +2300,12 @@ function _hodEquipBackdown(el) {
             + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'
             + '<span style="font-size:14px;font-weight:700;">' + (b.assetName || 'Equipment') + '</span>'
             + '<span class="badge badge-secondary" style="font-size:10px;">' + (b.assetCode || '-') + '</span>'
-            + '<span style="font-size:10px;color:#fff;background:#6a1b9a;padding:2px 8px;border-radius:8px;">Backdown</span>'
+            + '<span style="font-size:10px;color:#fff;background:#6a1b9a;padding:2px 8px;border-radius:8px;">Breakdown</span>'
             + '</div>'
             + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;margin-top:6px;font-size:13px;">'
             + '<div><span style="color:var(--gray);">Asset Code:</span> <strong>' + (b.assetCode || '-') + '</strong></div>'
             + '<div><span style="color:var(--gray);">Service Type:</span> <strong>' + (b.serviceType || '-') + '</strong></div>'
-            + '<div><span style="color:var(--gray);">Backdown Date:</span> <strong>' + (b.backdownDate ? APP.formatDate(b.backdownDate) : '-') + '</strong></div>'
+            + '<div><span style="color:var(--gray);">Breakdown Date:</span> <strong>' + (b.backdownDate ? APP.formatDate(b.backdownDate) : '-') + '</strong></div>'
             + (b.warrantyInfo ? '<div><span style="color:var(--gray);">Warranty:</span> <strong>' + b.warrantyInfo + '</strong></div>' : '')
             + (b.servicePeriod ? '<div><span style="color:var(--gray);">Service Period:</span> <strong>' + b.servicePeriod + '</strong></div>' : '')
             + (b.lastServiceDate ? '<div><span style="color:var(--gray);">Last Service:</span> <strong>' + APP.formatDate(b.lastServiceDate) + '</strong></div>' : '')
@@ -2316,36 +2316,36 @@ function _hodEquipBackdown(el) {
             + '<div style="font-size:11px;color:var(--gray);margin-top:6px;">👤 ' + (b.createdByName || b.createdBy || '-') + ' · ' + APP.formatDate(b.createdAt) + '</div>'
             + '</div>'
             + '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">'
-            + '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--danger);border-color:var(--danger);" onclick="hodBackdownDelete(\'' + b.id + '\')">🗑 Delete</button>'
+            + '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--danger);border-color:var(--danger);" onclick="hodBreakdownDelete(\'' + b.id + '\')">🗑 Delete</button>'
             + '</div></div></div>';
     }
 
     var html = ''
         + '<div style="background:linear-gradient(135deg,#6a1b9a,#4a148c);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
-        + '<div><div style="font-size:18px;font-weight:700;">📉 Equipment Backdown Records — ' + dept + '</div>'
-        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + all.length + ' total backdown(s)</div></div>'
+        + '<div><div style="font-size:18px;font-weight:700;">📉 Equipment Breakdown Records — ' + dept + '</div>'
+        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + all.length + ' total breakdown(s)</div></div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodBackdownAdd()">+ Record Backdown</button>'
-        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadBackdownReport()">📥 Excel</button>'
-        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadBackdownPdf()">📕 PDF</button>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodBreakdownAdd()">+ Record Breakdown</button>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadBreakdownReport()">📥 Excel</button>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadBreakdownPdf()">📕 PDF</button>'
         + '</div></div>'
 
         // KPI cards
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;">'
-        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#6a1b9a;">' + all.length + '</div><div style="font-size:11px;color:var(--gray);">Total Backdowns</div></div>'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#6a1b9a;">' + all.length + '</div><div style="font-size:11px;color:var(--gray);">Total Breakdowns</div></div>'
         + '</div>';
 
     if (all.length === 0) {
         html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
             + '<div style="font-size:32px;margin-bottom:8px;">📉</div>'
-            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No backdown records yet</div>'
-            + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Backdown equipment from the Equipment Service tab or use the button above.</div>'
-            + '<button class="btn btn-primary" onclick="hodBackdownAdd()">+ Record Backdown</button></div>';
+            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No breakdown records yet</div>'
+            + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Breakdown equipment from the Equipment Service tab or use the button above.</div>'
+            + '<button class="btn btn-primary" onclick="hodBreakdownAdd()">+ Record Breakdown</button></div>';
         el.innerHTML = html;
         return;
     }
 
-    // Sort by backdown date desc
+    // Sort by breakdown date desc
     all.slice().sort(function(a,b){ return (b.backdownDate||'').localeCompare(a.backdownDate||''); }).forEach(function(b){
         html += backdownCard(b);
     });
@@ -2353,11 +2353,11 @@ function _hodEquipBackdown(el) {
     el.innerHTML = html;
 }
 
-function hodBackdownFromService(serviceId) {
+function hodBreakdownFromService(serviceId) {
     var svc = DB.getById('hodEquipmentServices', serviceId);
     if (!svc) { APP.notify('Equipment service record not found', 'error'); return; }
     var today = new Date().toISOString().slice(0,10);
-    var form = '<form id="hodBackdownForm">'
+    var form = '<form id="hodBreakdownForm">'
         + '<div class="form-group"><label>Asset Code *</label><input type="text" name="assetCode" class="form-control" required value="' + (svc.assetCode||'') + '"></div>'
         + '<div class="form-group"><label>Asset Name *</label><input type="text" name="assetName" class="form-control" required value="' + (svc.assetName||'') + '"></div>'
         + '<div class="form-group"><label>Service Type</label><input type="text" name="serviceType" class="form-control" readonly style="background:var(--light-gray);" value="' + (svc.serviceType||'') + '"></div>'
@@ -2366,10 +2366,10 @@ function hodBackdownFromService(serviceId) {
         + '<div class="form-group"><label>Next Service Due</label><input type="text" name="nextServiceDue" class="form-control" readonly style="background:var(--light-gray);" value="' + (svc.nextServiceDue||'') + '"></div>'
         + '</div>'
         + '<hr style="margin:12px 0;border-color:var(--border);">'
-        + '<div class="form-group"><label>Backdown Date *</label><input type="date" name="backdownDate" class="form-control" required value="' + today + '"></div>'
+        + '<div class="form-group"><label>Breakdown Date *</label><input type="date" name="backdownDate" class="form-control" required value="' + today + '"></div>'
         + '<div class="form-group"><label>Warranty Info</label><input type="text" name="warrantyInfo" class="form-control" placeholder="e.g. Warranty valid until 2028-01-01"></div>'
         + '<div class="form-group"><label>Service Period</label><input type="text" name="servicePeriod" class="form-control" placeholder="e.g. Jan 2023 - Jun 2026"></div>'
-        + '<div class="form-group"><label>Reason for Backdown *</label>'
+        + '<div class="form-group"><label>Reason for Breakdown *</label>'
         + '<select name="reason" class="form-control" required>'
         + '<option value="">Select reason...</option>'
         + '<option value="End of life">End of life</option>'
@@ -2383,12 +2383,12 @@ function hodBackdownFromService(serviceId) {
         + '<div class="form-group"><label>Additional Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="Any additional details"></textarea></div>'
         + '<input type="hidden" name="serviceId" value="' + serviceId + '">'
         + '</form>';
-    openFormModal('⬇ Backdown Equipment — ' + svc.assetName, form, 'hodBackdownSave()', false);
+    openFormModal('⬇ Breakdown Equipment — ' + svc.assetName, form, 'hodBreakdownSave()', false);
 }
 
-function hodBackdownSelectService(sel) {
+function hodBreakdownSelectService(sel) {
     var id = sel && sel.value;
-    var f = document.getElementById('hodBackdownForm');
+    var f = document.getElementById('hodBreakdownForm');
     if (!f) return;
     if (!id) {
         f.querySelector('[name="assetCode"]').value = '';
@@ -2412,15 +2412,15 @@ function hodBackdownSelectService(sel) {
     f.querySelector('[name="warrantyInfo"]').value = svc.warrantyInfo || '';
 }
 
-function hodBackdownAdd() {
+function hodBreakdownAdd() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
     var services = (DB.get('hodEquipmentServices') || []).filter(function(s){ return s.department === dept && s.status !== 'backdown'; });
     var today = new Date().toISOString().slice(0,10);
-    var form = '<form id="hodBackdownForm">'
+    var form = '<form id="hodBreakdownForm">'
         + '<div class="form-group"><label>Select Equipment (from Service Records)</label>'
-        + '<select class="form-control" onchange="hodBackdownSelectService(this)">'
+        + '<select class="form-control" onchange="hodBreakdownSelectService(this)">'
         + '<option value="">— Manual Entry —</option>';
     services.forEach(function(s){
         form += '<option value="' + s.id + '">' + APP.encodeHtml(s.assetName || '') + ' (' + APP.encodeHtml(s.assetCode || '') + ')</option>';
@@ -2442,10 +2442,10 @@ function hodBackdownAdd() {
         + '<div class="form-group"><label>Next Service Due</label><input type="date" name="nextServiceDue" class="form-control"></div>'
         + '</div>'
         + '<hr style="margin:12px 0;border-color:var(--border);">'
-        + '<div class="form-group"><label>Backdown Date *</label><input type="date" name="backdownDate" class="form-control" required value="' + today + '"></div>'
+        + '<div class="form-group"><label>Breakdown Date *</label><input type="date" name="backdownDate" class="form-control" required value="' + today + '"></div>'
         + '<div class="form-group"><label>Warranty Info</label><input type="text" name="warrantyInfo" class="form-control" placeholder="e.g. Warranty valid until 2028-01-01"></div>'
         + '<div class="form-group"><label>Service Period</label><input type="text" name="servicePeriod" class="form-control" placeholder="e.g. Jan 2023 - Jun 2026"></div>'
-        + '<div class="form-group"><label>Reason for Backdown *</label>'
+        + '<div class="form-group"><label>Reason for Breakdown *</label>'
         + '<select name="reason" class="form-control" required>'
         + '<option value="">Select reason...</option>'
         + '<option value="End of life">End of life</option>'
@@ -2459,13 +2459,13 @@ function hodBackdownAdd() {
         + '<div class="form-group"><label>Additional Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="Any additional details"></textarea></div>'
         + '<input type="hidden" name="serviceId" value="">'
         + '</form>';
-    openFormModal('📉 Record Equipment Backdown', form, 'hodBackdownSave()', false);
+    openFormModal('📉 Record Equipment Breakdown', form, 'hodBreakdownSave()', false);
 }
 
-function hodBackdownSave() {
+function hodBreakdownSave() {
     var user = AUTH.currentUser();
     if (!user) return false;
-    var data = getFormData('hodBackdownForm');
+    var data = getFormData('hodBreakdownForm');
     if (!data.assetCode || !data.assetName || !data.backdownDate || !data.reason) {
         APP.notify('Fill all required fields', 'error'); return false;
     }
@@ -2487,19 +2487,19 @@ function hodBackdownSave() {
         createdByName: user.fullName,
         createdAt: new Date().toISOString()
     });
-    // Update the linked equipment service status to 'backdown'
+    // Update the linked equipment service status to 'breakdown'
     if (data.serviceId) {
         DB.update('hodEquipmentServices', data.serviceId, { status: 'backdown' });
     }
-    APP.notify('Backdown record saved!', 'success');
+    APP.notify('Breakdown record saved!', 'success');
     _renderHodTab('equipbackdown');
     return true;
 }
 
-function hodBackdownDelete(id) {
-    confirmAction('Delete this backdown record?', function(){
+function hodBreakdownDelete(id) {
+    confirmAction('Delete this breakdown record?', function(){
         DB.delete('hodEquipmentBackdowns', id);
-        APP.notify('Backdown record deleted', 'success');
+        APP.notify('Breakdown record deleted', 'success');
         _renderHodTab('equipbackdown');
     });
 }
@@ -2521,7 +2521,7 @@ function hodDownloadServiceReport() {
         ['Overdue', all.filter(function(e){return e.status!=='done'&&e.status!=='backdown'&&e.nextServiceDue&&new Date(e.nextServiceDue)<new Date();}).length],
         ['Upcoming', all.filter(function(e){return e.status!=='done'&&e.status!=='backdown'&&e.nextServiceDue&&new Date(e.nextServiceDue)>=new Date();}).length],
         ['Completed', all.filter(function(e){return e.status==='done';}).length],
-        ['Backdown', all.filter(function(e){return e.status==='backdown';}).length]
+        ['Breakdown', all.filter(function(e){return e.status==='backdown';}).length]
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dashData), 'Dashboard');
     var headers = ['Asset Code','Asset Name','Service Type','Last Service Date','Next Service Due','Status','Warranty Info','Warranty Expiry','Warranty Provider','Notes','Created By','Created At'];
@@ -2533,7 +2533,7 @@ function hodDownloadServiceReport() {
     APP.notify('Equipment Service Report downloaded!', 'success');
 }
 
-function hodDownloadBackdownReport() {
+function hodDownloadBreakdownReport() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
@@ -2541,24 +2541,24 @@ function hodDownloadBackdownReport() {
     var all = DB.get('hodEquipmentBackdowns') || [];
     var wb = XLSX.utils.book_new();
     var dashData = [
-        ['Equipment Backdown Report'],
+        ['Equipment Breakdown Report'],
         ['Department', dept],
         ['Generated', new Date().toLocaleString('en-IN')],
         [],
         ['Metric', 'Value'],
-        ['Total Backdowns', all.length]
+        ['Total Breakdowns', all.length]
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dashData), 'Dashboard');
-    var headers = ['Asset Code','Asset Name','Service Type','Backdown Date','Reason','Warranty Info','Service Period','Last Service','Next Service Due','Notes','Created By','Created At'];
+    var headers = ['Asset Code','Asset Name','Service Type','Breakdown Date','Reason','Warranty Info','Service Period','Last Service','Next Service Due','Notes','Created By','Created At'];
     var rows = all.map(function(b){
         return [b.assetCode||'', b.assetName||'', b.serviceType||'', b.backdownDate||'', b.reason||'', b.warrantyInfo||'', b.servicePeriod||'', b.lastServiceDate||'', b.nextServiceDue||'', b.notes||'', b.createdByName||'', b.createdAt?APP.formatDate(b.createdAt):''];
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(rows)), 'All Backdowns');
-    XLSX.writeFile(wb, 'Equipment_Backdown_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
-    APP.notify('Equipment Backdown Report downloaded!', 'success');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(rows)), 'All Breakdowns');
+    XLSX.writeFile(wb, 'Equipment_Breakdown_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
+    APP.notify('Equipment Breakdown Report downloaded!', 'success');
 }
 
-function hodDownloadBackdownPdf() {
+function hodDownloadBreakdownPdf() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
@@ -2567,15 +2567,15 @@ function hodDownloadBackdownPdf() {
     var all = DB.get('hodEquipmentBackdowns') || [];
     var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
     doc.setFontSize(14);
-    doc.text('Equipment Backdown Report — ' + dept, 14, 15);
+    doc.text('Equipment Breakdown Report — ' + dept, 14, 15);
     doc.setFontSize(9);
     doc.text('Generated: ' + new Date().toLocaleString('en-IN') + '   Total Records: ' + all.length, 14, 22);
-    var headers = ['Asset Code','Asset Name','Service Type','Backdown Date','Reason','Warranty Info','Service Period','Last Service','Next Service Due','Notes','Created By'];
+    var headers = ['Asset Code','Asset Name','Service Type','Breakdown Date','Reason','Warranty Info','Service Period','Last Service','Next Service Due','Notes','Created By'];
     var rows = all.map(function(b){
         return [b.assetCode||'', b.assetName||'', b.serviceType||'', b.backdownDate||'', b.reason||'', b.warrantyInfo||'', b.servicePeriod||'', b.lastServiceDate||'', b.nextServiceDue||'', b.notes||'', b.createdByName||''];
     });
     doc.autoTable({ head:[headers], body:rows, startY:27, styles:{fontSize:7}, headStyles:{fillColor:[106,27,154]} });
-    doc.save('Equipment_Backdown_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+    doc.save('Equipment_Breakdown_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.pdf');
     APP.notify('PDF downloaded', 'success');
 }
 
@@ -5051,3 +5051,5 @@ function _hodDchkOversight(el, user, dept, assignments, team) {
 
     el.innerHTML = html;
 }
+
+
