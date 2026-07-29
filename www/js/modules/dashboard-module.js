@@ -1,3 +1,4 @@
+function esc(v) { return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 var _dashProbActiveTab = 'daily';
 
 function _dashProbPeriodStart(freq) {
@@ -128,6 +129,9 @@ function renderDashboard(container) {
     const monthTrips = trips.filter(t => isThisMonth(t.createdAt)).length;
     const totalKm = trips.reduce((s, t) => s + (parseFloat(t.kilometers) || 0), 0);
     const totalFare = trips.reduce((s, t) => s + (parseFloat(t.fare) || 0), 0);
+
+    const equipServices = DB.get('hodEquipmentServices') || [];
+    const equipBreakdowns = DB.get('hodEquipmentBackdowns') || [];
 
     const pendingPwReqs = isAdmin ? (DB.get('pwResetRequests') || []).filter(function(r){ return r.status === 'pending'; }) : [];
     const pwReqAlert = pendingPwReqs.length > 0
@@ -303,6 +307,22 @@ function renderDashboard(container) {
                 <button id="dashProbBtnYearly"  class="btn btn-sm btn-outline" style="border-radius:7px;font-weight:600;" onclick="dashProbTab('yearly')">Yearly</button>
             </div>
             <div id="dashProbContent"></div>
+        </div>
+
+        <div class="card" style="margin-top:20px;">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <h2>🔧 Equipment Service Records</h2>
+                <button class="btn btn-sm btn-primary" onclick="adminServiceAdd()">+ Add Equipment</button>
+            </div>
+            <div id="adminEquipmentServices">${renderAdminEquipmentServices(equipServices)}</div>
+        </div>
+
+        <div class="card" style="margin-top:20px;">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <h2>📉 Equipment Breakdown Records</h2>
+                <button class="btn btn-sm btn-primary" onclick="adminBreakdownAdd()">+ Record Breakdown</button>
+            </div>
+            <div id="adminEquipmentBreakdowns">${renderAdminEquipmentBreakdowns(equipBreakdowns)}</div>
         </div>
         ` : ''}
 
@@ -589,4 +609,219 @@ function _renderDashProbContent(freq) {
 
     html += '</tbody></table></div>';
     el.innerHTML = html;
+}
+
+/* ──────────── Equipment Service (Admin) ──────────── */
+function renderAdminEquipmentServices(services) {
+    if (!services || services.length === 0) return '<div class="empty-state">No equipment service records</div>';
+    var html = '<div style="max-height:300px;overflow-y:auto;">';
+    services.forEach(function(s) {
+        var expiryColor = s.warrantyExpiry ? (new Date(s.warrantyExpiry) < new Date() ? 'var(--danger)' : 'var(--secondary)') : 'var(--gray)';
+        html += '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">'
+            + '<div><strong>' + esc(s.assetName||'') + '</strong> <span class="badge badge-secondary">' + esc(s.assetCode||'') + '</span></div>'
+            + '<div style="display:flex;gap:4px;">'
+            + (s.status !== 'done' ? '<button class="btn btn-sm btn-success" style="font-size:10px;padding:2px 8px;" onclick="adminServiceMarkDone(\'' + s.id + '\')">Mark Done</button>' : '')
+            + '<button class="btn btn-sm btn-outline" style="font-size:10px;color:var(--danger);border-color:var(--danger);padding:2px 8px;" onclick="adminServiceDelete(\'' + s.id + '\')">Delete</button>'
+            + '</div></div>'
+            + '<div style="font-size:12px;color:var(--gray);margin-top:4px;">'
+            + (s.serviceType ? 'Type: ' + s.serviceType + ' | ' : '') + 'Last: ' + (s.lastServiceDate||'-') + ' | Next: ' + (s.nextServiceDue||'-')
+            + (s.warrantyInfo ? ' | Warranty: ' + esc(s.warrantyInfo) : '')
+            + (s.warrantyExpiry ? ' <span style="color:' + expiryColor + ';">(Exp: ' + s.warrantyExpiry + ')</span>' : '')
+            + '</div></div>';
+    });
+    return html + '</div>';
+}
+
+function adminServiceAdd() {
+    var today = new Date().toISOString().slice(0,10);
+    var form = '<form id="adminServiceForm">'
+        + '<div class="form-group"><label>Asset Code *</label><input type="text" name="assetCode" class="form-control" required placeholder="e.g. EQ-001"></div>'
+        + '<div class="form-group"><label>Asset Name *</label><input type="text" name="assetName" class="form-control" required placeholder="e.g. MRI Machine"></div>'
+        + '<div class="form-group"><label>Service Type</label><select name="serviceType" class="form-control">'
+        + '<option value="">Select type…</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>'
+        + '<option value="quarterly">Quarterly</option><option value="yearly">Yearly</option><option value="custom">Custom</option>'
+        + '</select></div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Last Service Date</label><input type="date" name="lastServiceDate" class="form-control"></div>'
+        + '<div class="form-group"><label>Next Service Due</label><input type="date" name="nextServiceDue" class="form-control"></div>'
+        + '</div>'
+        + '<hr style="margin:10px 0;border-color:var(--border);">'
+        + '<div class="form-group"><label>Warranty Info</label><input type="text" name="warrantyInfo" class="form-control" placeholder="e.g. Warranty valid until 2028"></div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Warranty Expiry</label><input type="date" name="warrantyExpiry" class="form-control"></div>'
+        + '<div class="form-group"><label>Warranty Provider</label><input type="text" name="warrantyProvider" class="form-control" placeholder="e.g. Siemens"></div>'
+        + '</div>'
+        + '<input type="hidden" name="department" value="' + (AUTH.currentUser()?.department || 'IT') + '">'
+        + '</form>';
+    openFormModal('🔧 Add Equipment Service Record', form, 'adminServiceSave()', false);
+}
+
+function adminServiceSave() {
+    var data = getFormData('adminServiceForm');
+    if (!data.assetCode || !data.assetName) { APP.notify('Fill asset code and name', 'error'); return false; }
+    var user = AUTH.currentUser();
+    DB.add('hodEquipmentServices', {
+        assetCode: data.assetCode, assetName: data.assetName, serviceType: data.serviceType || '',
+        lastServiceDate: data.lastServiceDate || '', nextServiceDue: data.nextServiceDue || '',
+        warrantyInfo: data.warrantyInfo || '', warrantyExpiry: data.warrantyExpiry || '',
+        warrantyProvider: data.warrantyProvider || '', department: data.department || (user?.department || 'IT'),
+        status: 'active', createdBy: user?.username || '', createdAt: new Date().toISOString()
+    });
+    APP.notify('Equipment service added', 'success');
+    closeModal();
+    var container = document.getElementById('pageContent');
+    if (container) renderDashboard(container);
+}
+
+function adminServiceDelete(id) {
+    if (!confirm('Delete this equipment service record?')) return;
+    DB.delete('hodEquipmentServices', id);
+    APP.notify('Deleted', 'info');
+    var container = document.getElementById('pageContent');
+    if (container) renderDashboard(container);
+}
+
+function adminServiceMarkDone(id) {
+    var all = DB.get('hodEquipmentServices') || [];
+    var svc = null;
+    for (var i = 0; i < all.length; i++) { if (all[i].id === id) { svc = all[i]; break; } }
+    if (!svc) return;
+    var today = new Date().toISOString().slice(0,10);
+    var nextDue = today;
+    if (svc.serviceType === 'weekly') {
+        var d = new Date(today); d.setDate(d.getDate() + 7); nextDue = d.toISOString().slice(0,10);
+    } else if (svc.serviceType === 'monthly') {
+        var d = new Date(today); d.setMonth(d.getMonth() + 1); nextDue = d.toISOString().slice(0,10);
+    } else if (svc.serviceType === 'quarterly') {
+        var d = new Date(today); d.setMonth(d.getMonth() + 3); nextDue = d.toISOString().slice(0,10);
+    } else if (svc.serviceType === 'yearly') {
+        var d = new Date(today); d.setFullYear(d.getFullYear() + 1); nextDue = d.toISOString().slice(0,10);
+    }
+    DB.update('hodEquipmentServices', id, { lastServiceDate: today, nextServiceDue: nextDue, status: 'done' });
+    APP.notify('Service marked done. Next due: ' + nextDue, 'success');
+    var container = document.getElementById('pageContent');
+    if (container) renderDashboard(container);
+}
+
+/* ──────────── Equipment Breakdown (Admin) ──────────── */
+function renderAdminEquipmentBreakdowns(breakdowns) {
+    if (!breakdowns || breakdowns.length === 0) return '<div class="empty-state">No breakdown records</div>';
+    var html = '<div style="max-height:300px;overflow-y:auto;">';
+    breakdowns.slice().sort(function(a,b){ return (b.backdownDate||'').localeCompare(a.backdownDate||''); }).forEach(function(b) {
+        html += '<div style="border:1px solid var(--border);border-left:4px solid #6a1b9a;border-radius:8px;padding:10px 12px;margin-bottom:8px;">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">'
+            + '<div><strong>' + esc(b.assetName||'Equipment') + '</strong> <span class="badge badge-secondary">' + esc(b.assetCode||'-') + '</span></div>'
+            + '<div style="display:flex;gap:4px;">'
+            + '<button class="btn btn-sm btn-outline" style="font-size:10px;color:var(--danger);border-color:var(--danger);padding:2px 8px;" onclick="adminBreakdownDelete(\'' + b.id + '\')">Delete</button>'
+            + '</div></div>'
+            + '<div style="font-size:12px;color:var(--gray);margin-top:4px;">'
+            + 'Date: ' + (b.backdownDate||'-') + ' | Reason: ' + (b.reason||'-')
+            + (b.warrantyInfo ? ' | Warranty: ' + esc(b.warrantyInfo) : '')
+            + (b.servicePeriod ? ' | Period: ' + esc(b.servicePeriod) : '')
+            + (b.notes ? ' | Notes: ' + esc(b.notes) : '')
+            + '</div></div>';
+    });
+    return html + '</div>';
+}
+
+function adminBreakdownAdd() {
+    var services = (DB.get('hodEquipmentServices') || []).filter(function(s){ return s.status !== 'backdown'; });
+    var today = new Date().toISOString().slice(0,10);
+    var form = '<form id="adminBreakdownForm">'
+        + '<div class="form-group"><label>Select Equipment (from Service Records)</label>'
+        + '<select class="form-control" onchange="adminBreakdownSelectService(this)">'
+        + '<option value="">— Manual Entry —</option>';
+    services.forEach(function(s){
+        form += '<option value="' + s.id + '">' + esc(s.assetName||'') + ' (' + esc(s.assetCode||'') + ')</option>';
+    });
+    form += '</select></div>'
+        + '<div class="form-group"><label>Asset Code *</label><input type="text" name="assetCode" class="form-control" required placeholder="e.g. EQ-001"></div>'
+        + '<div class="form-group"><label>Asset Name *</label><input type="text" name="assetName" class="form-control" required placeholder="e.g. MRI Machine"></div>'
+        + '<div class="form-group"><label>Service Type</label><select name="serviceType" class="form-control">'
+        + '<option value="">N/A</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option>'
+        + '<option value="quarterly">Quarterly</option><option value="yearly">Yearly</option><option value="custom">Custom</option>'
+        + '</select></div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Last Service Date</label><input type="date" name="lastServiceDate" class="form-control"></div>'
+        + '<div class="form-group"><label>Next Service Due</label><input type="date" name="nextServiceDue" class="form-control"></div>'
+        + '</div>'
+        + '<hr style="margin:10px 0;border-color:var(--border);">'
+        + '<div class="form-group"><label>Breakdown Date *</label><input type="date" name="backdownDate" class="form-control" required value="' + today + '"></div>'
+        + '<div class="form-group"><label>Warranty Info</label><input type="text" name="warrantyInfo" class="form-control" placeholder="e.g. Warranty valid until 2028-01-01"></div>'
+        + '<div class="form-group"><label>Service Period</label><input type="text" name="servicePeriod" class="form-control" placeholder="e.g. Jan 2023 - Jun 2026"></div>'
+        + '<div class="form-group"><label>Reason for Breakdown *</label><select name="reason" class="form-control" required>'
+        + '<option value="">Select reason…</option><option value="End of life">End of life</option>'
+        + '<option value="Upgraded / Replaced">Upgraded / Replaced</option>'
+        + '<option value="Damaged / Beyond repair">Damaged / Beyond repair</option>'
+        + '<option value="No longer needed">No longer needed</option>'
+        + '<option value="Transferred to another department">Transferred to another department</option>'
+        + '<option value="Lost / Stolen">Lost / Stolen</option>'
+        + '<option value="other">Other</option></select></div>'
+        + '<div class="form-group"><label>Additional Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="Any additional details"></textarea></div>'
+        + '<input type="hidden" name="serviceId" value="">'
+        + '<input type="hidden" name="department" value="' + (AUTH.currentUser()?.department || 'IT') + '">'
+        + '</form>';
+    openFormModal('📉 Record Equipment Breakdown', form, 'adminBreakdownSave()', false);
+}
+
+function adminBreakdownSelectService(sel) {
+    var id = sel && sel.value;
+    var f = document.getElementById('adminBreakdownForm');
+    if (!f) return;
+    if (!id) {
+        f.querySelector('[name="assetCode"]').value = '';
+        f.querySelector('[name="assetName"]').value = '';
+        f.querySelector('[name="serviceType"]').value = '';
+        f.querySelector('[name="lastServiceDate"]').value = '';
+        f.querySelector('[name="nextServiceDue"]').value = '';
+        f.querySelector('[name="serviceId"]').value = '';
+        return;
+    }
+    var all = DB.get('hodEquipmentServices') || [];
+    var svc = null;
+    for (var i = 0; i < all.length; i++) { if (all[i].id === id) { svc = all[i]; break; } }
+    if (!svc) return;
+    f.querySelector('[name="assetCode"]').value = svc.assetCode || '';
+    f.querySelector('[name="assetName"]').value = svc.assetName || '';
+    f.querySelector('[name="serviceType"]').value = svc.serviceType || '';
+    f.querySelector('[name="lastServiceDate"]').value = svc.lastServiceDate || '';
+    f.querySelector('[name="nextServiceDue"]').value = svc.nextServiceDue || '';
+    f.querySelector('[name="serviceId"]').value = svc.id || '';
+    f.querySelector('[name="warrantyInfo"]').value = svc.warrantyInfo || '';
+}
+
+function adminBreakdownSave() {
+    var data = getFormData('adminBreakdownForm');
+    if (!data.assetCode || !data.assetName || !data.backdownDate || !data.reason) {
+        APP.notify('Fill all required fields', 'error'); return false;
+    }
+    var user = AUTH.currentUser();
+    DB.add('hodEquipmentBackdowns', {
+        assetCode: data.assetCode, assetName: data.assetName, serviceType: data.serviceType || '',
+        lastServiceDate: data.lastServiceDate || '', nextServiceDue: data.nextServiceDue || '',
+        backdownDate: data.backdownDate, warrantyInfo: data.warrantyInfo || '',
+        servicePeriod: data.servicePeriod || '',
+        reason: data.reason === 'other' ? (data.notes || 'Other') : data.reason,
+        notes: data.reason === 'other' ? (data.notes || '') : (data.notes || ''),
+        serviceId: data.serviceId || '', status: 'backdown',
+        department: data.department || (user?.department || 'IT'),
+        createdBy: user?.username || '', createdByName: user?.fullName || '',
+        createdAt: new Date().toISOString()
+    });
+    if (data.serviceId) {
+        DB.update('hodEquipmentServices', data.serviceId, { status: 'backdown' });
+    }
+    APP.notify('Breakdown record saved', 'success');
+    closeModal();
+    var container = document.getElementById('pageContent');
+    if (container) renderDashboard(container);
+}
+
+function adminBreakdownDelete(id) {
+    if (!confirm('Delete this breakdown record?')) return;
+    DB.delete('hodEquipmentBackdowns', id);
+    APP.notify('Deleted', 'info');
+    var container = document.getElementById('pageContent');
+    if (container) renderDashboard(container);
 }

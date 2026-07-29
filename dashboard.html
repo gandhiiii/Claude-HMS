@@ -74,7 +74,8 @@
     <script src="js/i18n/phase2.js?v=95"></script>
     <script src="js/checklists.js?v=95"></script>
     <script src="js/app.js?v=95"></script>
-    <script src="js/modules/dashboard-module.js?v=95"></script>
+    <script src="js/ws-notifications.js?v=1"></script>
+    <script src="js/modules/dashboard-module.js?v=96"></script>
     <script src="js/modules/users.js?v=95"></script>
     <script src="js/modules/departments.js?v=95"></script>
     <script src="js/modules/feature-rights.js?v=95"></script>
@@ -107,6 +108,7 @@
         window.addEventListener('DOMContentLoaded', function() {
             Router.init();
             setTimeout(function() { try { SYNC.init(); } catch(e) {} }, 300);
+            setTimeout(function() { try { WS_NOTIFY.init(); } catch(e) {} }, 600);
             /* Apply saved hospital branding (falls back to default if not yet set) */
             try {
                 var _raw = localStorage.getItem('hms_hospital_settings');
