@@ -35,9 +35,9 @@ var _hodData   = {};
 var _hodFilter = 'all';
 var _hodInvDeptFilter = null; // null = current HOD dept, '__all__' = all departments
 var _hodEditingPurchaseId;
-var HOD_PURCHASE_DEPTS = ['IT', 'Facility'];
-var HOD_SERVICE_DEPTS = ['IT', 'Facility'];
-var HOD_BACKDOWN_DEPTS = ['IT', 'Facility'];
+var HOD_PURCHASE_DEPTS = ['IT', 'Facility', 'Maintenance'];
+var HOD_SERVICE_DEPTS = ['IT', 'Facility', 'Maintenance'];
+var HOD_BACKDOWN_DEPTS = ['IT', 'Facility', 'Maintenance'];
 
 function _hodInDeptList(dept, list) {
     var u = AUTH.currentUser();
@@ -1623,7 +1623,7 @@ function _hodPurchases(el) {
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = user.department || '';
     if (!_hodInDeptList(dept, HOD_PURCHASE_DEPTS)) {
-        el.innerHTML = '<div class="empty-state">Purchases module is only available for IT and Facility departments.</div>';
+        el.innerHTML = '<div class="empty-state">Purchases module is only available for IT, Facility and Maintenance departments.</div>';
         return;
     }
 
@@ -2076,7 +2076,7 @@ function _hodEquipService(el) {
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = user.department || '';
     if (!_hodInDeptList(dept, HOD_SERVICE_DEPTS)) {
-        el.innerHTML = '<div class="empty-state">Equipment Service is only available for IT and Facility departments.</div>';
+        el.innerHTML = '<div class="empty-state">Equipment Service is only available for IT, Facility and Maintenance departments.</div>';
         return;
     }
 
@@ -2307,7 +2307,7 @@ function _hodEquipBreakdown(el) {
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = user.department || '';
     if (!_hodInDeptList(dept, HOD_BACKDOWN_DEPTS)) {
-        el.innerHTML = '<div class="empty-state">Breakdowns are only available for IT and Facility departments.</div>';
+        el.innerHTML = '<div class="empty-state">Breakdowns are only available for IT, Facility and Maintenance departments.</div>';
         return;
     }
 
