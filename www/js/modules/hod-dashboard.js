@@ -2424,7 +2424,7 @@ function hodBreakdownAdd() {
         + '<select class="form-control" onchange="hodBreakdownSelectService(this)">'
         + '<option value="">— Manual Entry —</option>';
     services.forEach(function(s){
-        form += '<option value="' + s.id + '">' + APP.encodeHtml(s.assetName || '') + ' (' + APP.encodeHtml(s.assetCode || '') + ')</option>';
+        form += '<option value="' + s.id + '">' + esc(s.assetName || '') + ' (' + esc(s.assetCode || '') + ')</option>';
     });
     form += '</select></div>'
         + '<div class="form-group"><label>Asset Code *</label><input type="text" name="assetCode" class="form-control" required placeholder="e.g. EQ-001"></div>'
@@ -2502,8 +2502,8 @@ function hodBreakdownEdit(id) {
     if (!b) { APP.notify('Record not found', 'error'); return; }
     var today = new Date().toISOString().slice(0,10);
     var form = '<form id="hodBreakdownForm">'
-        + '<div class="form-group"><label>Asset Code *</label><input type="text" name="assetCode" class="form-control" required value="' + APP.encodeHtml(b.assetCode||'') + '"></div>'
-        + '<div class="form-group"><label>Asset Name *</label><input type="text" name="assetName" class="form-control" required value="' + APP.encodeHtml(b.assetName||'') + '"></div>'
+        + '<div class="form-group"><label>Asset Code *</label><input type="text" name="assetCode" class="form-control" required value="' + esc(b.assetCode||'') + '"></div>'
+        + '<div class="form-group"><label>Asset Name *</label><input type="text" name="assetName" class="form-control" required value="' + esc(b.assetName||'') + '"></div>'
         + '<div class="form-group"><label>Service Type</label>'
         + '<select name="serviceType" class="form-control">'
         + '<option value="">N/A</option>'
@@ -2519,8 +2519,8 @@ function hodBreakdownEdit(id) {
         + '</div>'
         + '<hr style="margin:12px 0;border-color:var(--border);">'
         + '<div class="form-group"><label>Breakdown Date *</label><input type="date" name="backdownDate" class="form-control" required value="' + (b.backdownDate||today) + '"></div>'
-        + '<div class="form-group"><label>Warranty Info</label><input type="text" name="warrantyInfo" class="form-control" value="' + APP.encodeHtml(b.warrantyInfo||'') + '"></div>'
-        + '<div class="form-group"><label>Service Period</label><input type="text" name="servicePeriod" class="form-control" value="' + APP.encodeHtml(b.servicePeriod||'') + '"></div>'
+        + '<div class="form-group"><label>Warranty Info</label><input type="text" name="warrantyInfo" class="form-control" value="' + esc(b.warrantyInfo||'') + '"></div>'
+        + '<div class="form-group"><label>Service Period</label><input type="text" name="servicePeriod" class="form-control" value="' + esc(b.servicePeriod||'') + '"></div>'
         + '<div class="form-group"><label>Reason for Breakdown *</label>'
         + '<select name="reason" class="form-control" required>'
         + '<option value="">Select reason...</option>'
@@ -2532,7 +2532,7 @@ function hodBreakdownEdit(id) {
         + '<option value="Lost / Stolen"' + (b.reason==='Lost / Stolen'?' selected':'') + '>Lost / Stolen</option>'
         + '<option value="other"' + (b.reason!=='End of life'&&b.reason!=='Upgraded / Replaced'&&b.reason!=='Damaged / Beyond repair'&&b.reason!=='No longer needed'&&b.reason!=='Transferred to another department'&&b.reason!=='Lost / Stolen'?' selected':'') + '>Other</option>'
         + '</select></div>'
-        + '<div class="form-group"><label>Additional Notes</label><textarea name="notes" class="form-control" rows="2">' + APP.encodeHtml(b.notes||'') + '</textarea></div>'
+        + '<div class="form-group"><label>Additional Notes</label><textarea name="notes" class="form-control" rows="2">' + esc(b.notes||'') + '</textarea></div>'
         + '<input type="hidden" name="serviceId" value="' + (b.serviceId||'') + '">'
         + '</form>';
     openFormModal('✏️ Edit Breakdown Record', form, 'hodBreakdownUpdate(\'' + id + '\')', false);
