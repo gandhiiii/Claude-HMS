@@ -35,6 +35,7 @@ var _hodData   = {};
 var _hodFilter = 'all';
 var _hodInvDeptFilter = null; // null = current HOD dept, '__all__' = all departments
 var _hodEditingPurchaseId;
+var HOD_PURCHASE_DEPTS = ['IT', 'Facility'];
 
 /* ═══════════════════════════════════════════════
    HELPERS
@@ -197,6 +198,8 @@ function renderHodDashboard(container) {
         return sum + (parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0);
     }, 0);
 
+    var canPurchases = HOD_PURCHASE_DEPTS.indexOf(dept) !== -1;
+
     var tabs = [
         { id: 'overview',    label: 'Overview' },
         { id: 'admissions',  label: 'Admissions' },
@@ -209,10 +212,12 @@ function renderHodDashboard(container) {
         { id: 'performance', label: 'Performance' },
         { id: 'hodreports',  label: '📤 Reports', badge: teamReports.length, bc: 'badge-danger' },
         { id: 'hodqp',       label: '🎯 Q Priorities' },
-        { id: 'purchases',   label: '💰 Purchases', badge: pendingPurchases, bc: 'badge-warning' },
         { id: 'hodtodo',     label: '📋 My TODOs', badge: hodPendingTodos, bc: 'badge-danger' },
         { id: 'hodworkreport', label: '📊 Work Report' }
     ];
+    if (canPurchases) {
+        tabs.splice(12, 0, { id: 'purchases', label: '💰 Purchases', badge: pendingPurchases, bc: 'badge-warning' });
+    }
 
     var html = ''
         + '<div style="background:linear-gradient(135deg,#6a1b9a,#4a148c);border-radius:14px;padding:20px 24px;color:#fff;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
@@ -233,7 +238,7 @@ function renderHodDashboard(container) {
         + _hKpi('✅', 'Checklists Due', pendingCl,                            '#e8f5e9', 'var(--secondary)', 'checklists')
         + _hKpi('📦', 'Inventory Items', deptInventory.length,                '#e0f2f1', '#00796b', 'inventory')
         + _hKpi('🧹', 'Rooms to Clean', cleaning.length,                      '#fce4ec', 'var(--danger)', 'admissions')
-        + _hKpi('💰', 'Purchase Requests', deptPurchases.length,               '#e8f5e9', '#2e7d32', 'purchases')
+        + (canPurchases ? _hKpi('💰', 'Purchase Requests', deptPurchases.length, '#e8f5e9', '#2e7d32', 'purchases') : '')
         + _hKpi('📋', 'My TODOs', hodPendingTodos,                             '#fce4ec', '#e91e63', 'hodtodo')
         + '</div>'
 
@@ -1575,6 +1580,10 @@ function _hodPurchases(el) {
     var user = AUTH.currentUser();
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = user.department || '';
+    if (HOD_PURCHASE_DEPTS.indexOf(dept) === -1) {
+        el.innerHTML = '<div class="empty-state">Purchases module is only available for IT and Facility departments.</div>';
+        return;
+    }
 
     var allPurchases = DB.get('hodPurchases') || [];
     var purchases = allPurchases.filter(function (p) { return p.department === dept; }).slice().reverse();
@@ -1876,6 +1885,7 @@ function hodDownloadPurchasesReport() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = user.department || '';
+    if (HOD_PURCHASE_DEPTS.indexOf(dept) === -1) return;
     var allPurchases = (DB.get('hodPurchases') || []).filter(function(p){ return p.department === dept; });
 
     var todayStr = new Date().toISOString().slice(0,10);
