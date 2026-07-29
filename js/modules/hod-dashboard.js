@@ -1812,19 +1812,20 @@ function hodDeletePurchase(id) {
 function hodEditPurchase(id) {
     var p = DB.getById('hodPurchases', id);
     if (!p) { APP.notify('Request not found', 'error'); return; }
+    var esc = function(v){ return String(v||'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
     var form = '<form id="hodPurchaseEditForm">'
-        + '<div class="form-group"><label>Request Title *</label><input type="text" name="title" class="form-control" required value="' + APP.encodeHtml(p.title||'') + '"></div>'
-        + '<div class="form-group"><label>Item / Goods Name *</label><input type="text" name="itemName" class="form-control" required value="' + APP.encodeHtml(p.itemName||'') + '"></div>'
+        + '<div class="form-group"><label>Request Title *</label><input type="text" name="title" class="form-control" required value="' + esc(p.title) + '"></div>'
+        + '<div class="form-group"><label>Item / Goods Name *</label><input type="text" name="itemName" class="form-control" required value="' + esc(p.itemName) + '"></div>'
         + '<div class="grid-3" style="gap:10px;">'
         + '<div class="form-group"><label>Quantity</label><input type="number" name="quantity" class="form-control" min="1" value="' + (p.quantity||1) + '" oninput="hodPurchaseCalcTotalEdit()"></div>'
         + '<div class="form-group"><label>Price per Unit (₹) *</label><input type="number" name="price" class="form-control" step="0.01" min="0" required value="' + (parseFloat(p.price)||0) + '" oninput="hodPurchaseCalcTotalEdit()"></div>'
         + '<div class="form-group"><label>Total (auto-calc)</label><input type="text" id="hodPurchaseEditTotal" class="form-control" readonly style="background:var(--light-gray);font-weight:700;" value="₹' + (parseFloat(p.total)||0).toFixed(2) + '"></div>'
         + '</div>'
         + '<div class="grid-2" style="gap:10px;">'
-        + '<div class="form-group"><label>Location / Store *</label><input type="text" name="location" class="form-control" required value="' + APP.encodeHtml(p.location||'') + '"></div>'
-        + '<div class="form-group"><label>Vendor / Supplier</label><input type="text" name="vendor" class="form-control" value="' + APP.encodeHtml(p.vendor||'') + '"></div>'
+        + '<div class="form-group"><label>Location / Store *</label><input type="text" name="location" class="form-control" required value="' + esc(p.location) + '"></div>'
+        + '<div class="form-group"><label>Vendor / Supplier</label><input type="text" name="vendor" class="form-control" value="' + esc(p.vendor) + '"></div>'
         + '</div>'
-        + '<div class="form-group"><label>Description / Purpose *</label><textarea name="description" class="form-control" rows="3" required>' + APP.encodeHtml(p.description||'') + '</textarea></div>'
+        + '<div class="form-group"><label>Description / Purpose *</label><textarea name="description" class="form-control" rows="3" required>' + esc(p.description) + '</textarea></div>'
         + '</form>';
     openFormModal('✎ Edit Purchase / Expense Request', form, 'hodUpdatePurchase("' + id + '")', false);
 }
