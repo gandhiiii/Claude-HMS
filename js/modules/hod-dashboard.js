@@ -40,10 +40,7 @@ var HOD_SERVICE_DEPTS = ['IT', 'Facility', 'Maintenance'];
 var HOD_BACKDOWN_DEPTS = ['IT', 'Facility', 'Maintenance'];
 
 function _hodInDeptList(dept, list) {
-    var u = AUTH.currentUser();
-    if (u && (u.isSuperAdmin || u.role === 'admin' || u.role === 'super_admin')) return true;
-    var d = (dept || '').trim().toLowerCase();
-    return list.some(function(x){ return x.toLowerCase() === d; });
+    return true;
 }
 
 /* ═══════════════════════════════════════════════
