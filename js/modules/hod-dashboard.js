@@ -1659,7 +1659,7 @@ function _hodPurchases(el) {
 
 function _hodPurchaseCard(p, user) {
     var canManage = user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin');
-    var isOwner = p.createdBy === user.username;
+    var canEdit = canManage || (user.role === 'hod');
     var statusBadge = p.status === 'approved' ? '<span class="badge badge-success" style="font-size:10px;">✓ Approved</span>'
         : p.status === 'rejected' ? '<span class="badge badge-danger" style="font-size:10px;">✗ Rejected</span>'
         : '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>';
@@ -1691,10 +1691,10 @@ function _hodPurchaseCard(p, user) {
             ? '<button class="btn btn-sm btn-success" onclick="hodApprovePurchase(\'' + p.id + '\')">✓ Approve</button>'
               + '<button class="btn btn-sm btn-danger" onclick="hodRejectPurchase(\'' + p.id + '\')">✗ Reject</button>'
             : '')
-        + (canManage || isOwner
+        + (canEdit
             ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--primary);border-color:var(--primary);" onclick="hodEditPurchase(\'' + p.id + '\')">✎ Edit</button>'
             : '')
-        + ((isOwner || canManage) && p.status === 'pending'
+        + (canEdit && p.status === 'pending'
             ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--danger);border-color:var(--danger);" onclick="hodDeletePurchase(\'' + p.id + '\')">🗑 Delete</button>'
             : '')
         + '</div></div></div>';
