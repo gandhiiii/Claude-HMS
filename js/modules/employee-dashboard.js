@@ -2255,6 +2255,7 @@ function empBackdownSelectService(sel) {
     f.querySelector('[name="lastServiceDate"]').value = svc.lastServiceDate || '';
     f.querySelector('[name="nextServiceDue"]').value = svc.nextServiceDue || '';
     f.querySelector('[name="serviceId"]').value = svc.id || '';
+    f.querySelector('[name="warrantyInfo"]').value = svc.warrantyInfo || '';
 }
 
 function empBackdownAdd() {

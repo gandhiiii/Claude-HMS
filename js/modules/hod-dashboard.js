@@ -2117,6 +2117,7 @@ function _hodEquipService(el) {
             + '<div><span style="color:var(--gray);">Asset Code:</span> <strong>' + (e.assetCode || '-') + '</strong></div>'
             + '<div><span style="color:var(--gray);">Service:</span> <strong>' + (e.serviceType || '-') + '</strong></div>'
             + '<div><span style="color:var(--gray);">Due:</span> <strong>' + (dueDate ? APP.formatDate(dueDate) : 'Not set') + '</strong></div>'
+            + (e.warrantyInfo || e.warrantyExpiry || e.warrantyProvider ? '<div style="grid-column:1/-1;background:#fff8e1;border:1px solid #ffe082;border-radius:6px;padding:6px 10px;font-size:12px;margin-top:4px;">🔒 <strong>Warranty:</strong> ' + (e.warrantyInfo||'') + (e.warrantyExpiry ? ' &middot; Expires: ' + APP.formatDate(e.warrantyExpiry) : '') + (e.warrantyProvider ? ' &middot; Provider: ' + e.warrantyProvider : '') + '</div>' : '')
             + (e.notes ? '<div style="grid-column:1/-1;"><span style="color:var(--gray);">Notes:</span> ' + e.notes + '</div>' : '')
             + (e.status === 'backdown' ? '<div style="grid-column:1/-1;color:#6a1b9a;font-weight:600;font-size:12px;">⬇ Backdown — ' + APP.formatDate(e.lastServiceDate || e.completedAt) + '</div>' : '')
             + '</div>'
@@ -2201,6 +2202,14 @@ function hodServiceAdd() {
         + '<div class="form-group"><label>Last Service Date</label><input type="date" name="lastServiceDate" class="form-control" value="' + today + '"></div>'
         + '<div class="form-group"><label>Next Service Due Date *</label><input type="date" name="nextServiceDue" class="form-control" required></div>'
         + '</div>'
+        + '<details style="margin:10px 0;border:1px solid var(--border);border-radius:8px;padding:10px;">'
+        + '<summary style="font-weight:600;font-size:13px;cursor:pointer;color:var(--primary);">🔒 Warranty Details</summary>'
+        + '<div style="margin-top:10px;">'
+        + '<div class="form-group"><label>Warranty Info</label><input type="text" name="warrantyInfo" class="form-control" placeholder="e.g. Warranty valid until 2028-01-01, covers parts and labor"></div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Warranty Expiry Date</label><input type="date" name="warrantyExpiry" class="form-control"></div>'
+        + '<div class="form-group"><label>Warranty Provider</label><input type="text" name="warrantyProvider" class="form-control" placeholder="e.g. Vendor name"></div>'
+        + '</div></div></details>'
         + '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="e.g. Service contract details, vendor info"></textarea></div>'
         + '</form>';
     openFormModal('🔧 Add Equipment Service Record', form, 'hodServiceSave()', false);
@@ -2220,6 +2229,9 @@ function hodServiceSave() {
         lastServiceDate: data.lastServiceDate || '',
         nextServiceDue: data.nextServiceDue,
         status: 'upcoming',
+        warrantyInfo: data.warrantyInfo || '',
+        warrantyExpiry: data.warrantyExpiry || '',
+        warrantyProvider: data.warrantyProvider || '',
         notes: data.notes || '',
         department: user.department,
         createdBy: user.username,
@@ -2396,6 +2408,7 @@ function hodBackdownSelectService(sel) {
     f.querySelector('[name="lastServiceDate"]').value = svc.lastServiceDate || '';
     f.querySelector('[name="nextServiceDue"]').value = svc.nextServiceDue || '';
     f.querySelector('[name="serviceId"]').value = svc.id || '';
+    f.querySelector('[name="warrantyInfo"]').value = svc.warrantyInfo || '';
 }
 
 function hodBackdownAdd() {
@@ -2510,9 +2523,9 @@ function hodDownloadServiceReport() {
         ['Backdown', all.filter(function(e){return e.status==='backdown';}).length]
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dashData), 'Dashboard');
-    var headers = ['Asset Code','Asset Name','Service Type','Last Service Date','Next Service Due','Status','Notes','Created By','Created At'];
+    var headers = ['Asset Code','Asset Name','Service Type','Last Service Date','Next Service Due','Status','Warranty Info','Warranty Expiry','Warranty Provider','Notes','Created By','Created At'];
     var rows = all.map(function(e){
-        return [e.assetCode||'', e.assetName||'', e.serviceType||'', e.lastServiceDate||'', e.nextServiceDue||'', e.status||'', e.notes||'', e.createdByName||'', e.createdAt?APP.formatDate(e.createdAt):''];
+        return [e.assetCode||'', e.assetName||'', e.serviceType||'', e.lastServiceDate||'', e.nextServiceDue||'', e.status||'', e.warrantyInfo||'', e.warrantyExpiry||'', e.warrantyProvider||'', e.notes||'', e.createdByName||'', e.createdAt?APP.formatDate(e.createdAt):''];
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(rows)), 'All Records');
     XLSX.writeFile(wb, 'Equipment_Service_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
