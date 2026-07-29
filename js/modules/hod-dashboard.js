@@ -34,6 +34,7 @@ var _hodTab    = 'overview';
 var _hodData   = {};
 var _hodFilter = 'all';
 var _hodInvDeptFilter = null; // null = current HOD dept, '__all__' = all departments
+var _hodEditingPurchaseId;
 
 /* ═══════════════════════════════════════════════
    HELPERS
@@ -1812,6 +1813,7 @@ function hodDeletePurchase(id) {
 function hodEditPurchase(id) {
     var p = DB.getById('hodPurchases', id);
     if (!p) { APP.notify('Request not found', 'error'); return; }
+    _hodEditingPurchaseId = id;
     var esc = function(v){ return String(v||'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
     var form = '<form id="hodPurchaseEditForm">'
         + '<div class="form-group"><label>Request Title *</label><input type="text" name="title" class="form-control" required value="' + esc(p.title) + '"></div>'
@@ -1827,7 +1829,7 @@ function hodEditPurchase(id) {
         + '</div>'
         + '<div class="form-group"><label>Description / Purpose *</label><textarea name="description" class="form-control" rows="3" required>' + esc(p.description) + '</textarea></div>'
         + '</form>';
-    openFormModal('✎ Edit Purchase / Expense Request', form, 'hodUpdatePurchase("' + id + '")', false);
+    openFormModal('✎ Edit Purchase / Expense Request', form, 'hodUpdatePurchase()', false);
 }
 
 function hodPurchaseCalcTotalEdit() {
@@ -1840,9 +1842,9 @@ function hodPurchaseCalcTotalEdit() {
     tot.value = '₹' + (q * p).toFixed(2);
 }
 
-function hodUpdatePurchase(id) {
-    var user = AUTH.currentUser();
-    if (!user) return false;
+function hodUpdatePurchase() {
+    var id = _hodEditingPurchaseId;
+    if (!id) { APP.notify('Edit session expired', 'error'); return false; }
     var data = getFormData('hodPurchaseEditForm');
     if (!data.title || !data.itemName || !data.price || !data.location || !data.description) {
         APP.notify('Please fill all required fields', 'error'); return false;
