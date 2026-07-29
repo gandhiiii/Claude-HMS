@@ -1615,6 +1615,27 @@ function _hodPurchases(el) {
             + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Click "+ New Purchase Request" to submit one for approval.</div>'
             + '<button class="btn btn-primary" onclick="hodCreatePurchase()">+ New Purchase Request</button></div>';
     } else {
+        // ── Daily Report Summary ──
+        var todayStr = new Date().toISOString().slice(0,10);
+        var todayPurchases = purchases.filter(function(p){ return p.createdAt && p.createdAt.slice(0,10) === todayStr; });
+        var todayPending = todayPurchases.filter(function(p){ return p.status === 'pending'; });
+        var todayApproved = todayPurchases.filter(function(p){ return p.status === 'approved'; });
+        var todayVal = todayPurchases.reduce(function(s,p){ return s + (parseFloat(p.total)||0); }, 0);
+        var approvedVal = approved.reduce(function(s,p){ return s + (parseFloat(p.total)||0); }, 0);
+        var pendingVal = pendingP.reduce(function(s,p){ return s + (parseFloat(p.total)||0); }, 0);
+
+        html += '<div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:12px;padding:16px;margin-bottom:16px;">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
+            + '<div><div style="font-weight:700;font-size:15px;">📊 Daily Purchases & Expenses Report</div>'
+            + '<div style="font-size:12px;color:var(--gray);">' + new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) + '</div></div>'
+            + '<button class="btn btn-sm" style="background:#1b5e20;color:#fff;border:none;padding:6px 14px;font-size:12px;" onclick="hodDownloadPurchasesReport()">📥 Download Report</button>'
+            + '</div>'
+            + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">'
+            + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:20px;font-weight:700;color:#2e7d32;">' + purchases.length + '</div><div style="font-size:11px;color:var(--gray);">All Time Requests</div></div>'
+            + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:20px;font-weight:700;color:#1565c0;">' + todayPurchases.length + '</div><div style="font-size:11px;color:var(--gray);">Today\'s Requests</div></div>'
+            + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:20px;font-weight:700;color:#2e7d32;">₹' + approvedVal.toFixed(2) + '</div><div style="font-size:11px;color:var(--gray);">Approved Value</div></div>'
+            + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:20px;font-weight:700;color:#e65100;">₹' + pendingVal.toFixed(2) + '</div><div style="font-size:11px;color:var(--gray);">Pending Value</div></div>'
+            + '</div></div>';
         // Pending section
         if (pendingP.length > 0) {
             html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px;">⏳ Pending Approval (' + pendingP.length + ')</div>';
@@ -1783,6 +1804,69 @@ function hodDeletePurchase(id) {
         _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
         _renderHodTab('purchases');
     });
+}
+
+/* Download Daily Purchases & Expenses Report as Excel */
+function hodDownloadPurchasesReport() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = user.department || '';
+    var allPurchases = (DB.get('hodPurchases') || []).filter(function(p){ return p.department === dept; });
+
+    var todayStr = new Date().toISOString().slice(0,10);
+    var today = allPurchases.filter(function(p){ return p.createdAt && p.createdAt.slice(0,10) === todayStr; });
+    var approved = allPurchases.filter(function(p){ return p.status === 'approved'; });
+    var pending = allPurchases.filter(function(p){ return p.status === 'pending'; });
+    var rejected = allPurchases.filter(function(p){ return p.status === 'rejected'; });
+    var approvedVal = approved.reduce(function(s,p){ return s+(parseFloat(p.total)||0); },0);
+    var pendingVal = pending.reduce(function(s,p){ return s+(parseFloat(p.total)||0); },0);
+
+    var wb = XLSX.utils.book_new();
+
+    // ── Dashboard sheet ──
+    var dashData = [
+        ['Daily Purchases & Expenses Report'],
+        ['Department', dept],
+        ['Generated', new Date().toLocaleString('en-IN')],
+        [],
+        ['Metric', 'Value'],
+        ['All Time Requests', allPurchases.length],
+        ['Approved', approved.length],
+        ['Pending', pending.length],
+        ['Rejected', rejected.length],
+        ['Approved Value (₹)', approvedVal.toFixed(2)],
+        ['Pending Value (₹)', pendingVal.toFixed(2)],
+        ['Total Value (₹)', allPurchases.reduce(function(s,p){ return s+(parseFloat(p.total)||0); },0).toFixed(2)],
+        [],
+        ['Today (' + todayStr + ')'],
+        ['Today\'s Requests', today.length],
+        ['Today\'s Approved', today.filter(function(p){ return p.status==='approved'; }).length],
+        ['Today\'s Pending', today.filter(function(p){ return p.status==='pending'; }).length],
+        ['Today\'s Value (₹)', today.reduce(function(s,p){ return s+(parseFloat(p.total)||0); },0).toFixed(2)]
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dashData), 'Dashboard');
+
+    // ── All Records sheet ──
+    var headers = ['Date','Title','Item','Qty','Unit Price','Total','Location','Vendor','Status','Created By','Approved/Rejected By','Description'];
+    var rows = allPurchases.map(function(p){
+        var approvedBy = p.approvedBy || p.rejectedBy || '';
+        return [
+            APP.formatDate(p.createdAt), p.title||'', p.itemName||'', p.quantity||1,
+            parseFloat(p.price)||0, parseFloat(p.total)||0, p.location||'', p.vendor||'',
+            p.status, p.createdByName||p.createdBy||'', approvedBy, p.description||''
+        ];
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(rows)), 'All Records');
+
+    // ── Today Summary sheet ──
+    var todayHeaders = ['Title','Item','Qty','Total','Status','Created By','Time'];
+    var todayRows = today.map(function(p){
+        return [p.title||'', p.itemName||'', p.quantity||1, parseFloat(p.total)||0, p.status, p.createdByName||p.createdBy||'', p.createdAt ? p.createdAt.slice(11,16) : ''];
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([todayHeaders].concat(todayRows)), 'Today');
+
+    XLSX.writeFile(wb, 'Daily_Purchases_Report_' + dept + '_' + todayStr + '.xlsx');
+    APP.notify('Daily Purchases Report downloaded!', 'success');
 }
 
 /* ═══════════════════════════════════════════════
