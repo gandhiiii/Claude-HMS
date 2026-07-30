@@ -5,10 +5,11 @@
   "main": "electron/main.js",
   "scripts": {
     "server:start": "node server/ws-server.js",
+    "watch": "node scripts/watch-and-sync.js",
     "electron:dev": "electron .",
     "electron:build": "electron-builder --win portable",
     "build:exe": "npm run electron:build",
-    "build:www": "if exist www rmdir /s /q www && mkdir www && xcopy css www\\css /E /I /Y && xcopy js www\\js /E /I /Y && xcopy assets www\\assets /E /I /Y && copy index.html www\\ && copy dashboard.html www\\",
+    "build:www": "node scripts/build-www.js",
     "capacitor:sync": "npm run build:www && npx cap sync android",
     "capacitor:open": "npx cap open android",
     "build:apk": "npm run capacitor:sync && cd android && .\\gradlew assembleDebug"

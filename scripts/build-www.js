@@ -1,32 +1,56 @@
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
 
 const src = path.join(__dirname, '..');
 const dest = path.join(__dirname, '..', 'www');
 
-const dirsToCopy = ['css', 'js', 'assets'];
-const filesToCopy = ['index.html', 'dashboard.html'];
-
-if (fs.existsSync(dest)) {
-    fs.rmSync(dest, { recursive: true });
+function copyRecursiveSync(srcDir, destDir) {
+    if (!fs.existsSync(destDir)) {
+        fs.mkdirSync(destDir, { recursive: true });
+    }
+    const entries = fs.readdirSync(srcDir, { withFileTypes: true });
+    for (const entry of entries) {
+        const srcPath = path.join(srcDir, entry.name);
+        const destPath = path.join(destDir, entry.name);
+        if (entry.isDirectory()) {
+            copyRecursiveSync(srcPath, destPath);
+        } else {
+            fs.copyFileSync(srcPath, destPath);
+        }
+    }
 }
-fs.mkdirSync(dest, { recursive: true });
 
-dirsToCopy.forEach(dir => {
-    const srcDir = path.join(src, dir);
-    const destDir = path.join(dest, dir);
-    if (fs.existsSync(srcDir)) {
-        execSync(`xcopy "${srcDir}" "${destDir}" /E /I /Y`, { stdio: 'inherit' });
+function buildWWW() {
+    if (fs.existsSync(dest)) {
+        try {
+            fs.rmSync(dest, { recursive: true, force: true });
+        } catch (e) {}
     }
-});
+    fs.mkdirSync(dest, { recursive: true });
 
-filesToCopy.forEach(file => {
-    const srcFile = path.join(src, file);
-    const destFile = path.join(dest, file);
-    if (fs.existsSync(srcFile)) {
-        fs.copyFileSync(srcFile, destFile);
-    }
-});
+    const dirsToCopy = ['css', 'js', 'assets'];
+    dirsToCopy.forEach(dir => {
+        const srcDir = path.join(src, dir);
+        const destDir = path.join(dest, dir);
+        if (fs.existsSync(srcDir)) {
+            copyRecursiveSync(srcDir, destDir);
+        }
+    });
 
-console.log('www/ built successfully');
+    const entries = fs.readdirSync(src);
+    entries.forEach(file => {
+        if (file.endsWith('.html')) {
+            const srcFile = path.join(src, file);
+            const destFile = path.join(dest, file);
+            fs.copyFileSync(srcFile, destFile);
+        }
+    });
+
+    console.log('✅ www/ distribution directory built and synced successfully.');
+}
+
+if (require.main === module) {
+    buildWWW();
+}
+
+module.exports = { buildWWW, copyRecursiveSync };

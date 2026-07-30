@@ -80,6 +80,27 @@ function createWindow() {
         mainWindow.loadURL(`http://127.0.0.1:${port}`);
     });
 
+    // Auto-reload Electron window on base code change
+    let reloadTimer = null;
+    function watchForChanges(itemPath) {
+        if (!fs.existsSync(itemPath)) return;
+        try {
+            fs.watch(itemPath, { recursive: true }, (evt, filename) => {
+                clearTimeout(reloadTimer);
+                reloadTimer = setTimeout(() => {
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        console.log('[ELECTRON] Base code update detected (' + filename + ') -> reloading window...');
+                        mainWindow.reload();
+                    }
+                }, 300);
+            });
+        } catch (e) {}
+    }
+
+    ['css', 'js', 'assets', 'index.html', 'dashboard.html', 'checklists.html', 'verify.html'].forEach(item => {
+        watchForChanges(path.join(htmlDir, item));
+    });
+
     Menu.setApplicationMenu(null);
 
     mainWindow.on('closed', () => {

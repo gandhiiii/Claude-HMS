@@ -146,6 +146,13 @@ wss.on('connection', function (ws, req) {
                 break;
             }
 
+            // ── Live Code Reload Signal ──────────────────────────────
+            case 'reload': {
+                broadcast({ type: 'reload' }, ws);
+                console.log('[WS]  reload signal broadcasted to all connected clients');
+                break;
+            }
+
             default:
                 break;
         }

@@ -289,6 +289,9 @@ var WS_NOTIFY = (function () {
                     var msg = JSON.parse(evt.data);
                     if (msg.type === 'notification') {
                         _push(msg.title || 'Notification', msg.body || '', msg.notifType || 'info');
+                    } else if (msg.type === 'reload') {
+                        console.log('[WS_NOTIFY] Live Code Update signal received. Refreshing...');
+                        window.location.reload();
                     }
                 } catch (e) {}
             };

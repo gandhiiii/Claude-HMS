@@ -1624,14 +1624,15 @@ function hodConfirmReceipt(id) {
 function _hodPurchases(el) {
     var user = AUTH.currentUser();
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
-    var dept = user.department || '';
+    var dept = window._hodActiveDept || user.department || '';
     if (!_hodInDeptList(dept, 'purchases')) {
         el.innerHTML = '<div class="empty-state">Purchases module not enabled for your department.</div>';
         return;
     }
 
     var allPurchases = DB.get('hodPurchases') || [];
-    var purchases = allPurchases.filter(function (p) { return p.department === dept; }).slice().reverse();
+    var deptLow = dept.trim().toLowerCase();
+    var purchases = allPurchases.filter(function (p) { return (p.department||'').trim().toLowerCase() === deptLow; }).slice().reverse();
     var pendingP = purchases.filter(function (p) { return p.status === 'pending'; });
     var approved = purchases.filter(function (p) { return p.status === 'approved'; });
     var rejected = purchases.filter(function (p) { return p.status === 'rejected'; });
@@ -1837,6 +1838,7 @@ function hodSavePurchase() {
     var approvalOther = data.approvalOther || '';
     var preApprovedBy = data.preApprovedBy || '';
     var recStatus = approvalType === 'none' ? 'approved' : (approvalType === 'pre-approved' ? 'approved' : 'pending');
+    var dept = window._hodActiveDept || user.department || '';
     DB.add('hodPurchases', {
         title: data.title,
         itemName: data.itemName,
@@ -1846,7 +1848,7 @@ function hodSavePurchase() {
         location: data.location,
         vendor: data.vendor || '',
         description: data.description,
-        department: user.department,
+        department: dept,
         status: recStatus,
         approvalType: approvalType,
         approvalOther: approvalOther,
@@ -1858,7 +1860,8 @@ function hodSavePurchase() {
         createdAt: new Date().toISOString()
     });
     APP.notify('Purchase request submitted for approval!', 'success');
-    _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return p.department === user.department; });
+    var deptLow = dept.trim().toLowerCase();
+    _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return (p.department||'').trim().toLowerCase() === deptLow; });
     _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
     _renderHodTab('purchases');
     return true;
@@ -1874,12 +1877,14 @@ function hodApprovePurchase(id) {
             approvedAt: new Date().toISOString()
         });
         APP.notify('Purchase request approved', 'success');
-        _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return p.department === user.department; });
+        var _d = window._hodActiveDept || user.department || '';
+        var _dl = _d.trim().toLowerCase();
+        _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return (p.department||'').trim().toLowerCase() === _dl; });
         _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
         _renderHodTab('purchases');
     });
 }
-
+    
 function hodRejectPurchase(id) {
     var user = AUTH.currentUser();
     if (!user) return;
@@ -1892,7 +1897,9 @@ function hodRejectPurchase(id) {
         rejectionReason: reason || ''
     });
     APP.notify('Purchase request rejected', 'info');
-    _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return p.department === user.department; });
+    var _d = window._hodActiveDept || user.department || '';
+    var _dl = _d.trim().toLowerCase();
+    _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return (p.department||'').trim().toLowerCase() === _dl; });
     _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
     _renderHodTab('purchases');
 }
@@ -1908,7 +1915,9 @@ function hodDeletePurchase(id) {
     confirmAction('Delete this purchase request?', function () {
         DB.delete('hodPurchases', id);
         APP.notify('Purchase request deleted', 'success');
-        _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return p.department === user.department; });
+        var _d = window._hodActiveDept || user.department || '';
+        var _dl = _d.trim().toLowerCase();
+        _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return (p.department||'').trim().toLowerCase() === _dl; });
         _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
         _renderHodTab('purchases');
     });
@@ -1966,6 +1975,8 @@ function hodPurchaseCalcTotalEdit() {
 function hodUpdatePurchase() {
     var id = _hodEditingPurchaseId;
     if (!id) { APP.notify('Edit session expired', 'error'); return false; }
+    var user = AUTH.currentUser();
+    if (!user) return false;
     var data = getFormData('hodPurchaseEditForm');
     if (!data.title || !data.itemName || !data.price || !data.location || !data.description) {
         APP.notify('Please fill all required fields', 'error'); return false;
@@ -1998,7 +2009,9 @@ function hodUpdatePurchase() {
     }
     DB.update('hodPurchases', id, upd);
     APP.notify('Purchase request updated!', 'success');
-    _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return p.department === user.department; });
+    var _d = window._hodActiveDept || user.department || '';
+    var _dl = _d.trim().toLowerCase();
+    _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return (p.department||'').trim().toLowerCase() === _dl; });
     _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
     _renderHodTab('purchases');
     return true;
@@ -2008,9 +2021,10 @@ function hodUpdatePurchase() {
 function hodDownloadPurchasesReport() {
     var user = AUTH.currentUser();
     if (!user) return;
-    var dept = user.department || '';
+    var dept = window._hodActiveDept || user.department || '';
     if (!_hodInDeptList(dept, 'purchases')) return;
-    var allPurchases = (DB.get('hodPurchases') || []).filter(function(p){ return p.department === dept; });
+    var dLow = dept.trim().toLowerCase();
+    var allPurchases = (DB.get('hodPurchases') || []).filter(function(p){ return (p.department||'').trim().toLowerCase() === dLow; });
 
     var todayStr = new Date().toISOString().slice(0,10);
     var today = allPurchases.filter(function(p){ return p.createdAt && p.createdAt.slice(0,10) === todayStr; });
