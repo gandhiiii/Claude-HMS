@@ -204,7 +204,8 @@ function renderHodDashboard(container) {
     var pendingCl  = myCl.filter(function (c) { return c.status !== 'completed'; }).length;
     var hodTodosList = (DB.get('hodTodos') || []).filter(function (t) { return t.createdBy === u || t.department === dept; });
     var hodPendingTodos = hodTodosList.filter(function (t) { return t.status !== 'completed'; }).length;
-    var deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return p.department === dept; });
+    var deptLow2 = dept.trim().toLowerCase();
+    var deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return (p.department||'').trim().toLowerCase() === deptLow2; });
     var pendingPurchases = deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
     var pendingReq = myReqs.filter(function (r) { return r.status === 'pending'; }).length + pendingMatApprovals.length + pendingGateApprovals.length;
     var openProblems = routedProblems.length;
@@ -954,7 +955,8 @@ function _hodClCard(cl, user) {
         + '<div style="font-size:11px;color:var(--gray);margin-top:2px;">'
         + '👤 ' + (cl.assignedTo === 'common' ? 'Everyone' : cl.assignedTo)
         + (cl.floor ? ' &nbsp;·&nbsp; 📍 ' + cl.floor : '')
-        + (cl.deadline ? ' &nbsp;·&nbsp; 📅 ' + APP.formatDate(cl.deadline) + (isOverdue?' <span style="color:var(--danger);font-weight:600;">⚠ Overdue</span>':'') : '')
+        + (cl.weekDate ? ' &nbsp;·&nbsp; 📅 Week: ' + new Date(cl.weekDate).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'}) : '')
+        + (cl.deadline ? ' &nbsp;·&nbsp; 🗓 Due: ' + APP.formatDate(cl.deadline) + (isOverdue?' <span style="color:var(--danger);font-weight:600;">⚠ Overdue</span>':'') : '')
         + ' &nbsp;·&nbsp; by ' + (cl.assignedBy || '—')
         + '</div>'
         + '<div style="display:flex;align-items:center;gap:6px;margin-top:6px;">'

@@ -60,9 +60,10 @@ function _isThisWeek(dateStr) {
 ══════════════════════════════════════════ */
 function _clPad(n) { return ('0' + n).slice(-2); }
 
-function _clPeriodKey(freq) {
+function _clPeriodKey(freq, refDate) {
     // "Day" starts at 5:00 AM — subtract 5 h so anything before 5 AM still counts as yesterday
-    var adj = new Date(new Date().getTime() - 5 * 60 * 60 * 1000);
+    var base = refDate ? new Date(refDate) : new Date();
+    var adj = new Date(base.getTime() - 5 * 60 * 60 * 1000);
     var y = adj.getFullYear(), m = adj.getMonth(), d = adj.getDate();
     if (freq === 'weekly') {
         var dow = adj.getDay();
@@ -75,8 +76,9 @@ function _clPeriodKey(freq) {
     return y + '-' + _clPad(m + 1) + '-' + _clPad(d);
 }
 
-function _clPeriodLabel(freq) {
-    var adj = new Date(new Date().getTime() - 5 * 60 * 60 * 1000);
+function _clPeriodLabel(freq, refDate) {
+    var base = refDate ? new Date(refDate) : new Date();
+    var adj = new Date(base.getTime() - 5 * 60 * 60 * 1000);
     if (freq === 'weekly')  return 'Week of ' + adj.toLocaleDateString('en-IN', {month:'short', day:'numeric'});
     if (freq === 'monthly') return adj.toLocaleDateString('en-IN', {month:'long', year:'numeric'});
     return 'Today (' + adj.toLocaleDateString('en-IN', {weekday:'short', day:'numeric', month:'short'}) + ')';
@@ -160,7 +162,8 @@ function _clAutoReport(cl, user, periodKey) {
 function _checkAndResetChecklists(checklists, user) {
     checklists.forEach(function(cl) {
         if (!cl.frequency) return; // legacy checklists without frequency skip auto-reset
-        var expected = _clPeriodKey(cl.frequency);
+        var refDate = (cl.frequency === 'weekly' && cl.weekDate) ? new Date(cl.weekDate) : null;
+        var expected = _clPeriodKey(cl.frequency, refDate);
         var stored   = cl.periodKey || '';
         if (!stored) {
             DB.update('checklists', cl.id, { periodKey: expected, periodSubmitted: false });
@@ -909,7 +912,8 @@ function _renderEmpChecklists(checklists) {
             var clr   = freqClr[freq] || '#1565c0';
             var icon  = freqIcon[freq]|| '🔄';
             var freqCap = { daily: T('empd2_freq_daily_cap'), weekly: T('empd2_freq_weekly_cap'), monthly: T('empd2_freq_monthly_cap') }[freq] || (freq.charAt(0).toUpperCase() + freq.slice(1));
-            var periodLabel = _clPeriodLabel(freq);
+            var periodRef = (freq === 'weekly' && cl.weekDate) ? new Date(cl.weekDate) : null;
+            var periodLabel = _clPeriodLabel(freq, periodRef);
             var timeLeft    = _clTimeUntil(_clNextReset(freq));
             var submitted   = !!cl.periodSubmitted;
 
@@ -920,7 +924,8 @@ function _renderEmpChecklists(checklists) {
                 + '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:4px;">'
                 + '<span style="background:' + bg + ';color:' + clr + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + icon + ' ' + freqCap + '</span>'
                 + '<span style="font-size:11px;color:var(--gray);">' + periodLabel + '</span>'
-                + '<span style="font-size:11px;color:var(--gray);">' + T('empd2_cl_resets_in') + ' ' + timeLeft + '</span>'
+                + (periodRef ? '<span style="background:#ede7f6;color:#4527a0;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">📅 ' + new Date(cl.weekDate).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'}) + ' (set by HOD/Admin)</span>' : '')
+                + (periodRef ? '' : '<span style="font-size:11px;color:var(--gray);">' + T('empd2_cl_resets_in') + ' ' + timeLeft + '</span>')
                 + (submitted ? '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + T('empd2_cl_submitted') + '</span>' : '')
                 + '</div>'
                 + '</div>'
@@ -999,7 +1004,8 @@ function empSubmitClPeriod(id) {
     var cl = DB.getById('checklists', id);
     if (!cl) return;
     var freq = cl.frequency || 'daily';
-    var periodKey = _clPeriodKey(freq);
+    var refDate = (freq === 'weekly' && cl.weekDate) ? new Date(cl.weekDate) : null;
+    var periodKey = _clPeriodKey(freq, refDate);
     var items = cl.items || [];
     var done  = items.filter(function(i){ return i.status && i.status !== 'pending'; }).length;
     var pct   = items.length ? Math.round(done / items.length * 100) : 0;

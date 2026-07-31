@@ -89,6 +89,7 @@ function renderClList() {
                     <span style="font-size:12px;color:var(--gray);display:block;">
                         ${c.assignedTo === 'common' ? T('chkmod_common_badge') : '👤 ' + c.assignedTo}
                         ${c.floor ? ' | 📍 ' + c.floor : ''}
+                        ${c.weekDate && c.frequency === 'weekly' ? ' | 📅 ' + new Date(c.weekDate).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'}) : ''}
                         ${c.deadline ? ' | ' + T('chkmod_due_label') + APP.formatDate(c.deadline) : ''}
                         ${c.deadline && APP.daysBetween(new Date().toISOString(), c.deadline) < 0 && c.status !== 'completed' ? ' ' + T('chkmod_overdue_label') : ''}
                         ${c.frequency === 'weekly' ? ' | ' + T('chkmod_freq_weekly') : c.frequency === 'monthly' ? ' | ' + T('chkmod_freq_monthly') : ' | ' + T('chkmod_freq_daily')}
@@ -190,11 +191,16 @@ function showClForm(cl) {
                 </div>
                 <div class="form-group">
                     <label>${T('chkmod_label_frequency')}</label>
-                    <select name="frequency" class="form-control">
+                    <select name="frequency" class="form-control" onchange="toggleClWeekDate(this)">
                         <option value="daily"   ${(cl?.frequency||'daily')==='daily'  ?'selected':''}>${T('chkmod_freq_opt_daily')}</option>
                         <option value="weekly"  ${cl?.frequency==='weekly' ?'selected':''}>${T('chkmod_freq_opt_weekly')}</option>
                         <option value="monthly" ${cl?.frequency==='monthly'?'selected':''}>${T('chkmod_freq_opt_monthly')}</option>
                     </select>
+                </div>
+                <div class="form-group" id="clWeekDateGroup" style="${(cl?.frequency||'daily')==='weekly' ? '' : 'display:none;'}">
+                    <label>📅 ${T('chkmod_label_week_start')}</label>
+                    <input type="date" name="weekDate" class="form-control" value="${cl?.weekDate ? cl.weekDate.split('T')[0] : ''}">
+                    <div style="font-size:11px;color:var(--gray);margin-top:3px;">${T('chkmod_week_start_hint')}</div>
                 </div>
             </div>
             <div class="form-group">
@@ -272,6 +278,11 @@ function removeClItem(btn) {
     });
 }
 
+function toggleClWeekDate(sel) {
+    const group = document.getElementById('clWeekDateGroup');
+    if (group) group.style.display = sel.value === 'weekly' ? '' : 'none';
+}
+
 function saveCl() {
     const user = AUTH.currentUser();
     const form = document.getElementById('clForm');
@@ -284,6 +295,7 @@ function saveCl() {
     const description = form.querySelector('[name="description"]')?.value;
     const department = form.querySelector('[name="department"]')?.value || user.department || '';
     const frequency  = form.querySelector('[name="frequency"]')?.value  || 'daily';
+    const weekDate   = form.querySelector('[name="weekDate"]')?.value  || '';
     if (!title || !assignedTo) { APP.notify(T('chkmod_msg_title_assignment_required'), 'error'); return; }
     const items = [];
     const rows = form.querySelectorAll('.cl-item-row');
@@ -300,12 +312,12 @@ function saveCl() {
         items.forEach(item => {
             if (statusMap[item.task] !== undefined) item.status = statusMap[item.task];
         });
-        DB.update('checklists', id, { title, assignedTo, floor, deadline, description, items, status, department, frequency });
+        DB.update('checklists', id, { title, assignedTo, floor, deadline, description, items, status, department, frequency, weekDate });
         APP.notify(T('chkmod_msg_updated'), 'success');
     } else {
         DB.add('checklists', {
             title, assignedTo, floor: floor || '', deadline: deadline || '', description: description || '',
-            department, items, status: 'active', assignedBy: user.fullName, frequency
+            department, items, status: 'active', assignedBy: user.fullName, frequency, weekDate
         });
         APP.notify(T('chkmod_msg_created'), 'success');
     }
