@@ -2820,14 +2820,10 @@ function hodAddUniform() {
     var typeOpts = types.map(function(t){ return '<option value="' + t + '">' + t + '</option>'; }).join('');
     var sizes = ['S','M','L','XL','XXL','Other'];
     var sizeOpts = sizes.map(function(s){ return '<option value="' + s + '">' + s + '</option>'; }).join('');
-    var depts = (DB.get('departments') || []).filter(function(d){ return d.active !== false; });
-    var deptOpts = depts.map(function(d){
-        return '<option value="' + d.name.replace(/"/g,'&quot;') + '" ' + ((d.name||'').trim().toLowerCase() === dept.trim().toLowerCase() ? 'selected' : '') + '>' + d.name + '</option>';
-    }).join('');
 
     var form = '<form id="hodUniformForm">'
         + '<div class="form-group"><label>Department *</label>'
-        + '<select name="department" class="form-control" required>' + deptOpts + '</select></div>'
+        + '<input type="text" name="department" class="form-control" required value="' + dept.replace(/"/g,'&quot;') + '" placeholder="Type department name"></div>'
         + '<div class="form-group"><label>Staff Name *</label>'
         + '<input type="text" name="staffName" class="form-control" required placeholder="Type staff name (manual entry by Facility HOD)"></div>'
         + '<div class="grid-2" style="gap:10px;">'
@@ -2902,13 +2898,9 @@ function hodEditUniform(id) {
     var typeOpts = types.map(function(t){ return '<option value="' + t + '" ' + (u.uniformType===t?'selected':'') + '>' + t + '</option>'; }).join('');
     var sizes = ['S','M','L','XL','XXL','Other'];
     var sizeOpts = sizes.map(function(s){ return '<option value="' + s + '" ' + (u.size===s?'selected':'') + '>' + s + '</option>'; }).join('');
-    var depts = (DB.get('departments') || []).filter(function(d){ return d.active !== false; });
-    var deptOpts = depts.map(function(d){
-        return '<option value="' + d.name.replace(/"/g,'&quot;') + '" ' + ((d.name||'') === (u.department||'') ? 'selected' : '') + '>' + d.name + '</option>';
-    }).join('');
     var form = '<form id="hodUniformEditForm">'
         + '<div class="form-group"><label>Department *</label>'
-        + '<select name="department" class="form-control" required>' + deptOpts + '</select></div>'
+        + '<input type="text" name="department" class="form-control" required value="' + esc(u.department) + '" placeholder="Type department name"></div>'
         + '<div class="form-group"><label>Staff Name *</label><input type="text" name="staffName" class="form-control" required value="' + esc(u.staffName) + '"></div>'
         + '<div class="grid-2" style="gap:10px;">'
         + '<div class="form-group"><label>Employee ID</label><input type="text" name="employeeId" class="form-control" value="' + esc(u.employeeId) + '"></div>'
@@ -3154,14 +3146,10 @@ function hodAddLocker() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = window._hodActiveDept || user.department || '';
-    var depts = (DB.get('departments') || []).filter(function(d){ return d.active !== false; });
-    var deptOpts = depts.map(function(d){
-        return '<option value="' + d.name.replace(/"/g,'&quot;') + '" ' + ((d.name||'').trim().toLowerCase() === dept.trim().toLowerCase() ? 'selected' : '') + '>' + d.name + '</option>';
-    }).join('');
 
     var form = '<form id="hodLockerForm">'
         + '<div class="form-group"><label>Department *</label>'
-        + '<select name="department" class="form-control" required>' + deptOpts + '</select></div>'
+        + '<input type="text" name="department" class="form-control" required value="' + dept.replace(/"/g,'&quot;') + '" placeholder="Type department name"></div>'
         + '<div class="form-group"><label>Staff Name *</label>'
         + '<input type="text" name="staffName" class="form-control" required placeholder="Type staff name (manual entry by Facility HOD)"></div>'
         + '<div class="grid-2" style="gap:10px;">'
@@ -3230,13 +3218,9 @@ function hodEditLocker(id) {
     if (!l) { APP.notify('Record not found', 'error'); return; }
     _hodEditingLockerId = id;
     var esc = function(v){ return String(v||'').replace(/"/g,'&quot;'); };
-    var depts = (DB.get('departments') || []).filter(function(d){ return d.active !== false; });
-    var deptOpts = depts.map(function(d){
-        return '<option value="' + d.name.replace(/"/g,'&quot;') + '" ' + ((d.name||'') === (l.department||'') ? 'selected' : '') + '>' + d.name + '</option>';
-    }).join('');
     var form = '<form id="hodLockerEditForm">'
         + '<div class="form-group"><label>Department *</label>'
-        + '<select name="department" class="form-control" required>' + deptOpts + '</select></div>'
+        + '<input type="text" name="department" class="form-control" required value="' + esc(l.department) + '" placeholder="Type department name"></div>'
         + '<div class="form-group"><label>Staff Name *</label><input type="text" name="staffName" class="form-control" required value="' + esc(l.staffName) + '"></div>'
         + '<div class="grid-2" style="gap:10px;">'
         + '<div class="form-group"><label>Employee ID</label><input type="text" name="employeeId" class="form-control" value="' + esc(l.employeeId) + '"></div>'
