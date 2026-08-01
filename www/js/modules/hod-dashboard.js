@@ -2718,6 +2718,7 @@ function _hodUniform(el) {
     });
     var pending = all.filter(function(u){ return u.status === 'pending'; });
     var allocated = all.filter(function(u){ return u.status === 'allocated'; });
+    var returned = all.filter(function(u){ return u.status === 'returned'; });
 
     var totalQty = all.reduce(function(s,u){ return s + (parseInt(u.quantity)||0); }, 0);
     var pendQty = pending.reduce(function(s,u){ return s + (parseInt(u.quantity)||0); }, 0);
@@ -2742,11 +2743,13 @@ function _hodUniform(el) {
         + '<button class="tab-btn' + (_hodUniformFilter==='all'?' active':'') + '" onclick="_hodUniformFilter=\'all\';_renderHodTab(\'uniform\')">All (' + all.length + ')</button>'
         + '<button class="tab-btn' + (_hodUniformFilter==='pending'?' active':'') + '" onclick="_hodUniformFilter=\'pending\';_renderHodTab(\'uniform\')">⏳ Pending (' + pending.length + ')</button>'
         + '<button class="tab-btn' + (_hodUniformFilter==='allocated'?' active':'') + '" onclick="_hodUniformFilter=\'allocated\';_renderHodTab(\'uniform\')">✓ Allocated (' + allocated.length + ')</button>'
+        + '<button class="tab-btn' + (_hodUniformFilter==='returned'?' active':'') + '" onclick="_hodUniformFilter=\'returned\';_renderHodTab(\'uniform\')">↩️ Returned (' + returned.length + ')</button>'
         + '</div>';
 
     var shown = [];
     if (_hodUniformFilter === 'pending') shown = pending;
     else if (_hodUniformFilter === 'allocated') shown = allocated;
+    else if (_hodUniformFilter === 'returned') shown = returned;
     else shown = all;
 
     if (shown.length === 0) {
@@ -2760,12 +2763,14 @@ function _hodUniform(el) {
         html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;">'
             + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#e65100;">' + pending.length + '</div><div style="font-size:11px;color:var(--gray);">Pending</div></div>'
             + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#2e7d32;">' + allocated.length + '</div><div style="font-size:11px;color:var(--gray);">Allocated</div></div>'
-            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#6a1b9a;">' + totalQty + '</div><div style="font-size:11px;color:var(--gray);">Total Pieces</div></div>'
+            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#6a1b9a;">' + returned.length + '</div><div style="font-size:11px;color:var(--gray);">Returned</div></div>'
+            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#1a237e;">' + totalQty + '</div><div style="font-size:11px;color:var(--gray);">Total Pieces</div></div>'
             + '</div>';
 
         // Section headers
         var pendShown = shown.filter(function(u){ return u.status === 'pending'; });
         var allocShown = shown.filter(function(u){ return u.status === 'allocated'; });
+        var retShown = shown.filter(function(u){ return u.status === 'returned'; });
         if (pendShown.length > 0) {
             html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">⏳ Pending (' + pendShown.length + ')</div>';
             pendShown.forEach(function(u){ html += _hodUniformCard(u, user); });
@@ -2773,6 +2778,10 @@ function _hodUniform(el) {
         if (allocShown.length > 0) {
             html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">✓ Allocated (' + allocShown.length + ')</div>';
             allocShown.forEach(function(u){ html += _hodUniformCard(u, user); });
+        }
+        if (retShown.length > 0) {
+            html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">↩️ Returned (' + retShown.length + ')</div>';
+            retShown.forEach(function(u){ html += _hodUniformCard(u, user); });
         }
     }
 
@@ -2784,8 +2793,11 @@ function _hodUniformCard(u, user) {
     var canManage = isAdmin || user.role === 'hod';
     var statusBadge = u.status === 'allocated'
         ? '<span class="badge badge-success" style="font-size:10px;">✓ Allocated</span>'
-        : '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>';
-    return '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid ' + (u.status==='allocated'?'var(--success)':'var(--warning)') + ';border-radius:10px;padding:14px;margin-bottom:10px;">'
+        : (u.status === 'returned'
+            ? '<span class="badge" style="font-size:10px;background:#6a1b9a;color:#fff;">↩️ Returned</span>'
+            : '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>');
+    var borderColor = u.status === 'allocated' ? 'var(--success)' : (u.status === 'returned' ? '#6a1b9a' : 'var(--warning)');
+    return '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid ' + borderColor + ';border-radius:10px;padding:14px;margin-bottom:10px;">'
         + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">'
         + '<div style="flex:1;min-width:180px;">'
         + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'
@@ -2801,14 +2813,17 @@ function _hodUniformCard(u, user) {
         + (u.notes ? '<div style="font-size:12px;color:var(--text);margin-top:6px;background:var(--light-gray);padding:6px 10px;border-radius:6px;">📝 ' + u.notes + '</div>' : '')
         + '<div style="font-size:11px;color:var(--gray);margin-top:6px;">👤 ' + (u.createdByName || u.createdBy || '-') + ' · ' + APP.formatDate(u.createdAt)
         + (u.allocatedBy ? ' · ✓ Allocated by ' + u.allocatedBy + (u.allocatedAt ? ' on ' + APP.formatDate(u.allocatedAt) : '') : '')
+        + (u.returnedBy ? ' · ↩️ Returned by ' + u.returnedBy + (u.returnedAt ? ' on ' + APP.formatDate(u.returnedAt) : '') : '')
         + '</div></div>'
         + '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">'
         + (canManage && u.status === 'pending'
             ? '<button class="btn btn-sm btn-success" onclick="hodSetUniformStatus(\'' + u.id + '\',\'allocated\')">✓ Mark Allocated</button>' : '')
+        + (canManage && u.status === 'allocated'
+            ? '<button class="btn btn-sm" style="background:#6a1b9a;color:#fff;font-size:11px;" onclick="hodSetUniformStatus(\'' + u.id + '\',\'returned\')">↩️ Mark Returned</button>' : '')
         + (canManage
             ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--primary);border-color:var(--primary);" onclick="hodEditUniform(\'' + u.id + '\')">✎ Edit</button>' : '')
         + (canManage
-            ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--danger);border-color:var(--danger);" onclick="hodDeleteUniform(\'' + u.id + '\')">🗑 Delete</button>' : '')
+            ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--danger);border-color:var(--danger);" onclick="hodDeleteUniform(\'' + u.id + '\')">🗑 Remove Staff</button>' : '')
         + '</div></div></div>';
 }
 
@@ -2835,7 +2850,7 @@ function hodAddUniform() {
         + '<div class="form-group"><label>Quantity *</label><input type="number" name="quantity" class="form-control" min="1" value="1" required></div>'
         + '</div>'
         + '<div class="form-group"><label>Status</label>'
-        + '<select name="status" class="form-control"><option value="pending">⏳ Pending</option><option value="allocated">✓ Allocated</option></select></div>'
+        + '<select name="status" class="form-control"><option value="pending">⏳ Pending</option><option value="allocated">✓ Allocated</option><option value="returned">↩️ Returned</option></select></div>'
         + '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="e.g. new joinee, replacement, etc."></textarea></div>'
         + '</form>';
     openFormModal('👕 New Uniform Entry', form, 'hodSaveUniform()', true);
@@ -2881,9 +2896,22 @@ function hodSetUniformStatus(id, status) {
             DB.update('hodUniforms', id, {
                 status: 'allocated',
                 allocatedBy: user.fullName,
-                allocatedAt: new Date().toISOString()
+                allocatedAt: new Date().toISOString(),
+                returnedBy: '',
+                returnedAt: ''
             });
             APP.notify(u.staffName + ' — uniform allocated', 'success');
+            _renderHodTab('uniform');
+        });
+    }
+    if (status === 'returned') {
+        confirmAction('Mark uniform as returned from ' + u.staffName + '?', function(){
+            DB.update('hodUniforms', id, {
+                status: 'returned',
+                returnedBy: user.fullName,
+                returnedAt: new Date().toISOString()
+            });
+            APP.notify(u.staffName + ' — uniform returned', 'success');
             _renderHodTab('uniform');
         });
     }
@@ -2911,7 +2939,7 @@ function hodEditUniform(id) {
         + '<div class="form-group"><label>Quantity *</label><input type="number" name="quantity" class="form-control" min="1" value="' + (u.quantity||1) + '" required></div>'
         + '</div>'
         + '<div class="form-group"><label>Status</label>'
-        + '<select name="status" class="form-control"><option value="pending"' + (u.status!=='allocated'?' selected':'') + '>⏳ Pending</option><option value="allocated"' + (u.status==='allocated'?' selected':'') + '>✓ Allocated</option></select></div>'
+        + '<select name="status" class="form-control"><option value="pending"' + (u.status!=='allocated'&&u.status!=='returned'?' selected':'') + '>⏳ Pending</option><option value="allocated"' + (u.status==='allocated'?' selected':'') + '>✓ Allocated</option><option value="returned"' + (u.status==='returned'?' selected':'') + '>↩️ Returned</option></select></div>'
         + '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="2">' + esc(u.notes) + '</textarea></div>'
         + '</form>';
     openFormModal('✎ Edit Uniform Entry', form, 'hodUpdateUniform()', false);
@@ -2941,6 +2969,12 @@ function hodUpdateUniform() {
     if (data.status === 'allocated' && !DB.getById('hodUniforms', id).allocatedBy) {
         upd.allocatedBy = user.fullName;
         upd.allocatedAt = new Date().toISOString();
+        upd.returnedBy = '';
+        upd.returnedAt = '';
+    }
+    if (data.status === 'returned' && !DB.getById('hodUniforms', id).returnedBy) {
+        upd.returnedBy = user.fullName;
+        upd.returnedAt = new Date().toISOString();
     }
     DB.update('hodUniforms', id, upd);
     APP.notify('Uniform entry updated', 'success');
@@ -2973,6 +3007,7 @@ function hodDownloadUniformReport() {
         var wb = XLSX.utils.book_new();
         var pending = all.filter(function(u){ return u.status === 'pending'; });
         var allocated = all.filter(function(u){ return u.status === 'allocated'; });
+        var returned = all.filter(function(u){ return u.status === 'returned'; });
         var totalQty = all.reduce(function(s,u){ return s + (parseInt(u.quantity)||0); }, 0);
 
         // Sheet 1: Dashboard / Summary
@@ -2986,18 +3021,20 @@ function hodDownloadUniformReport() {
             ['Total Records', all.length],
             ['Pending', pending.length],
             ['Allocated', allocated.length],
+            ['Returned', returned.length],
             ['Total Pieces', totalQty],
             ['Pending Pieces', pending.reduce(function(s,u){ return s + (parseInt(u.quantity)||0); }, 0)]
         ];
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dashData), 'Summary');
 
         // Sheet 2: Pending
-        var headers = ['Staff Name','Employee ID','Uniform Type','Size','Quantity','Department','Status','Notes','Created By','Created At','Allocated By','Allocated At'];
+        var headers = ['Staff Name','Employee ID','Uniform Type','Size','Quantity','Department','Status','Notes','Created By','Created At','Allocated By','Allocated At','Returned By','Returned At'];
         var rowOf = function(u){
-            return [u.staffName||'', u.employeeId||'', u.uniformType||'', u.size||'', u.quantity||1, u.department||'', u.status||'pending', u.notes||'', u.createdByName||'', u.createdAt?APP.formatDate(u.createdAt):'', u.allocatedBy||'', u.allocatedAt?APP.formatDate(u.allocatedAt):''];
+            return [u.staffName||'', u.employeeId||'', u.uniformType||'', u.size||'', u.quantity||1, u.department||'', u.status||'pending', u.notes||'', u.createdByName||'', u.createdAt?APP.formatDate(u.createdAt):'', u.allocatedBy||'', u.allocatedAt?APP.formatDate(u.allocatedAt):'', u.returnedBy||'', u.returnedAt?APP.formatDate(u.returnedAt):''];
         };
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(pending.map(rowOf))), 'Pending');
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(allocated.map(rowOf))), 'Allocated');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(returned.map(rowOf))), 'Returned');
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(all.map(rowOf))), 'All Records');
 
         XLSX.writeFile(wb, 'Uniform_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
@@ -3021,11 +3058,12 @@ function hodDownloadUniformPdf() {
     });
     var pending = all.filter(function(u){ return u.status === 'pending'; });
     var allocated = all.filter(function(u){ return u.status === 'allocated'; });
+    var returned = all.filter(function(u){ return u.status === 'returned'; });
     var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
     doc.setFontSize(14);
     doc.text('Staff Uniform Report — ' + dept, 14, 15);
     doc.setFontSize(9);
-    doc.text('Generated: ' + new Date().toLocaleString('en-IN') + '   Total: ' + all.length + '   Pending: ' + pending.length + '   Allocated: ' + allocated.length, 14, 22);
+    doc.text('Generated: ' + new Date().toLocaleString('en-IN') + '   Total: ' + all.length + '   Pending: ' + pending.length + '   Allocated: ' + allocated.length + '   Returned: ' + returned.length, 14, 22);
     var headers = ['Staff Name','Employee ID','Uniform Type','Size','Qty','Dept','Status','Notes','Created By','Created At'];
     var rows = all.map(function(u){
         return [u.staffName||'', u.employeeId||'', u.uniformType||'', u.size||'', u.quantity||1, u.department||'', u.status||'', u.notes||'', u.createdByName||'', u.createdAt?APP.formatDate(u.createdAt):''];
@@ -3050,6 +3088,7 @@ function _hodLocker(el) {
     });
     var pending = all.filter(function(l){ return l.status === 'pending'; });
     var allocated = all.filter(function(l){ return l.status === 'allocated'; });
+    var returned = all.filter(function(l){ return l.status === 'returned'; });
 
     var totalCount = all.length;
 
@@ -3073,11 +3112,13 @@ function _hodLocker(el) {
         + '<button class="tab-btn' + (_hodLockerFilter==='all'?' active':'') + '" onclick="_hodLockerFilter=\'all\';_renderHodTab(\'locker\')">All (' + all.length + ')</button>'
         + '<button class="tab-btn' + (_hodLockerFilter==='pending'?' active':'') + '" onclick="_hodLockerFilter=\'pending\';_renderHodTab(\'locker\')">⏳ Pending (' + pending.length + ')</button>'
         + '<button class="tab-btn' + (_hodLockerFilter==='allocated'?' active':'') + '" onclick="_hodLockerFilter=\'allocated\';_renderHodTab(\'locker\')">✓ Allocated (' + allocated.length + ')</button>'
+        + '<button class="tab-btn' + (_hodLockerFilter==='returned'?' active':'') + '" onclick="_hodLockerFilter=\'returned\';_renderHodTab(\'locker\')">↩️ Returned (' + returned.length + ')</button>'
         + '</div>';
 
     var shown = [];
     if (_hodLockerFilter === 'pending') shown = pending;
     else if (_hodLockerFilter === 'allocated') shown = allocated;
+    else if (_hodLockerFilter === 'returned') shown = returned;
     else shown = all;
 
     if (shown.length === 0) {
@@ -3092,11 +3133,13 @@ function _hodLocker(el) {
             + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#4527a0;">' + totalCount + '</div><div style="font-size:11px;color:var(--gray);">Total</div></div>'
             + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#e65100;">' + pending.length + '</div><div style="font-size:11px;color:var(--gray);">Pending</div></div>'
             + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#2e7d32;">' + allocated.length + '</div><div style="font-size:11px;color:var(--gray);">Allocated</div></div>'
+            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#6a1b9a;">' + returned.length + '</div><div style="font-size:11px;color:var(--gray);">Returned</div></div>'
             + '</div>';
 
         // Section headers
         var pendShown = shown.filter(function(l){ return l.status === 'pending'; });
         var allocShown = shown.filter(function(l){ return l.status === 'allocated'; });
+        var retShown = shown.filter(function(l){ return l.status === 'returned'; });
         if (pendShown.length > 0) {
             html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">⏳ Pending (' + pendShown.length + ')</div>';
             pendShown.forEach(function(l){ html += _hodLockerCard(l, user); });
@@ -3104,6 +3147,10 @@ function _hodLocker(el) {
         if (allocShown.length > 0) {
             html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">✓ Allocated (' + allocShown.length + ')</div>';
             allocShown.forEach(function(l){ html += _hodLockerCard(l, user); });
+        }
+        if (retShown.length > 0) {
+            html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">↩️ Returned (' + retShown.length + ')</div>';
+            retShown.forEach(function(l){ html += _hodLockerCard(l, user); });
         }
     }
 
@@ -3115,8 +3162,11 @@ function _hodLockerCard(l, user) {
     var canManage = isAdmin || user.role === 'hod';
     var statusBadge = l.status === 'allocated'
         ? '<span class="badge badge-success" style="font-size:10px;">✓ Allocated</span>'
-        : '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>';
-    return '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid ' + (l.status==='allocated'?'var(--success)':'var(--warning)') + ';border-radius:10px;padding:14px;margin-bottom:10px;">'
+        : (l.status === 'returned'
+            ? '<span class="badge" style="font-size:10px;background:#6a1b9a;color:#fff;">↩️ Returned</span>'
+            : '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>');
+    var borderColor = l.status === 'allocated' ? 'var(--success)' : (l.status === 'returned' ? '#6a1b9a' : 'var(--warning)');
+    return '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid ' + borderColor + ';border-radius:10px;padding:14px;margin-bottom:10px;">'
         + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">'
         + '<div style="flex:1;min-width:180px;">'
         + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'
@@ -3131,14 +3181,17 @@ function _hodLockerCard(l, user) {
         + (l.notes ? '<div style="font-size:12px;color:var(--text);margin-top:6px;background:var(--light-gray);padding:6px 10px;border-radius:6px;">📝 ' + l.notes + '</div>' : '')
         + '<div style="font-size:11px;color:var(--gray);margin-top:6px;">👤 ' + (l.createdByName || l.createdBy || '-') + ' · ' + APP.formatDate(l.createdAt)
         + (l.allocatedBy ? ' · ✓ Allocated by ' + l.allocatedBy + (l.allocatedAt ? ' on ' + APP.formatDate(l.allocatedAt) : '') : '')
+        + (l.returnedBy ? ' · ↩️ Returned by ' + l.returnedBy + (l.returnedAt ? ' on ' + APP.formatDate(l.returnedAt) : '') : '')
         + '</div></div>'
         + '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">'
         + (canManage && l.status === 'pending'
             ? '<button class="btn btn-sm btn-success" onclick="hodSetLockerStatus(\'' + l.id + '\',\'allocated\')">✓ Mark Allocated</button>' : '')
+        + (canManage && l.status === 'allocated'
+            ? '<button class="btn btn-sm" style="background:#6a1b9a;color:#fff;font-size:11px;" onclick="hodSetLockerStatus(\'' + l.id + '\',\'returned\')">↩️ Mark Returned</button>' : '')
         + (canManage
             ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--primary);border-color:var(--primary);" onclick="hodEditLocker(\'' + l.id + '\')">✎ Edit</button>' : '')
         + (canManage
-            ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--danger);border-color:var(--danger);" onclick="hodDeleteLocker(\'' + l.id + '\')">🗑 Delete</button>' : '')
+            ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--danger);border-color:var(--danger);" onclick="hodDeleteLocker(\'' + l.id + '\')">🗑 Remove Staff</button>' : '')
         + '</div></div></div>';
 }
 
@@ -3159,7 +3212,7 @@ function hodAddLocker() {
         + '<div class="grid-2" style="gap:10px;">'
         + '<div class="form-group"><label>Locker Location</label><input type="text" name="lockerLocation" class="form-control" placeholder="e.g. Ground Floor, Wing B"></div>'
         + '<div class="form-group"><label>Status</label>'
-        + '<select name="status" class="form-control"><option value="pending">⏳ Pending</option><option value="allocated">✓ Allocated</option></select></div>'
+        + '<select name="status" class="form-control"><option value="pending">⏳ Pending</option><option value="allocated">✓ Allocated</option><option value="returned">↩️ Returned</option></select></div>'
         + '</div>'
         + '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="e.g. new joinee, replacement, etc."></textarea></div>'
         + '</form>';
@@ -3185,6 +3238,8 @@ function hodSaveLocker() {
         notes: data.notes || '',
         allocatedBy: status === 'allocated' ? user.fullName : '',
         allocatedAt: status === 'allocated' ? new Date().toISOString() : '',
+        returnedBy: status === 'returned' ? user.fullName : '',
+        returnedAt: status === 'returned' ? new Date().toISOString() : '',
         createdBy: user.username,
         createdByName: user.fullName || user.username,
         createdAt: new Date().toISOString()
@@ -3205,9 +3260,22 @@ function hodSetLockerStatus(id, status) {
             DB.update('hodLockers', id, {
                 status: 'allocated',
                 allocatedBy: user.fullName,
-                allocatedAt: new Date().toISOString()
+                allocatedAt: new Date().toISOString(),
+                returnedBy: '',
+                returnedAt: ''
             });
             APP.notify(l.staffName + ' — locker allocated', 'success');
+            _renderHodTab('locker');
+        });
+    }
+    if (status === 'returned') {
+        confirmAction('Mark locker as returned from ' + l.staffName + '?', function(){
+            DB.update('hodLockers', id, {
+                status: 'returned',
+                returnedBy: user.fullName,
+                returnedAt: new Date().toISOString()
+            });
+            APP.notify(l.staffName + ' — locker returned', 'success');
             _renderHodTab('locker');
         });
     }
@@ -3229,7 +3297,7 @@ function hodEditLocker(id) {
         + '<div class="grid-2" style="gap:10px;">'
         + '<div class="form-group"><label>Locker Location</label><input type="text" name="lockerLocation" class="form-control" value="' + esc(l.lockerLocation) + '"></div>'
         + '<div class="form-group"><label>Status</label>'
-        + '<select name="status" class="form-control"><option value="pending"' + (l.status!=='allocated'?' selected':'') + '>⏳ Pending</option><option value="allocated"' + (l.status==='allocated'?' selected':'') + '>✓ Allocated</option></select></div>'
+        + '<select name="status" class="form-control"><option value="pending"' + (l.status!=='allocated'&&l.status!=='returned'?' selected':'') + '>⏳ Pending</option><option value="allocated"' + (l.status==='allocated'?' selected':'') + '>✓ Allocated</option><option value="returned"' + (l.status==='returned'?' selected':'') + '>↩️ Returned</option></select></div>'
         + '</div>'
         + '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="2">' + esc(l.notes) + '</textarea></div>'
         + '</form>';
@@ -3259,6 +3327,12 @@ function hodUpdateLocker() {
     if (data.status === 'allocated' && !DB.getById('hodLockers', id).allocatedBy) {
         upd.allocatedBy = user.fullName;
         upd.allocatedAt = new Date().toISOString();
+        upd.returnedBy = '';
+        upd.returnedAt = '';
+    }
+    if (data.status === 'returned' && !DB.getById('hodLockers', id).returnedBy) {
+        upd.returnedBy = user.fullName;
+        upd.returnedAt = new Date().toISOString();
     }
     DB.update('hodLockers', id, upd);
     APP.notify('Locker entry updated', 'success');
@@ -3291,6 +3365,7 @@ function hodDownloadLockerReport() {
         var wb = XLSX.utils.book_new();
         var pending = all.filter(function(l){ return l.status === 'pending'; });
         var allocated = all.filter(function(l){ return l.status === 'allocated'; });
+        var returned = all.filter(function(l){ return l.status === 'returned'; });
 
         // Sheet 1: Dashboard / Summary
         var dashData = [
@@ -3302,17 +3377,19 @@ function hodDownloadLockerReport() {
             ['Metric', 'Value'],
             ['Total Records', all.length],
             ['Pending', pending.length],
-            ['Allocated', allocated.length]
+            ['Allocated', allocated.length],
+            ['Returned', returned.length]
         ];
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dashData), 'Summary');
 
         // Sheet 2: Pending
-        var headers = ['Staff Name','Employee ID','Locker Number','Locker Location','Department','Status','Notes','Created By','Created At','Allocated By','Allocated At'];
+        var headers = ['Staff Name','Employee ID','Locker Number','Locker Location','Department','Status','Notes','Created By','Created At','Allocated By','Allocated At','Returned By','Returned At'];
         var rowOf = function(l){
-            return [l.staffName||'', l.employeeId||'', l.lockerNumber||'', l.lockerLocation||'', l.department||'', l.status||'pending', l.notes||'', l.createdByName||'', l.createdAt?APP.formatDate(l.createdAt):'', l.allocatedBy||'', l.allocatedAt?APP.formatDate(l.allocatedAt):''];
+            return [l.staffName||'', l.employeeId||'', l.lockerNumber||'', l.lockerLocation||'', l.department||'', l.status||'pending', l.notes||'', l.createdByName||'', l.createdAt?APP.formatDate(l.createdAt):'', l.allocatedBy||'', l.allocatedAt?APP.formatDate(l.allocatedAt):'', l.returnedBy||'', l.returnedAt?APP.formatDate(l.returnedAt):''];
         };
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(pending.map(rowOf))), 'Pending');
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(allocated.map(rowOf))), 'Allocated');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(returned.map(rowOf))), 'Returned');
         XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(all.map(rowOf))), 'All Records');
 
         XLSX.writeFile(wb, 'Locker_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
@@ -3336,11 +3413,12 @@ function hodDownloadLockerPdf() {
     });
     var pending = all.filter(function(l){ return l.status === 'pending'; });
     var allocated = all.filter(function(l){ return l.status === 'allocated'; });
+    var returned = all.filter(function(l){ return l.status === 'returned'; });
     var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
     doc.setFontSize(14);
     doc.text('Locker Allocation Report — ' + dept, 14, 15);
     doc.setFontSize(9);
-    doc.text('Generated: ' + new Date().toLocaleString('en-IN') + '   Total: ' + all.length + '   Pending: ' + pending.length + '   Allocated: ' + allocated.length, 14, 22);
+    doc.text('Generated: ' + new Date().toLocaleString('en-IN') + '   Total: ' + all.length + '   Pending: ' + pending.length + '   Allocated: ' + allocated.length + '   Returned: ' + returned.length, 14, 22);
     var headers = ['Staff Name','Employee ID','Locker No','Location','Dept','Status','Notes','Created By','Created At'];
     var rows = all.map(function(l){
         return [l.staffName||'', l.employeeId||'', l.lockerNumber||'', l.lockerLocation||'', l.department||'', l.status||'', l.notes||'', l.createdByName||'', l.createdAt?APP.formatDate(l.createdAt):''];
