@@ -249,6 +249,11 @@ function renderHodDashboard(container) {
     if (canBreakdown) {
         tabs.splice(14, 0, { id: 'equipbackdown', label: '📉 Breakdowns', badge: backdowns.length, bc: 'badge-secondary' });
     }
+    var _dlowU = (dept || '').trim().toLowerCase();
+    var canUniform = (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') || _dlowU === 'facility';
+    if (canUniform) {
+        tabs.push({ id: 'uniform', label: '👕 Uniform', badge: (DB.get('hodUniforms') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU && x.status === 'pending'; }).length, bc: 'badge-warning' });
+    }
 
     var html = ''
         + '<div style="background:linear-gradient(135deg,#6a1b9a,#4a148c);border-radius:14px;padding:20px 24px;color:#fff;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
@@ -346,6 +351,7 @@ function _renderHodTab(tab) {
                 purchases: _hodPurchases,
                 equipservice: _hodEquipService,
                 equipbackdown: _hodEquipBreakdown,
+                uniform: _hodUniform,
                 hodtodo: _hodTodo,
                 hodworkreport: _hodWorkReport };
     if (map[tab]) map[tab](el);
@@ -2683,6 +2689,342 @@ function hodDownloadBreakdownPdf() {
     });
     doc.autoTable({ head:[headers], body:rows, startY:27, styles:{fontSize:7}, headStyles:{fillColor:[106,27,154]} });
     doc.save('Equipment_Breakdown_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+    APP.notify('PDF downloaded', 'success');
+}
+
+/* ═══════════════════════════════════════════════
+   UNIFORM TAB — Facility HOD staff uniform allocation
+═══════════════════════════════════════════════ */
+var _hodUniformFilter = 'all'; // all | pending | allocated
+
+function _hodUniform(el) {
+    var user = AUTH.currentUser();
+    if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
+    var dept = window._hodActiveDept || user.department || '';
+    var deptLow = dept.trim().toLowerCase();
+    var all = (DB.get('hodUniforms') || []).filter(function(u){
+        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+        return admin || (u.department||'').trim().toLowerCase() === deptLow;
+    });
+    var pending = all.filter(function(u){ return u.status === 'pending'; });
+    var allocated = all.filter(function(u){ return u.status === 'allocated'; });
+
+    var totalQty = all.reduce(function(s,u){ return s + (parseInt(u.quantity)||0); }, 0);
+    var pendQty = pending.reduce(function(s,u){ return s + (parseInt(u.quantity)||0); }, 0);
+
+    var html = ''
+
+        // Header
+        + '<div style="background:linear-gradient(135deg,#e65100,#bf360c);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
+        + '<div><div style="font-size:18px;font-weight:700;">👕 Staff Uniform Management — ' + dept + '</div>'
+        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + all.length + ' records · ' + totalQty + ' pieces · ' + pendQty + ' pending</div></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm" style="background:#fff;color:#e65100;border:none;padding:6px 14px;font-size:12px;font-weight:600;" onclick="hodAddUniform()">+ New Uniform Entry</button>'
+        + '<button class="btn btn-sm" style="background:#1b5e20;color:#fff;border:none;padding:6px 14px;font-size:12px;" onclick="hodDownloadUniformReport()">📥 Excel</button>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadUniformPdf()">📕 PDF</button>'
+        + '</div></div>'
+
+        // Filter buttons
+        + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;">'
+        + '<button class="tab-btn' + (_hodUniformFilter==='all'?' active':'') + '" onclick="_hodUniformFilter=\'all\';_renderHodTab(\'uniform\')">All (' + all.length + ')</button>'
+        + '<button class="tab-btn' + (_hodUniformFilter==='pending'?' active':'') + '" onclick="_hodUniformFilter=\'pending\';_renderHodTab(\'uniform\')">⏳ Pending (' + pending.length + ')</button>'
+        + '<button class="tab-btn' + (_hodUniformFilter==='allocated'?' active':'') + '" onclick="_hodUniformFilter=\'allocated\';_renderHodTab(\'uniform\')">✓ Allocated (' + allocated.length + ')</button>'
+        + '</div>';
+
+    var shown = [];
+    if (_hodUniformFilter === 'pending') shown = pending;
+    else if (_hodUniformFilter === 'allocated') shown = allocated;
+    else shown = all;
+
+    if (shown.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
+            + '<div style="font-size:32px;margin-bottom:8px;">👕</div>'
+            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No uniform records</div>'
+            + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Click "+ New Uniform Entry" to add staff uniform details.</div>'
+            + '<button class="btn btn-primary" onclick="hodAddUniform()">+ New Uniform Entry</button></div>';
+    } else {
+        // Summary KPIs
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;">'
+            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#e65100;">' + pending.length + '</div><div style="font-size:11px;color:var(--gray);">Pending</div></div>'
+            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#2e7d32;">' + allocated.length + '</div><div style="font-size:11px;color:var(--gray);">Allocated</div></div>'
+            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#6a1b9a;">' + totalQty + '</div><div style="font-size:11px;color:var(--gray);">Total Pieces</div></div>'
+            + '</div>';
+
+        // Section headers
+        var pendShown = shown.filter(function(u){ return u.status === 'pending'; });
+        var allocShown = shown.filter(function(u){ return u.status === 'allocated'; });
+        if (pendShown.length > 0) {
+            html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">⏳ Pending (' + pendShown.length + ')</div>';
+            pendShown.forEach(function(u){ html += _hodUniformCard(u, user); });
+        }
+        if (allocShown.length > 0) {
+            html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">✓ Allocated (' + allocShown.length + ')</div>';
+            allocShown.forEach(function(u){ html += _hodUniformCard(u, user); });
+        }
+    }
+
+    el.innerHTML = html;
+}
+
+function _hodUniformCard(u, user) {
+    var isAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+    var canManage = isAdmin || user.role === 'hod';
+    var statusBadge = u.status === 'allocated'
+        ? '<span class="badge badge-success" style="font-size:10px;">✓ Allocated</span>'
+        : '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>';
+    return '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid ' + (u.status==='allocated'?'var(--success)':'var(--warning)') + ';border-radius:10px;padding:14px;margin-bottom:10px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">'
+        + '<div style="flex:1;min-width:180px;">'
+        + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'
+        + '<span style="font-size:14px;font-weight:700;">' + (u.staffName || 'Staff') + '</span>' + statusBadge
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-top:6px;font-size:13px;">'
+        + '<div><span style="color:var(--gray);">Uniform:</span> <strong>' + (u.uniformType || '-') + '</strong></div>'
+        + '<div><span style="color:var(--gray);">Size:</span> <strong>' + (u.size || '-') + '</strong></div>'
+        + '<div><span style="color:var(--gray);">Qty:</span> <strong>' + (u.quantity || 1) + '</strong></div>'
+        + '<div><span style="color:var(--gray);">Dept:</span> <strong>' + (u.department || '-') + '</strong></div>'
+        + (u.employeeId ? '<div><span style="color:var(--gray);">Emp ID:</span> <strong>' + u.employeeId + '</strong></div>' : '')
+        + '</div>'
+        + (u.notes ? '<div style="font-size:12px;color:var(--text);margin-top:6px;background:var(--light-gray);padding:6px 10px;border-radius:6px;">📝 ' + u.notes + '</div>' : '')
+        + '<div style="font-size:11px;color:var(--gray);margin-top:6px;">👤 ' + (u.createdByName || u.createdBy || '-') + ' · ' + APP.formatDate(u.createdAt)
+        + (u.allocatedBy ? ' · ✓ Allocated by ' + u.allocatedBy + (u.allocatedAt ? ' on ' + APP.formatDate(u.allocatedAt) : '') : '')
+        + '</div></div>'
+        + '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">'
+        + (canManage && u.status === 'pending'
+            ? '<button class="btn btn-sm btn-success" onclick="hodSetUniformStatus(\'' + u.id + '\',\'allocated\')">✓ Mark Allocated</button>' : '')
+        + (canManage
+            ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--primary);border-color:var(--primary);" onclick="hodEditUniform(\'' + u.id + '\')">✎ Edit</button>' : '')
+        + (canManage
+            ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--danger);border-color:var(--danger);" onclick="hodDeleteUniform(\'' + u.id + '\')">🗑 Delete</button>' : '')
+        + '</div></div></div>';
+}
+
+function hodAddUniform() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = window._hodActiveDept || user.department || '';
+    var team = (DB.get('users') || []).filter(function(m){
+        return (m.department||'').trim().toLowerCase() === dept.trim().toLowerCase() && m.role !== 'admin' && m.role !== 'super_admin';
+    });
+    var staffOpts = '<option value="">— Select Staff —</option>'
+        + team.map(function(m){ return '<option value="' + m.fullName.replace(/"/g,'&quot;') + '">' + m.fullName + '</option>'; }).join('');
+    var types = ['Shirt','Trouser','Apron','Coat / Jacket','Shoes','Cap','Gloves','Other'];
+    var typeOpts = types.map(function(t){ return '<option value="' + t + '">' + t + '</option>'; }).join('');
+    var sizes = ['S','M','L','XL','XXL','Other'];
+    var sizeOpts = sizes.map(function(s){ return '<option value="' + s + '">' + s + '</option>'; }).join('');
+
+    var form = '<form id="hodUniformForm">'
+        + '<div class="form-group"><label>Staff Name *</label>'
+        + '<select name="staffName" class="form-control" required onchange="hodUniformStaffPick(this)">' + staffOpts + '</select>'
+        + '<input type="text" name="staffNameManual" class="form-control" style="margin-top:6px;display:none;" placeholder="Or type staff name manually"></div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Employee ID</label><input type="text" name="employeeId" class="form-control" placeholder="e.g. EMP-0123"></div>'
+        + '<div class="form-group"><label>Uniform Type *</label><select name="uniformType" class="form-control" required>' + typeOpts + '</select></div>'
+        + '</div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Size *</label><select name="size" class="form-control" required>' + sizeOpts + '</select></div>'
+        + '<div class="form-group"><label>Quantity *</label><input type="number" name="quantity" class="form-control" min="1" value="1" required></div>'
+        + '</div>'
+        + '<div class="form-group"><label>Status</label>'
+        + '<select name="status" class="form-control"><option value="pending">⏳ Pending</option><option value="allocated">✓ Allocated</option></select></div>'
+        + '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="e.g. new joinee, replacement, etc."></textarea></div>'
+        + '<input type="hidden" name="department" value="' + dept.replace(/"/g,'&quot;') + '">'
+        + '</form>';
+    openFormModal('👕 New Uniform Entry', form, 'hodSaveUniform()', true);
+}
+
+function hodUniformStaffPick(sel) {
+    var manual = document.querySelector('#hodUniformForm [name="staffNameManual"]');
+    if (!manual) return;
+    manual.style.display = sel.value === '' ? '' : 'none';
+}
+
+function hodSaveUniform() {
+    var user = AUTH.currentUser();
+    if (!user) return false;
+    var data = getFormData('hodUniformForm');
+    var staffName = data.staffName || data.staffNameManual || '';
+    if (!staffName || !data.uniformType || !data.size || !data.quantity) {
+        APP.notify('Staff name, uniform type, size and quantity are required', 'error'); return false;
+    }
+    var status = data.status || 'pending';
+    DB.add('hodUniforms', {
+        staffName: staffName,
+        employeeId: data.employeeId || '',
+        uniformType: data.uniformType,
+        size: data.size,
+        quantity: parseInt(data.quantity) || 1,
+        department: data.department || user.department || '',
+        status: status,
+        notes: data.notes || '',
+        allocatedBy: status === 'allocated' ? user.fullName : '',
+        allocatedAt: status === 'allocated' ? new Date().toISOString() : '',
+        createdBy: user.username,
+        createdByName: user.fullName || user.username,
+        createdAt: new Date().toISOString()
+    });
+    APP.notify('Uniform entry added', 'success');
+    _hodUniformFilter = 'all';
+    _renderHodTab('uniform');
+    return true;
+}
+
+function hodSetUniformStatus(id, status) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var u = DB.getById('hodUniforms', id);
+    if (!u) { APP.notify('Record not found', 'error'); return; }
+    if (status === 'allocated') {
+        confirmAction('Mark uniform as allocated for ' + u.staffName + '?', function(){
+            DB.update('hodUniforms', id, {
+                status: 'allocated',
+                allocatedBy: user.fullName,
+                allocatedAt: new Date().toISOString()
+            });
+            APP.notify(u.staffName + ' — uniform allocated', 'success');
+            _renderHodTab('uniform');
+        });
+    }
+}
+
+function hodEditUniform(id) {
+    var u = DB.getById('hodUniforms', id);
+    if (!u) { APP.notify('Record not found', 'error'); return; }
+    _hodEditingUniformId = id;
+    var esc = function(v){ return String(v||'').replace(/"/g,'&quot;'); };
+    var types = ['Shirt','Trouser','Apron','Coat / Jacket','Shoes','Cap','Gloves','Other'];
+    var typeOpts = types.map(function(t){ return '<option value="' + t + '" ' + (u.uniformType===t?'selected':'') + '>' + t + '</option>'; }).join('');
+    var sizes = ['S','M','L','XL','XXL','Other'];
+    var sizeOpts = sizes.map(function(s){ return '<option value="' + s + '" ' + (u.size===s?'selected':'') + '>' + s + '</option>'; }).join('');
+    var form = '<form id="hodUniformEditForm">'
+        + '<div class="form-group"><label>Staff Name *</label><input type="text" name="staffName" class="form-control" required value="' + esc(u.staffName) + '"></div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Employee ID</label><input type="text" name="employeeId" class="form-control" value="' + esc(u.employeeId) + '"></div>'
+        + '<div class="form-group"><label>Uniform Type *</label><select name="uniformType" class="form-control" required>' + typeOpts + '</select></div>'
+        + '</div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Size *</label><select name="size" class="form-control" required>' + sizeOpts + '</select></div>'
+        + '<div class="form-group"><label>Quantity *</label><input type="number" name="quantity" class="form-control" min="1" value="' + (u.quantity||1) + '" required></div>'
+        + '</div>'
+        + '<div class="form-group"><label>Status</label>'
+        + '<select name="status" class="form-control"><option value="pending"' + (u.status!=='allocated'?' selected':'') + '>⏳ Pending</option><option value="allocated"' + (u.status==='allocated'?' selected':'') + '>✓ Allocated</option></select></div>'
+        + '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="2">' + esc(u.notes) + '</textarea></div>'
+        + '</form>';
+    openFormModal('✎ Edit Uniform Entry', form, 'hodUpdateUniform()', false);
+}
+
+function hodUpdateUniform() {
+    var id = _hodEditingUniformId;
+    if (!id) { APP.notify('Edit session expired', 'error'); return false; }
+    var user = AUTH.currentUser();
+    if (!user) return false;
+    var data = getFormData('hodUniformEditForm');
+    if (!data.staffName || !data.uniformType || !data.size || !data.quantity) {
+        APP.notify('Staff name, uniform type, size and quantity are required', 'error'); return false;
+    }
+    var upd = {
+        staffName: data.staffName,
+        employeeId: data.employeeId || '',
+        uniformType: data.uniformType,
+        size: data.size,
+        quantity: parseInt(data.quantity) || 1,
+        status: data.status || 'pending',
+        notes: data.notes || '',
+        editedAt: new Date().toISOString(),
+        editedBy: user.fullName
+    };
+    if (data.status === 'allocated' && !DB.getById('hodUniforms', id).allocatedBy) {
+        upd.allocatedBy = user.fullName;
+        upd.allocatedAt = new Date().toISOString();
+    }
+    DB.update('hodUniforms', id, upd);
+    APP.notify('Uniform entry updated', 'success');
+    _renderHodTab('uniform');
+    return true;
+}
+
+function hodDeleteUniform(id) {
+    var u = DB.getById('hodUniforms', id);
+    if (!u) { APP.notify('Record not found', 'error'); return; }
+    confirmAction('Delete uniform record for ' + u.staffName + '?', function(){
+        DB.delete('hodUniforms', id);
+        APP.notify('Uniform record deleted', 'success');
+        _renderHodTab('uniform');
+    });
+}
+
+/* Download Uniform Report as Excel */
+function hodDownloadUniformReport() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = window._hodActiveDept || user.department || '';
+    var deptLow = dept.trim().toLowerCase();
+    var all = (DB.get('hodUniforms') || []).filter(function(u){
+        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+        return admin || (u.department||'').trim().toLowerCase() === deptLow;
+    });
+    try {
+        var wb = XLSX.utils.book_new();
+        var pending = all.filter(function(u){ return u.status === 'pending'; });
+        var allocated = all.filter(function(u){ return u.status === 'allocated'; });
+        var totalQty = all.reduce(function(s,u){ return s + (parseInt(u.quantity)||0); }, 0);
+
+        // Sheet 1: Dashboard / Summary
+        var dashData = [
+            ['STAFF UNIFORM REPORT'],
+            [''],
+            ['Department', dept],
+            ['Generated', new Date().toLocaleString('en-IN')],
+            [''],
+            ['Metric', 'Value'],
+            ['Total Records', all.length],
+            ['Pending', pending.length],
+            ['Allocated', allocated.length],
+            ['Total Pieces', totalQty],
+            ['Pending Pieces', pending.reduce(function(s,u){ return s + (parseInt(u.quantity)||0); }, 0)]
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dashData), 'Summary');
+
+        // Sheet 2: Pending
+        var headers = ['Staff Name','Employee ID','Uniform Type','Size','Quantity','Department','Status','Notes','Created By','Created At','Allocated By','Allocated At'];
+        var rowOf = function(u){
+            return [u.staffName||'', u.employeeId||'', u.uniformType||'', u.size||'', u.quantity||1, u.department||'', u.status||'pending', u.notes||'', u.createdByName||'', u.createdAt?APP.formatDate(u.createdAt):'', u.allocatedBy||'', u.allocatedAt?APP.formatDate(u.allocatedAt):''];
+        };
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(pending.map(rowOf))), 'Pending');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(allocated.map(rowOf))), 'Allocated');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(all.map(rowOf))), 'All Records');
+
+        XLSX.writeFile(wb, 'Uniform_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
+        APP.notify('Uniform Report downloaded!', 'success');
+    } catch(e) {
+        APP.notify('Report failed: ' + e.message, 'error');
+    }
+}
+
+/* Download Uniform Report as PDF */
+function hodDownloadUniformPdf() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = window._hodActiveDept || user.department || '';
+    if (typeof window.jspdf==='undefined'){ APP.notify('PDF library not loaded','error'); return; }
+    var deptLow = dept.trim().toLowerCase();
+    var all = (DB.get('hodUniforms') || []).filter(function(u){
+        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+        return admin || (u.department||'').trim().toLowerCase() === deptLow;
+    });
+    var pending = all.filter(function(u){ return u.status === 'pending'; });
+    var allocated = all.filter(function(u){ return u.status === 'allocated'; });
+    var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14);
+    doc.text('Staff Uniform Report — ' + dept, 14, 15);
+    doc.setFontSize(9);
+    doc.text('Generated: ' + new Date().toLocaleString('en-IN') + '   Total: ' + all.length + '   Pending: ' + pending.length + '   Allocated: ' + allocated.length, 14, 22);
+    var headers = ['Staff Name','Employee ID','Uniform Type','Size','Qty','Dept','Status','Notes','Created By','Created At'];
+    var rows = all.map(function(u){
+        return [u.staffName||'', u.employeeId||'', u.uniformType||'', u.size||'', u.quantity||1, u.department||'', u.status||'', u.notes||'', u.createdByName||'', u.createdAt?APP.formatDate(u.createdAt):''];
+    });
+    doc.autoTable({ head:[headers], body:rows, startY:27, styles:{fontSize:7}, headStyles:{fillColor:[230,81,0]} });
+    doc.save('Uniform_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.pdf');
     APP.notify('PDF downloaded', 'success');
 }
 
