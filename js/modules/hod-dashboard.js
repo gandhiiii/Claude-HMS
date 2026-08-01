@@ -254,6 +254,10 @@ function renderHodDashboard(container) {
     if (canUniform) {
         tabs.push({ id: 'uniform', label: '👕 Uniform', badge: (DB.get('hodUniforms') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU && x.status === 'pending'; }).length, bc: 'badge-warning' });
     }
+    var canLocker = canUniform;
+    if (canLocker) {
+        tabs.push({ id: 'locker', label: '🔐 Locker', badge: (DB.get('hodLockers') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU && x.status === 'pending'; }).length, bc: 'badge-warning' });
+    }
 
     var html = ''
         + '<div style="background:linear-gradient(135deg,#6a1b9a,#4a148c);border-radius:14px;padding:20px 24px;color:#fff;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
@@ -352,6 +356,7 @@ function _renderHodTab(tab) {
                 equipservice: _hodEquipService,
                 equipbackdown: _hodEquipBreakdown,
                 uniform: _hodUniform,
+                locker: _hodLocker,
                 hodtodo: _hodTodo,
                 hodworkreport: _hodWorkReport };
     if (map[tab]) map[tab](el);
@@ -2697,6 +2702,9 @@ function hodDownloadBreakdownPdf() {
 ═══════════════════════════════════════════════ */
 var _hodUniformFilter = 'all'; // all | pending | allocated
 var _hodUniformDept = 'all';   // all | department name
+var _hodLockerFilter = 'all'; // all | pending | allocated
+var _hodLockerDept = 'all';   // all | department name
+var _hodEditingLockerId = null;
 
 function _hodUniform(el) {
     var user = AUTH.currentUser();
@@ -3045,8 +3053,340 @@ function hodDownloadUniformPdf() {
 }
 
 /* ═══════════════════════════════════════════════
+   LOCKER TAB — Locker allocation management
+   ═══════════════════════════════════════════════ */
+function _hodLocker(el) {
+    var user = AUTH.currentUser();
+    if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
+    var dept = window._hodActiveDept || user.department || '';
+    var deptLow = dept.trim().toLowerCase();
+    var all = (DB.get('hodLockers') || []).filter(function(l){
+        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+        var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
+        return admin || isFacility || (l.department||'').trim().toLowerCase() === deptLow;
+    });
+    if (_hodLockerDept !== 'all') {
+        all = all.filter(function(l){ return (l.department||'') === _hodLockerDept; });
+    }
+    var pending = all.filter(function(l){ return l.status === 'pending'; });
+    var allocated = all.filter(function(l){ return l.status === 'allocated'; });
+
+    var totalCount = all.length;
+
+    var depts = (DB.get('departments') || []).filter(function(d){ return d.active !== false; });
+    var deptOpts = '<option value="all"' + (_hodLockerDept==='all'?' selected':'') + '>🏢 All Departments</option>'
+        + depts.map(function(d){ return '<option value="' + d.name.replace(/"/g,'&quot;') + '" ' + (_hodLockerDept===d.name?' selected':'') + '>' + d.name + '</option>'; }).join('');
+
+    var html = ''
+
+        // Header
+        + '<div style="background:linear-gradient(135deg,#4527a0,#311b92);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
+        + '<div><div style="font-size:18px;font-weight:700;">🔐 Locker Allocation Management</div>'
+        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + all.length + ' records · ' + pending.length + ' pending · ' + allocated.length + ' allocated</div></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm" style="background:#fff;color:#4527a0;border:none;padding:6px 14px;font-size:12px;font-weight:600;" onclick="hodAddLocker()">+ New Locker Entry</button>'
+        + '<button class="btn btn-sm" style="background:#1b5e20;color:#fff;border:none;padding:6px 14px;font-size:12px;" onclick="hodDownloadLockerReport()">📥 Excel</button>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadLockerPdf()">📕 PDF</button>'
+        + '</div></div>'
+
+        // Department filter
+        + '<div class="form-group" style="max-width:280px;margin-bottom:10px;">'
+        + '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">🏢 Department</label>'
+        + '<select class="form-control" onchange="_hodLockerDept=this.value;_renderHodTab(\'locker\')">' + deptOpts + '</select></div>'
+
+        // Filter buttons
+        + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;">'
+        + '<button class="tab-btn' + (_hodLockerFilter==='all'?' active':'') + '" onclick="_hodLockerFilter=\'all\';_renderHodTab(\'locker\')">All (' + all.length + ')</button>'
+        + '<button class="tab-btn' + (_hodLockerFilter==='pending'?' active':'') + '" onclick="_hodLockerFilter=\'pending\';_renderHodTab(\'locker\')">⏳ Pending (' + pending.length + ')</button>'
+        + '<button class="tab-btn' + (_hodLockerFilter==='allocated'?' active':'') + '" onclick="_hodLockerFilter=\'allocated\';_renderHodTab(\'locker\')">✓ Allocated (' + allocated.length + ')</button>'
+        + '</div>';
+
+    var shown = [];
+    if (_hodLockerFilter === 'pending') shown = pending;
+    else if (_hodLockerFilter === 'allocated') shown = allocated;
+    else shown = all;
+
+    if (shown.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
+            + '<div style="font-size:32px;margin-bottom:8px;">🔐</div>'
+            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No locker records</div>'
+            + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Click "+ New Locker Entry" to add locker allocation details.</div>'
+            + '<button class="btn btn-primary" onclick="hodAddLocker()">+ New Locker Entry</button></div>';
+    } else {
+        // Summary KPIs
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;">'
+            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#4527a0;">' + totalCount + '</div><div style="font-size:11px;color:var(--gray);">Total</div></div>'
+            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#e65100;">' + pending.length + '</div><div style="font-size:11px;color:var(--gray);">Pending</div></div>'
+            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#2e7d32;">' + allocated.length + '</div><div style="font-size:11px;color:var(--gray);">Allocated</div></div>'
+            + '</div>';
+
+        // Section headers
+        var pendShown = shown.filter(function(l){ return l.status === 'pending'; });
+        var allocShown = shown.filter(function(l){ return l.status === 'allocated'; });
+        if (pendShown.length > 0) {
+            html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">⏳ Pending (' + pendShown.length + ')</div>';
+            pendShown.forEach(function(l){ html += _hodLockerCard(l, user); });
+        }
+        if (allocShown.length > 0) {
+            html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">✓ Allocated (' + allocShown.length + ')</div>';
+            allocShown.forEach(function(l){ html += _hodLockerCard(l, user); });
+        }
+    }
+
+    el.innerHTML = html;
+}
+
+function _hodLockerCard(l, user) {
+    var isAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+    var canManage = isAdmin || user.role === 'hod';
+    var statusBadge = l.status === 'allocated'
+        ? '<span class="badge badge-success" style="font-size:10px;">✓ Allocated</span>'
+        : '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>';
+    return '<div style="background:var(--card);border:1px solid var(--border);border-left:4px solid ' + (l.status==='allocated'?'var(--success)':'var(--warning)') + ';border-radius:10px;padding:14px;margin-bottom:10px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">'
+        + '<div style="flex:1;min-width:180px;">'
+        + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'
+        + '<span style="font-size:14px;font-weight:700;">' + (l.staffName || 'Staff') + '</span>' + statusBadge
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-top:6px;font-size:13px;">'
+        + '<div><span style="color:var(--gray);">Locker No:</span> <strong>' + (l.lockerNumber || '-') + '</strong></div>'
+        + '<div><span style="color:var(--gray);">Location:</span> <strong>' + (l.lockerLocation || '-') + '</strong></div>'
+        + '<div><span style="color:var(--gray);">Dept:</span> <strong>' + (l.department || '-') + '</strong></div>'
+        + (l.employeeId ? '<div><span style="color:var(--gray);">Emp ID:</span> <strong>' + l.employeeId + '</strong></div>' : '')
+        + '</div>'
+        + (l.notes ? '<div style="font-size:12px;color:var(--text);margin-top:6px;background:var(--light-gray);padding:6px 10px;border-radius:6px;">📝 ' + l.notes + '</div>' : '')
+        + '<div style="font-size:11px;color:var(--gray);margin-top:6px;">👤 ' + (l.createdByName || l.createdBy || '-') + ' · ' + APP.formatDate(l.createdAt)
+        + (l.allocatedBy ? ' · ✓ Allocated by ' + l.allocatedBy + (l.allocatedAt ? ' on ' + APP.formatDate(l.allocatedAt) : '') : '')
+        + '</div></div>'
+        + '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">'
+        + (canManage && l.status === 'pending'
+            ? '<button class="btn btn-sm btn-success" onclick="hodSetLockerStatus(\'' + l.id + '\',\'allocated\')">✓ Mark Allocated</button>' : '')
+        + (canManage
+            ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--primary);border-color:var(--primary);" onclick="hodEditLocker(\'' + l.id + '\')">✎ Edit</button>' : '')
+        + (canManage
+            ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--danger);border-color:var(--danger);" onclick="hodDeleteLocker(\'' + l.id + '\')">🗑 Delete</button>' : '')
+        + '</div></div></div>';
+}
+
+function hodAddLocker() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = window._hodActiveDept || user.department || '';
+    var depts = (DB.get('departments') || []).filter(function(d){ return d.active !== false; });
+    var deptOpts = depts.map(function(d){
+        return '<option value="' + d.name.replace(/"/g,'&quot;') + '" ' + ((d.name||'').trim().toLowerCase() === dept.trim().toLowerCase() ? 'selected' : '') + '>' + d.name + '</option>';
+    }).join('');
+
+    var form = '<form id="hodLockerForm">'
+        + '<div class="form-group"><label>Department *</label>'
+        + '<select name="department" class="form-control" required>' + deptOpts + '</select></div>'
+        + '<div class="form-group"><label>Staff Name *</label>'
+        + '<input type="text" name="staffName" class="form-control" required placeholder="Type staff name (manual entry by Facility HOD)"></div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Employee ID</label><input type="text" name="employeeId" class="form-control" placeholder="e.g. EMP-0123"></div>'
+        + '<div class="form-group"><label>Locker Number *</label><input type="text" name="lockerNumber" class="form-control" required placeholder="e.g. A-12, B-08"></div>'
+        + '</div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Locker Location</label><input type="text" name="lockerLocation" class="form-control" placeholder="e.g. Ground Floor, Wing B"></div>'
+        + '<div class="form-group"><label>Status</label>'
+        + '<select name="status" class="form-control"><option value="pending">⏳ Pending</option><option value="allocated">✓ Allocated</option></select></div>'
+        + '</div>'
+        + '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="e.g. new joinee, replacement, etc."></textarea></div>'
+        + '</form>';
+    openFormModal('🔐 New Locker Entry', form, 'hodSaveLocker()', true);
+}
+
+function hodSaveLocker() {
+    var user = AUTH.currentUser();
+    if (!user) return false;
+    var data = getFormData('hodLockerForm');
+    var staffName = (data.staffName || '').trim();
+    if (!staffName || !data.lockerNumber) {
+        APP.notify('Staff name and locker number are required', 'error'); return false;
+    }
+    var status = data.status || 'pending';
+    DB.add('hodLockers', {
+        staffName: staffName,
+        employeeId: data.employeeId || '',
+        lockerNumber: data.lockerNumber,
+        lockerLocation: data.lockerLocation || '',
+        department: data.department || user.department || '',
+        status: status,
+        notes: data.notes || '',
+        allocatedBy: status === 'allocated' ? user.fullName : '',
+        allocatedAt: status === 'allocated' ? new Date().toISOString() : '',
+        createdBy: user.username,
+        createdByName: user.fullName || user.username,
+        createdAt: new Date().toISOString()
+    });
+    APP.notify('Locker entry added', 'success');
+    _hodLockerFilter = 'all';
+    _renderHodTab('locker');
+    return true;
+}
+
+function hodSetLockerStatus(id, status) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var l = DB.getById('hodLockers', id);
+    if (!l) { APP.notify('Record not found', 'error'); return; }
+    if (status === 'allocated') {
+        confirmAction('Mark locker as allocated for ' + l.staffName + '?', function(){
+            DB.update('hodLockers', id, {
+                status: 'allocated',
+                allocatedBy: user.fullName,
+                allocatedAt: new Date().toISOString()
+            });
+            APP.notify(l.staffName + ' — locker allocated', 'success');
+            _renderHodTab('locker');
+        });
+    }
+}
+
+function hodEditLocker(id) {
+    var l = DB.getById('hodLockers', id);
+    if (!l) { APP.notify('Record not found', 'error'); return; }
+    _hodEditingLockerId = id;
+    var esc = function(v){ return String(v||'').replace(/"/g,'&quot;'); };
+    var depts = (DB.get('departments') || []).filter(function(d){ return d.active !== false; });
+    var deptOpts = depts.map(function(d){
+        return '<option value="' + d.name.replace(/"/g,'&quot;') + '" ' + ((d.name||'') === (l.department||'') ? 'selected' : '') + '>' + d.name + '</option>';
+    }).join('');
+    var form = '<form id="hodLockerEditForm">'
+        + '<div class="form-group"><label>Department *</label>'
+        + '<select name="department" class="form-control" required>' + deptOpts + '</select></div>'
+        + '<div class="form-group"><label>Staff Name *</label><input type="text" name="staffName" class="form-control" required value="' + esc(l.staffName) + '"></div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Employee ID</label><input type="text" name="employeeId" class="form-control" value="' + esc(l.employeeId) + '"></div>'
+        + '<div class="form-group"><label>Locker Number *</label><input type="text" name="lockerNumber" class="form-control" required value="' + esc(l.lockerNumber) + '"></div>'
+        + '</div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Locker Location</label><input type="text" name="lockerLocation" class="form-control" value="' + esc(l.lockerLocation) + '"></div>'
+        + '<div class="form-group"><label>Status</label>'
+        + '<select name="status" class="form-control"><option value="pending"' + (l.status!=='allocated'?' selected':'') + '>⏳ Pending</option><option value="allocated"' + (l.status==='allocated'?' selected':'') + '>✓ Allocated</option></select></div>'
+        + '</div>'
+        + '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="2">' + esc(l.notes) + '</textarea></div>'
+        + '</form>';
+    openFormModal('✎ Edit Locker Entry', form, 'hodUpdateLocker()', false);
+}
+
+function hodUpdateLocker() {
+    var id = _hodEditingLockerId;
+    if (!id) { APP.notify('Edit session expired', 'error'); return false; }
+    var user = AUTH.currentUser();
+    if (!user) return false;
+    var data = getFormData('hodLockerEditForm');
+    if (!data.staffName || !data.lockerNumber) {
+        APP.notify('Staff name and locker number are required', 'error'); return false;
+    }
+    var upd = {
+        staffName: data.staffName,
+        employeeId: data.employeeId || '',
+        lockerNumber: data.lockerNumber,
+        lockerLocation: data.lockerLocation || '',
+        department: data.department || '',
+        status: data.status || 'pending',
+        notes: data.notes || '',
+        editedAt: new Date().toISOString(),
+        editedBy: user.fullName
+    };
+    if (data.status === 'allocated' && !DB.getById('hodLockers', id).allocatedBy) {
+        upd.allocatedBy = user.fullName;
+        upd.allocatedAt = new Date().toISOString();
+    }
+    DB.update('hodLockers', id, upd);
+    APP.notify('Locker entry updated', 'success');
+    _renderHodTab('locker');
+    return true;
+}
+
+function hodDeleteLocker(id) {
+    var l = DB.getById('hodLockers', id);
+    if (!l) { APP.notify('Record not found', 'error'); return; }
+    confirmAction('Delete locker record for ' + l.staffName + '?', function(){
+        DB.delete('hodLockers', id);
+        APP.notify('Locker record deleted', 'success');
+        _renderHodTab('locker');
+    });
+}
+
+/* Download Locker Report as Excel */
+function hodDownloadLockerReport() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = window._hodActiveDept || user.department || '';
+    var deptLow = dept.trim().toLowerCase();
+    var all = (DB.get('hodLockers') || []).filter(function(l){
+        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+        var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
+        return admin || isFacility || (l.department||'').trim().toLowerCase() === deptLow;
+    });
+    try {
+        var wb = XLSX.utils.book_new();
+        var pending = all.filter(function(l){ return l.status === 'pending'; });
+        var allocated = all.filter(function(l){ return l.status === 'allocated'; });
+
+        // Sheet 1: Dashboard / Summary
+        var dashData = [
+            ['LOCKER ALLOCATION REPORT'],
+            [''],
+            ['Department', dept],
+            ['Generated', new Date().toLocaleString('en-IN')],
+            [''],
+            ['Metric', 'Value'],
+            ['Total Records', all.length],
+            ['Pending', pending.length],
+            ['Allocated', allocated.length]
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dashData), 'Summary');
+
+        // Sheet 2: Pending
+        var headers = ['Staff Name','Employee ID','Locker Number','Locker Location','Department','Status','Notes','Created By','Created At','Allocated By','Allocated At'];
+        var rowOf = function(l){
+            return [l.staffName||'', l.employeeId||'', l.lockerNumber||'', l.lockerLocation||'', l.department||'', l.status||'pending', l.notes||'', l.createdByName||'', l.createdAt?APP.formatDate(l.createdAt):'', l.allocatedBy||'', l.allocatedAt?APP.formatDate(l.allocatedAt):''];
+        };
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(pending.map(rowOf))), 'Pending');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(allocated.map(rowOf))), 'Allocated');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers].concat(all.map(rowOf))), 'All Records');
+
+        XLSX.writeFile(wb, 'Locker_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
+        APP.notify('Locker Report downloaded!', 'success');
+    } catch(e) {
+        APP.notify('Report failed: ' + e.message, 'error');
+    }
+}
+
+/* Download Locker Report as PDF */
+function hodDownloadLockerPdf() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = window._hodActiveDept || user.department || '';
+    if (typeof window.jspdf==='undefined'){ APP.notify('PDF library not loaded','error'); return; }
+    var deptLow = dept.trim().toLowerCase();
+    var all = (DB.get('hodLockers') || []).filter(function(l){
+        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+        var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
+        return admin || isFacility || (l.department||'').trim().toLowerCase() === deptLow;
+    });
+    var pending = all.filter(function(l){ return l.status === 'pending'; });
+    var allocated = all.filter(function(l){ return l.status === 'allocated'; });
+    var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14);
+    doc.text('Locker Allocation Report — ' + dept, 14, 15);
+    doc.setFontSize(9);
+    doc.text('Generated: ' + new Date().toLocaleString('en-IN') + '   Total: ' + all.length + '   Pending: ' + pending.length + '   Allocated: ' + allocated.length, 14, 22);
+    var headers = ['Staff Name','Employee ID','Locker No','Location','Dept','Status','Notes','Created By','Created At'];
+    var rows = all.map(function(l){
+        return [l.staffName||'', l.employeeId||'', l.lockerNumber||'', l.lockerLocation||'', l.department||'', l.status||'', l.notes||'', l.createdByName||'', l.createdAt?APP.formatDate(l.createdAt):''];
+    });
+    doc.autoTable({ head:[headers], body:rows, startY:27, styles:{fontSize:7}, headStyles:{fillColor:[69,39,160]} });
+    doc.save('Locker_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+    APP.notify('PDF downloaded', 'success');
+}
+
+/* ═══════════════════════════════════════════════
    HOD TODO TAB — HOD's own personal work tasks
-═══════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════ */
 function _hodTodo(el) {
     var user = AUTH.currentUser();
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
