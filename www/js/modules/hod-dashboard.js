@@ -35,6 +35,9 @@ var _hodData   = {};
 var _hodFilter = 'all';
 var _hodInvDeptFilter = null; // null = current HOD dept, '__all__' = all departments
 var _hodEditingPurchaseId;
+var _hodInvSubTab = 'general'; // 'general' | 'linen' | 'housekeeping'
+var _hodSpecialInvType = 'linen';
+var _hodSpecialInvEditId = null;
 
 var HOD_DEFAULT_DEPTS = ['IT', 'Facility', 'Maintenance'];
 
@@ -5370,6 +5373,34 @@ function hodSaveReturn() {
 ═══════════════════════════════════════════════ */
 function _hodInventoryReport(el) {
     var user = AUTH.currentUser();
+    if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
+    var canSpecial = (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin')
+        || (user.department || '').trim().toLowerCase() === 'facility';
+    if (!canSpecial) { _hodInvSubTab = 'general'; _hodInvGeneral(el); return; }
+
+    var html = '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;">'
+        + '<button class="tab-btn' + (_hodInvSubTab === 'general' ? ' active' : '') + '" onclick="hodInvSubSwitch(\'general\',this)">📦 General</button>'
+        + '<button class="tab-btn' + (_hodInvSubTab === 'linen' ? ' active' : '') + '" onclick="hodInvSubSwitch(\'linen\',this)">🛏️ Linen</button>'
+        + '<button class="tab-btn' + (_hodInvSubTab === 'housekeeping' ? ' active' : '') + '" onclick="hodInvSubSwitch(\'housekeeping\',this)">🧹 Housekeeping</button>'
+        + '</div>'
+        + '<div id="hodInvSubContent"></div>';
+
+    el.innerHTML = html;
+    var subEl = document.getElementById('hodInvSubContent');
+    if (_hodInvSubTab === 'linen') _hodLinenInventory(subEl);
+    else if (_hodInvSubTab === 'housekeeping') _hodHousekeepingInventory(subEl);
+    else _hodInvGeneral(subEl);
+}
+
+function hodInvSubSwitch(tab, btn) {
+    _hodInvSubTab = tab;
+    var el = document.getElementById('hodTabContent');
+    if (el) _hodInventoryReport(el);
+    if (btn) btn.classList.add('active');
+}
+
+function _hodInvGeneral(el) {
+    var user = AUTH.currentUser();
     var myDept = (user.department || '').trim().toLowerCase();
     var allInv = DB.get('inventory') || [];
 
@@ -5863,6 +5894,305 @@ function hodDownloadInvPdf() {
         return [idx + 1, i.name || '-', i.category || '-', qty, i.unit || 'pcs', '₹' + price, '₹' + (qty * price).toFixed(2)];
     });
     _hodPdfExport(dept + ' Inventory Report', headers, rows);
+}
+
+/* ═══════════════════════════════════════════════
+   LINEN & HOUSEKEEPING INVENTORY (Facility HOD / admin only)
+═══════════════════════════════════════════════ */
+var _HOD_SPECIAL_INV = {
+    linen: {
+        store: 'hodLinenInv',
+        title: '🛏️ Linen Inventory',
+        color: '#6a1b9a',
+        colorBg: '#f3e5f5',
+        placeholders: ['Bed Sheet', 'Pillow Cover', 'Blanket', 'Bedsheet Set', 'Towel', 'Gown', 'Quilt', 'Mattress Cover', 'Duster', 'Curtain']
+    },
+    housekeeping: {
+        store: 'hodHousekeepingInv',
+        title: '🧹 Housekeeping Inventory',
+        color: '#00796b',
+        colorBg: '#e0f2f1',
+        placeholders: ['Broom', 'Mop', 'Bucket', 'Cleaning Liquid', 'Disinfectant', 'Dustbin', 'Gloves', 'Tissue Box', 'Waste Bag', 'Detergent']
+    }
+};
+
+function _hodLinenInventory(el) { _hodSpecialInv(el, 'linen'); }
+function _hodHousekeepingInventory(el) { _hodSpecialInv(el, 'housekeeping'); }
+
+function _hodSpecialInv(el, type) {
+    var user = AUTH.currentUser();
+    if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
+    var cfg = _HOD_SPECIAL_INV[type];
+    var items = (DB.get(cfg.store) || []).filter(function (i) {
+        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+        var isFacility = (user.department || '').trim().toLowerCase() === 'facility';
+        var deptLow = (i.department || '').trim().toLowerCase();
+        return admin || isFacility || deptLow === (user.department || '').trim().toLowerCase() || deptLow === 'facility';
+    });
+    var low = items.filter(function (i) { var q = parseFloat(i.quantity) || 0; return q > 0 && q <= 10; });
+    var out = items.filter(function (i) { return (parseFloat(i.quantity) || 0) === 0; });
+    var totalQty = items.reduce(function (s, i) { return s + (parseFloat(i.quantity) || 0); }, 0);
+    var totalVal = items.reduce(function (s, i) { return s + (parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0); }, 0);
+
+    function st(item) {
+        var q = parseFloat(item.quantity) || 0;
+        if (q === 0) return { l: 'NO STOCK', c: '#212121', b: '#f5f5f5' };
+        if (q <= 10) return { l: 'LOW STOCK', c: '#e65100', b: '#fff3e0' };
+        return { l: 'IN STOCK', c: '#2e7d32', b: '#e8f5e9' };
+    }
+    function exp(item) {
+        if (!item.expiryDate) return null;
+        var d = (new Date(item.expiryDate) - new Date()) / 86400000;
+        if (d < 0) return { l: 'EXPIRED', c: '#c62828', b: '#ffebee' };
+        if (d <= 30) return { l: 'NEAR EXPIRE', c: '#e65100', b: '#fff8e1' };
+        return { l: 'VALID', c: '#2e7d32', b: '#e8f5e9' };
+    }
+
+    var html = ''
+        + '<div style="background:linear-gradient(135deg,' + cfg.color + ',#2d0e4e);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
+        + '<div><div style="font-size:18px;font-weight:700;">' + cfg.title + '</div>'
+        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + items.length + ' item(s) · ' + totalQty + ' total qty · ₹' + totalVal.toFixed(2) + ' value</div></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm" style="background:#fff;color:' + cfg.color + ';border:none;padding:6px 14px;font-size:12px;font-weight:600;" onclick="hodSpecialInvAdd(\'' + type + '\')">+ Add Item</button>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodSpecialInvExcel(\'' + type + '\')">📥 Excel</button>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodSpecialInvPdf(\'' + type + '\')">📄 PDF</button>'
+        + '</div></div>';
+
+    // KPIs
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;">'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:' + cfg.color + ';">' + items.length + '</div><div style="font-size:11px;color:var(--gray);">Total Items</div></div>'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;">' + totalQty + '</div><div style="font-size:11px;color:var(--gray);">Total Quantity</div></div>'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#e65100;">' + low.length + '</div><div style="font-size:11px;color:var(--gray);">Low Stock</div></div>'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:var(--danger);">' + out.length + '</div><div style="font-size:11px;color:var(--gray);">No Stock</div></div>'
+        + '</div>';
+
+    if (items.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:28px;text-align:center;">'
+            + '<div style="font-size:32px;margin-bottom:8px;">' + cfg.title.slice(0, 2) + '</div>'
+            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No ' + cfg.title.split(' ')[1].toLowerCase() + ' items yet</div>'
+            + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Add items to track ' + cfg.title.split(' ')[1].toLowerCase() + ' stock.</div>'
+            + '<button class="btn btn-primary" onclick="hodSpecialInvAdd(\'' + type + '\')">+ Add Item</button></div>';
+        el.innerHTML = html;
+        return;
+    }
+
+    html += '<div class="card"><div class="card-header"><h3>📋 Items</h3></div>'
+        + '<div class="table-responsive"><table><thead><tr><th>#</th><th>Item Name</th><th>Category</th><th>Qty</th><th>Unit</th><th>Price/Unit</th><th>Value</th><th>Supplier</th><th>Location</th><th>Expiry</th><th>Stock</th><th>Actions</th></tr></thead><tbody>'
+        + items.map(function (i, idx) {
+            var ss = st(i);
+            var es = exp(i);
+            var expBadge = es ? '<span class="inv-badge" style="background:' + es.b + ';color:' + es.c + ';">' + es.l + '</span>' : '<span style="font-size:11px;color:var(--gray);">—</span>';
+            return '<tr>'
+                + '<td>' + (idx + 1) + '</td>'
+                + '<td><strong>' + (i.name || '-') + '</strong></td>'
+                + '<td>' + (i.category || '-') + '</td>'
+                + '<td style="display:flex;align-items:center;gap:6px;"><button class="btn btn-xs" style="min-width:22px;padding:1px 6px;font-size:12px;line-height:1;" onclick="hodSpecialInvQty(\'' + type + '\',\'' + i.id + '\',-1)">−</button><strong>' + (parseFloat(i.quantity) || 0) + '</strong><button class="btn btn-xs" style="min-width:22px;padding:1px 6px;font-size:12px;line-height:1;" onclick="hodSpecialInvQty(\'' + type + '\',\'' + i.id + '\',1)">+</button></td>'
+                + '<td>' + (i.unit || 'pcs') + '</td>'
+                + '<td>₹' + (parseFloat(i.price) || 0).toFixed(2) + '</td>'
+                + '<td>₹' + ((parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0)).toFixed(2) + '</td>'
+                + '<td>' + (i.supplier || '-') + '</td>'
+                + '<td>' + (i.location || '-') + '</td>'
+                + '<td>' + expBadge + '</td>'
+                + '<td><span class="inv-badge" style="background:' + ss.b + ';color:' + ss.c + ';border:1px solid ' + ss.c + ';">' + ss.l + '</span></td>'
+                + '<td style="white-space:nowrap;">'
+                + '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--primary);border-color:var(--primary);padding:2px 8px;" onclick="hodSpecialInvEdit(\'' + type + '\',\'' + i.id + '\')">✎ Edit</button> '
+                + '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--danger);border-color:var(--danger);padding:2px 8px;" onclick="hodSpecialInvDelete(\'' + type + '\',\'' + i.id + '\')">🗑</button>'
+                + '</td></tr>';
+        }).join('')
+        + '</tbody></table></div></div>';
+
+    el.innerHTML = html;
+}
+
+function hodSpecialInvAdd(type) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    _hodSpecialInvType = type;
+    _hodSpecialInvEditId = null;
+    var cfg = _HOD_SPECIAL_INV[type];
+    var dept = user.department || '';
+    var ph = cfg.placeholders.map(function (p) { return '<option value="' + p + '">' + p + '</option>'; }).join('');
+    var form = '<form id="hodSpecialInvForm">'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Item Name *</label><input type="text" name="name" class="form-control" required placeholder="e.g. ' + cfg.placeholders[0] + '"></div>'
+        + '<div class="form-group"><label>Category</label><select name="category" class="form-control">' + ph + '<option value="Other">Other</option></select></div>'
+        + '</div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Quantity *</label><input type="number" name="quantity" class="form-control" min="0" value="1" required></div>'
+        + '<div class="form-group"><label>Unit</label><input type="text" name="unit" class="form-control" value="pcs" placeholder="pcs, set, litre"></div>'
+        + '</div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Price / Unit (₹)</label><input type="number" name="price" class="form-control" min="0" step="0.01" value="0"></div>'
+        + '<div class="form-group"><label>Supplier</label><input type="text" name="supplier" class="form-control" placeholder="e.g. Vendor name"></div>'
+        + '</div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Expiry Date</label><input type="date" name="expiryDate" class="form-control"></div>'
+        + '<div class="form-group"><label>Location</label><input type="text" name="location" class="form-control" placeholder="e.g. Store Room A"></div>'
+        + '</div>'
+        + '<div class="form-group"><label>Department</label><input type="text" name="department" class="form-control" value="' + dept.replace(/"/g, '&quot;') + '"></div>'
+        + '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="e.g. reorder point, condition, etc."></textarea></div>'
+        + '</form>';
+    openFormModal(cfg.title.slice(0, 2) + ' Add ' + cfg.title.split(' ')[1] + ' Item', form, 'hodSpecialInvSave()', true);
+}
+
+function hodSpecialInvSave() {
+    var user = AUTH.currentUser();
+    if (!user) return false;
+    var data = getFormData('hodSpecialInvForm');
+    if (!data.name) { APP.notify('Item name is required', 'error'); return false; }
+    var cfg = _HOD_SPECIAL_INV[_hodSpecialInvType];
+    if (!cfg) return false;
+    DB.add(cfg.store, {
+        name: data.name.trim(),
+        category: data.category || '',
+        quantity: parseInt(data.quantity) || 0,
+        unit: data.unit || 'pcs',
+        price: parseFloat(data.price) || 0,
+        supplier: data.supplier || '',
+        expiryDate: data.expiryDate || '',
+        location: data.location || '',
+        department: data.department || user.department || 'Facility',
+        notes: data.notes || '',
+        createdBy: user.fullName
+    });
+    APP.notify(data.name + ' added', 'success');
+    _hodRefreshSpecialInv();
+    return true;
+}
+
+function hodSpecialInvEdit(type, id) {
+    var cfg = _HOD_SPECIAL_INV[type];
+    var item = DB.getById(cfg.store, id);
+    if (!item) { APP.notify('Item not found', 'error'); return; }
+    _hodSpecialInvType = type;
+    _hodSpecialInvEditId = id;
+    var esc = function (v) { return String(v || '').replace(/"/g, '&quot;'); };
+    var ph = cfg.placeholders.map(function (p) { return '<option value="' + p + '"' + (item.category === p ? ' selected' : '') + '>' + p + '</option>'; }).join('') + '<option value="Other"' + (['Bed Sheet','Pillow Cover','Blanket','Bedsheet Set','Towel','Gown','Quilt','Mattress Cover','Duster','Curtain','Broom','Mop','Bucket','Cleaning Liquid','Disinfectant','Dustbin','Gloves','Tissue Box','Waste Bag','Detergent'].indexOf(item.category) === -1 && item.category ? ' selected' : '') + '>Other</option>';
+    var form = '<form id="hodSpecialInvForm">'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Item Name *</label><input type="text" name="name" class="form-control" required value="' + esc(item.name) + '"></div>'
+        + '<div class="form-group"><label>Category</label><select name="category" class="form-control">' + ph + '</select></div>'
+        + '</div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Quantity *</label><input type="number" name="quantity" class="form-control" min="0" value="' + (parseFloat(item.quantity) || 0) + '" required></div>'
+        + '<div class="form-group"><label>Unit</label><input type="text" name="unit" class="form-control" value="' + esc(item.unit || 'pcs') + '"></div>'
+        + '</div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Price / Unit (₹)</label><input type="number" name="price" class="form-control" min="0" step="0.01" value="' + (parseFloat(item.price) || 0) + '"></div>'
+        + '<div class="form-group"><label>Supplier</label><input type="text" name="supplier" class="form-control" value="' + esc(item.supplier) + '"></div>'
+        + '</div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Expiry Date</label><input type="date" name="expiryDate" class="form-control" value="' + esc(item.expiryDate) + '"></div>'
+        + '<div class="form-group"><label>Location</label><input type="text" name="location" class="form-control" value="' + esc(item.location) + '"></div>'
+        + '</div>'
+        + '<div class="form-group"><label>Department</label><input type="text" name="department" class="form-control" value="' + esc(item.department) + '"></div>'
+        + '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="2">' + esc(item.notes) + '</textarea></div>'
+        + '</form>';
+    openFormModal('✎ Edit ' + cfg.title.split(' ')[1] + ' Item', form, 'hodSpecialInvUpdate()', true);
+}
+
+function hodSpecialInvUpdate() {
+    var user = AUTH.currentUser();
+    if (!user) return false;
+    var id = _hodSpecialInvEditId;
+    if (!id) { APP.notify('Edit session expired', 'error'); return false; }
+    var cfg = _HOD_SPECIAL_INV[_hodSpecialInvType];
+    if (!cfg) return false;
+    var data = getFormData('hodSpecialInvForm');
+    if (!data.name) { APP.notify('Item name is required', 'error'); return false; }
+    DB.update(cfg.store, id, {
+        name: data.name.trim(),
+        category: data.category || '',
+        quantity: parseInt(data.quantity) || 0,
+        unit: data.unit || 'pcs',
+        price: parseFloat(data.price) || 0,
+        supplier: data.supplier || '',
+        expiryDate: data.expiryDate || '',
+        location: data.location || '',
+        department: data.department || user.department || 'Facility',
+        notes: data.notes || '',
+        editedBy: user.fullName
+    });
+    APP.notify('Item updated', 'success');
+    _hodRefreshSpecialInv();
+    return true;
+}
+
+function hodSpecialInvDelete(type, id) {
+    var cfg = _HOD_SPECIAL_INV[type];
+    var item = DB.getById(cfg.store, id);
+    if (!item) { APP.notify('Item not found', 'error'); return; }
+    confirmAction('Delete "' + (item.name || 'item') + '" from ' + cfg.title + '?', function () {
+        DB.delete(cfg.store, id);
+        APP.notify('Item deleted', 'success');
+        _hodRefreshSpecialInv();
+    });
+}
+
+function hodSpecialInvQty(type, id, delta) {
+    var cfg = _HOD_SPECIAL_INV[type];
+    var item = DB.getById(cfg.store, id);
+    if (!item) { APP.notify('Item not found', 'error'); return; }
+    var q = (parseFloat(item.quantity) || 0) + delta;
+    if (q < 0) { APP.notify('Quantity cannot be negative', 'error'); return; }
+    DB.update(cfg.store, id, { quantity: q });
+    _hodRefreshSpecialInv();
+}
+
+function _hodRefreshSpecialInv() {
+    var el = document.getElementById('hodInvSubContent');
+    if (!el) {
+        var main = document.getElementById('hodTabContent');
+        if (main) _hodInventoryReport(main);
+        return;
+    }
+    if (_hodSpecialInvType === 'linen') _hodLinenInventory(el);
+    else if (_hodSpecialInvType === 'housekeeping') _hodHousekeepingInventory(el);
+    else _hodInvGeneral(el);
+}
+
+function _hodSpecialInvData(type) {
+    var user = AUTH.currentUser();
+    if (!user) return [];
+    var cfg = _HOD_SPECIAL_INV[type];
+    return (DB.get(cfg.store) || []).filter(function (i) {
+        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+        var isFacility = (user.department || '').trim().toLowerCase() === 'facility';
+        var deptLow = (i.department || '').trim().toLowerCase();
+        return admin || isFacility || deptLow === (user.department || '').trim().toLowerCase() || deptLow === 'facility';
+    });
+}
+
+function hodSpecialInvExcel(type) {
+    var cfg = _HOD_SPECIAL_INV[type];
+    var items = _hodSpecialInvData(type);
+    if (items.length === 0) { APP.notify('No ' + cfg.title + ' data to download', 'info'); return; }
+    if (typeof XLSX === 'undefined') { APP.notify('Excel library not loaded', 'error'); return; }
+    var headers = ['#', 'Item Name', 'Category', 'Quantity', 'Unit', 'Price/Unit', 'Total Value', 'Supplier', 'Location', 'Expiry Date', 'Notes'];
+    var rows = items.map(function (i, idx) {
+        return [idx + 1, i.name || '-', i.category || '-', parseFloat(i.quantity) || 0, i.unit || 'pcs', (parseFloat(i.price) || 0).toFixed(2), ((parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0)).toFixed(2), i.supplier || '-', i.location || '-', i.expiryDate ? APP.formatDate(i.expiryDate) : '-', i.notes || ''];
+    });
+    var wb = XLSX.utils.book_new();
+    var ws = XLSX.utils.aoa_to_sheet([headers].concat(rows));
+    ws['!cols'] = headers.map(function (h, ci) {
+        var max = h.length;
+        rows.forEach(function (r) { var v = r[ci] != null ? String(r[ci]) : ''; if (v.length > max) max = v.length; });
+        return { wch: Math.min(max + 3, 45) };
+    });
+    XLSX.utils.book_append_sheet(wb, ws, cfg.title.split(' ')[1]);
+    XLSX.writeFile(wb, cfg.title.split(' ')[1] + '_Inventory_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+    APP.notify(cfg.title + ' Excel downloaded!', 'success');
+}
+
+function hodSpecialInvPdf(type) {
+    var cfg = _HOD_SPECIAL_INV[type];
+    var items = _hodSpecialInvData(type);
+    if (items.length === 0) { APP.notify('No ' + cfg.title + ' data to download', 'info'); return; }
+    var headers = ['#', 'Item Name', 'Category', 'Quantity', 'Unit', 'Price/Unit', 'Total Value', 'Supplier', 'Location'];
+    var rows = items.map(function (i, idx) {
+        return [idx + 1, i.name || '-', i.category || '-', parseFloat(i.quantity) || 0, i.unit || 'pcs', '₹' + (parseFloat(i.price) || 0).toFixed(2), '₹' + ((parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0)).toFixed(2), i.supplier || '-', i.location || '-'];
+    });
+    _hodPdfExport(cfg.title + ' Report', headers, rows);
 }
 
 /* ═══════════════════════════════════════════════
