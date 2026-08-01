@@ -39,7 +39,7 @@ function buildWWW() {
 
     const entries = fs.readdirSync(src);
     entries.forEach(file => {
-        if (file.endsWith('.html')) {
+        if (file.endsWith('.html') || file === 'sw.js') {
             const srcFile = path.join(src, file);
             const destFile = path.join(dest, file);
             fs.copyFileSync(srcFile, destFile);

@@ -114,6 +114,7 @@
             /* ── Reports tab ── */
             empd2_rep_comprehensive: 'Comprehensive Work Report',
             empd2_rep_send_hod: 'Send to HOD',
+            empd2_rep_whatsapp: 'WhatsApp',
             empd2_rep_excel: '📥 Excel Report',
             empd2_rep_tasks: 'Tasks',
             empd2_rep_overdue: 'Overdue',
@@ -297,6 +298,7 @@
             /* ── Reports tab ── */
             empd2_rep_comprehensive: 'व्यापक कार्य रिपोर्ट',
             empd2_rep_send_hod: 'HOD को भेजें',
+            empd2_rep_whatsapp: 'WhatsApp',
             empd2_rep_excel: '📥 एक्सेल रिपोर्ट',
             empd2_rep_tasks: 'कार्य',
             empd2_rep_overdue: 'विलंबित',
@@ -480,6 +482,7 @@
             /* ── Reports tab ── */
             empd2_rep_comprehensive: 'વ્યાપક કાર્ય રિપોર્ટ',
             empd2_rep_send_hod: 'HOD ને મોકલો',
+            empd2_rep_whatsapp: 'WhatsApp',
             empd2_rep_excel: '📥 એક્સેલ રિપોર્ટ',
             empd2_rep_tasks: 'કાર્યો',
             empd2_rep_overdue: 'બાકી',

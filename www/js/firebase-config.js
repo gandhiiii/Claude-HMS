@@ -80,6 +80,21 @@ var firebaseConfig = {
 })();
 
 // ── WebSocket Notification Server URL ───────────────────────────────
-// Points to the local ws-server.js running on the same machine.
-// Change to wss://your-domain.com if deploying to a remote server.
-window.WS_SERVER_URL = 'ws://localhost:8765';
+// Dynamically resolves to current host IP/hostname when accessed over LAN/WAN
+(function () {
+    try {
+        var customHost = localStorage.getItem('hms_ws_host') || localStorage.getItem('hms_ws_server_url');
+        if (customHost) {
+            window.WS_SERVER_URL = customHost.startsWith('ws') ? customHost : 'ws://' + customHost + ':8765';
+            return;
+        }
+        var host = (window.location && window.location.hostname && window.location.hostname !== '' && window.location.hostname !== 'file:')
+            ? window.location.hostname
+            : 'localhost';
+        var proto = (window.location && window.location.protocol === 'https:') ? 'wss:' : 'ws:';
+        window.WS_SERVER_URL = proto + '//' + host + ':8765';
+    } catch (e) {
+        window.WS_SERVER_URL = 'ws://localhost:8765';
+    }
+})();
+

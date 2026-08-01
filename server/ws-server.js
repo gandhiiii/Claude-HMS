@@ -7,36 +7,43 @@
 // Clients connect from dashboard.html via WS_NOTIFY (ws-notifications.js).
 // Each client sends an { type:"auth", userId, role, dept } on connect.
 // Server can then push targeted notifications to any client or group.
-//
-// Message types handled:
-//   Client → Server:
-//     { type:"auth",      userId, role, dept }          — identify this socket
-//     { type:"broadcast", to, title, body, notifType }  — fan-out to others
-//     { type:"ping" }                                    — keepalive
-//
-//   Server → Client:
-//     { type:"notification", title, body, notifType }   — push to WS_NOTIFY
-//     { type:"pong" }                                    — keepalive reply
-//     { type:"connected", clientId }                     — welcome message
 // ═══════════════════════════════════════════════════════════════════
 
 'use strict';
 
 const WebSocket = require('ws');
 const http      = require('http');
+const os        = require('os');
 
 const PORT = process.env.HMS_WS_PORT || 8765;
 const HOST = process.env.HMS_WS_HOST || '0.0.0.0';
 
+function getLocalIPs() {
+    const interfaces = os.networkInterfaces();
+    const ips = [];
+    for (const name of Object.keys(interfaces)) {
+        for (const iface of interfaces[name]) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                ips.push(iface.address);
+            }
+        }
+    }
+    return ips;
+}
+
 /* ── HTTP server (health check at GET /) ── */
 const httpServer = http.createServer(function (req, res) {
     if (req.url === '/health' || req.url === '/') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+        });
         res.end(JSON.stringify({
             status:  'ok',
             service: 'HMS WebSocket Notification Server',
             clients: wss ? wss.clients.size : 0,
-            uptime:  Math.floor(process.uptime()) + 's'
+            uptime:  Math.floor(process.uptime()) + 's',
+            localIPs: getLocalIPs()
         }));
     } else {
         res.writeHead(404);
@@ -75,7 +82,7 @@ function broadcast(obj, exclude) {
  */
 function deliver(to, notification, excludeWs) {
     wss.clients.forEach(function (ws) {
-        if (ws === excludeWs) return;
+        if (excludeWs && ws === excludeWs) return;
         const meta = clients.get(ws);
         if (!meta) return;
 
@@ -132,9 +139,13 @@ wss.on('connection', function (ws, req) {
                     type:       'notification',
                     title:      msg.title      || 'Update',
                     body:       msg.body       || '',
-                    notifType:  msg.notifType  || 'info'
+                    notifType:  msg.notifType  || 'info',
+                    key:        msg.key        || null,
+                    itemId:     msg.itemId     || null,
+                    timestamp:  Date.now()
                 };
-                deliver(msg.to || null, notification, ws);
+                const exclude = msg.includeSelf ? null : ws;
+                deliver(msg.to || null, notification, exclude);
                 console.log('[WS]  broadcast from=%s  to=%s  title="%s"',
                     clientId, msg.to || 'all', notification.title);
                 break;
@@ -169,9 +180,9 @@ wss.on('connection', function (ws, req) {
     });
 });
 
-/* ── Server-side push API (call from this process if needed) ── */
+/* ── Server-side push API ── */
 function pushToAll(title, body, notifType) {
-    broadcast({ type: 'notification', title, body, notifType: notifType || 'info' });
+    deliver('all', { type: 'notification', title, body, notifType: notifType || 'info' }, null);
 }
 
 function pushToRole(role, title, body, notifType) {
@@ -182,7 +193,7 @@ function pushToUser(userId, title, body, notifType) {
     deliver('user:' + userId, { type: 'notification', title, body, notifType: notifType || 'info' }, null);
 }
 
-/* ── Keepalive ping every 30 s (prevents idle disconnects) ── */
+/* ── Keepalive ping every 30 s ── */
 setInterval(function () {
     wss.clients.forEach(function (ws) {
         if (ws.readyState === WebSocket.OPEN) {
@@ -193,12 +204,17 @@ setInterval(function () {
 
 /* ── Start listening ── */
 httpServer.listen(PORT, HOST, function () {
+    const ips = getLocalIPs();
     console.log('');
     console.log('╔══════════════════════════════════════════════════╗');
     console.log('║   HMS WebSocket Notification Server               ║');
     console.log('╠══════════════════════════════════════════════════╣');
-    console.log('║   WS   →  ws://localhost:' + PORT + '                  ║');
-    console.log('║   HTTP →  http://localhost:' + PORT + '/health          ║');
+    console.log('║   Local   →  ws://localhost:' + PORT + '              ║');
+    ips.forEach(ip => {
+        const padded = ('ws://' + ip + ':' + PORT).padEnd(28, ' ');
+        console.log('║   LAN     →  ' + padded + '  ║');
+    });
+    console.log('║   Health  →  http://localhost:' + PORT + '/health      ║');
     console.log('╚══════════════════════════════════════════════════╝');
     console.log('');
 });
@@ -210,3 +226,4 @@ process.on('SIGINT', function () {
 });
 
 module.exports = { pushToAll, pushToRole, pushToUser };
+

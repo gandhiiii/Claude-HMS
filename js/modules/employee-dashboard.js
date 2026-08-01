@@ -1295,6 +1295,7 @@ function renderEmpReportsTab(el) {
         + '<div style="font-size:12px;opacity:0.8;margin-top:2px;">' + d.user.fullName + ' &nbsp;·&nbsp; ' + (d.dept||'No Dept') + ' &nbsp;·&nbsp; ' + new Date().toLocaleDateString('en-IN') + '</div></div>'
         + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
         + '<button class="btn btn-sm" style="background:#fff;color:#1a237e;padding:6px 12px;font-weight:600;" onclick="showReportForm()">' + T('empd2_rep_send_hod') + '</button>'
+        + '<button class="btn btn-sm" style="background:#25D366;color:#fff;border:none;padding:6px 12px;font-weight:600;" onclick="empShareFullWorkReport()">💬 ' + T('empd2_rep_whatsapp') + '</button>'
         + '<button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.4);padding:6px 12px;" onclick="empDownloadFullReport()">' + T('empd2_rep_excel') + '</button>'
         + '</div></div>'
         // Stats row
@@ -1703,6 +1704,103 @@ function empShareReport(id, via) {
     } else {
         window.location.href = 'mailto:?subject=' + encodeURIComponent(r.title||'Work Report') + '&body=' + encodeURIComponent(text);
     }
+}
+
+/* Share the employee's FULL work report (all sections) via WhatsApp */
+function empShareFullWorkReport() {
+    var d = _empData;
+    if (!d || !d.user) { APP.notify('View your dashboard first', 'error'); return; }
+    var user = d.user;
+    var today = new Date().toLocaleDateString('en-IN', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    var L = '━━━━━━━━━━━━━━━━━━━━━\n';
+
+    var tasks    = d.myTasks     || [];
+    var probs    = d.myProblems  || [];
+    var cls      = d.myChecklists|| [];
+    var reqs     = d.myRequests  || [];
+    var myTodos  = (DB.get('employeeTodos')||[]).filter(function(t){ return t.createdBy===user.username; });
+
+    var tDone = tasks.filter(function(t){ return t.status==='completed'; }).length;
+    var tPend = tasks.filter(function(t){ return t.status!=='completed'; }).length;
+    var tOver = tasks.filter(function(t){ return t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='completed'; }).length;
+    var pOpen = probs.filter(function(p){ return p.status!=='resolved' && p.status!=='closed'; }).length;
+    var pRes  = probs.filter(function(p){ return p.status==='resolved'||p.status==='closed'; }).length;
+    var clDone= cls.filter(function(c){ return c.status==='completed'; }).length;
+    var clRate= cls.length>0?Math.round(clDone/cls.length*100):0;
+    var reqPend=reqs.filter(function(r){ return r.status==='pending'||r.status==='hod_approved'; }).length;
+    var tdDone = myTodos.filter(function(t){ return t.status==='completed'; }).length;
+    var tdPend = myTodos.length - tdDone;
+
+    function _bar(p){
+        p = Math.max(0, Math.min(100, Math.round(p)));
+        var f = Math.round(p/10);
+        return '█'.repeat(f) + '░'.repeat(10-f) + ' ' + p + '%';
+    }
+
+    var text = '🏥 *HOSPITAL MANAGEMENT SYSTEM*\n'
+        + '*COMPREHENSIVE WORK REPORT*\n'
+        + L
+        + '👤 *Employee:* ' + (user.fullName||user.username) + '\n'
+        + '🏢 *Department:* ' + (d.dept||'—') + '\n'
+        + '📅 *Report Date:* ' + today + '\n'
+        + L
+        + '📊 *OVERVIEW*\n'
+        + '📋 *Tasks:* ' + tDone + '/' + tasks.length + ' done · ' + tOver + ' overdue (' + _bar(tasks.length?Math.round(tDone/tasks.length*100):0) + ')\n'
+        + '🔧 *Problems:* ' + pRes + ' resolved · ' + pOpen + ' open (' + _bar(probs.length?Math.round(pRes/probs.length*100):0) + ')\n'
+        + '✅ *Checklists:* ' + clDone + '/' + cls.length + ' completed (' + _bar(clRate) + ')\n'
+        + '📦 *Requests:* ' + reqs.length + ' total · ' + reqPend + ' pending\n'
+        + '📝 *TODOs:* ' + tdDone + ' done · ' + tdPend + ' pending (' + _bar(myTodos.length?Math.round(tdDone/myTodos.length*100):0) + ')\n'
+        + L;
+
+    if (tasks.length > 0) {
+        text += '📋 *TASKS*\n';
+        tasks.slice().reverse().slice(0,10).forEach(function(t){
+            text += '• ' + (t.title||'') + ' — ' + (t.status||'') + (t.deadline?' (due '+APP.formatDate(t.deadline)+')':'') + '\n';
+        });
+        if (tasks.length > 10) text += '… +' + (tasks.length-10) + ' more\n';
+        text += L;
+    }
+
+    if (probs.length > 0) {
+        text += '🔧 *PROBLEMS*\n';
+        probs.slice().reverse().slice(0,10).forEach(function(p){
+            text += '• ' + (p.title||'') + ' — ' + (p.status||'') + '\n';
+        });
+        if (probs.length > 10) text += '… +' + (probs.length-10) + ' more\n';
+        text += L;
+    }
+
+    if (cls.length > 0) {
+        text += '✅ *CHECKLIST STATUS*\n';
+        cls.slice().reverse().slice(0,10).forEach(function(cl){
+            var tot = cl.items?cl.items.length:0;
+            var dn  = cl.items?cl.items.filter(function(i){ return i.status && i.status!=='pending'; }).length:0;
+            text += '• ' + (cl.title||'') + ' — ' + dn + '/' + tot + (cl.weekDate?' (week '+APP.formatDate(cl.weekDate)+')':'') + '\n';
+        });
+        if (cls.length > 10) text += '… +' + (cls.length-10) + ' more\n';
+        text += L;
+    }
+
+    if (reqs.length > 0) {
+        text += '📦 *MATERIAL REQUESTS*\n';
+        reqs.slice().reverse().slice(0,10).forEach(function(r){
+            text += '• ' + (r.title||r.itemName||'') + ' — ' + (r.status||'') + '\n';
+        });
+        if (reqs.length > 10) text += '… +' + (reqs.length-10) + ' more\n';
+        text += L;
+    }
+
+    if (myTodos.length > 0) {
+        text += '📝 *TODOs*\n';
+        myTodos.slice().reverse().slice(0,10).forEach(function(t){
+            text += '• ' + (t.title||'') + ' — ' + (t.status||'') + '\n';
+        });
+        if (myTodos.length > 10) text += '… +' + (myTodos.length-10) + ' more\n';
+        text += L;
+    }
+
+    text += '_Generated by ' + (user.fullName||user.username) + ' on ' + today + '_';
+    window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
 }
 
 function empExportReportExcel(id) {
