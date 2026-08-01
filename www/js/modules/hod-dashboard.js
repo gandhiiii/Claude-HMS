@@ -2784,7 +2784,7 @@ function _hodUniform(el) {
     el.innerHTML = html;
 }
 
-function _hodUniformCard(u, user) {
+function _hodUniformCard(u, user, showReturnBtn) {
     var isAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
     var canManage = isAdmin || user.role === 'hod';
     var statusBadge = u.status === 'allocated'
@@ -2814,6 +2814,8 @@ function _hodUniformCard(u, user) {
         + '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">'
         + (canManage && u.status === 'pending'
             ? '<button class="btn btn-sm btn-success" onclick="hodSetUniformStatus(\'' + u.id + '\',\'allocated\')">✓ Mark Allocated</button>' : '')
+        + (canManage && u.status === 'allocated' && showReturnBtn
+            ? '<button class="btn btn-sm" style="background:#6a1b9a;color:#fff;font-size:11px;" onclick="hodSetUniformStatus(\'' + u.id + '\',\'returned\')">↩️ Mark Returned</button>' : '')
         + (canManage
             ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--primary);border-color:var(--primary);" onclick="hodEditUniform(\'' + u.id + '\')">✎ Edit</button>' : '')
         + (canManage
@@ -3244,7 +3246,7 @@ function hodViewLockerDetail(id) {
     showModal('<div class="modal-header"><h3>🔐 Locker Detail</h3><button class="modal-close" onclick="this.closest(\'.modal\').remove()">&times;</button></div><div style="padding:16px;">' + html + '</div>');
 }
 
-function _hodLockerCard(l, user) {
+function _hodLockerCard(l, user, showReturnBtn) {
     var isAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
     var canManage = isAdmin || user.role === 'hod';
     var statusBadge = l.status === 'allocated'
@@ -3273,6 +3275,8 @@ function _hodLockerCard(l, user) {
         + '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">'
         + (canManage && l.status === 'pending'
             ? '<button class="btn btn-sm btn-success" onclick="hodSetLockerStatus(\'' + l.id + '\',\'allocated\')">✓ Mark Allocated</button>' : '')
+        + (canManage && l.status === 'allocated' && showReturnBtn
+            ? '<button class="btn btn-sm" style="background:#6a1b9a;color:#fff;font-size:11px;" onclick="hodSetLockerStatus(\'' + l.id + '\',\'returned\')">↩️ Mark Returned</button>' : '')
         + (canManage
             ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--primary);border-color:var(--primary);" onclick="hodEditLocker(\'' + l.id + '\')">✎ Edit</button>' : '')
         + (canManage
@@ -3521,18 +3525,20 @@ function _hodUniformReturn(el) {
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = window._hodActiveDept || user.department || '';
     var deptLow = dept.trim().toLowerCase();
-    var returned = (DB.get('hodUniforms') || []).filter(function(u){
+    var all = (DB.get('hodUniforms') || []).filter(function(u){
         var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
         var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
-        return (admin || isFacility || (u.department||'').trim().toLowerCase() === deptLow) && u.status === 'returned';
+        return admin || isFacility || (u.department||'').trim().toLowerCase() === deptLow;
     });
+    var allocated = all.filter(function(u){ return u.status === 'allocated'; });
+    var returned = all.filter(function(u){ return u.status === 'returned'; });
 
     var html = ''
 
         // Header
         + '<div style="background:linear-gradient(135deg,#6a1b9a,#4a148c);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
         + '<div><div style="font-size:18px;font-weight:700;">↩️ Uniform Return</div>'
-        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + returned.length + ' returned record(s)</div></div>'
+        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + allocated.length + ' allocated · ' + returned.length + ' returned</div></div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-sm" style="background:#fff;color:#6a1b9a;border:none;padding:6px 14px;font-size:12px;font-weight:600;" onclick="hodAddUniformReturn()">+ Add Return Entry</button>'
         + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadUniformReturnPdf()">📕 PDF</button>'
@@ -3541,16 +3547,25 @@ function _hodUniformReturn(el) {
         // Department name display
         + '<div style="margin-bottom:10px;font-size:13px;font-weight:600;">🏢 Department: <span style="color:#6a1b9a;">' + (dept || '-') + '</span></div>';
 
-    if (returned.length === 0) {
-        html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
-            + '<div style="font-size:32px;margin-bottom:8px;">↩️</div>'
-            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No returned uniforms</div>'
-            + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Enter a staff name below to log a uniform return.</div>'
-            + '<button class="btn btn-primary" onclick="hodAddUniformReturn()">+ Add Return Entry</button></div>';
+    // KPI strip
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;">'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#2e7d32;">' + allocated.length + '</div><div style="font-size:11px;color:var(--gray);">Allocated</div></div>'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#6a1b9a;">' + returned.length + '</div><div style="font-size:11px;color:var(--gray);">Returned</div></div>'
+        + '</div>';
+
+    // Allocated section — click to mark returned
+    html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">✓ Allocated — mark as returned (' + allocated.length + ')</div>';
+    if (allocated.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:16px;text-align:center;color:var(--gray);font-size:13px;">No allocated uniforms to return right now.</div>';
     } else {
-        html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;">'
-            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#6a1b9a;">' + returned.length + '</div><div style="font-size:11px;color:var(--gray);">Returned</div></div>'
-            + '</div>';
+        allocated.forEach(function(u){ html += _hodUniformCard(u, user, true); });
+    }
+
+    // Returned section
+    html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">↩️ Already Returned (' + returned.length + ')</div>';
+    if (returned.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:16px;text-align:center;color:var(--gray);font-size:13px;">No returned uniforms logged yet. Use "+ Add Return Entry" or mark an allocated uniform as returned.</div>';
+    } else {
         returned.forEach(function(u){ html += _hodUniformCard(u, user); });
     }
 
@@ -3636,18 +3651,20 @@ function _hodLockerReturn(el) {
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = window._hodActiveDept || user.department || '';
     var deptLow = dept.trim().toLowerCase();
-    var returned = (DB.get('hodLockers') || []).filter(function(l){
+    var all = (DB.get('hodLockers') || []).filter(function(l){
         var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
         var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
-        return (admin || isFacility || (l.department||'').trim().toLowerCase() === deptLow) && l.status === 'returned';
+        return admin || isFacility || (l.department||'').trim().toLowerCase() === deptLow;
     });
+    var allocated = all.filter(function(l){ return l.status === 'allocated'; });
+    var returned = all.filter(function(l){ return l.status === 'returned'; });
 
     var html = ''
 
         // Header
         + '<div style="background:linear-gradient(135deg,#6a1b9a,#4a148c);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
         + '<div><div style="font-size:18px;font-weight:700;">↩️ Locker Return</div>'
-        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + returned.length + ' returned record(s)</div></div>'
+        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + allocated.length + ' allocated · ' + returned.length + ' returned</div></div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-sm" style="background:#fff;color:#6a1b9a;border:none;padding:6px 14px;font-size:12px;font-weight:600;" onclick="hodAddLockerReturn()">+ Add Return Entry</button>'
         + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadLockerReturnPdf()">📕 PDF</button>'
@@ -3656,16 +3673,25 @@ function _hodLockerReturn(el) {
         // Department name display
         + '<div style="margin-bottom:10px;font-size:13px;font-weight:600;">🏢 Department: <span style="color:#6a1b9a;">' + (dept || '-') + '</span></div>';
 
-    if (returned.length === 0) {
-        html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
-            + '<div style="font-size:32px;margin-bottom:8px;">↩️</div>'
-            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No returned lockers</div>'
-            + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Enter a staff name below to log a locker return.</div>'
-            + '<button class="btn btn-primary" onclick="hodAddLockerReturn()">+ Add Return Entry</button></div>';
+    // KPI strip
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;">'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#2e7d32;">' + allocated.length + '</div><div style="font-size:11px;color:var(--gray);">Allocated</div></div>'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#6a1b9a;">' + returned.length + '</div><div style="font-size:11px;color:var(--gray);">Returned</div></div>'
+        + '</div>';
+
+    // Allocated section — click to mark returned
+    html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">✓ Allocated — mark as returned (' + allocated.length + ')</div>';
+    if (allocated.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:16px;text-align:center;color:var(--gray);font-size:13px;">No allocated lockers to return right now.</div>';
     } else {
-        html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;">'
-            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#6a1b9a;">' + returned.length + '</div><div style="font-size:11px;color:var(--gray);">Returned</div></div>'
-            + '</div>';
+        allocated.forEach(function(l){ html += _hodLockerCard(l, user, true); });
+    }
+
+    // Returned section
+    html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">↩️ Already Returned (' + returned.length + ')</div>';
+    if (returned.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:16px;text-align:center;color:var(--gray);font-size:13px;">No returned lockers logged yet. Use "+ Add Return Entry" or mark an allocated locker as returned.</div>';
+    } else {
         returned.forEach(function(l){ html += _hodLockerCard(l, user); });
     }
 
