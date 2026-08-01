@@ -2908,7 +2908,7 @@ function hodSetUniformStatus(id, status) {
                 returnedAt: new Date().toISOString()
             });
             APP.notify(u.staffName + ' — uniform returned', 'success');
-            _renderHodTab('uniformreturn');
+            hodTabSwitch('uniformreturn');
         });
     }
 }
@@ -3368,7 +3368,7 @@ function hodSetLockerStatus(id, status) {
                 returnedAt: new Date().toISOString()
             });
             APP.notify(l.staffName + ' — locker returned', 'success');
-            _renderHodTab('lockerreturn');
+            hodTabSwitch('lockerreturn');
         });
     }
 }
@@ -3606,7 +3606,7 @@ function hodSaveUniformReturn() {
         createdAt: new Date().toISOString()
     });
     APP.notify('Uniform return logged for ' + staffName, 'success');
-    _renderHodTab('uniformreturn');
+    hodTabSwitch('uniformreturn');
     return true;
 }
 
@@ -3718,7 +3718,7 @@ function hodSaveLockerReturn() {
         createdAt: new Date().toISOString()
     });
     APP.notify('Locker return logged for ' + staffName, 'success');
-    _renderHodTab('lockerreturn');
+    hodTabSwitch('lockerreturn');
     return true;
 }
 
