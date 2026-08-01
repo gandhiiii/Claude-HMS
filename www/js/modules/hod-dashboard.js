@@ -3103,6 +3103,15 @@ function _hodLocker(el) {
         // Department name display
         + '<div style="margin-bottom:10px;font-size:13px;font-weight:600;">🏢 Department: <span style="color:#4527a0;">' + (dept || '-') + '</span></div>'
 
+        // Locker graphic grid
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+        + '<div style="font-weight:700;font-size:15px;">🗄️ Locker Grid</div>'
+        + '<span style="font-size:11px;color:var(--gray);">' + _hodLockerGridCount(all) + ' locker(s) mapped</span>'
+        + '</div>'
+        + _hodLockerGrid(all, user)
+        + '</div>'
+
         // Filter buttons
         + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;">'
         + '<button class="tab-btn' + (_hodLockerFilter==='all'?' active':'') + '" onclick="_hodLockerFilter=\'all\';_renderHodTab(\'locker\')">All (' + all.length + ')</button>'
@@ -3143,6 +3152,99 @@ function _hodLocker(el) {
     }
 
     el.innerHTML = html;
+}
+
+function _hodLockerGridCount(all) {
+    var seen = {};
+    (all || []).forEach(function(l){ if (l.lockerNumber) seen[String(l.lockerNumber).trim().toUpperCase()] = true; });
+    return Object.keys(seen).length;
+}
+
+function _hodLockerGrid(all, user) {
+    var byNo = {};
+    (all || []).forEach(function(l){
+        if (!l.lockerNumber) return;
+        var key = String(l.lockerNumber).trim().toUpperCase();
+        if (!byNo[key]) byNo[key] = { no: String(l.lockerNumber).trim(), location: l.lockerLocation || '', staff: [], pending: [], allocated: [] };
+        if (l.status === 'allocated') byNo[key].allocated.push(l);
+        else if (l.status === 'pending') byNo[key].pending.push(l);
+        else byNo[key].staff.push(l);
+    });
+    var keys = Object.keys(byNo).sort(function(a, b) {
+        var na = parseInt(a); var nb = parseInt(b);
+        return (isNaN(na) ? a : na) > (isNaN(nb) ? b : nb) ? 1 : -1;
+    });
+    if (keys.length === 0) {
+        return '<div style="text-align:center;color:var(--gray);font-size:13px;padding:18px;">No lockers mapped yet. Add locker entries to see them in the grid.</div>';
+    }
+    var grid = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;">';
+    keys.forEach(function(key){
+        var info = byNo[key];
+        var primary = info.allocated[0] || info.pending[0] || null;
+        var bg, border, label, name;
+        if (info.allocated.length > 0) { bg = '#e8f5e9'; border = '#43a047'; label = '✓ Allocated'; }
+        else if (info.pending.length > 0) { bg = '#fff3e0'; border = '#ff9800'; label = '⏳ Pending'; }
+        else { bg = '#eceff1'; border = '#78909c'; label = 'Available'; }
+        if (primary) {
+            name = primary.staffName || '';
+            var perLocker = info.allocated[0] ? info.allocated[0].department : info.pending[0].department;
+            grid += '<div style="background:' + bg + ';border-radius:10px;padding:12px;cursor:pointer;border:2px solid ' + border + ';position:relative;text-align:center;" onclick="hodViewLockerDetail(\'' + String(primary.id).replace(/'/g,"\\'") + '\')" title="Click to view details">'
+                + '<div style="font-size:20px;font-weight:700;color:#311b92;">' + info.no + '</div>'
+                + '<div style="font-size:12px;font-weight:600;color:#2e7d32;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (name || '-') + '</div>'
+                + '<div style="font-size:10px;color:var(--gray);margin-top:2px;">' + label + (info.location ? ' · ' + info.location : '') + '</div>'
+                + '</div>';
+        } else {
+            grid += '<div style="background:' + bg + ';border-radius:10px;padding:12px;cursor:pointer;border:2px solid ' + border + ';position:relative;text-align:center;" onclick="hodAddLocker()">'
+                + '<div style="font-size:20px;font-weight:700;color:#311b92;">' + info.no + '</div>'
+                + '<div style="font-size:12px;font-weight:600;color:#2e7d32;margin-top:6px;">-</div>'
+                + '<div style="font-size:10px;color:var(--gray);margin-top:2px;">' + label + (info.location ? ' · ' + info.location : '') + '</div>'
+                + '</div>';
+        }
+    });
+    grid += '</div>';
+    return grid;
+}
+
+function hodViewLockerDetail(id) {
+    var l = DB.getById('hodLockers', id);
+    if (!l) { APP.notify('Record not found', 'error'); return; }
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var esc = function(v){ return String(v||'').replace(/"/g,'&quot;'); };
+    var statusBadge = l.status === 'allocated'
+        ? '<span class="badge badge-success">✓ Allocated</span>'
+        : (l.status === 'returned'
+            ? '<span class="badge" style="background:#6a1b9a;color:#fff;">↩️ Returned</span>'
+            : '<span class="badge badge-warning">⏳ Pending</span>');
+    var isAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+    var canManage = isAdmin || user.role === 'hod';
+    var actions = '';
+    if (canManage && l.status === 'pending') {
+        actions += '<button class="btn btn-sm btn-success" style="margin:2px;" onclick="hodSetLockerStatus(\'' + l.id + '\',\'allocated\')">✓ Mark Allocated</button>';
+    }
+    if (canManage && l.status === 'allocated') {
+        actions += '<button class="btn btn-sm" style="margin:2px;background:#6a1b9a;color:#fff;" onclick="hodSetLockerStatus(\'' + l.id + '\',\'returned\')">↩️ Mark Returned</button>';
+    }
+    if (canManage) {
+        actions += '<button class="btn btn-sm btn-outline" style="margin:2px;color:var(--primary);border-color:var(--primary);" onclick="hodEditLocker(\'' + l.id + '\')">✎ Edit</button>';
+        actions += '<button class="btn btn-sm btn-outline" style="margin:2px;color:var(--danger);border-color:var(--danger);" onclick="hodDeleteLocker(\'' + l.id + '\')">🗑 Remove Staff</button>';
+    }
+    var html = '<div style="text-align:center;">'
+        + '<div style="font-size:40px;margin-bottom:8px;">🔐</div>'
+        + '<div style="font-size:22px;font-weight:700;color:#311b92;">' + esc(l.lockerNumber) + '</div>'
+        + '<div style="font-size:13px;color:var(--gray);margin-top:4px;">' + (l.lockerLocation || 'No location') + '</div>'
+        + statusBadge
+        + '</div>'
+        + '<div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;">'
+        + '<div><span style="color:var(--gray);">Staff Name:</span><br><strong>' + esc(l.staffName) + '</strong></div>'
+        + '<div><span style="color:var(--gray);">Department:</span><br><strong>' + esc(l.department) + '</strong></div>'
+        + (l.employeeId ? '<div><span style="color:var(--gray);">Emp ID:</span><br><strong>' + esc(l.employeeId) + '</strong></div>' : '')
+        + (l.allocatedBy ? '<div><span style="color:var(--gray);">Allocated By:</span><br><strong>' + esc(l.allocatedBy) + '</strong></div>' : '')
+        + (l.returnedBy ? '<div><span style="color:var(--gray);">Returned By:</span><br><strong>' + esc(l.returnedBy) + '</strong></div>' : '')
+        + '</div>'
+        + (l.notes ? '<div style="margin-top:10px;font-size:12px;background:var(--light-gray);padding:8px 10px;border-radius:6px;">📝 ' + esc(l.notes) + '</div>' : '')
+        + '<div style="text-align:center;margin-top:14px;">' + actions + '</div>';
+    showModal('<div class="modal-header"><h3>🔐 Locker Detail</h3><button class="modal-close" onclick="this.closest(\'.modal\').remove()">&times;</button></div><div style="padding:16px;">' + html + '</div>');
 }
 
 function _hodLockerCard(l, user) {

@@ -319,6 +319,9 @@ tr:hover td { background: var(--primary-light); }
 /* Room card delete button */
 .room-card:hover .room-del-btn { display:block !important; }
 
+/* Locker grid card */
+.locker-grid-card:hover { box-shadow:0 4px 14px rgba(0,0,0,.15); transform:translateY(-2px); }
+
 /* Live sync indicator pulse */
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
 
