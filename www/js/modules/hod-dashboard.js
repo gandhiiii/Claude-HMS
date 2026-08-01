@@ -2716,18 +2716,11 @@ function _hodUniform(el) {
         var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
         return admin || isFacility || (u.department||'').trim().toLowerCase() === deptLow;
     });
-    if (_hodUniformDept !== 'all') {
-        all = all.filter(function(u){ return (u.department||'') === _hodUniformDept; });
-    }
     var pending = all.filter(function(u){ return u.status === 'pending'; });
     var allocated = all.filter(function(u){ return u.status === 'allocated'; });
 
     var totalQty = all.reduce(function(s,u){ return s + (parseInt(u.quantity)||0); }, 0);
     var pendQty = pending.reduce(function(s,u){ return s + (parseInt(u.quantity)||0); }, 0);
-
-    var depts = (DB.get('departments') || []).filter(function(d){ return d.active !== false; });
-    var deptOpts = '<option value="all"' + (_hodUniformDept==='all'?' selected':'') + '>🏢 All Departments</option>'
-        + depts.map(function(d){ return '<option value="' + d.name.replace(/"/g,'&quot;') + '" ' + (_hodUniformDept===d.name?' selected':'') + '>' + d.name + '</option>'; }).join('');
 
     var html = ''
 
@@ -2741,10 +2734,8 @@ function _hodUniform(el) {
         + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadUniformPdf()">📕 PDF</button>'
         + '</div></div>'
 
-        // Department filter
-        + '<div class="form-group" style="max-width:280px;margin-bottom:10px;">'
-        + '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">🏢 Department</label>'
-        + '<select class="form-control" onchange="_hodUniformDept=this.value;_renderHodTab(\'uniform\')">' + deptOpts + '</select></div>'
+        // Department name display
+        + '<div style="margin-bottom:10px;font-size:13px;font-weight:600;">🏢 Department: <span style="color:#e65100;">' + (dept || '-') + '</span></div>'
 
         // Filter buttons
         + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;">'
@@ -3065,17 +3056,10 @@ function _hodLocker(el) {
         var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
         return admin || isFacility || (l.department||'').trim().toLowerCase() === deptLow;
     });
-    if (_hodLockerDept !== 'all') {
-        all = all.filter(function(l){ return (l.department||'') === _hodLockerDept; });
-    }
     var pending = all.filter(function(l){ return l.status === 'pending'; });
     var allocated = all.filter(function(l){ return l.status === 'allocated'; });
 
     var totalCount = all.length;
-
-    var depts = (DB.get('departments') || []).filter(function(d){ return d.active !== false; });
-    var deptOpts = '<option value="all"' + (_hodLockerDept==='all'?' selected':'') + '>🏢 All Departments</option>'
-        + depts.map(function(d){ return '<option value="' + d.name.replace(/"/g,'&quot;') + '" ' + (_hodLockerDept===d.name?' selected':'') + '>' + d.name + '</option>'; }).join('');
 
     var html = ''
 
@@ -3089,10 +3073,8 @@ function _hodLocker(el) {
         + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadLockerPdf()">📕 PDF</button>'
         + '</div></div>'
 
-        // Department filter
-        + '<div class="form-group" style="max-width:280px;margin-bottom:10px;">'
-        + '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">🏢 Department</label>'
-        + '<select class="form-control" onchange="_hodLockerDept=this.value;_renderHodTab(\'locker\')">' + deptOpts + '</select></div>'
+        // Department name display
+        + '<div style="margin-bottom:10px;font-size:13px;font-weight:600;">🏢 Department: <span style="color:#4527a0;">' + (dept || '-') + '</span></div>'
 
         // Filter buttons
         + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;">'
