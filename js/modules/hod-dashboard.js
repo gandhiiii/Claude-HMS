@@ -2975,7 +2975,8 @@ function hodDownloadUniformReport() {
     var deptLow = dept.trim().toLowerCase();
     var all = (DB.get('hodUniforms') || []).filter(function(u){
         var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
-        return admin || (u.department||'').trim().toLowerCase() === deptLow;
+        var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
+        return admin || isFacility || (u.department||'').trim().toLowerCase() === deptLow;
     });
     try {
         var wb = XLSX.utils.book_new();
@@ -3024,7 +3025,8 @@ function hodDownloadUniformPdf() {
     var deptLow = dept.trim().toLowerCase();
     var all = (DB.get('hodUniforms') || []).filter(function(u){
         var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
-        return admin || (u.department||'').trim().toLowerCase() === deptLow;
+        var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
+        return admin || isFacility || (u.department||'').trim().toLowerCase() === deptLow;
     });
     var pending = all.filter(function(u){ return u.status === 'pending'; });
     var allocated = all.filter(function(u){ return u.status === 'allocated'; });
