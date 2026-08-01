@@ -2803,11 +2803,6 @@ function hodAddUniform() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = window._hodActiveDept || user.department || '';
-    var team = (DB.get('users') || []).filter(function(m){
-        return (m.department||'').trim().toLowerCase() === dept.trim().toLowerCase() && m.role !== 'admin' && m.role !== 'super_admin';
-    });
-    var staffOpts = '<option value="">— Select Staff —</option>'
-        + team.map(function(m){ return '<option value="' + m.fullName.replace(/"/g,'&quot;') + '">' + m.fullName + '</option>'; }).join('');
     var types = ['Shirt','Trouser','Apron','Coat / Jacket','Shoes','Cap','Gloves','Other'];
     var typeOpts = types.map(function(t){ return '<option value="' + t + '">' + t + '</option>'; }).join('');
     var sizes = ['S','M','L','XL','XXL','Other'];
@@ -2815,8 +2810,7 @@ function hodAddUniform() {
 
     var form = '<form id="hodUniformForm">'
         + '<div class="form-group"><label>Staff Name *</label>'
-        + '<select name="staffName" class="form-control" required onchange="hodUniformStaffPick(this)">' + staffOpts + '</select>'
-        + '<input type="text" name="staffNameManual" class="form-control" style="margin-top:6px;display:none;" placeholder="Or type staff name manually"></div>'
+        + '<input type="text" name="staffName" class="form-control" required placeholder="Type staff name (manual entry by Facility HOD)"></div>'
         + '<div class="grid-2" style="gap:10px;">'
         + '<div class="form-group"><label>Employee ID</label><input type="text" name="employeeId" class="form-control" placeholder="e.g. EMP-0123"></div>'
         + '<div class="form-group"><label>Uniform Type *</label><select name="uniformType" class="form-control" required>' + typeOpts + '</select></div>'
@@ -2833,17 +2827,11 @@ function hodAddUniform() {
     openFormModal('👕 New Uniform Entry', form, 'hodSaveUniform()', true);
 }
 
-function hodUniformStaffPick(sel) {
-    var manual = document.querySelector('#hodUniformForm [name="staffNameManual"]');
-    if (!manual) return;
-    manual.style.display = sel.value === '' ? '' : 'none';
-}
-
 function hodSaveUniform() {
     var user = AUTH.currentUser();
     if (!user) return false;
     var data = getFormData('hodUniformForm');
-    var staffName = data.staffName || data.staffNameManual || '';
+    var staffName = (data.staffName || '').trim();
     if (!staffName || !data.uniformType || !data.size || !data.quantity) {
         APP.notify('Staff name, uniform type, size and quantity are required', 'error'); return false;
     }
