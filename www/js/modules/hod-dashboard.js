@@ -3177,29 +3177,31 @@ function _hodLockerGrid(all, user) {
     if (keys.length === 0) {
         return '<div style="text-align:center;color:var(--gray);font-size:13px;padding:18px;">No lockers mapped yet. Add locker entries to see them in the grid.</div>';
     }
-    var grid = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;">';
+    var grid = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;">';
     keys.forEach(function(key){
         var info = byNo[key];
         var primary = info.allocated[0] || info.pending[0] || null;
-        var bg, border, label, name;
-        if (info.allocated.length > 0) { bg = '#e8f5e9'; border = '#43a047'; label = '✓ Allocated'; }
-        else if (info.pending.length > 0) { bg = '#fff3e0'; border = '#ff9800'; label = '⏳ Pending'; }
-        else { bg = '#eceff1'; border = '#78909c'; label = 'Available'; }
-        if (primary) {
-            name = primary.staffName || '';
-            var perLocker = info.allocated[0] ? info.allocated[0].department : info.pending[0].department;
-            grid += '<div style="background:' + bg + ';border-radius:10px;padding:12px;cursor:pointer;border:2px solid ' + border + ';position:relative;text-align:center;" onclick="hodViewLockerDetail(\'' + String(primary.id).replace(/'/g,"\\'") + '\')" title="Click to view details">'
-                + '<div style="font-size:20px;font-weight:700;color:#311b92;">' + info.no + '</div>'
-                + '<div style="font-size:12px;font-weight:600;color:#2e7d32;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (name || '-') + '</div>'
-                + '<div style="font-size:10px;color:var(--gray);margin-top:2px;">' + label + (info.location ? ' · ' + info.location : '') + '</div>'
-                + '</div>';
-        } else {
-            grid += '<div style="background:' + bg + ';border-radius:10px;padding:12px;cursor:pointer;border:2px solid ' + border + ';position:relative;text-align:center;" onclick="hodAddLocker()">'
-                + '<div style="font-size:20px;font-weight:700;color:#311b92;">' + info.no + '</div>'
-                + '<div style="font-size:12px;font-weight:600;color:#2e7d32;margin-top:6px;">-</div>'
-                + '<div style="font-size:10px;color:var(--gray);margin-top:2px;">' + label + (info.location ? ' · ' + info.location : '') + '</div>'
-                + '</div>';
-        }
+        var bg, border, label, name, isAlloc;
+        if (info.allocated.length > 0) { bg = 'linear-gradient(145deg,#e8f5e9,#c8e6c9)'; border = '#43a047'; label = '✓ Allocated'; isAlloc = true; }
+        else if (info.pending.length > 0) { bg = 'linear-gradient(145deg,#fff3e0,#ffe0b2)'; border = '#ff9800'; label = '⏳ Pending'; isAlloc = false; }
+        else { bg = 'linear-gradient(145deg,#eceff1,#cfd8dc)'; border = '#78909c'; label = 'Available'; isAlloc = false; }
+        name = primary ? (primary.staffName || '-') : '-';
+        var onclk = primary ? "hodViewLockerDetail('" + String(primary.id).replace(/'/g,"\\'") + "')" : 'hodAddLocker()';
+        grid += '<div class="locker-grid-card" style="background:' + bg + ';border-radius:6px;cursor:pointer;border:2px solid ' + border + ';position:relative;aspect-ratio:3/4;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;box-shadow:inset 0 0 0 3px rgba(255,255,255,.6), 0 2px 4px rgba(0,0,0,.1);" onclick="' + onclk + '" title="Click to view details">'
+            // Number plate
+            + '<div style="background:#fff;border:1px solid #b0bec5;border-radius:4px;padding:2px 8px;font-size:14px;font-weight:700;color:#311b92;box-shadow:0 1px 2px rgba(0,0,0,.15);">' + info.no + '</div>'
+            // Door vent slots
+            + '<div style="margin:8px 0 6px 0;display:flex;flex-direction:column;gap:3px;">'
+            + '<span style="display:block;width:34px;height:2px;background:rgba(0,0,0,.15);border-radius:1px;"></span>'
+            + '<span style="display:block;width:34px;height:2px;background:rgba(0,0,0,.15);border-radius:1px;"></span>'
+            + '<span style="display:block;width:34px;height:2px;background:rgba(0,0,0,.15);border-radius:1px;"></span>'
+            + '</div>'
+            // Door handle
+            + '<div style="width:4px;height:16px;background:#90a4ae;border-radius:2px;position:absolute;right:10px;top:50%;transform:translateY(-50%);box-shadow:0 1px 2px rgba(0,0,0,.2);"></div>'
+            // Staff name
+            + '<div style="font-size:11px;font-weight:700;color:#2e7d32;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;">' + name + '</div>'
+            + '<div style="font-size:9px;color:var(--gray);margin-top:2px;">' + label + '</div>'
+            + '</div>';
     });
     grid += '</div>';
     return grid;
