@@ -253,10 +253,12 @@ function renderHodDashboard(container) {
     var canUniform = (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') || _dlowU === 'facility';
     if (canUniform) {
         tabs.push({ id: 'uniform', label: '👕 Uniform', badge: (DB.get('hodUniforms') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU && x.status === 'pending'; }).length, bc: 'badge-warning' });
+        tabs.push({ id: 'uniformreturn', label: '↩️ Uniform Return', badge: (DB.get('hodUniforms') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU && x.status === 'returned'; }).length, bc: 'badge-secondary' });
     }
     var canLocker = canUniform;
     if (canLocker) {
         tabs.push({ id: 'locker', label: '🔐 Locker', badge: (DB.get('hodLockers') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU && x.status === 'pending'; }).length, bc: 'badge-warning' });
+        tabs.push({ id: 'lockerreturn', label: '↩️ Locker Return', badge: (DB.get('hodLockers') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU && x.status === 'returned'; }).length, bc: 'badge-secondary' });
     }
 
     var html = ''
@@ -356,7 +358,9 @@ function _renderHodTab(tab) {
                 equipservice: _hodEquipService,
                 equipbackdown: _hodEquipBreakdown,
                 uniform: _hodUniform,
+                uniformreturn: _hodUniformReturn,
                 locker: _hodLocker,
+                lockerreturn: _hodLockerReturn,
                 hodtodo: _hodTodo,
                 hodworkreport: _hodWorkReport };
     if (map[tab]) map[tab](el);
@@ -2714,7 +2718,7 @@ function _hodUniform(el) {
     var all = (DB.get('hodUniforms') || []).filter(function(u){
         var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
         var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
-        return admin || isFacility || (u.department||'').trim().toLowerCase() === deptLow;
+        return (admin || isFacility || (u.department||'').trim().toLowerCase() === deptLow) && u.status !== 'returned';
     });
     var pending = all.filter(function(u){ return u.status === 'pending'; });
     var allocated = all.filter(function(u){ return u.status === 'allocated'; });
@@ -2743,13 +2747,11 @@ function _hodUniform(el) {
         + '<button class="tab-btn' + (_hodUniformFilter==='all'?' active':'') + '" onclick="_hodUniformFilter=\'all\';_renderHodTab(\'uniform\')">All (' + all.length + ')</button>'
         + '<button class="tab-btn' + (_hodUniformFilter==='pending'?' active':'') + '" onclick="_hodUniformFilter=\'pending\';_renderHodTab(\'uniform\')">⏳ Pending (' + pending.length + ')</button>'
         + '<button class="tab-btn' + (_hodUniformFilter==='allocated'?' active':'') + '" onclick="_hodUniformFilter=\'allocated\';_renderHodTab(\'uniform\')">✓ Allocated (' + allocated.length + ')</button>'
-        + '<button class="tab-btn' + (_hodUniformFilter==='returned'?' active':'') + '" onclick="_hodUniformFilter=\'returned\';_renderHodTab(\'uniform\')">↩️ Returned (' + returned.length + ')</button>'
         + '</div>';
 
     var shown = [];
     if (_hodUniformFilter === 'pending') shown = pending;
     else if (_hodUniformFilter === 'allocated') shown = allocated;
-    else if (_hodUniformFilter === 'returned') shown = returned;
     else shown = all;
 
     if (shown.length === 0) {
@@ -2763,14 +2765,12 @@ function _hodUniform(el) {
         html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;">'
             + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#e65100;">' + pending.length + '</div><div style="font-size:11px;color:var(--gray);">Pending</div></div>'
             + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#2e7d32;">' + allocated.length + '</div><div style="font-size:11px;color:var(--gray);">Allocated</div></div>'
-            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#6a1b9a;">' + returned.length + '</div><div style="font-size:11px;color:var(--gray);">Returned</div></div>'
-            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#1a237e;">' + totalQty + '</div><div style="font-size:11px;color:var(--gray);">Total Pieces</div></div>'
+            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#6a1b9a;">' + totalQty + '</div><div style="font-size:11px;color:var(--gray);">Total Pieces</div></div>'
             + '</div>';
 
         // Section headers
         var pendShown = shown.filter(function(u){ return u.status === 'pending'; });
         var allocShown = shown.filter(function(u){ return u.status === 'allocated'; });
-        var retShown = shown.filter(function(u){ return u.status === 'returned'; });
         if (pendShown.length > 0) {
             html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">⏳ Pending (' + pendShown.length + ')</div>';
             pendShown.forEach(function(u){ html += _hodUniformCard(u, user); });
@@ -2778,10 +2778,6 @@ function _hodUniform(el) {
         if (allocShown.length > 0) {
             html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">✓ Allocated (' + allocShown.length + ')</div>';
             allocShown.forEach(function(u){ html += _hodUniformCard(u, user); });
-        }
-        if (retShown.length > 0) {
-            html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">↩️ Returned (' + retShown.length + ')</div>';
-            retShown.forEach(function(u){ html += _hodUniformCard(u, user); });
         }
     }
 
@@ -2912,7 +2908,7 @@ function hodSetUniformStatus(id, status) {
                 returnedAt: new Date().toISOString()
             });
             APP.notify(u.staffName + ' — uniform returned', 'success');
-            _renderHodTab('uniform');
+            _renderHodTab('uniformreturn');
         });
     }
 }
@@ -3084,7 +3080,7 @@ function _hodLocker(el) {
     var all = (DB.get('hodLockers') || []).filter(function(l){
         var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
         var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
-        return admin || isFacility || (l.department||'').trim().toLowerCase() === deptLow;
+        return (admin || isFacility || (l.department||'').trim().toLowerCase() === deptLow) && l.status !== 'returned';
     });
     var pending = all.filter(function(l){ return l.status === 'pending'; });
     var allocated = all.filter(function(l){ return l.status === 'allocated'; });
@@ -3112,13 +3108,11 @@ function _hodLocker(el) {
         + '<button class="tab-btn' + (_hodLockerFilter==='all'?' active':'') + '" onclick="_hodLockerFilter=\'all\';_renderHodTab(\'locker\')">All (' + all.length + ')</button>'
         + '<button class="tab-btn' + (_hodLockerFilter==='pending'?' active':'') + '" onclick="_hodLockerFilter=\'pending\';_renderHodTab(\'locker\')">⏳ Pending (' + pending.length + ')</button>'
         + '<button class="tab-btn' + (_hodLockerFilter==='allocated'?' active':'') + '" onclick="_hodLockerFilter=\'allocated\';_renderHodTab(\'locker\')">✓ Allocated (' + allocated.length + ')</button>'
-        + '<button class="tab-btn' + (_hodLockerFilter==='returned'?' active':'') + '" onclick="_hodLockerFilter=\'returned\';_renderHodTab(\'locker\')">↩️ Returned (' + returned.length + ')</button>'
         + '</div>';
 
     var shown = [];
     if (_hodLockerFilter === 'pending') shown = pending;
     else if (_hodLockerFilter === 'allocated') shown = allocated;
-    else if (_hodLockerFilter === 'returned') shown = returned;
     else shown = all;
 
     if (shown.length === 0) {
@@ -3133,13 +3127,11 @@ function _hodLocker(el) {
             + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#4527a0;">' + totalCount + '</div><div style="font-size:11px;color:var(--gray);">Total</div></div>'
             + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#e65100;">' + pending.length + '</div><div style="font-size:11px;color:var(--gray);">Pending</div></div>'
             + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#2e7d32;">' + allocated.length + '</div><div style="font-size:11px;color:var(--gray);">Allocated</div></div>'
-            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#6a1b9a;">' + returned.length + '</div><div style="font-size:11px;color:var(--gray);">Returned</div></div>'
             + '</div>';
 
         // Section headers
         var pendShown = shown.filter(function(l){ return l.status === 'pending'; });
         var allocShown = shown.filter(function(l){ return l.status === 'allocated'; });
-        var retShown = shown.filter(function(l){ return l.status === 'returned'; });
         if (pendShown.length > 0) {
             html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">⏳ Pending (' + pendShown.length + ')</div>';
             pendShown.forEach(function(l){ html += _hodLockerCard(l, user); });
@@ -3147,10 +3139,6 @@ function _hodLocker(el) {
         if (allocShown.length > 0) {
             html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">✓ Allocated (' + allocShown.length + ')</div>';
             allocShown.forEach(function(l){ html += _hodLockerCard(l, user); });
-        }
-        if (retShown.length > 0) {
-            html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">↩️ Returned (' + retShown.length + ')</div>';
-            retShown.forEach(function(l){ html += _hodLockerCard(l, user); });
         }
     }
 
@@ -3276,7 +3264,7 @@ function hodSetLockerStatus(id, status) {
                 returnedAt: new Date().toISOString()
             });
             APP.notify(l.staffName + ' — locker returned', 'success');
-            _renderHodTab('locker');
+            _renderHodTab('lockerreturn');
         });
     }
 }
@@ -3425,6 +3413,233 @@ function hodDownloadLockerPdf() {
     });
     doc.autoTable({ head:[headers], body:rows, startY:27, styles:{fontSize:7}, headStyles:{fillColor:[69,39,160]} });
     doc.save('Locker_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+    APP.notify('PDF downloaded', 'success');
+}
+
+/* ═══════════════════════════════════════════════
+   UNIFORM RETURN TAB — returned uniform records
+   ═══════════════════════════════════════════════ */
+function _hodUniformReturn(el) {
+    var user = AUTH.currentUser();
+    if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
+    var dept = window._hodActiveDept || user.department || '';
+    var deptLow = dept.trim().toLowerCase();
+    var returned = (DB.get('hodUniforms') || []).filter(function(u){
+        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+        var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
+        return (admin || isFacility || (u.department||'').trim().toLowerCase() === deptLow) && u.status === 'returned';
+    });
+
+    var html = ''
+
+        // Header
+        + '<div style="background:linear-gradient(135deg,#6a1b9a,#4a148c);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
+        + '<div><div style="font-size:18px;font-weight:700;">↩️ Uniform Return</div>'
+        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + returned.length + ' returned record(s)</div></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm" style="background:#fff;color:#6a1b9a;border:none;padding:6px 14px;font-size:12px;font-weight:600;" onclick="hodAddUniformReturn()">+ Add Return Entry</button>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadUniformReturnPdf()">📕 PDF</button>'
+        + '</div></div>'
+
+        // Department name display
+        + '<div style="margin-bottom:10px;font-size:13px;font-weight:600;">🏢 Department: <span style="color:#6a1b9a;">' + (dept || '-') + '</span></div>';
+
+    if (returned.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
+            + '<div style="font-size:32px;margin-bottom:8px;">↩️</div>'
+            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No returned uniforms</div>'
+            + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Enter a staff name below to log a uniform return.</div>'
+            + '<button class="btn btn-primary" onclick="hodAddUniformReturn()">+ Add Return Entry</button></div>';
+    } else {
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;">'
+            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#6a1b9a;">' + returned.length + '</div><div style="font-size:11px;color:var(--gray);">Returned</div></div>'
+            + '</div>';
+        returned.forEach(function(u){ html += _hodUniformCard(u, user); });
+    }
+
+    el.innerHTML = html;
+}
+
+function hodAddUniformReturn() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = window._hodActiveDept || user.department || '';
+    var types = ['Shirt','Trouser','Scrub','Kurta & Pajama Set','Dupatta','Apron','Coat / Jacket','Shoes','Cap','Gloves','Other'];
+    var typeOpts = types.map(function(t){ return '<option value="' + t + '">' + t + '</option>'; }).join('');
+    var form = '<form id="hodUniformReturnForm">'
+        + '<div class="form-group"><label>Staff Name *</label>'
+        + '<input type="text" name="staffName" class="form-control" required placeholder="Type staff name returning uniform"></div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Uniform Type *</label><select name="uniformType" class="form-control" required>' + typeOpts + '</select></div>'
+        + '<div class="form-group"><label>Size</label><select name="size" class="form-control"><option value="">-</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option>Other</option></select></div>'
+        + '</div>'
+        + '<div class="form-group"><label>Department</label>'
+        + '<input type="text" name="department" class="form-control" value="' + dept.replace(/"/g,'&quot;') + '"></div>'
+        + '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="e.g. uniform returned in good condition"></textarea></div>'
+        + '</form>';
+    openFormModal('↩️ Uniform Return Entry', form, 'hodSaveUniformReturn()', true);
+}
+
+function hodSaveUniformReturn() {
+    var user = AUTH.currentUser();
+    if (!user) return false;
+    var data = getFormData('hodUniformReturnForm');
+    var staffName = (data.staffName || '').trim();
+    if (!staffName) { APP.notify('Staff name is required', 'error'); return false; }
+    DB.add('hodUniforms', {
+        staffName: staffName,
+        employeeId: '',
+        uniformType: data.uniformType || 'Other',
+        size: data.size || '',
+        quantity: 1,
+        department: data.department || user.department || '',
+        status: 'returned',
+        notes: data.notes || '',
+        returnedBy: user.fullName,
+        returnedAt: new Date().toISOString(),
+        createdBy: user.username,
+        createdByName: user.fullName || user.username,
+        createdAt: new Date().toISOString()
+    });
+    APP.notify('Uniform return logged for ' + staffName, 'success');
+    _renderHodTab('uniformreturn');
+    return true;
+}
+
+function hodDownloadUniformReturnPdf() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = window._hodActiveDept || user.department || '';
+    if (typeof window.jspdf==='undefined'){ APP.notify('PDF library not loaded','error'); return; }
+    var deptLow = dept.trim().toLowerCase();
+    var all = (DB.get('hodUniforms') || []).filter(function(u){
+        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+        var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
+        return (admin || isFacility || (u.department||'').trim().toLowerCase() === deptLow) && u.status === 'returned';
+    });
+    var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14);
+    doc.text('Uniform Return Report — ' + dept, 14, 15);
+    doc.setFontSize(9);
+    doc.text('Generated: ' + new Date().toLocaleString('en-IN') + '   Total Returned: ' + all.length, 14, 22);
+    var headers = ['Staff Name','Uniform Type','Size','Dept','Returned By','Returned At'];
+    var rows = all.map(function(u){
+        return [u.staffName||'', u.uniformType||'', u.size||'', u.department||'', u.returnedBy||'', u.returnedAt?APP.formatDate(u.returnedAt):''];
+    });
+    doc.autoTable({ head:[headers], body:rows, startY:27, styles:{fontSize:7}, headStyles:{fillColor:[106,27,154]} });
+    doc.save('Uniform_Return_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+    APP.notify('PDF downloaded', 'success');
+}
+
+/* ═══════════════════════════════════════════════
+   LOCKER RETURN TAB — returned locker records
+   ═══════════════════════════════════════════════ */
+function _hodLockerReturn(el) {
+    var user = AUTH.currentUser();
+    if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
+    var dept = window._hodActiveDept || user.department || '';
+    var deptLow = dept.trim().toLowerCase();
+    var returned = (DB.get('hodLockers') || []).filter(function(l){
+        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+        var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
+        return (admin || isFacility || (l.department||'').trim().toLowerCase() === deptLow) && l.status === 'returned';
+    });
+
+    var html = ''
+
+        // Header
+        + '<div style="background:linear-gradient(135deg,#6a1b9a,#4a148c);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
+        + '<div><div style="font-size:18px;font-weight:700;">↩️ Locker Return</div>'
+        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + returned.length + ' returned record(s)</div></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm" style="background:#fff;color:#6a1b9a;border:none;padding:6px 14px;font-size:12px;font-weight:600;" onclick="hodAddLockerReturn()">+ Add Return Entry</button>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadLockerReturnPdf()">📕 PDF</button>'
+        + '</div></div>'
+
+        // Department name display
+        + '<div style="margin-bottom:10px;font-size:13px;font-weight:600;">🏢 Department: <span style="color:#6a1b9a;">' + (dept || '-') + '</span></div>';
+
+    if (returned.length === 0) {
+        html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
+            + '<div style="font-size:32px;margin-bottom:8px;">↩️</div>'
+            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No returned lockers</div>'
+            + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Enter a staff name below to log a locker return.</div>'
+            + '<button class="btn btn-primary" onclick="hodAddLockerReturn()">+ Add Return Entry</button></div>';
+    } else {
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;">'
+            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#6a1b9a;">' + returned.length + '</div><div style="font-size:11px;color:var(--gray);">Returned</div></div>'
+            + '</div>';
+        returned.forEach(function(l){ html += _hodLockerCard(l, user); });
+    }
+
+    el.innerHTML = html;
+}
+
+function hodAddLockerReturn() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = window._hodActiveDept || user.department || '';
+    var form = '<form id="hodLockerReturnForm">'
+        + '<div class="form-group"><label>Staff Name *</label>'
+        + '<input type="text" name="staffName" class="form-control" required placeholder="Type staff name returning locker"></div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Locker Number *</label><input type="text" name="lockerNumber" class="form-control" required placeholder="e.g. A-12"></div>'
+        + '<div class="form-group"><label>Locker Location</label><input type="text" name="lockerLocation" class="form-control" placeholder="e.g. Ground Floor, Wing B"></div>'
+        + '</div>'
+        + '<div class="form-group"><label>Department</label>'
+        + '<input type="text" name="department" class="form-control" value="' + dept.replace(/"/g,'&quot;') + '"></div>'
+        + '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="e.g. locker key returned"></textarea></div>'
+        + '</form>';
+    openFormModal('↩️ Locker Return Entry', form, 'hodSaveLockerReturn()', true);
+}
+
+function hodSaveLockerReturn() {
+    var user = AUTH.currentUser();
+    if (!user) return false;
+    var data = getFormData('hodLockerReturnForm');
+    var staffName = (data.staffName || '').trim();
+    if (!staffName || !data.lockerNumber) { APP.notify('Staff name and locker number are required', 'error'); return false; }
+    DB.add('hodLockers', {
+        staffName: staffName,
+        employeeId: '',
+        lockerNumber: data.lockerNumber,
+        lockerLocation: data.lockerLocation || '',
+        department: data.department || user.department || '',
+        status: 'returned',
+        notes: data.notes || '',
+        returnedBy: user.fullName,
+        returnedAt: new Date().toISOString(),
+        createdBy: user.username,
+        createdByName: user.fullName || user.username,
+        createdAt: new Date().toISOString()
+    });
+    APP.notify('Locker return logged for ' + staffName, 'success');
+    _renderHodTab('lockerreturn');
+    return true;
+}
+
+function hodDownloadLockerReturnPdf() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var dept = window._hodActiveDept || user.department || '';
+    if (typeof window.jspdf==='undefined'){ APP.notify('PDF library not loaded','error'); return; }
+    var deptLow = dept.trim().toLowerCase();
+    var all = (DB.get('hodLockers') || []).filter(function(l){
+        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+        var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
+        return (admin || isFacility || (l.department||'').trim().toLowerCase() === deptLow) && l.status === 'returned';
+    });
+    var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(14);
+    doc.text('Locker Return Report — ' + dept, 14, 15);
+    doc.setFontSize(9);
+    doc.text('Generated: ' + new Date().toLocaleString('en-IN') + '   Total Returned: ' + all.length, 14, 22);
+    var headers = ['Staff Name','Locker No','Location','Dept','Returned By','Returned At'];
+    var rows = all.map(function(l){
+        return [l.staffName||'', l.lockerNumber||'', l.lockerLocation||'', l.department||'', l.returnedBy||'', l.returnedAt?APP.formatDate(l.returnedAt):''];
+    });
+    doc.autoTable({ head:[headers], body:rows, startY:27, styles:{fontSize:7}, headStyles:{fillColor:[106,27,154]} });
+    doc.save('Locker_Return_Report_' + dept + '_' + new Date().toISOString().slice(0,10) + '.pdf');
     APP.notify('PDF downloaded', 'success');
 }
 
