@@ -2696,6 +2696,7 @@ function hodDownloadBreakdownPdf() {
    UNIFORM TAB — Facility HOD staff uniform allocation
 ═══════════════════════════════════════════════ */
 var _hodUniformFilter = 'all'; // all | pending | allocated
+var _hodUniformDept = 'all';   // all | department name
 
 function _hodUniform(el) {
     var user = AUTH.currentUser();
@@ -2704,25 +2705,38 @@ function _hodUniform(el) {
     var deptLow = dept.trim().toLowerCase();
     var all = (DB.get('hodUniforms') || []).filter(function(u){
         var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
-        return admin || (u.department||'').trim().toLowerCase() === deptLow;
+        var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
+        return admin || isFacility || (u.department||'').trim().toLowerCase() === deptLow;
     });
+    if (_hodUniformDept !== 'all') {
+        all = all.filter(function(u){ return (u.department||'') === _hodUniformDept; });
+    }
     var pending = all.filter(function(u){ return u.status === 'pending'; });
     var allocated = all.filter(function(u){ return u.status === 'allocated'; });
 
     var totalQty = all.reduce(function(s,u){ return s + (parseInt(u.quantity)||0); }, 0);
     var pendQty = pending.reduce(function(s,u){ return s + (parseInt(u.quantity)||0); }, 0);
 
+    var depts = (DB.get('departments') || []).filter(function(d){ return d.active !== false; });
+    var deptOpts = '<option value="all"' + (_hodUniformDept==='all'?' selected':'') + '>🏢 All Departments</option>'
+        + depts.map(function(d){ return '<option value="' + d.name.replace(/"/g,'&quot;') + '" ' + (_hodUniformDept===d.name?' selected':'') + '>' + d.name + '</option>'; }).join('');
+
     var html = ''
 
         // Header
         + '<div style="background:linear-gradient(135deg,#e65100,#bf360c);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
-        + '<div><div style="font-size:18px;font-weight:700;">👕 Staff Uniform Management — ' + dept + '</div>'
+        + '<div><div style="font-size:18px;font-weight:700;">👕 Staff Uniform Management</div>'
         + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + all.length + ' records · ' + totalQty + ' pieces · ' + pendQty + ' pending</div></div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-sm" style="background:#fff;color:#e65100;border:none;padding:6px 14px;font-size:12px;font-weight:600;" onclick="hodAddUniform()">+ New Uniform Entry</button>'
         + '<button class="btn btn-sm" style="background:#1b5e20;color:#fff;border:none;padding:6px 14px;font-size:12px;" onclick="hodDownloadUniformReport()">📥 Excel</button>'
         + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadUniformPdf()">📕 PDF</button>'
         + '</div></div>'
+
+        // Department filter
+        + '<div class="form-group" style="max-width:280px;margin-bottom:10px;">'
+        + '<label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px;">🏢 Department</label>'
+        + '<select class="form-control" onchange="_hodUniformDept=this.value;_renderHodTab(\'uniform\')">' + deptOpts + '</select></div>'
 
         // Filter buttons
         + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;">'
@@ -2807,8 +2821,14 @@ function hodAddUniform() {
     var typeOpts = types.map(function(t){ return '<option value="' + t + '">' + t + '</option>'; }).join('');
     var sizes = ['S','M','L','XL','XXL','Other'];
     var sizeOpts = sizes.map(function(s){ return '<option value="' + s + '">' + s + '</option>'; }).join('');
+    var depts = (DB.get('departments') || []).filter(function(d){ return d.active !== false; });
+    var deptOpts = depts.map(function(d){
+        return '<option value="' + d.name.replace(/"/g,'&quot;') + '" ' + ((d.name||'').trim().toLowerCase() === dept.trim().toLowerCase() ? 'selected' : '') + '>' + d.name + '</option>';
+    }).join('');
 
     var form = '<form id="hodUniformForm">'
+        + '<div class="form-group"><label>Department *</label>'
+        + '<select name="department" class="form-control" required>' + deptOpts + '</select></div>'
         + '<div class="form-group"><label>Staff Name *</label>'
         + '<input type="text" name="staffName" class="form-control" required placeholder="Type staff name (manual entry by Facility HOD)"></div>'
         + '<div class="grid-2" style="gap:10px;">'
@@ -2822,7 +2842,6 @@ function hodAddUniform() {
         + '<div class="form-group"><label>Status</label>'
         + '<select name="status" class="form-control"><option value="pending">⏳ Pending</option><option value="allocated">✓ Allocated</option></select></div>'
         + '<div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="e.g. new joinee, replacement, etc."></textarea></div>'
-        + '<input type="hidden" name="department" value="' + dept.replace(/"/g,'&quot;') + '">'
         + '</form>';
     openFormModal('👕 New Uniform Entry', form, 'hodSaveUniform()', true);
 }
@@ -2884,7 +2903,13 @@ function hodEditUniform(id) {
     var typeOpts = types.map(function(t){ return '<option value="' + t + '" ' + (u.uniformType===t?'selected':'') + '>' + t + '</option>'; }).join('');
     var sizes = ['S','M','L','XL','XXL','Other'];
     var sizeOpts = sizes.map(function(s){ return '<option value="' + s + '" ' + (u.size===s?'selected':'') + '>' + s + '</option>'; }).join('');
+    var depts = (DB.get('departments') || []).filter(function(d){ return d.active !== false; });
+    var deptOpts = depts.map(function(d){
+        return '<option value="' + d.name.replace(/"/g,'&quot;') + '" ' + ((d.name||'') === (u.department||'') ? 'selected' : '') + '>' + d.name + '</option>';
+    }).join('');
     var form = '<form id="hodUniformEditForm">'
+        + '<div class="form-group"><label>Department *</label>'
+        + '<select name="department" class="form-control" required>' + deptOpts + '</select></div>'
         + '<div class="form-group"><label>Staff Name *</label><input type="text" name="staffName" class="form-control" required value="' + esc(u.staffName) + '"></div>'
         + '<div class="grid-2" style="gap:10px;">'
         + '<div class="form-group"><label>Employee ID</label><input type="text" name="employeeId" class="form-control" value="' + esc(u.employeeId) + '"></div>'
@@ -2916,6 +2941,7 @@ function hodUpdateUniform() {
         uniformType: data.uniformType,
         size: data.size,
         quantity: parseInt(data.quantity) || 1,
+        department: data.department || '',
         status: data.status || 'pending',
         notes: data.notes || '',
         editedAt: new Date().toISOString(),
