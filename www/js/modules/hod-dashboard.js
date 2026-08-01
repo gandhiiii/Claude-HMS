@@ -2803,7 +2803,7 @@ function hodAddUniform() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = window._hodActiveDept || user.department || '';
-    var types = ['Shirt','Trouser','Scrub','Apron','Coat / Jacket','Shoes','Cap','Gloves','Other'];
+    var types = ['Shirt','Trouser','Scrub','Kurta & Pajama Set','Dupatta','Apron','Coat / Jacket','Shoes','Cap','Gloves','Other'];
     var typeOpts = types.map(function(t){ return '<option value="' + t + '">' + t + '</option>'; }).join('');
     var sizes = ['S','M','L','XL','XXL','Other'];
     var sizeOpts = sizes.map(function(s){ return '<option value="' + s + '">' + s + '</option>'; }).join('');
@@ -2880,7 +2880,7 @@ function hodEditUniform(id) {
     if (!u) { APP.notify('Record not found', 'error'); return; }
     _hodEditingUniformId = id;
     var esc = function(v){ return String(v||'').replace(/"/g,'&quot;'); };
-    var types = ['Shirt','Trouser','Scrub','Apron','Coat / Jacket','Shoes','Cap','Gloves','Other'];
+    var types = ['Shirt','Trouser','Scrub','Kurta & Pajama Set','Dupatta','Apron','Coat / Jacket','Shoes','Cap','Gloves','Other'];
     var typeOpts = types.map(function(t){ return '<option value="' + t + '" ' + (u.uniformType===t?'selected':'') + '>' + t + '</option>'; }).join('');
     var sizes = ['S','M','L','XL','XXL','Other'];
     var sizeOpts = sizes.map(function(s){ return '<option value="' + s + '" ' + (u.size===s?'selected':'') + '>' + s + '</option>'; }).join('');
