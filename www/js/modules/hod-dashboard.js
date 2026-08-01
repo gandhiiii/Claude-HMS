@@ -2814,8 +2814,6 @@ function _hodUniformCard(u, user) {
         + '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">'
         + (canManage && u.status === 'pending'
             ? '<button class="btn btn-sm btn-success" onclick="hodSetUniformStatus(\'' + u.id + '\',\'allocated\')">✓ Mark Allocated</button>' : '')
-        + (canManage && u.status === 'allocated'
-            ? '<button class="btn btn-sm" style="background:#6a1b9a;color:#fff;font-size:11px;" onclick="hodSetUniformStatus(\'' + u.id + '\',\'returned\')">↩️ Mark Returned</button>' : '')
         + (canManage
             ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--primary);border-color:var(--primary);" onclick="hodEditUniform(\'' + u.id + '\')">✎ Edit</button>' : '')
         + (canManage
@@ -3224,9 +3222,6 @@ function hodViewLockerDetail(id) {
     if (canManage && l.status === 'pending') {
         actions += '<button class="btn btn-sm btn-success" style="margin:2px;" onclick="hodSetLockerStatus(\'' + l.id + '\',\'allocated\')">✓ Mark Allocated</button>';
     }
-    if (canManage && l.status === 'allocated') {
-        actions += '<button class="btn btn-sm" style="margin:2px;background:#6a1b9a;color:#fff;" onclick="hodSetLockerStatus(\'' + l.id + '\',\'returned\')">↩️ Mark Returned</button>';
-    }
     if (canManage) {
         actions += '<button class="btn btn-sm btn-outline" style="margin:2px;color:var(--primary);border-color:var(--primary);" onclick="hodEditLocker(\'' + l.id + '\')">✎ Edit</button>';
         actions += '<button class="btn btn-sm btn-outline" style="margin:2px;color:var(--danger);border-color:var(--danger);" onclick="hodDeleteLocker(\'' + l.id + '\')">🗑 Remove Staff</button>';
@@ -3278,8 +3273,6 @@ function _hodLockerCard(l, user) {
         + '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">'
         + (canManage && l.status === 'pending'
             ? '<button class="btn btn-sm btn-success" onclick="hodSetLockerStatus(\'' + l.id + '\',\'allocated\')">✓ Mark Allocated</button>' : '')
-        + (canManage && l.status === 'allocated'
-            ? '<button class="btn btn-sm" style="background:#6a1b9a;color:#fff;font-size:11px;" onclick="hodSetLockerStatus(\'' + l.id + '\',\'returned\')">↩️ Mark Returned</button>' : '')
         + (canManage
             ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--primary);border-color:var(--primary);" onclick="hodEditLocker(\'' + l.id + '\')">✎ Edit</button>' : '')
         + (canManage
