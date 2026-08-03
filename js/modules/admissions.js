@@ -207,7 +207,7 @@ function showRoomManagement() {
     var listHtml = '';
     for (var i = 0; i < rooms.length; i++) {
         var rm = rooms[i];
-        listHtml += '<tr><td>' + rm.roomNo + '</td><td>' + rm.floor + '</td><td><span class="badge badge-info">' + rm.category + '</span></td><td>' + (rm.beds || ['A']).join(', ') + '</td><td><button class="btn btn-sm btn-danger" onclick="deleteRoom(\'' + rm.id + '\')">🗑️</button></td></tr>';
+        listHtml += '<tr><td>' + rm.roomNo + '</td><td>' + rm.floor + '</td><td><span class="badge badge-info">' + rm.category + '</span></td><td>' + (rm.beds || ['A']).join(', ') + '</td><td><button class="btn btn-sm btn-secondary" onclick="editRoom(\'' + rm.id + '\')">✏️ ' + T('admmod_btn_edit') + '</button> <button class="btn btn-sm btn-danger" onclick="deleteRoom(\'' + rm.id + '\')">🗑️</button></td></tr>';
     }
     showModal(`
         <div class="modal-header"><h3>⚙️ ${T('admmod_room_mgmt')}</h3><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
@@ -271,6 +271,114 @@ function addRoom() {
     APP.notify(T('admmod_room_word') + ' ' + roomNo + ' ' + T('admmod_added'), 'success');
 }
 
+function editRoom(id) {
+    var rooms = getRooms();
+    var room = null;
+    for (var i = 0; i < rooms.length; i++) {
+        if (rooms[i].id === id) { room = rooms[i]; break; }
+    }
+    if (!room) { APP.notify(T('admmod_msg_room_not_found'), 'error'); return; }
+    var catOpts = '';
+    for (var c = 0; c < ROOM_CATEGORIES.length; c++) {
+        catOpts += '<option value="' + ROOM_CATEGORIES[c] + '"' + (room.category === ROOM_CATEGORIES[c] ? ' selected' : '') + '>' + ROOM_CATEGORIES[c] + '</option>';
+    }
+    var currentBeds = room.beds || ['A'];
+    var bedCbs = '';
+    for (var b = 0; b < BED_LABELS.length; b++) {
+        var checked = currentBeds.indexOf(BED_LABELS[b]) !== -1 ? ' checked' : '';
+        bedCbs += '<label style="font-size:13px;display:flex;align-items:center;gap:2px;"><input type="checkbox" class="edit-bed-cb" value="' + BED_LABELS[b] + '"' + checked + '> ' + BED_LABELS[b] + '</label>';
+    }
+    var m = showModal(`
+        <div class="modal-header"><h3>✏️ ${T('admmod_edit_room')} — ${room.roomNo}</h3><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
+        <div style="padding:4px 0;">
+            <div class="card" style="padding:12px;">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:end;">
+                    <div class="form-group" style="margin:0;">
+                        <label>${T('admmod_lbl_room_no')}</label>
+                        <input type="text" id="editRoomNo" class="form-control" value="${room.roomNo}">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label>${T('admmod_floor')}</label>
+                        <input type="number" id="editRoomFloor" class="form-control" value="${room.floor}" min="1" max="20">
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label>${T('admmod_category')}</label>
+                        <select id="editRoomCategory" class="form-control">` + catOpts + `</select>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-top:10px;margin-bottom:0;">
+                    <label>${T('admmod_beds')}</label>
+                    <div style="display:flex;gap:4px;">` + bedCbs + `</div>
+                </div>
+                <div style="text-align:right;margin-top:14px;">
+                    <button class="btn btn-secondary" onclick="this.closest('.modal').remove()">${T('admmod_cancel')}</button>
+                    <button class="btn btn-primary" onclick="updateRoom('${id}')">${T('admmod_save')}</button>
+                </div>
+            </div>
+        </div>
+    `);
+}
+
+function updateRoom(id) {
+    var roomNo = document.getElementById('editRoomNo').value.trim();
+    var floor = parseInt(document.getElementById('editRoomFloor').value) || 1;
+    var category = document.getElementById('editRoomCategory').value;
+    var bedCbs = document.querySelectorAll('.edit-bed-cb:checked');
+    var beds = [];
+    for (var i = 0; i < bedCbs.length; i++) beds.push(bedCbs[i].value);
+    if (!roomNo) { APP.notify(T('admmod_msg_enter_room'), 'error'); return; }
+    if (beds.length === 0) { APP.notify(T('admmod_msg_select_bed'), 'error'); return; }
+    var rooms = getRooms();
+    var target = null;
+    for (var r = 0; r < rooms.length; r++) {
+        if (rooms[r].id === id) { target = rooms[r]; break; }
+    }
+    if (!target) { APP.notify(T('admmod_msg_room_not_found'), 'error'); return; }
+    for (var r2 = 0; r2 < rooms.length; r2++) {
+        if (rooms[r2].id !== id && rooms[r2].roomNo === roomNo) {
+            APP.notify(T('admmod_room_word') + ' ' + roomNo + ' ' + T('admmod_already_exists'), 'error');
+            return;
+        }
+    }
+    var oldRoomNo = target.roomNo;
+    target.roomNo = roomNo;
+    target.floor = floor;
+    target.category = category;
+    target.beds = beds;
+    saveRooms(rooms);
+    if (oldRoomNo !== roomNo) {
+        var adms = DB.get('admissions') || [];
+        var changed = false;
+        for (var a = 0; a < adms.length; a++) {
+            if (adms[a].roomNo === oldRoomNo) { adms[a].roomNo = roomNo; changed = true; }
+        }
+        if (changed) DB.set('admissions', adms);
+        var rmv = DB.get('roomStatus') || [];
+        var changedRmv = false;
+        for (var v = 0; v < rmv.length; v++) {
+            if (rmv[v].roomNo === oldRoomNo) { rmv[v].roomNo = roomNo; changedRmv = true; }
+        }
+        if (changedRmv) DB.set('roomStatus', rmv);
+        var rct = DB.get('roomCleaningTasks') || [];
+        var changedRct = false;
+        for (var ct = 0; ct < rct.length; ct++) {
+            if (rct[ct].roomNo === oldRoomNo) { rct[ct].roomNo = roomNo; changedRct = true; }
+        }
+        if (changedRct) DB.set('roomCleaningTasks', rct);
+        var rcl = DB.get('roomchecklists') || [];
+        var changedRcl = false;
+        for (var cl = 0; cl < rcl.length; cl++) {
+            if (rcl[cl].roomNo === oldRoomNo) { rcl[cl].roomNo = roomNo; changedRcl = true; }
+        }
+        if (changedRcl) DB.set('roomchecklists', rcl);
+    }
+    renderRoomManagementList();
+    renderRoomView();
+    var modals = document.querySelectorAll('.modal');
+    if (modals.length > 0) modals[modals.length - 1].remove();
+    APP.notify(T('admmod_msg_room_updated'), 'success');
+}
+
 function deleteRoom(id) {
     confirmAction(T('admmod_confirm_delete_room'), function() {
         var rooms = getRooms();
@@ -303,7 +411,7 @@ function renderRoomManagementList() {
     var html = '';
     for (var i = 0; i < rooms.length; i++) {
         var rm = rooms[i];
-        html += '<tr><td>' + rm.roomNo + '</td><td>' + rm.floor + '</td><td><span class="badge badge-info">' + rm.category + '</span></td><td>' + (rm.beds || ['A']).join(', ') + '</td><td><button class="btn btn-sm btn-danger" onclick="deleteRoom(\'' + rm.id + '\')">🗑️</button></td></tr>';
+        html += '<tr><td>' + rm.roomNo + '</td><td>' + rm.floor + '</td><td><span class="badge badge-info">' + rm.category + '</span></td><td>' + (rm.beds || ['A']).join(', ') + '</td><td><button class="btn btn-sm btn-secondary" onclick="editRoom(\'' + rm.id + '\')">✏️ ' + T('admmod_btn_edit') + '</button> <button class="btn btn-sm btn-danger" onclick="deleteRoom(\'' + rm.id + '\')">🗑️</button></td></tr>';
     }
     tbody.innerHTML = html || '<tr><td colspan="5" class="empty-state">' + T('admmod_no_rooms') + '</td></tr>';
 }
@@ -417,6 +525,7 @@ function renderRoomView() {
             var catColor = '#78909c';
             html += '<div class="room-card" data-room="' + roomNo + '" onclick="showRoomDetail(\'' + roomNo + '\')"';
             html += ' style="background:' + bg + ';border-radius:10px;padding:12px;cursor:pointer;border:2px solid ' + borderColor + ';position:relative;">';
+            html += '<span onclick="event.stopPropagation();editRoom(\'' + rm.id + '\')" style="position:absolute;top:4px;right:26px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.15);color:#666;font-size:11px;font-weight:700;text-align:center;line-height:20px;cursor:pointer;display:none;" class="room-del-btn" title="' + T('admmod_btn_edit') + '">✏️</span>';
             html += '<span onclick="event.stopPropagation();confirmDeleteRoom(\'' + rm.id + '\',\'' + roomNo + '\')" style="position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,0.15);color:#666;font-size:12px;font-weight:700;text-align:center;line-height:20px;cursor:pointer;display:none;" class="room-del-btn" title="' + T('admmod_title_remove_room') + '">&times;</span>';
             html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">';
             html += '<div style="font-size:20px;font-weight:700;">' + roomNo + '</div>';
