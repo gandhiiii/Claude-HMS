@@ -247,7 +247,6 @@ function _mdrRenderTab() {
 function _mdrOverviewTab(el) {
     var occ = _mdrOccupancy();
     var adms = _mdrAdmissions();
-    var discharges = _mdrDischarges();
     var problems = _mdrProblems();
     var complaints = _mdrComplaints();
     var trips = _mdrTrips();
@@ -262,7 +261,6 @@ function _mdrOverviewTab(el) {
         + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;padding:14px;">'
         + _mdrStat(occ.pct + '%', T('mdr_ov_occupancy'), 'var(--primary)')
         + _mdrStat(adms.length, T('mdr_ov_admissions'), 'var(--info)')
-        + _mdrStat(discharges.length, T('mdr_ov_discharges'), 'var(--secondary)')
         + _mdrStat(privileged, T('mdr_ov_privileged'), 'var(--warning)')
         + _mdrStat(problems.length, T('mdr_ov_problems'), 'var(--danger)')
         + _mdrStat(complaints.length, T('mdr_ov_indoor'), 'var(--danger)')
@@ -274,7 +272,6 @@ function _mdrOverviewTab(el) {
     html += _mdrCard(T('mdr_ov_quick_view'), ''
         + '<div style="font-size:13px;line-height:1.9;">'
         + '<div>🛏 <strong>' + T('mdr_ov_occupancy') + ':</strong> ' + occ.pct + '% · ' + T('mdr_ov_cleaning') + ': ' + occ.cleaning + ' · ' + T('mdr_ov_maintenance') + ': ' + occ.maintenance + '</div>'
-        + '<div>🚪 <strong>' + T('mdr_ov_discharges') + ':</strong> ' + discharges.length + '</div>'
         + '<div>🔧 <strong>' + T('mdr_ov_problems') + ':</strong> ' + openProbs + ' ' + T('mdr_ov_open') + ' · ' + resolvedProbs + ' ' + T('mdr_ov_resolved') + '</div>'
         + '<div>🚑 <strong>' + T('mdr_ov_trips') + ':</strong> ' + trips.length + '</div>'
         + '<div>📦 <strong>' + T('mdr_ov_purchases') + ':</strong> ' + receipts.length + '</div>'
@@ -289,7 +286,6 @@ function _mdrOverviewTab(el) {
    ═══════════════════════════════════════════════ */
 function _mdrAdmissionsTab(el) {
     var rows = _mdrAdmissions();
-    var discharges = _mdrDischarges();
     var admitted = rows.filter(function (r) { return r.status === 'admitted'; }).length;
     var emergency = rows.filter(function (r) { return r.type === 'emergency'; }).length;
     var totalBill = rows.reduce(function (s, r) { return s + (parseFloat(r.billAmount) || 0); }, 0);
@@ -297,7 +293,6 @@ function _mdrAdmissionsTab(el) {
     var sumHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;">'
         + _mdrStat(rows.length, T('mdr_ov_admissions'), 'var(--primary)')
         + _mdrStat(admitted, T('mdr_ov_currently_admitted'), 'var(--info)')
-        + _mdrStat(discharges.length, T('mdr_ov_discharges'), 'var(--secondary)')
         + _mdrStat(emergency, T('mdr_ov_emergency'), 'var(--danger)')
         + _mdrStat('₹' + totalBill.toLocaleString('en-IN'), T('mdr_ov_revenue'), 'var(--success)')
         + '</div>';
@@ -364,7 +359,6 @@ function _mdrOccupancyTab(el) {
         + '<div class="card-header"><h3>' + T('mdr_occ_title') + '</h3></div>'
         + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;padding:14px;">'
         + _mdrStat(occ.pct + '%', T('mdr_ov_occupancy'), 'var(--primary)')
-        + _mdrStat(discharges.length, T('mdr_ov_discharges'), 'var(--secondary)')
         + _mdrStat(occ.cleaning, T('mdr_ov_cleaning'), 'var(--warning)')
         + _mdrStat(maintRooms.length, T('mdr_ov_maintenance'), 'var(--danger)')
         + _mdrStat(openProbs, T('mdr_occ_open_problems'), 'var(--danger)')
@@ -676,7 +670,6 @@ function _mdrBuildWhatsApp() {
     var receipts = _mdrReceipts();
     var security = _mdrSecurity();
     var complaints = _mdrComplaints();
-    var discharges = _mdrDischarges();
     var privileged = _mdrAdmissions().filter(function (a) { return a.privileged === 'yes'; }).length;
     var openProbs = problems.filter(function (p) { return p.status !== 'resolved'; }).length;
     var resolvedProbs = problems.filter(function (p) { return p.status === 'resolved'; }).length;
@@ -687,7 +680,6 @@ function _mdrBuildWhatsApp() {
         + '📅 ' + _mdrPeriodLabel() + ' | ' + APP.formatDate(new Date()) + '\n'
         + '━━━━━━━━━━━━━━━\n'
         + '🛏 ' + T('mdr_ov_occupancy') + ': ' + occ.pct + '%\n'
-        + '🚪 ' + T('mdr_ov_discharges') + ': ' + discharges.length + '\n'
         + '🔧 ' + T('mdr_ov_problems') + ': ' + problems.length + ' (' + openProbs + ' ' + T('mdr_ov_open') + ', ' + resolvedProbs + ' ' + T('mdr_ov_resolved') + ')\n'
         + '🚑 ' + T('mdr_ov_trips') + ': ' + trips.length + ' (' + totalKm.toFixed(1) + ' km)\n'
         + '📦 ' + T('mdr_ov_purchases') + ': ' + receipts.length + '\n'
