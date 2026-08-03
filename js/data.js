@@ -412,6 +412,8 @@ const AUTH = {
         if (user.role === 'storekeeper' && ['inventory','material-requests','problems'].indexOf(permission) !== -1) return true;
         // HOD auto-gets admissions, checklists, material-requests so they can manage their dept
         if (user.role === 'hod' && ['admissions','checklists','departmental-checklist','material-requests','problems','tasks','department-meetings'].indexOf(permission) !== -1) return true;
+        // HOD and employees can file indoor incidents (complaints)
+        if (permission === 'complaints' && (user.role === 'hod' || user.role === 'employee')) return true;
         return user.permissions && user.permissions.includes(permission);
     },
     canAccess(permission) {

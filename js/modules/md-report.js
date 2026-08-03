@@ -80,11 +80,8 @@ function _mdrDischarges() {
 }
 
 function _mdrProblems() {
-    var scope = _mdrScope();
     return (DB.get('problems') || []).filter(function (p) {
-        if (!_mdrInRange(p.createdAt)) return false;
-        if (scope === 'all') return true;
-        return ((p.routedTo || p.department) || '').trim().toLowerCase() === scope.toLowerCase();
+        return _mdrInRange(p.createdAt);
     });
 }
 
@@ -256,7 +253,7 @@ function _mdrOverviewTab(el) {
     var trips = _mdrTrips();
     var receipts = _mdrReceipts();
     var security = _mdrSecurity();
-    var privileged = adms.filter(function (a) { return a.type === 'icu' || a.type === 'emergency'; }).length;
+    var privileged = adms.filter(function (a) { return a.privileged === 'yes'; }).length;
     var openProbs = problems.filter(function (p) { return p.status !== 'resolved'; }).length;
     var resolvedProbs = problems.filter(function (p) { return p.status === 'resolved'; }).length;
     var totalPurchase = receipts.reduce(function (s, r) { return s + (parseFloat(r.total) || 0); }, 0);
@@ -684,7 +681,7 @@ function _mdrBuildWhatsApp() {
     var security = _mdrSecurity();
     var complaints = _mdrComplaints();
     var discharges = _mdrDischarges();
-    var privileged = _mdrAdmissions().filter(function (a) { return a.type === 'icu' || a.type === 'emergency'; }).length;
+    var privileged = _mdrAdmissions().filter(function (a) { return a.privileged === 'yes'; }).length;
     var openProbs = problems.filter(function (p) { return p.status !== 'resolved'; }).length;
     var resolvedProbs = problems.filter(function (p) { return p.status === 'resolved'; }).length;
     var totalKm = trips.reduce(function (s, t) { return s + (parseFloat(t.kilometers) || 0); }, 0);
