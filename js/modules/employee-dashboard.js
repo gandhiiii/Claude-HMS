@@ -166,8 +166,23 @@ function _checkAndResetChecklists(checklists, user) {
         var expected = _clPeriodKey(cl.frequency, refDate);
         var stored   = cl.periodKey || '';
         if (!stored) {
-            DB.update('checklists', cl.id, { periodKey: expected, periodSubmitted: false });
+            // Legacy checklist with no periodKey yet. If it has leftover done
+            // items or was left 'completed', roll it into the fresh period so
+            // the OK/fault dropdowns show again; a brand-new empty checklist
+            // just gets its periodKey recorded.
+            var leftover = cl.status === 'completed' || (cl.items || []).some(function(item) {
+                return item.status && item.status !== 'pending';
+            });
+            var updates = { periodKey: expected, periodSubmitted: false };
+            if (leftover) {
+                updates.items = (cl.items || []).map(function(item) {
+                    return { task: item.task, unit: item.unit || '', status: 'pending', value: '' };
+                });
+                updates.status = 'active';
+            }
+            DB.update('checklists', cl.id, updates);
             cl.periodKey = expected; cl.periodSubmitted = false;
+            if (leftover) { cl.items = updates.items; cl.status = 'active'; }
             return;
         }
         if (stored === expected) return; // same period, nothing to do
@@ -966,13 +981,8 @@ function _renderEmpChecklists(checklists) {
             };
             el2.appendChild(div);
         });
-        var reportCount = el.querySelectorAll('.empClItem[data-status="report"]').length;
-        if (reportCount > 0) {
-            var dbg = document.getElementById('empClListNew');
-            if (dbg) dbg.insertAdjacentHTML('afterbegin', '<div style="background:red;color:white;padding:4px 8px;font-size:12px;border-radius:4px;margin-bottom:4px;">DEBUG: ' + reportCount + ' REPORT items, textareas added</div>');
-        }
     } catch(e) {
-        if (el) el.insertAdjacentHTML('afterbegin', '<div style="background:red;color:white;padding:4px;font-size:11px;">DEBUG ERROR: ' + e.message + '</div>');
+        if (el) el.insertAdjacentHTML('afterbegin', '<div style="background:#ffebee;color:#c62828;padding:4px;font-size:11px;">Error rendering: ' + e.message + '</div>');
     }
 }
 

@@ -45,6 +45,17 @@ function renderClList() {
     const allChecklists = DB.get('checklists');
     const search = (document.getElementById('clSearch')?.value || '').toLowerCase();
 
+    // Roll over Daily/Weekly/Monthly periods for the current user's checklists.
+    // Without this, a daily checklist stays 'completed' from yesterday and the
+    // OK/fault dropdowns are hidden the next morning. This mirrors the reset
+    // that already runs on the employee-dashboard checklists tab.
+    if (user && typeof _checkAndResetChecklists === 'function') {
+        var mine = allChecklists.filter(function(c) {
+            return c.assignedTo === user.fullName || c.assignedTo === 'common';
+        });
+        if (mine.length > 0) _checkAndResetChecklists(mine, user);
+    }
+
     let scopeFiltered = allChecklists.filter(c => {
         if (user.role === 'admin' || user.isSuperAdmin) return true;
         if (user.role === 'hod') return c.department === user.department || c.assignedBy === user.fullName;

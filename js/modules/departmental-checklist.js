@@ -458,10 +458,6 @@ let dchkFillState = {};
 function dchkRenderFill() {
     const content = document.getElementById('dchkContent');
     if (!content) return;
-    // DEBUG: check if function runs
-    if (!window._dchkDebug) { window._dchkDebug = 0; }
-    window._dchkDebug++;
-    console.log('dchkRenderFill called #' + window._dchkDebug);
     const user = AUTH.currentUser();
     if (!window.CHECKLISTS) {
         content.innerHTML = '<div class="empty-state">System not loaded</div>';
@@ -558,7 +554,6 @@ function dchkRenderFill() {
                         var sel = st.status || 'pending';
                         var val = st.value || '';
                         var rem = st.remarks || '';
-                        if (sel === 'report') console.log('RENDERING TEXTAREA for', it.itemId, rem);
                         var sc = dchkStatusColors[sel] || '#e9ecef';
                         var sbg = dchkStatusBgs[sel] || 'var(--bg)';
                         var opts = DCHK_STATUSES.map(function(s) { return '<option value="' + s + '" ' + (sel === s ? 'selected' : '') + '>' + s.toUpperCase() + '</option>'; }).join('');
@@ -602,12 +597,8 @@ function dchkRenderFill() {
             };
             el.appendChild(div);
         });
-        var rc = content.querySelectorAll('.dchk-item[data-status="report"]').length;
-        if (rc > 0) {
-            content.insertAdjacentHTML('afterbegin', '<div style="background:red;color:white;padding:4px 8px;font-size:12px;border-radius:4px;margin-bottom:4px;">DEBUG: ' + rc + ' REPORT items</div>');
-        }
     } catch(e) {
-        if (content) content.insertAdjacentHTML('afterbegin', '<div style="background:red;color:white;padding:4px;font-size:11px;">DEBUG ERROR: ' + e.message + '</div>');
+        if (content) content.insertAdjacentHTML('afterbegin', '<div style="background:#ffebee;color:#c62828;padding:4px;font-size:11px;">Error rendering: ' + e.message + '</div>');
     }
 }
 
