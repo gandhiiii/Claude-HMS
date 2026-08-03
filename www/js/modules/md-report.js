@@ -256,8 +256,6 @@ function _mdrOverviewTab(el) {
     var privileged = adms.filter(function (a) { return a.privileged === 'yes'; }).length;
     var openProbs = problems.filter(function (p) { return p.status !== 'resolved'; }).length;
     var resolvedProbs = problems.filter(function (p) { return p.status === 'resolved'; }).length;
-    var totalPurchase = receipts.reduce(function (s, r) { return s + (parseFloat(r.total) || 0); }, 0);
-    var totalFare = trips.reduce(function (s, t) { return s + (parseFloat(t.fare) || 0); }, 0);
 
     var html = '<div class="card" style="margin-bottom:14px;">'
         + '<div class="card-header"><h3>' + T('mdr_ov_hospital_ops') + ' — ' + _mdrPeriodLabel() + '</h3></div>'
@@ -269,7 +267,7 @@ function _mdrOverviewTab(el) {
         + _mdrStat(problems.length, T('mdr_ov_problems'), 'var(--danger)')
         + _mdrStat(complaints.length, T('mdr_ov_indoor'), 'var(--danger)')
         + _mdrStat(trips.length, T('mdr_ov_trips'), 'var(--info)')
-        + _mdrStat('₹' + totalPurchase.toLocaleString('en-IN'), T('mdr_ov_purchases'), 'var(--success)')
+        + _mdrStat(receipts.length, T('mdr_ov_purchases'), 'var(--success)')
         + _mdrStat(security.length, T('mdr_ov_security'), 'var(--warning)')
         + '</div></div>';
 
@@ -278,8 +276,8 @@ function _mdrOverviewTab(el) {
         + '<div>🛏 <strong>' + T('mdr_ov_occupancy') + ':</strong> ' + occ.occupied + '/' + occ.totalBeds + ' (' + occ.pct + '%) · ' + T('mdr_ov_cleaning') + ': ' + occ.cleaning + ' · ' + T('mdr_ov_maintenance') + ': ' + occ.maintenance + '</div>'
         + '<div>🚪 <strong>' + T('mdr_ov_discharges') + ':</strong> ' + discharges.length + '</div>'
         + '<div>🔧 <strong>' + T('mdr_ov_problems') + ':</strong> ' + openProbs + ' ' + T('mdr_ov_open') + ' · ' + resolvedProbs + ' ' + T('mdr_ov_resolved') + '</div>'
-        + '<div>🚑 <strong>' + T('mdr_ov_trips') + ':</strong> ' + trips.length + ' · ₹' + totalFare.toLocaleString('en-IN') + '</div>'
-        + '<div>📦 <strong>' + T('mdr_ov_purchases') + ':</strong> ₹' + totalPurchase.toLocaleString('en-IN') + '</div>'
+        + '<div>🚑 <strong>' + T('mdr_ov_trips') + ':</strong> ' + trips.length + '</div>'
+        + '<div>📦 <strong>' + T('mdr_ov_purchases') + ':</strong> ' + receipts.length + '</div>'
         + '<div>🛡 <strong>' + T('mdr_ov_security') + ':</strong> ' + security.length + ' · 📝 ' + T('mdr_ov_indoor') + ': ' + complaints.length + '</div>'
         + '</div>');
 
@@ -587,7 +585,6 @@ function _mdrDeptTab(el) {
     var fulfilledReqs = reqs.filter(function (r) { return r.status === 'store_fulfilled' || r.status === 'confirmed'; }).length;
 
     var approvedPurchases = purchases.filter(function (x) { return x.status === 'approved' || x.status === 'pending'; }).length;
-    var purchaseValue = purchases.reduce(function (s, x) { return s + (parseFloat(x.total) || 0); }, 0);
 
     var qpTotal = 0, qpDone = 0;
     qp.forEach(function (q) { (q.items || []).forEach(function (it) { qpTotal++; if (it.status === 'completed') qpDone++; }); });
@@ -625,8 +622,8 @@ function _mdrDeptTab(el) {
     // Purchases
     var purHtml = purchases.length === 0
         ? '<div class="empty-state" style="padding:16px;text-align:center;color:var(--gray);font-size:13px;">' + T('mdr_no_records') + '</div>'
-        : '<div class="table-responsive"><table><thead><tr><th>' + T('mdr_th_title') + '</th><th>' + T('mdr_th_item') + '</th><th>' + T('mdr_th_qty') + '</th><th>' + T('mdr_th_total') + '</th><th>' + T('mdr_th_status') + '</th></tr></thead><tbody>' + purchases.slice().sort(function (a, b) { return new Date(b.createdAt) - new Date(a.createdAt); }).map(function (x) {
-            return '<tr><td>' + _mdrEsc(x.title) + '</td><td>' + _mdrEsc(x.itemName || '—') + '</td><td>' + _mdrEsc(x.quantity || '—') + '</td><td>' + (x.total ? '₹' + parseFloat(x.total).toLocaleString('en-IN') : '—') + '</td><td><span class="badge ' + APP.getStatusBadge(x.status) + '">' + _mdrEsc(x.status) + '</span></td></tr>';
+        : '<div class="table-responsive"><table><thead><tr><th>' + T('mdr_th_title') + '</th><th>' + T('mdr_th_item') + '</th><th>' + T('mdr_th_qty') + '</th><th>' + T('mdr_th_status') + '</th></tr></thead><tbody>' + purchases.slice().sort(function (a, b) { return new Date(b.createdAt) - new Date(a.createdAt); }).map(function (x) {
+            return '<tr><td>' + _mdrEsc(x.title) + '</td><td>' + _mdrEsc(x.itemName || '—') + '</td><td>' + _mdrEsc(x.quantity || '—') + '</td><td><span class="badge ' + APP.getStatusBadge(x.status) + '">' + _mdrEsc(x.status) + '</span></td></tr>';
         }).join('') + '</tbody></table></div>';
 
     // Material requests
@@ -660,7 +657,7 @@ function _mdrDeptTab(el) {
     // Employee reports summary card row
     var html = _mdrCard(T('mdr_dept_employee_work') + ' — ' + (user ? user.department : ''), empHtml)
         + _mdrCard(T('mdr_ov_problems') + ' & ' + T('mdr_th_solution') + ' (' + openProbs + ' ' + T('mdr_ov_open') + ' · ' + resolvedProbs + ' ' + T('mdr_ov_resolved') + ')', probHtml)
-        + _mdrCard(T('mdr_ov_purchases') + ' (₹' + purchaseValue.toLocaleString('en-IN') + ')', purHtml)
+        + _mdrCard(T('mdr_ov_purchases') + ' (' + approvedPurchases + ' ' + T('mdr_ov_pending') + ')', purHtml)
         + _mdrCard(T('mdr_ov_material_reqs') + ' (' + pendingReqs + ' ' + T('mdr_ov_pending') + ' · ' + fulfilledReqs + ' ' + T('mdr_ov_fulfilled') + ')', reqHtml)
         + _mdrCard(T('mdr_ov_tasks'), taskHtml)
         + _mdrCard(T('mdr_ov_qpriorities'), qpHtml)
@@ -685,8 +682,6 @@ function _mdrBuildWhatsApp() {
     var openProbs = problems.filter(function (p) { return p.status !== 'resolved'; }).length;
     var resolvedProbs = problems.filter(function (p) { return p.status === 'resolved'; }).length;
     var totalKm = trips.reduce(function (s, t) { return s + (parseFloat(t.kilometers) || 0); }, 0);
-    var totalFare = trips.reduce(function (s, t) { return s + (parseFloat(t.fare) || 0); }, 0);
-    var totalPurchase = receipts.reduce(function (s, r) { return s + (parseFloat(r.total) || 0); }, 0);
     var hs = (typeof getHospitalSettings === 'function') ? getHospitalSettings() : {};
 
     return '🏥 *' + (hs.name || 'Stavya Intelligence') + ' — MD Report*\n'
@@ -695,8 +690,8 @@ function _mdrBuildWhatsApp() {
         + '🛏 ' + T('mdr_ov_occupancy') + ': ' + occ.occupied + '/' + occ.totalBeds + ' (' + occ.pct + '%)\n'
         + '🚪 ' + T('mdr_ov_discharges') + ': ' + discharges.length + '\n'
         + '🔧 ' + T('mdr_ov_problems') + ': ' + problems.length + ' (' + openProbs + ' ' + T('mdr_ov_open') + ', ' + resolvedProbs + ' ' + T('mdr_ov_resolved') + ')\n'
-        + '🚑 ' + T('mdr_ov_trips') + ': ' + trips.length + ' (' + totalKm.toFixed(1) + ' km, ₹' + totalFare.toFixed(0) + ')\n'
-        + '📦 ' + T('mdr_ov_purchases') + ': ₹' + totalPurchase.toFixed(2) + '\n'
+        + '🚑 ' + T('mdr_ov_trips') + ': ' + trips.length + ' (' + totalKm.toFixed(1) + ' km)\n'
+        + '📦 ' + T('mdr_ov_purchases') + ': ' + receipts.length + '\n'
         + '🛡 ' + T('mdr_ov_security') + ': ' + security.length + '\n'
         + '📝 ' + T('mdr_ov_indoor') + ': ' + complaints.length + '\n'
         + '⭐ ' + T('mdr_ov_privileged') + ': ' + privileged + '\n'
