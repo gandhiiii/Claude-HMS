@@ -27,6 +27,17 @@ function _probPriorityLabel(priority) {
     return map[priority] || map.low;
 }
 
+function _probCanDelete(user, p) {
+    if (!user) return false;
+    if (user.isSuperAdmin || user.role === 'admin') return true;
+    // Facility HOD (or its aliases) may remove problems routed to their department
+    var lowDept = (user.department || '').trim().toLowerCase();
+    var isFacilityHod = user.role === 'hod' && (lowDept === 'facility' || lowDept === 'it' || lowDept === 'maintenance');
+    if (!isFacilityHod) return false;
+    var routed = (p.routedTo || p.department || '').trim().toLowerCase();
+    return routed === lowDept;
+}
+
 function renderProblems(container) {
     container.innerHTML = ''
         + '<div class="flex-between mb-4">'
@@ -121,7 +132,7 @@ function renderProbList() {
             + '<button class="btn btn-sm btn-primary" onclick="viewProb(\'' + p.id + '\')">' + T('probmod_btn_view') + '</button>'
             + (canAssign ? ' <button class="btn btn-sm btn-warning" onclick="showAssignProbForm(\'' + p.id + '\')">' + T('probmod_btn_assign') + '</button>' : '')
             + (canResolve ? ' <button class="btn btn-sm btn-success" onclick="resolveProb(\'' + p.id + '\')">' + T('probmod_btn_solve') + '</button>' : '')
-            + (isAdmin ? ' <button class="btn btn-sm btn-danger" onclick="deleteProb(\'' + p.id + '\',\'' + (p.title||'').replace(/'/g,"\\'") + '\')">' + T('probmod_btn_delete') + '</button>' : '')
+            + (_probCanDelete(user, p) ? ' <button class="btn btn-sm btn-danger" onclick="deleteProb(\'' + p.id + '\',\'' + (p.title||'').replace(/'/g,"\\'") + '\')">' + T('probmod_btn_delete') + '</button>' : '')
             + '</td></tr>';
     }).join('');
 }
@@ -314,6 +325,10 @@ function viewProb(id) {
             + '<label style="font-weight:600;">' + T('probmod_label_resolution_details') + '</label>'
             + '<textarea id="solutionText" class="form-control" rows="2" style="margin:6px 0;" placeholder="' + T('probmod_placeholder_describe_resolution') + '"></textarea>'
             + '<button class="btn btn-success" onclick="resolveProbDirect(\'' + p.id + '\')">' + T('probmod_btn_mark_resolved') + '</button></div>';
+    }
+    if (_probCanDelete(user, p)) {
+        html += '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;text-align:right;">'
+            + '<button class="btn btn-danger" onclick="deleteProb(\'' + p.id + '\',\'' + (p.title || '').replace(/'/g, "\\'") + '\')">' + T('probmod_btn_delete') + '</button></div>';
     }
 
     showModal(html);
