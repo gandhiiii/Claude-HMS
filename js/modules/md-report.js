@@ -247,6 +247,7 @@ function _mdrRenderTab() {
 function _mdrOverviewTab(el) {
     var occ = _mdrOccupancy();
     var adms = _mdrAdmissions();
+    var discharges = _mdrDischarges();
     var problems = _mdrProblems();
     var complaints = _mdrComplaints();
     var trips = _mdrTrips();
@@ -261,6 +262,7 @@ function _mdrOverviewTab(el) {
         + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;padding:14px;">'
         + _mdrStat(occ.pct + '%', T('mdr_ov_occupancy'), 'var(--primary)')
         + _mdrStat(adms.length, T('mdr_ov_admissions'), 'var(--info)')
+        + _mdrStat(discharges.length, T('mdr_ov_discharges'), 'var(--secondary)')
         + _mdrStat(privileged, T('mdr_ov_privileged'), 'var(--warning)')
         + _mdrStat(problems.length, T('mdr_ov_problems'), 'var(--danger)')
         + _mdrStat(complaints.length, T('mdr_ov_indoor'), 'var(--danger)')
