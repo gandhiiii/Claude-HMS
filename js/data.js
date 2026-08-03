@@ -371,6 +371,14 @@ const AUTH = {
         // Budget is strictly admin-only — cannot be granted via feature rights
         if (permission === 'budget') return user.isSuperAdmin || user.role === 'admin';
         if (permission === 'quarterly-priorities') return user.isSuperAdmin || user.role === 'admin';
+        if (permission === 'md-report') {
+            if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
+            if (user.role === 'hod') {
+                var _mdrDept = (user.department || '').trim().toLowerCase();
+                if (_mdrDept === 'facility' || _mdrDept === 'it' || _mdrDept === 'maintenance') return true;
+            }
+            return false;
+        }
         if (user.isSuperAdmin || (user.permissions && user.permissions.includes('all'))) return true;
         // Role-based auto-grants (no manual permission config needed)
         if (permission === 'hod-dashboard' && user.role === 'hod') return true;
