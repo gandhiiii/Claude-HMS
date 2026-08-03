@@ -139,7 +139,9 @@ function renderMatList() {
             var canFacApprove = isFacilityHod && r.status === 'hod_approved';
             var canStoreFulfill = isStorekeeper && r.status === 'facility_approved';
             var canConfirm = r.createdBy === user.username && r.status === 'store_fulfilled';
-            var canDelete = r.createdBy === user.username && r.status === 'pending';
+            var canDelete = isAdmin
+                || (isFacilityHod && (r.department === user.department || r.status === 'hod_approved'))
+                || (r.createdBy === user.username && r.status === 'pending');
             var canAdminOverride = isAdmin && (r.status === 'pending' || r.status === 'hod_approved');
 
             html += '<div class="card" style="padding:14px;margin-bottom:10px;">'
