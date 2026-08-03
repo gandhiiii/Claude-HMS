@@ -8,6 +8,14 @@ function saveRooms(rooms) {
     DB.set('rooms', rooms);
 }
 
+function _isFacilityAdmin(user) {
+    if (!user) return false;
+    if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
+    if (user.role !== 'hod') return false;
+    var dept = (user.department || '').trim().toLowerCase();
+    return dept === 'facility' || dept === 'it' || dept === 'maintenance';
+}
+
 function getBedsByRoom(roomNo) {
     var rooms = getRooms();
     for (var i = 0; i < rooms.length; i++) {
@@ -144,7 +152,7 @@ function renderAdmListView() {
 
 function renderAdmList() {
     var user = AUTH.currentUser();
-    var isAdmin = !user || user.isSuperAdmin || user.role === 'admin';
+    var isAdmin = !user || _isFacilityAdmin(user);
     var admissions = DB.get('admissions');
     var search = (document.getElementById('admSearch') ? document.getElementById('admSearch').value : '').toLowerCase();
     var filtered = [];
