@@ -52,9 +52,31 @@ const DB = {
     },
     delete(key, id) {
         this._autoSnapBeforeChange(key, 'delete');
+        this.markDeleted(key, id);
         const items = this.get(key).filter(i => i.id !== id);
         this.set(key, items);
         this._emit('change', { store: key, action: 'delete', id });
+    },
+    getDeletedIds() {
+        try {
+            var raw = localStorage.getItem('hms__deleted_ids');
+            if (raw) return JSON.parse(raw);
+        } catch (e) {}
+        return {};
+    },
+    markDeleted(key, id) {
+        if (!id) return;
+        try {
+            var delMap = this.getDeletedIds();
+            delMap[id] = Date.now();
+            this.set('_deleted_ids', delMap);
+            this._emit('change', { store: '_deleted_ids', action: 'delete_id', id: id });
+        } catch (e) {}
+    },
+    isDeleted(id) {
+        if (!id) return false;
+        var delMap = this.getDeletedIds();
+        return !!delMap[id];
     },
     getById(key, id) {
         return this.get(key).find(i => i.id === id) || null;
@@ -74,7 +96,8 @@ const DB = {
         'budgets', 'budget_expenses', 'quarterly_priorities',
         'inventory_movements', 'material_returns', 'sk_reports',
         'security_incidents',
-        'hospital_settings'
+        'hospital_settings',
+        '_deleted_ids'
     ],
 
     /* Export all app data as a downloadable JSON file */

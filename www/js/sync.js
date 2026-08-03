@@ -18,7 +18,7 @@ var SYNC = (function () {
         'budgets', 'budget_expenses',
         'quarterly_priorities', 'pwResetRequests',
         'material_returns', 'sk_reports',
-        'security_incidents'
+        'security_incidents', '_deleted_ids'
     ];
 
     var _pushing    = {};  // key -> true while a Firebase write is in-flight
@@ -60,26 +60,56 @@ var SYNC = (function () {
             var merged       = remoteData;
             var hasLocalOnly = false;
 
+            if (key === '_deleted_ids') {
+                var localDel = {};
+                try { if (localRaw) localDel = JSON.parse(localRaw); } catch(e) {}
+                var mergedDel = Object.assign({}, remoteData || {}, localDel || {});
+                var jsonDel = JSON.stringify(mergedDel);
+                localStorage.setItem('hms_' + key, jsonDel);
+                sessionStorage.setItem('hms_' + key, jsonDel);
+                localStorage.setItem('hms__deleted_ids', jsonDel);
+                sessionStorage.setItem('hms__deleted_ids', jsonDel);
+                return false;
+            }
+
+            var deletedMap = {};
+            try {
+                var delRaw = localStorage.getItem('hms__deleted_ids');
+                if (delRaw) deletedMap = JSON.parse(delRaw);
+            } catch(e) {}
+
             if (localRaw) {
                 var localData;
                 try { localData = JSON.parse(localRaw); } catch (e) { localData = null; }
 
                 if (Array.isArray(remoteData) && Array.isArray(localData)) {
-                    // Only do id-based merge for arrays of objects that have an .id field
-                    var isObjArr = remoteData.some(function (i) { return i && typeof i === 'object' && i.id; }) ||
+                    var cleanRemote = remoteData.filter(function(i) {
+                        return !(i && i.id && deletedMap[i.id]);
+                    });
+                    var isObjArr = cleanRemote.some(function (i) { return i && typeof i === 'object' && i.id; }) ||
                                    localData.some(function (i)  { return i && typeof i === 'object' && i.id; });
                     if (isObjArr) {
                         var remoteIds = {};
-                        remoteData.forEach(function (i) { if (i && i.id) remoteIds[i.id] = true; });
-                        merged = remoteData.slice();
+                        cleanRemote.forEach(function (i) { if (i && i.id) remoteIds[i.id] = true; });
+                        merged = cleanRemote.slice();
                         localData.forEach(function (item) {
-                            if (item && item.id && !remoteIds[item.id]) {
+                            if (item && item.id && !remoteIds[item.id] && !deletedMap[item.id]) {
                                 merged.push(item);
                                 hasLocalOnly = true;
                             }
                         });
+                    } else {
+                        merged = cleanRemote;
                     }
+                } else if (Array.isArray(remoteData)) {
+                    merged = remoteData.filter(function(i) {
+                        return !(i && i.id && deletedMap[i.id]);
+                    });
                 }
+            } else if (Array.isArray(remoteData)) {
+                merged = remoteData.filter(function(i) {
+                    return !(i && i.id && deletedMap[i.id]);
+                });
             }
 
             var json = JSON.stringify(merged);
@@ -98,7 +128,13 @@ var SYNC = (function () {
             var remote = snap.val() || {};
 
             // Step 1: merge keys Firebase has into local storage
-            Object.keys(remote).forEach(function (key) {
+            // Deletions MUST merge first, otherwise stale local copies of
+            // deleted records get re-added as "local-only" and re-pushed.
+            Object.keys(remote).sort(function (a, b) {
+                if (a === '_deleted_ids') return -1;
+                if (b === '_deleted_ids') return 1;
+                return 0;
+            }).forEach(function (key) {
                 if (SHARED_KEYS.indexOf(key) === -1) return;
                 var hadLocalOnly = _mergeIntoLocal(key, remote[key]);
                 if (hadLocalOnly) {
@@ -142,12 +178,27 @@ var SYNC = (function () {
             var remote = snap.val();
             if (!remote) return;
             var changed = false;
-            Object.keys(remote).forEach(function (key) {
+            // Deletions MUST be applied before data keys, otherwise a deleted
+            // record still present in a stale local copy gets resurrected.
+            Object.keys(remote).sort(function (a, b) {
+                if (a === '_deleted_ids') return -1;
+                if (b === '_deleted_ids') return 1;
+                return 0;
+            }).forEach(function (key) {
                 if (SHARED_KEYS.indexOf(key) === -1) return;
                 // Per-key echo prevention: skip keys that WE pushed within the last 2 seconds
                 if (_pushedKeys[key] && Date.now() - _pushedKeys[key] < 2000) return;
                 try {
-                    var json = JSON.stringify(remote[key]);
+                    var data = remote[key];
+                    var delMap = null;
+                    try {
+                        var delRaw = localStorage.getItem('hms__deleted_ids');
+                        if (delRaw) delMap = JSON.parse(delRaw);
+                    } catch (e2) {}
+                    if (Array.isArray(data) && delMap) {
+                        data = data.filter(function (i) { return !(i && i.id && delMap[i.id]); });
+                    }
+                    var json = JSON.stringify(data);
                     var existing = localStorage.getItem('hms_' + key);
                     if (existing !== json) {
                         localStorage.setItem('hms_' + key, json);
