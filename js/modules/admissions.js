@@ -686,7 +686,47 @@ function setRoomStatus(roomNo, status) {
         else { overrides.push(data); }
     }
     DB.set('roomStatus', overrides);
+
+    // When a room is manually set to Cleaning, also create a cleaning queue
+    // entry so it shows up in the Cleaning tab (admitted, discharged, or
+    // before admission). Reuse any existing non-done task for the room.
+    if (status === 'cleaning') {
+        var tasks = DB.get('roomCleaningTasks') || [];
+        var existing = false;
+        for (var t = 0; t < tasks.length; t++) {
+            if (tasks[t].roomNo === roomNo && tasks[t].status !== 'done') { existing = true; break; }
+        }
+        if (!existing) {
+            var rooms = getRooms();
+            var roomInfo = null;
+            for (var r = 0; r < rooms.length; r++) {
+                if (rooms[r].roomNo === roomNo) { roomInfo = rooms[r]; break; }
+            }
+            var adms = DB.get('admissions') || [];
+            var pat = null;
+            for (var a = 0; a < adms.length; a++) {
+                if (adms[a].roomNo === roomNo && adms[a].status === 'admitted') { pat = adms[a]; break; }
+            }
+            var usr = AUTH.currentUser();
+            DB.add('roomCleaningTasks', {
+                roomNo: roomNo,
+                bedId: pat ? (pat.bedId || '') : '',
+                floor: roomInfo ? roomInfo.floor : '',
+                category: roomInfo ? roomInfo.category : '',
+                patientName: pat ? pat.patientName : '',
+                dischargedAt: new Date().toISOString(),
+                dischargedBy: usr ? usr.fullName : 'Admin',
+                status: 'pending',
+                assignedTo: null,
+                startedAt: null,
+                completedAt: null,
+                completedBy: null
+            });
+        }
+    }
+
     renderRoomView();
+    updateCleaningBadge();
     APP.notify(T('admmod_msg_status_updated'), 'success');
 }
 
