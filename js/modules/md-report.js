@@ -260,7 +260,7 @@ function _mdrOverviewTab(el) {
     var html = '<div class="card" style="margin-bottom:14px;">'
         + '<div class="card-header"><h3>' + T('mdr_ov_hospital_ops') + ' — ' + _mdrPeriodLabel() + '</h3></div>'
         + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;padding:14px;">'
-        + _mdrStat(occ.occupied + ' / ' + occ.totalBeds + ' (' + occ.pct + '%)', T('mdr_ov_occupancy'), 'var(--primary)')
+        + _mdrStat(occ.pct + '%', T('mdr_ov_occupancy'), 'var(--primary)')
         + _mdrStat(adms.length, T('mdr_ov_admissions'), 'var(--info)')
         + _mdrStat(discharges.length, T('mdr_ov_discharges'), 'var(--secondary)')
         + _mdrStat(privileged, T('mdr_ov_privileged'), 'var(--warning)')
@@ -273,7 +273,7 @@ function _mdrOverviewTab(el) {
 
     html += _mdrCard(T('mdr_ov_quick_view'), ''
         + '<div style="font-size:13px;line-height:1.9;">'
-        + '<div>🛏 <strong>' + T('mdr_ov_occupancy') + ':</strong> ' + occ.occupied + '/' + occ.totalBeds + ' (' + occ.pct + '%) · ' + T('mdr_ov_cleaning') + ': ' + occ.cleaning + ' · ' + T('mdr_ov_maintenance') + ': ' + occ.maintenance + '</div>'
+        + '<div>🛏 <strong>' + T('mdr_ov_occupancy') + ':</strong> ' + occ.pct + '% · ' + T('mdr_ov_cleaning') + ': ' + occ.cleaning + ' · ' + T('mdr_ov_maintenance') + ': ' + occ.maintenance + '</div>'
         + '<div>🚪 <strong>' + T('mdr_ov_discharges') + ':</strong> ' + discharges.length + '</div>'
         + '<div>🔧 <strong>' + T('mdr_ov_problems') + ':</strong> ' + openProbs + ' ' + T('mdr_ov_open') + ' · ' + resolvedProbs + ' ' + T('mdr_ov_resolved') + '</div>'
         + '<div>🚑 <strong>' + T('mdr_ov_trips') + ':</strong> ' + trips.length + '</div>'
@@ -363,8 +363,7 @@ function _mdrOccupancyTab(el) {
     var html = '<div class="card" style="margin-bottom:14px;">'
         + '<div class="card-header"><h3>' + T('mdr_occ_title') + '</h3></div>'
         + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;padding:14px;">'
-        + _mdrStat(occ.occupied + ' / ' + occ.totalBeds, T('mdr_ov_occupancy'), 'var(--primary)')
-        + _mdrStat(occ.pct + '%', T('mdr_occ_occupancy_pct'), 'var(--info)')
+        + _mdrStat(occ.pct + '%', T('mdr_ov_occupancy'), 'var(--primary)')
         + _mdrStat(discharges.length, T('mdr_ov_discharges'), 'var(--secondary)')
         + _mdrStat(occ.cleaning, T('mdr_ov_cleaning'), 'var(--warning)')
         + _mdrStat(maintRooms.length, T('mdr_ov_maintenance'), 'var(--danger)')
@@ -687,7 +686,7 @@ function _mdrBuildWhatsApp() {
     return '🏥 *' + (hs.name || 'Stavya Intelligence') + ' — MD Report*\n'
         + '📅 ' + _mdrPeriodLabel() + ' | ' + APP.formatDate(new Date()) + '\n'
         + '━━━━━━━━━━━━━━━\n'
-        + '🛏 ' + T('mdr_ov_occupancy') + ': ' + occ.occupied + '/' + occ.totalBeds + ' (' + occ.pct + '%)\n'
+        + '🛏 ' + T('mdr_ov_occupancy') + ': ' + occ.pct + '%\n'
         + '🚪 ' + T('mdr_ov_discharges') + ': ' + discharges.length + '\n'
         + '🔧 ' + T('mdr_ov_problems') + ': ' + problems.length + ' (' + openProbs + ' ' + T('mdr_ov_open') + ', ' + resolvedProbs + ' ' + T('mdr_ov_resolved') + ')\n'
         + '🚑 ' + T('mdr_ov_trips') + ': ' + trips.length + ' (' + totalKm.toFixed(1) + ' km)\n'
