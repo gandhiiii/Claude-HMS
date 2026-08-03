@@ -73,6 +73,7 @@ const DB = {
         'roomCleaningTasks', 'floorItems',
         'budgets', 'budget_expenses', 'quarterly_priorities',
         'inventory_movements', 'material_returns', 'sk_reports',
+        'security_incidents',
         'hospital_settings'
     ],
 
@@ -855,6 +856,9 @@ const APP = {
             }
             if (!Array.isArray(DB.get('quarterly_priorities'))) {
                 DB.set('quarterly_priorities', []);
+            }
+            if (!Array.isArray(DB.get('security_incidents'))) {
+                DB.set('security_incidents', []);
             }
             if (!Array.isArray(DB.get('departmentMeetings'))) {
                 DB.set('departmentMeetings', []);

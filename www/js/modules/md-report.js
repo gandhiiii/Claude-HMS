@@ -101,7 +101,11 @@ function _mdrReceipts() {
 }
 
 function _mdrSecurity() {
-    return (DB.get('gatesecurity') || []).filter(function (g) { return _mdrInRange(g.createdAt); });
+    return (DB.get('security_incidents') || []).filter(function (g) { return _mdrInRange(g.createdAt || g.incidentDate); });
+}
+
+function _mdrSecurityAll() {
+    return (DB.get('security_incidents') || []);
 }
 
 function _mdrRoomChecklists() {
@@ -182,6 +186,7 @@ function renderMdReport(container) {
         ['overview', T('mdr_tab_overview')],
         ['admissions', T('mdr_tab_admissions')],
         ['occupancy', T('mdr_tab_occupancy')],
+        ['incidents', T('mdr_tab_incidents')],
         ['dept', T('mdr_tab_dept')],
         ['whatsapp', T('mdr_tab_whatsapp')]
     ];
@@ -233,6 +238,7 @@ function _mdrRenderTab() {
     var tab = _mdrState.tab;
     if (tab === 'admissions') _mdrAdmissionsTab(content);
     else if (tab === 'occupancy') _mdrOccupancyTab(content);
+    else if (tab === 'incidents') _mdrIncidentsTab(content);
     else if (tab === 'dept') _mdrDeptTab(content);
     else if (tab === 'whatsapp') _mdrWhatsAppTab(content);
     else _mdrOverviewTab(content);
@@ -419,6 +425,145 @@ function _mdrOccupancyTab(el) {
         + _mdrCard(T('mdr_occ_problems'), probHtml);
 
     el.innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════════
+   SECURITY INCIDENTS — add/remove by Facility HOD
+   ═══════════════════════════════════════════════ */
+function _mdrIncidentsTab(el) {
+    var user = AUTH.currentUser();
+    var canManage = _mdrAccessOk(user);
+    var incidents = _mdrSecurityAll().slice().sort(function (a, b) {
+        return new Date(b.createdAt || b.incidentDate || 0) - new Date(a.createdAt || a.incidentDate || 0);
+    });
+
+    var openCount = incidents.filter(function (i) { return (i.status || 'open') !== 'resolved'; }).length;
+    var resolvedCount = incidents.filter(function (i) { return i.status === 'resolved'; }).length;
+
+    var html = '<div class="card" style="margin-bottom:14px;">'
+        + '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
+        + '<h3 style="margin:0;">🛡 ' + T('mdr_tab_incidents') + '</h3>'
+        + (canManage ? '<button class="btn btn-sm btn-primary" onclick="mdRptAddIncident()">+ ' + T('mdr_inc_add') + '</button>' : '')
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;padding:14px;">'
+        + _mdrStat(incidents.length, T('mdr_ov_security'), 'var(--warning)')
+        + _mdrStat(openCount, T('mdr_inc_open'), 'var(--danger)')
+        + _mdrStat(resolvedCount, T('mdr_inc_resolved'), 'var(--success)')
+        + '</div></div>';
+
+    html += '<div class="card"><div class="card-header"><h3>' + T('mdr_inc_list') + '</h3></div>';
+    if (incidents.length === 0) {
+        html += '<div class="empty-state" style="padding:40px;text-align:center;color:var(--gray);">' + T('mdr_no_records') + '</div>';
+    } else {
+        html += '<div class="table-responsive"><table><thead><tr>'
+            + '<th>' + T('mdr_th_date') + '</th><th>' + T('mdr_inc_title') + '</th><th>' + T('mdr_th_category') + '</th>'
+            + '<th>' + T('mdr_th_location') + '</th><th>' + T('mdr_th_priority') + '</th><th>' + T('mdr_th_status') + '</th>'
+            + '<th>' + T('mdr_inc_description') + '</th><th>' + T('mdr_th_solution') + '</th><th>' + T('mdr_th_actions') + '</th></tr></thead><tbody>';
+        incidents.forEach(function (i) {
+            var sol = i.solution || '';
+            var solCell = i.status === 'resolved'
+                ? '<span style="color:var(--success);font-size:12px;">' + _mdrEsc(sol) + '</span>'
+                : (sol
+                    ? '<span style="font-size:12px;">' + _mdrEsc(sol) + '</span>'
+                    : '<span style="color:var(--gray);font-size:12px;">' + T('mdr_inc_no_solution') + '</span>');
+            html += '<tr>'
+                + '<td>' + APP.formatDate(i.incidentDate || i.createdAt) + '</td>'
+                + '<td><strong>' + _mdrEsc(i.title) + '</strong></td>'
+                + '<td>' + _mdrEsc(i.category || '—') + '</td>'
+                + '<td>' + _mdrEsc(i.location || '—') + '</td>'
+                + '<td><span class="badge ' + (i.priority === 'high' ? 'badge-danger' : i.priority === 'medium' ? 'badge-warning' : 'badge-info') + '">' + _mdrEsc(i.priority || 'low') + '</span></td>'
+                + '<td><span class="badge ' + APP.getStatusBadge(i.status || 'open') + '">' + _mdrEsc(i.status || 'open') + '</span></td>'
+                + '<td style="font-size:12px;max-width:200px;">' + _mdrEsc(i.description || '—') + '</td>'
+                + '<td style="max-width:220px;">' + solCell + '</td>'
+                + '<td style="white-space:nowrap;">'
+                + (canManage ? '<button class="btn btn-sm btn-info" onclick="mdRptSolveIncident(\'' + i.id + '\')">✏️ ' + T('mdr_inc_solution') + '</button> '
+                    + '<button class="btn btn-sm btn-danger" onclick="mdRptDeleteIncident(\'' + i.id + '\')">' + T('mdr_inc_delete') + '</button>' : '')
+                + '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+function mdRptAddIncident() {
+    var user = AUTH.currentUser();
+    if (!_mdrAccessOk(user)) { APP.notify(T('mdr_access_denied'), 'error'); return; }
+    var form = '<form id="incidentForm">'
+        + '<div class="grid-2"><div class="form-group"><label>' + T('mdr_inc_title') + ' *</label><input type="text" name="title" class="form-control" required></div>'
+        + '<div class="form-group"><label>' + T('mdr_th_category') + '</label><select name="category" class="form-control"><option value="Theft">Theft</option><option value="Unauthorized Entry">Unauthorized Entry</option><option value="Damage">Damage</option><option value="Fire">Fire</option><option value="Medical Emergency">Medical Emergency</option><option value="Visitor Issue">Visitor Issue</option><option value="Other">Other</option></select></div></div>'
+        + '<div class="grid-2"><div class="form-group"><label>' + T('mdr_th_location') + '</label><input type="text" name="location" class="form-control" placeholder="' + T('mdr_inc_loc_ph') + '"></div>'
+        + '<div class="form-group"><label>' + T('mdr_th_priority') + '</label><select name="priority" class="form-control"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select></div></div>'
+        + '<div class="form-group"><label>' + T('mdr_inc_date') + '</label><input type="date" name="incidentDate" class="form-control" value="' + new Date().toISOString().split('T')[0] + '"></div>'
+        + '<div class="form-group"><label>' + T('mdr_inc_description') + ' *</label><textarea name="description" class="form-control" rows="3" required placeholder="' + T('mdr_inc_desc_ph') + '"></textarea></div>'
+        + '</form>';
+    openFormModal(T('mdr_inc_add'), form, 'mdRptSaveIncident()', false);
+}
+
+function mdRptSaveIncident() {
+    var user = AUTH.currentUser();
+    if (!_mdrAccessOk(user)) { APP.notify(T('mdr_access_denied'), 'error'); return; }
+    var form = document.getElementById('incidentForm');
+    if (!form) return;
+    var data = getFormData('incidentForm');
+    if (!data.title || !data.description) { APP.notify(T('mdr_inc_required'), 'error'); return; }
+    DB.add('security_incidents', {
+        title: data.title,
+        category: data.category,
+        location: data.location,
+        priority: data.priority,
+        status: 'open',
+        description: data.description,
+        solution: '',
+        incidentDate: data.incidentDate || new Date().toISOString().split('T')[0],
+        createdBy: user ? user.username : '',
+        createdByName: user ? user.fullName : ''
+    });
+    APP.notify(T('mdr_inc_added'), 'success');
+    closeModal();
+    _mdrRenderTab();
+}
+
+function mdRptSolveIncident(id) {
+    var user = AUTH.currentUser();
+    if (!_mdrAccessOk(user)) { APP.notify(T('mdr_access_denied'), 'error'); return; }
+    var inc = DB.getById('security_incidents', id);
+    if (!inc) { APP.notify(T('mdr_inc_not_found'), 'error'); return; }
+    var form = '<form id="solveIncidentForm">'
+        + '<div style="font-size:13px;color:var(--gray);margin-bottom:12px;">' + T('mdr_inc_for') + ' <strong>' + _mdrEsc(inc.title) + '</strong></div>'
+        + '<div class="form-group"><label>' + T('mdr_th_solution') + ' *</label><textarea name="solution" class="form-control" rows="3" required>' + _mdrEsc(inc.solution || '') + '</textarea></div>'
+        + '<div class="form-group"><label>' + T('mdr_th_status') + '</label><select name="status" class="form-control"><option value="in_progress" ' + (inc.status === 'in_progress' ? 'selected' : '') + '>In Progress</option><option value="resolved" ' + (inc.status === 'resolved' ? 'selected' : '') + '>Resolved</option></select></div>'
+        + '</form>';
+    openFormModal(T('mdr_inc_solution'), form, 'mdRptSaveSolution(\'' + id + '\')', false);
+}
+
+function mdRptSaveSolution(id) {
+    var user = AUTH.currentUser();
+    if (!_mdrAccessOk(user)) { APP.notify(T('mdr_access_denied'), 'error'); return; }
+    var form = document.getElementById('solveIncidentForm');
+    if (!form) return;
+    var data = getFormData('solveIncidentForm');
+    if (!data.solution) { APP.notify(T('mdr_inc_required'), 'error'); return; }
+    DB.update('security_incidents', id, {
+        solution: data.solution,
+        status: data.status || 'resolved',
+        resolvedAt: data.status === 'resolved' ? new Date().toISOString() : (DB.getById('security_incidents', id) || {}).resolvedAt,
+        resolvedBy: data.status === 'resolved' ? (user ? user.fullName : '') : (DB.getById('security_incidents', id) || {}).resolvedBy
+    });
+    APP.notify(T('mdr_inc_updated'), 'success');
+    closeModal();
+    _mdrRenderTab();
+}
+
+function mdRptDeleteIncident(id) {
+    var user = AUTH.currentUser();
+    if (!_mdrAccessOk(user)) { APP.notify(T('mdr_access_denied'), 'error'); return; }
+    var inc = DB.getById('security_incidents', id);
+    confirmAction(T('mdr_inc_confirm_del') + (inc && inc.title ? ' "' + inc.title + '"?' : ''), function () {
+        DB.delete('security_incidents', id);
+        APP.notify(T('mdr_inc_deleted'), 'success');
+        _mdrRenderTab();
+    });
 }
 
 /* ═══════════════════════════════════════════════
