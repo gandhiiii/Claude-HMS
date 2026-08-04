@@ -2324,6 +2324,8 @@ function renderEmpHandoverTab(el) {
         html += '<div id="empHandoverFormWrap" style="display:none;background:var(--light-gray);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;">'
             + '<div style="font-weight:600;font-size:14px;margin-bottom:10px;">📤 ' + T('empd2_handover_submit_title') + '</div>'
             + '<div class="grid-2">'
+            + '<div class="form-group"><label>' + T('empd2_handover_name') + ' *</label>'
+            + '<input type="text" id="empHandoverName" class="form-control" value="' + _escHtml(user.fullName || user.username || '') + '"></div>'
             + '<div class="form-group"><label>' + T('empd2_handover_shift') + ' *</label>'
             + '<select id="empHandoverShift" class="form-control">'
             + shifts.map(function(s){ return '<option value="' + s + '">' + s + '</option>'; }).join('')
@@ -2348,7 +2350,7 @@ function renderEmpHandoverTab(el) {
             html += mine.slice().sort(function(a,b){ return new Date(b.createdAt) - new Date(a.createdAt); }).slice(0,5).map(function(h) {
                 return '<div class="work-item" style="flex-direction:column;align-items:stretch;gap:4px;margin-bottom:8px;border-left-color:#7b1fa2;">'
                     + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">'
-                    + '<div style="font-weight:600;font-size:13px;">' + _escHtml(h.shift || '') + ' · ' + (h.date || (h.createdAt||'').slice(0,10)) + '</div>'
+                    + '<div style="font-weight:600;font-size:13px;">' + _escHtml(h.employeeName || '') + ' · ' + _escHtml(h.shift || '') + ' · ' + (h.date || (h.createdAt||'').slice(0,10)) + '</div>'
                     + '<span style="font-size:11px;color:var(--gray);">' + APP.formatDate(h.createdAt) + '</span></div>'
                     + (h.summary ? '<div style="font-size:12px;color:var(--text);white-space:pre-wrap;">' + _escHtml(h.summary) + '</div>' : '')
                     + (h.pending ? '<div style="font-size:12px;color:#e65100;white-space:pre-wrap;background:#fff3e0;border-radius:6px;padding:6px 8px;"><strong>⏳ ' + T('empd2_handover_pending') + ':</strong> ' + _escHtml(h.pending) + '</div>' : '')
@@ -2395,16 +2397,17 @@ function empHandoverHideForm() {
 function empHandoverSubmit() {
     var user = AUTH.currentUser();
     if (!user) return;
+    var name = document.getElementById('empHandoverName')?.value?.trim() || '';
     var shift = document.getElementById('empHandoverShift')?.value || '';
     var date  = document.getElementById('empHandoverDate')?.value || new Date().toISOString().slice(0, 10);
     var summary = document.getElementById('empHandoverSummary')?.value?.trim() || '';
     var pending = document.getElementById('empHandoverPending')?.value?.trim() || '';
-    if (!shift || (!summary && !pending)) {
+    if (!name || !shift || (!summary && !pending)) {
         APP.notify(T('empd2_handover_required'), 'error');
         return;
     }
     DB.add('handovers', {
-        employeeName: user.fullName || user.username,
+        employeeName: name,
         employeeUsername: user.username || '',
         department: user.department || '',
         shift: shift,
