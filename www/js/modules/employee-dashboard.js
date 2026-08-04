@@ -2321,7 +2321,7 @@ function renderEmpHandoverTab(el) {
             + '</div>';
 
         // ── Submit handover form ──
-        html += '<div id="empHandoverFormWrap" style="display:none;background:var(--light-gray);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;">'
+        html += '<div id="empHandoverFormWrap" style="display:block;background:var(--light-gray);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;">'
             + '<div style="font-weight:600;font-size:14px;margin-bottom:10px;">📤 ' + T('empd2_handover_submit_title') + '</div>'
             + '<div class="grid-2">'
             + '<div class="form-group"><label>' + T('empd2_handover_name') + ' *</label>'
