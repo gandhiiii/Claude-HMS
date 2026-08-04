@@ -2325,7 +2325,7 @@ function renderEmpHandoverTab(el) {
             + '<div style="font-weight:600;font-size:14px;margin-bottom:10px;">📤 ' + T('empd2_handover_submit_title') + '</div>'
             + '<div class="grid-2">'
             + '<div class="form-group"><label>' + T('empd2_handover_name') + ' *</label>'
-            + '<input type="text" id="empHandoverName" class="form-control" value="' + _escHtml(user.fullName || user.username || '') + '"></div>'
+            + '<input type="text" id="empHandoverName" class="form-control" value="' + _escHtml(user.fullName || user.username || '') + '" placeholder="' + T('empd2_handover_name_ph') + '"></div>'
             + '<div class="form-group"><label>' + T('empd2_handover_shift') + ' *</label>'
             + '<select id="empHandoverShift" class="form-control">'
             + shifts.map(function(s){ return '<option value="' + s + '">' + s + '</option>'; }).join('')
