@@ -92,7 +92,7 @@ const DB = {
         'complaints', 'roomchecklists', 'admissions', 'rooms', 'roomStatus',
         'lostfound', 'adminChecklist', 'checklists',
         'material_requests', 'suggestions', 'reports',
-        'roomCleaningTasks', 'floorItems',
+        'roomCleaningTasks', 'floorItems', 'handovers',
         'budgets', 'budget_expenses', 'quarterly_priorities',
         'inventory_movements', 'material_returns', 'sk_reports',
         'security_incidents',

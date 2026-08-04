@@ -13,7 +13,7 @@ var SYNC = (function () {
         'roomchecklists', 'admissions', 'rooms', 'roomStatus',
         'lostfound', 'adminChecklist', 'checklists',
         'material_requests', 'suggestions', 'reports',
-        'roomCleaningTasks', 'floorItems', 'resetTokens',
+        'roomCleaningTasks', 'floorItems', 'resetTokens', 'handovers',
         'hodTasks', 'hodRequests',
         'budgets', 'budget_expenses',
         'quarterly_priorities', 'pwResetRequests',

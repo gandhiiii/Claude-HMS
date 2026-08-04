@@ -140,6 +140,12 @@ function _mdrReports() {
     return (DB.get('reports') || []).filter(function (r) { return _mdrInRange(r.createdAt) && _mdrInDept(r.department); });
 }
 
+function _mdrHandovers() {
+    return (DB.get('handovers') || []).filter(function (h) {
+        return _mdrInRange(h.createdAt) && _mdrInDept(h.department);
+    });
+}
+
 function _mdrTeam() {
     var scope = _mdrScope();
     return (DB.get('users') || []).filter(function (u) {
@@ -569,6 +575,7 @@ function _mdrDeptTab(el) {
     var breakdowns = _mdrBreakdowns();
     var reports = _mdrReports();
     var problems = _mdrProblems();
+    var handovers = _mdrHandovers();
 
     var doneTasks = tasks.filter(function (t) { return t.status === 'completed'; }).length;
     var pendingTasks = tasks.filter(function (t) { return t.status === 'pending'; }).length;
@@ -649,6 +656,13 @@ function _mdrDeptTab(el) {
             return '<tr><td>' + _mdrEsc(b.assetCode || '—') + '</td><td>' + _mdrEsc(b.assetName || '—') + '</td><td>' + _mdrEsc(b.reason || '—') + '</td><td>' + APP.formatDate(b.backdownDate || b.createdAt) + '</td></tr>';
         }).join('') + '</tbody></table></div>';
 
+    // Shift handovers
+    var handHtml = handovers.length === 0
+        ? '<div class="empty-state" style="padding:16px;text-align:center;color:var(--gray);font-size:13px;">' + T('mdr_no_records') + '</div>'
+        : '<div class="table-responsive"><table><thead><tr><th>' + T('mdr_handover_emp') + '</th><th>' + T('mdr_handover_shift') + '</th><th>' + T('mdr_handover_date') + '</th><th>' + T('mdr_handover_notes') + '</th></tr></thead><tbody>' + handovers.slice().sort(function (a, b) { return new Date(b.createdAt) - new Date(a.createdAt); }).map(function (h) {
+            return '<tr><td>' + _mdrEsc(h.employeeName || '—') + '</td><td>' + _mdrEsc(h.shift || '—') + '</td><td>' + _mdrEsc(h.date || APP.formatDate(h.createdAt)) + '</td><td style="font-size:12px;white-space:pre-wrap;">' + _mdrEsc(h.summary || '—') + (h.pending ? '<div style="color:#e65100;margin-top:4px;">⏳ ' + T('mdr_handover_pending') + ': ' + _mdrEsc(h.pending) + '</div>' : '') + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+
     // Employee reports summary card row
     var html = _mdrCard(T('mdr_dept_employee_work') + ' — ' + (user ? user.department : ''), empHtml)
         + _mdrCard(T('mdr_ov_problems') + ' & ' + T('mdr_th_solution') + ' (' + openProbs + ' ' + T('mdr_ov_open') + ' · ' + resolvedProbs + ' ' + T('mdr_ov_resolved') + ')', probHtml)
@@ -656,7 +670,8 @@ function _mdrDeptTab(el) {
         + _mdrCard(T('mdr_ov_material_reqs') + ' (' + pendingReqs + ' ' + T('mdr_ov_pending') + ' · ' + fulfilledReqs + ' ' + T('mdr_ov_fulfilled') + ')', reqHtml)
         + _mdrCard(T('mdr_ov_tasks'), taskHtml)
         + _mdrCard(T('mdr_ov_qpriorities'), qpHtml)
-        + _mdrCard(T('mdr_ov_breakdowns'), brkHtml);
+        + _mdrCard(T('mdr_ov_breakdowns'), brkHtml)
+        + _mdrCard(T('mdr_ov_handovers') + ' (' + handovers.length + ')', handHtml);
 
     el.innerHTML = html;
 }
@@ -672,6 +687,7 @@ function _mdrBuildWhatsApp() {
     var receipts = _mdrReceipts();
     var security = _mdrSecurity();
     var complaints = _mdrComplaints();
+    var handovers = _mdrHandovers();
     var privileged = _mdrAdmissions().filter(function (a) { return a.privileged === 'yes'; }).length;
     var openProbs = problems.filter(function (p) { return p.status !== 'resolved'; }).length;
     var resolvedProbs = problems.filter(function (p) { return p.status === 'resolved'; }).length;
@@ -688,6 +704,7 @@ function _mdrBuildWhatsApp() {
         + '🛡 ' + T('mdr_ov_security') + ': ' + security.length + '\n'
         + '📝 ' + T('mdr_ov_indoor') + ': ' + complaints.length + '\n'
         + '⭐ ' + T('mdr_ov_privileged') + ': ' + privileged + '\n'
+        + '🔄 ' + T('mdr_ov_handovers') + ': ' + handovers.length + '\n'
         + '━━━━━━━━━━━━━━━\n'
         + '👤 ' + (u ? u.fullName : '') + (u && u.department ? ' — ' + u.department : '');
 }

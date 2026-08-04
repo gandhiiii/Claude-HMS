@@ -279,6 +279,8 @@ function renderEmployeeDashboard(container) {
 
     var canBreakdown = true;
 
+    var isFacilityGrp = ['IT', 'Facility', 'Maintenance'].some(function(x){ return x.toLowerCase() === (dept||'').trim().toLowerCase(); });
+
     var tabs = [
         { id: 'overview',    label: T('empd2_tab_overview') },
         { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
@@ -286,6 +288,7 @@ function renderEmployeeDashboard(container) {
         { id: 'checklists',  label: T('empd2_tab_checklists') },
         { id: 'reports',     label: T('empd2_tab_reports') },
         ...(dept !== 'IT' ? [{ id: 'cleaning', label: T('empd2_tab_cleaning'), badge: _empData.pendingCleaning.length, badgeClass: 'badge-danger' }] : []),
+        ...(isFacilityGrp ? [{ id: 'handover', label: '🔄 ' + T('empd2_tab_handover') }] : []),
         { id: 'performance', label: T('empd2_tab_performance') },
         { id: 'qgoals',      label: T('empd2_tab_qgoals') }
     ];
@@ -390,6 +393,7 @@ function _renderEmpTab(tab) {
     if (tab === 'checklists')  { renderEmpChecklistsTab(el); return; }
     if (tab === 'reports')     { renderEmpReportsTab(el); return; }
     if (tab === 'cleaning')    { renderEmpCleaningSection(el); return; }
+    if (tab === 'handover')    { renderEmpHandoverTab(el); return; }
     if (tab === 'performance') { renderEmpPerformanceTab(el); return; }
     if (tab === 'qgoals')     { renderEmpQGoalsTab(el); return; }
     if (tab === 'equipbackdown') { renderEmpBreakdownTab(el); return; }
@@ -2294,8 +2298,137 @@ function empSaveReturn() {
 }
 
 /* ═══════════════════════════════════════════════
+   EMPLOYEE HANDOVER TAB (Facility/IT/Maintenance)
+   ═══════════════════════════════════════════════ */
+function renderEmpHandoverTab(el) {
+    try {
+        if (!el) el = document.getElementById('empTabContent');
+        if (!el) return;
+        var user = AUTH.currentUser();
+        if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
+        var dept = user.department || '';
+
+        var allHandovers = (DB.get('handovers') || []).filter(function(h) {
+            return (h.department||'').trim().toLowerCase() === (dept||'').trim().toLowerCase();
+        });
+        var mine = allHandovers.filter(function(h){ return h.employeeUsername === user.username; });
+
+        var shifts = ['Morning', 'Evening', 'Night'];
+
+        var html = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
+            + '<div style="font-weight:700;font-size:16px;">🔄 ' + T('empd2_handover_title') + '</div>'
+            + '<button class="btn btn-sm btn-primary" onclick="empHandoverShowForm()">+ ' + T('empd2_handover_new') + '</button>'
+            + '</div>';
+
+        // ── Submit handover form ──
+        html += '<div id="empHandoverFormWrap" style="display:none;background:var(--light-gray);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;">'
+            + '<div style="font-weight:600;font-size:14px;margin-bottom:10px;">📤 ' + T('empd2_handover_submit_title') + '</div>'
+            + '<div class="grid-2">'
+            + '<div class="form-group"><label>' + T('empd2_handover_shift') + ' *</label>'
+            + '<select id="empHandoverShift" class="form-control">'
+            + shifts.map(function(s){ return '<option value="' + s + '">' + s + '</option>'; }).join('')
+            + '</select></div>'
+            + '<div class="form-group"><label>' + T('empd2_handover_date') + ' *</label>'
+            + '<input type="date" id="empHandoverDate" class="form-control" value="' + new Date().toISOString().slice(0,10) + '"></div>'
+            + '</div>'
+            + '<div class="form-group"><label>' + T('empd2_handover_summary') + '</label>'
+            + '<textarea id="empHandoverSummary" rows="3" class="form-control" placeholder="' + T('empd2_handover_summary_ph') + '"></textarea></div>'
+            + '<div class="form-group"><label>' + T('empd2_handover_pending') + '</label>'
+            + '<textarea id="empHandoverPending" rows="3" class="form-control" placeholder="' + T('empd2_handover_pending_ph') + '"></textarea></div>'
+            + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+            + '<button class="btn btn-sm btn-success" onclick="empHandoverSubmit()">📤 ' + T('empd2_handover_btn_submit') + '</button>'
+            + '<button class="btn btn-sm btn-outline" onclick="empHandoverHideForm()">' + T('empd2_handover_btn_cancel') + '</button>'
+            + '</div></div>';
+
+        // ── My recent handovers ──
+        html += '<div style="font-weight:600;font-size:14px;margin-bottom:8px;">👤 ' + T('empd2_handover_mine') + ' (' + mine.length + ')</div>';
+        if (mine.length === 0) {
+            html += '<div style="color:var(--gray);font-size:13px;padding:12px;background:var(--light-gray);border-radius:8px;margin-bottom:16px;">' + T('empd2_handover_none') + '</div>';
+        } else {
+            html += mine.slice().sort(function(a,b){ return new Date(b.createdAt) - new Date(a.createdAt); }).slice(0,5).map(function(h) {
+                return '<div class="work-item" style="flex-direction:column;align-items:stretch;gap:4px;margin-bottom:8px;border-left-color:#7b1fa2;">'
+                    + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">'
+                    + '<div style="font-weight:600;font-size:13px;">' + _escHtml(h.shift || '') + ' · ' + (h.date || (h.createdAt||'').slice(0,10)) + '</div>'
+                    + '<span style="font-size:11px;color:var(--gray);">' + APP.formatDate(h.createdAt) + '</span></div>'
+                    + (h.summary ? '<div style="font-size:12px;color:var(--text);white-space:pre-wrap;">' + _escHtml(h.summary) + '</div>' : '')
+                    + (h.pending ? '<div style="font-size:12px;color:#e65100;white-space:pre-wrap;background:#fff3e0;border-radius:6px;padding:6px 8px;"><strong>⏳ ' + T('empd2_handover_pending') + ':</strong> ' + _escHtml(h.pending) + '</div>' : '')
+                    + '</div>';
+            }).join('');
+        }
+
+        // ── Team handovers ──
+        html += '<div style="font-weight:600;font-size:14px;margin-bottom:8px;">🏢 ' + T('empd2_handover_team') + ' (' + allHandovers.length + ')</div>';
+        if (allHandovers.length === 0) {
+            html += '<div style="color:var(--gray);font-size:13px;padding:12px;background:var(--light-gray);border-radius:8px;">' + T('empd2_handover_team_none') + '</div>';
+        } else {
+            html += allHandovers.slice().sort(function(a,b){ return new Date(b.createdAt) - new Date(a.createdAt); }).slice(0,10).map(function(h) {
+                return '<div class="work-item" style="flex-direction:column;align-items:stretch;gap:4px;margin-bottom:8px;">'
+                    + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">'
+                    + '<div style="font-weight:600;font-size:13px;">' + _escHtml(h.employeeName || '') + ' · ' + _escHtml(h.shift || '') + ' · ' + (h.date || (h.createdAt||'').slice(0,10)) + '</div>'
+                    + '<span style="font-size:11px;color:var(--gray);">' + APP.formatDate(h.createdAt) + '</span></div>'
+                    + (h.summary ? '<div style="font-size:12px;color:var(--text);white-space:pre-wrap;">' + _escHtml(h.summary) + '</div>' : '')
+                    + (h.pending ? '<div style="font-size:12px;color:#e65100;white-space:pre-wrap;background:#fff3e0;border-radius:6px;padding:6px 8px;"><strong>⏳ ' + T('empd2_handover_pending') + ':</strong> ' + _escHtml(h.pending) + '</div>' : '')
+                    + '</div>';
+            }).join('');
+        }
+
+        el.innerHTML = html;
+    } catch (e) {
+        if (el) el.innerHTML = '<div style="background:#ffebee;color:#c62828;padding:8px;font-size:12px;">Error: ' + _escHtml(e.message) + '</div>';
+    }
+}
+
+function _escHtml(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function empHandoverShowForm() {
+    var wrap = document.getElementById('empHandoverFormWrap');
+    if (wrap) wrap.style.display = 'block';
+    var sc = wrap ? wrap.querySelector('#empHandoverDate') : null;
+    if (sc && !sc.value) sc.value = new Date().toISOString().slice(0, 10);
+}
+function empHandoverHideForm() {
+    var wrap = document.getElementById('empHandoverFormWrap');
+    if (wrap) wrap.style.display = 'none';
+}
+function empHandoverSubmit() {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    var shift = document.getElementById('empHandoverShift')?.value || '';
+    var date  = document.getElementById('empHandoverDate')?.value || new Date().toISOString().slice(0, 10);
+    var summary = document.getElementById('empHandoverSummary')?.value?.trim() || '';
+    var pending = document.getElementById('empHandoverPending')?.value?.trim() || '';
+    if (!shift || (!summary && !pending)) {
+        APP.notify(T('empd2_handover_required'), 'error');
+        return;
+    }
+    DB.add('handovers', {
+        employeeName: user.fullName || user.username,
+        employeeUsername: user.username || '',
+        department: user.department || '',
+        shift: shift,
+        date: date,
+        summary: summary,
+        pending: pending,
+        status: 'open'
+    });
+    // Notify Facility/IT/Maintenance HODs and admins (broadcast; receiver-side relevance filters)
+    if (typeof WS_NOTIFY !== 'undefined' && WS_NOTIFY.push) {
+        WS_NOTIFY.push('🔄 ' + T('empd2_handover_notif_title'),
+            (user.fullName || user.username) + ' — ' + shift + ' (' + date + ')' + (summary ? ': ' + summary.slice(0, 120) : ''),
+            'info', 'handovers');
+    } else if (typeof APP !== 'undefined' && APP.notify) {
+        APP.notify(T('empd2_handover_saved'), 'success');
+    }
+    APP.notify(T('empd2_handover_saved'), 'success');
+    empHandoverHideForm();
+    renderEmpHandoverTab();
+}
+
+/* ═══════════════════════════════════════════════
    EMPLOYEE BREAKDOWN TAB
-═══════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════ */
 function renderEmpBreakdownTab(el) {
     try {
         if (!el) el = document.getElementById('empTabContent');

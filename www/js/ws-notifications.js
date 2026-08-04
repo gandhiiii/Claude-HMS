@@ -12,7 +12,8 @@ var WS_NOTIFY = (function () {
         'tasks', 'complaints', 'problems',
         'material_requests', 'hodRequests', 'suggestions',
         'ambulance', 'admissions', 'lostfound',
-        'hodEquipmentServices', 'hodEquipmentBackdowns'
+        'hodEquipmentServices', 'hodEquipmentBackdowns',
+        'handovers'
     ];
 
     /* ── State ── */
@@ -129,6 +130,8 @@ var WS_NOTIFY = (function () {
         if (key === 'lostfound')        return true;
         if (key === 'hodEquipmentServices')  return ['IT', 'Facility', 'Maintenance'].some(function(x){ return x.toLowerCase() === (user.department||'').trim().toLowerCase(); });
         if (key === 'hodEquipmentBackdowns') return ['IT', 'Facility', 'Maintenance'].some(function(x){ return x.toLowerCase() === (user.department||'').trim().toLowerCase(); });
+        if (key === 'handovers') return (user.role === 'hod' || user.role === 'super_admin' || user.role === 'admin') &&
+            ['IT','Facility','Maintenance'].some(function(x){ return x.toLowerCase() === (user.department||'').trim().toLowerCase(); });
         return false;
     }
 
@@ -144,7 +147,8 @@ var WS_NOTIFY = (function () {
             admissions:        { icon: '🏥', title: 'New Admission',       body: item.patientName || 'Patient admitted' },
             lostfound:         { icon: '🔍', title: 'Lost & Found',        body: item.itemName || item.description || 'Item reported' },
             hodEquipmentServices:  { icon: '🔧', title: 'Equipment Service',  body: (item.assetName||'Equipment') + ' — ' + (item.serviceType||'service') + ' record added' },
-            hodEquipmentBackdowns: { icon: '📉', title: 'Breakdown Alert',    body: (item.assetName||'Equipment') + ' — ' + (item.reason||'Breakdown reported') }
+            hodEquipmentBackdowns: { icon: '📉', title: 'Breakdown Alert',    body: (item.assetName||'Equipment') + ' — ' + (item.reason||'Breakdown reported') },
+            handovers:             { icon: '🔄', title: 'Shift Handover',     body: (item.employeeName||'Employee') + ' handed over ' + (item.shift||'') + ' shift' + (item.summary ? ': ' + item.summary : '') }
         };
         var m = map[key] || { icon: '🔔', title: 'Update', body: 'New data received' };
         return { icon: m.icon, title: m.icon + ' ' + m.title, body: m.body };
