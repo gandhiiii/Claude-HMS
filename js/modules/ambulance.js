@@ -68,7 +68,7 @@ function renderAmbulance(container) {
                 <div class="table-responsive">
                     <table>
                         <thead><tr>
-                            <th>${T('ambmod_th_date')}</th><th>${T('ambmod_th_vehicle')}</th><th>${T('ambmod_th_driver')}</th><th>${T('ambmod_th_patient')}</th>
+                            <th>${T('ambmod_th_departure')}</th><th>${T('ambmod_th_arrival')}</th><th>${T('ambmod_th_vehicle')}</th><th>${T('ambmod_th_driver')}</th><th>${T('ambmod_th_patient')}</th>
                             <th>${T('ambmod_th_pickup_drop')}</th><th>${T('ambmod_th_km')}</th><th>${T('ambmod_th_status')}</th><th>${T('ambmod_th_actions')}</th>
                         </tr></thead>
                         <tbody id="ambTripBody"></tbody>
@@ -417,6 +417,14 @@ function showTripForm(prefillAmb) {
                     <input type="number" name="patientAge" class="form-control">
                 </div>
                 <div class="form-group">
+                    <label>${T('ambmod_lbl_out_date')}</label>
+                    <input type="date" name="outDate" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>${T('ambmod_lbl_in_date')}</label>
+                    <input type="date" name="inDate" class="form-control">
+                </div>
+                <div class="form-group">
                     <label>${T('ambmod_lbl_pickup_location')}</label>
                     <input type="text" name="pickupLocation" class="form-control" placeholder="${T('ambmod_ph_address_landmark')}" required>
                 </div>
@@ -486,7 +494,8 @@ function renderTripList() {
     if (!tbody) return;
     tbody.innerHTML = trips.slice().reverse().map(t => `
         <tr>
-            <td>${APP.formatDateTime(t.createdAt)}</td>
+            <td style="font-size:12px;">${t.departureDate ? formatAmbulanceDate(t.departureDate) : (T('ambmod_not_set'))}</td>
+            <td style="font-size:12px;">${t.arrivalDate ? formatAmbulanceDate(t.arrivalDate) : (T('ambmod_not_set'))}</td>
             <td>${t.vehicleNo || '-'}</td>
             <td>${t.driverName || '-'}</td>
             <td><strong>${t.patientName}</strong>${t.patientAge ? ' ('+t.patientAge+')' : ''}</td>
@@ -498,7 +507,16 @@ function renderTripList() {
                 <button class="btn btn-sm btn-danger" onclick="deleteTrip('${t.id}')">${T('ambmod_del')}</button>
             </td>
         </tr>
-    `).join('') || `<tr><td colspan="8" class="empty-state">${T('ambmod_no_trips')}</td></tr>`;
+    `).join('') || `<tr><td colspan="9" class="empty-state">${T('ambmod_no_trips')}</td></tr>`;
+}
+
+function formatAmbulanceDate(val) {
+    if (!val) return '';
+    try {
+        var d = new Date(val);
+        if (isNaN(d.getTime())) return val;
+        return d.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch (e) { return val; }
 }
 
 function viewTrip(id) {
@@ -514,6 +532,8 @@ function viewTrip(id) {
             <div><strong>${T('ambmod_lbl_driver')}</strong> ${t.driverName || '-'}</div>
             <div><strong>${T('ambmod_lbl_patient')}</strong> ${t.patientName} ${t.patientAge ? '('+t.patientAge+')' : ''}</div>
             <div><strong>${T('ambmod_lbl_date')}</strong> ${APP.formatDateTime(t.createdAt)}</div>
+            <div><strong>${T('ambmod_lbl_departure_date')}</strong> ${t.departureDate ? formatAmbulanceDate(t.departureDate) : (T('ambmod_not_set'))}</div>
+            <div><strong>${T('ambmod_lbl_arrival_date')}</strong> ${t.arrivalDate ? formatAmbulanceDate(t.arrivalDate) : (T('ambmod_not_set'))}</div>
             <div><strong>${T('ambmod_lbl_pickup')}</strong> ${t.pickupLocation}</div>
             <div><strong>${T('ambmod_lbl_drop')}</strong> ${t.dropLocation}</div>
             <div><strong>${T('ambmod_lbl_kilometers')}</strong> ${t.kilometers} km</div>
