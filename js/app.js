@@ -364,6 +364,9 @@ function openFormModal(title, formHtml, onSave, large) {
 }
 
 function __modalSave(btn, fnCall) {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
     const result = eval(fnCall);
     if (result instanceof Promise) {
         result.then(r => { if (r !== false) btn.closest('.modal').remove(); });

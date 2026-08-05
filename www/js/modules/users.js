@@ -397,7 +397,13 @@ function onRoleChange(select) {
     if (section) section.style.display = role === 'hod' ? '' : 'none';
 }
 
+var _userSaveGuard = 0;
+
 function saveUser() {
+    if (_userSaveGuard && Date.now() - _userSaveGuard < 1000) {
+        return false;
+    }
+    _userSaveGuard = Date.now();
     const form = document.getElementById('userForm');
     const data = { fullName: '', username: '', password: '', email: '', phone: '', role: 'employee', department: '' };
     form.querySelectorAll('[name]').forEach(el => {
