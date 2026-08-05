@@ -1821,6 +1821,15 @@ function hodCreatePurchase() {
     var form = '<form id="hodPurchaseForm">'
         + '<div class="form-group"><label>Request Title *</label><input type="text" name="title" class="form-control" required placeholder="e.g. Purchase of cleaning supplies"></div>'
         + '<div class="form-group"><label>Item / Goods Name *</label><input type="text" name="itemName" class="form-control" required placeholder="e.g. Floor disinfectant 5L"></div>'
+        + '<div class="form-group"><label>Category *</label>'
+        + '<select name="category" class="form-control" required>'
+        + '<option value="">Select category</option>'
+        + '<option value="consumable">Consumable</option>'
+        + '<option value="new_purchase">New Purchase</option>'
+        + '<option value="replacement">Replacement</option>'
+        + '<option value="spare_parts">Spare Parts</option>'
+        + '<option value="other">Other</option>'
+        + '</select></div>'
         + '<div class="grid-3" style="gap:10px;">'
         + '<div class="form-group"><label>Quantity</label><input type="number" name="quantity" class="form-control" min="1" value="1" oninput="hodPurchaseCalcTotal()"></div>'
         + '<div class="form-group"><label>Price per Unit (₹) *</label><input type="number" name="price" class="form-control" step="0.01" min="0" required placeholder="e.g. 450" oninput="hodPurchaseCalcTotal()"></div>'
@@ -1860,7 +1869,7 @@ function hodSavePurchase() {
     var user = AUTH.currentUser();
     if (!user) return false;
     var data = getFormData('hodPurchaseForm');
-    if (!data.title || !data.itemName || !data.price || !data.location || !data.description) {
+    if (!data.title || !data.itemName || !data.price || !data.location || !data.description || !data.category) {
         APP.notify('Please fill all required fields', 'error'); return false;
     }
     var qty = parseFloat(data.quantity) || 1;
@@ -1874,6 +1883,7 @@ function hodSavePurchase() {
     DB.add('hodPurchases', {
         title: data.title,
         itemName: data.itemName,
+        category: data.category,
         quantity: qty,
         price: price,
         total: qty * price,
