@@ -2733,6 +2733,47 @@ var _hodLockerFilter = 'all'; // all | pending | allocated
 var _hodLockerDept = 'all';   // all | department name
 var _hodEditingLockerId = null;
 
+/* ═══════════════════════════════════════════════
+   HOD HANDOVER VIEW
+   ═══════════════════════════════════════════════ */
+function _hodHandovers(el) {
+    var user = AUTH.currentUser();
+    if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
+    var dept = window._hodActiveDept || user.department || '';
+    var deptLow = dept.trim().toLowerCase();
+    var all = (DB.get('handovers') || []).filter(function(h){
+        return (h.department||'').trim().toLowerCase() === deptLow;
+    });
+    var pending = all.filter(function(h){ return h.status === 'open' || !h.status; });
+    var acknowledged = all.filter(function(h){ return h.status === 'acknowledged'; });
+
+    var html = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
+        + '<div style="font-weight:700;font-size:16px;">🔄 Shift Handovers — ' + dept + '</div>'
+        + '</div>';
+
+    if (all.length === 0) {
+        html += '<div style="color:var(--gray);font-size:13px;padding:24px;text-align:center;background:var(--light-gray);border-radius:8px;">No handovers recorded yet.</div>';
+    } else {
+        html += all.slice().sort(function(a,b){ return new Date(b.createdAt) - new Date(a.createdAt); }).map(function(h) {
+            var badge = h.status === 'acknowledged' ? '<span class="badge badge-success" style="font-size:10px;">✓ Acknowledged</span>' : '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>';
+            return '<div class="card" style="margin-bottom:10px;">'
+                + '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
+                + '<h3 style="font-size:15px;margin:0;">' + h.employeeName + ' — ' + h.shift + ' (' + h.date + ')' + '</h3>'
+                + badge
+                + '</div>'
+                + '<div style="padding:12px;">'
+                + '<div style="font-size:13px;white-space:pre-wrap;">' + (h.summary || '') + '</div>'
+                + (h.pending ? '<div style="margin-top:8px;padding:8px;background:#fff3e0;border-radius:6px;border:1px solid #ffcc02;"><strong>⏳ Pending for next shift:</strong> ' + h.pending + '</div>' : '')
+                + '<div style="font-size:11px;color:var(--gray);margin-top:8px;">Submitted: ' + APP.formatDate(h.createdAt) + ' by ' + h.employeeName + '</div>'
+                + '</div></div>';
+        }).join('');
+    }
+    el.innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════════
+   HOD UNIFORM MANAGEMENT
+   ═══════════════════════════════════════════════ */
 function _hodUniform(el) {
     var user = AUTH.currentUser();
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
