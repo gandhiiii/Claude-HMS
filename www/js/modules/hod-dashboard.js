@@ -263,6 +263,11 @@ function renderHodDashboard(container) {
         tabs.push({ id: 'locker', label: '🔐 Locker', badge: (DB.get('hodLockers') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU && x.status === 'pending'; }).length, bc: 'badge-warning' });
         tabs.push({ id: 'lockerreturn', label: '↩️ Locker Return', badge: (DB.get('hodLockers') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU && x.status === 'returned'; }).length, bc: 'badge-secondary' });
     }
+    var canHandover = (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') ||
+        ['it', 'facility', 'maintenance'].indexOf(_dlowU) !== -1;
+    if (canHandover) {
+        tabs.push({ id: 'handover', label: '🔄 Handover', badge: (DB.get('handovers') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU; }).length, bc: 'badge-info' });
+    }
 
     var html = ''
         + '<div style="background:linear-gradient(135deg,#6a1b9a,#4a148c);border-radius:14px;padding:20px 24px;color:#fff;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
@@ -364,6 +369,7 @@ function _renderHodTab(tab) {
                 uniformreturn: _hodUniformReturn,
                 locker: _hodLocker,
                 lockerreturn: _hodLockerReturn,
+                handover: _hodHandovers,
                 hodtodo: _hodTodo,
                 hodworkreport: _hodWorkReport };
     if (map[tab]) map[tab](el);
@@ -1822,6 +1828,10 @@ function hodCreatePurchase() {
         + '<div class="form-group"><label>Location / Store *</label><input type="text" name="location" class="form-control" required placeholder="e.g. General Store, Counter 3"></div>'
         + '<div class="form-group"><label>Vendor / Supplier</label><input type="text" name="vendor" class="form-control" placeholder="e.g. ABC Traders"></div>'
         + '</div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Bill Date</label><input type="date" name="billDate" class="form-control"></div>'
+        + '<div class="form-group"><label>Invoice / Bill No</label><input type="text" name="billNo" class="form-control" placeholder="e.g. INV-2024-001"></div>'
+        + '</div>'
         + '<div class="form-group"><label>Description / Purpose *</label><textarea name="description" class="form-control" rows="3" required placeholder="Why is this purchase needed? How will it be used?"></textarea></div>'
         + '<hr style="margin:12px 0;border-color:var(--border);">'
         + '<div class="form-group"><label>Approval Required <span style="font-size:11px;color:var(--gray);">(who needs to approve this?)</span></label>'
@@ -1869,6 +1879,8 @@ function hodSavePurchase() {
         vendor: data.vendor || '',
         description: data.description,
         department: dept,
+        billDate: data.billDate || '',
+        billNo: data.billNo || '',
         status: recStatus,
         approvalType: approvalType,
         approvalOther: approvalOther,
@@ -1960,6 +1972,10 @@ function hodEditPurchase(id) {
         + '<div class="form-group"><label>Location / Store *</label><input type="text" name="location" class="form-control" required value="' + esc(p.location) + '"></div>'
         + '<div class="form-group"><label>Vendor / Supplier</label><input type="text" name="vendor" class="form-control" value="' + esc(p.vendor) + '"></div>'
         + '</div>'
+        + '<div class="grid-2" style="gap:10px;">'
+        + '<div class="form-group"><label>Bill Date</label><input type="date" name="billDate" class="form-control" value="' + (p.billDate ? p.billDate.slice(0,10) : '') + '"></div>'
+        + '<div class="form-group"><label>Invoice / Bill No</label><input type="text" name="billNo" class="form-control" placeholder="e.g. INV-2024-001" value="' + esc(p.billNo) + '"></div>'
+        + '</div>'
         + '<div class="form-group"><label>Description / Purpose *</label><textarea name="description" class="form-control" rows="3" required>' + esc(p.description) + '</textarea></div>'
         + '<hr style="margin:12px 0;border-color:var(--border);">'
         + '<div class="form-group"><label>Approval Required</label>'
@@ -2015,6 +2031,8 @@ function hodUpdatePurchase() {
         total: qty * price,
         location: data.location,
         vendor: data.vendor || '',
+        billDate: data.billDate || '',
+        billNo: data.billNo || '',
         description: data.description,
         approvalType: approvalType,
         approvalOther: approvalOther,
