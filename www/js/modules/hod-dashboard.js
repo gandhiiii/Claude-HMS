@@ -1774,7 +1774,7 @@ function _hodPurchaseCard(p, user) {
         + '<div><span style="color:var(--gray);">Total:</span> <strong>₹' + (parseFloat(p.total) || parseFloat(p.price) * (p.quantity || 1)).toFixed(2) + '</strong></div>'
         + (p.location ? '<div><span style="color:var(--gray);">Location:</span> <strong>' + p.location + '</strong></div>' : '')
         + (p.vendor ? '<div><span style="color:var(--gray);">Vendor:</span> <strong>' + p.vendor + '</strong></div>' : '')
-        + (p.billDate ? '<div><span style="color:var(--gray);">Bill Date:</span> <strong>' + p.billDate + '</strong></div>' : '')
+        + (p.billDate ? '<div><span style="color:var(--gray);">Bill Date:</span> <strong>' + APP.formatDate(p.billDate) + '</strong></div>' : '')
         + (p.billNo ? '<div><span style="color:var(--gray);">Bill No:</span> <strong>' + p.billNo + '</strong></div>' : '')
         + '</div>'
         + '<div style="margin-top:6px;">' + approvalHtml + '</div>'
