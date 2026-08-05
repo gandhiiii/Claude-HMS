@@ -2110,15 +2110,15 @@ function hodDownloadPurchasesReport() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dashData), 'Dashboard');
 
     // ── All Records sheet ──
-    var headers = ['Date','Title','Item','Qty','Unit Price','Total','Location','Vendor','Status','Approval','Created By','Approved/Rejected By','Description'];
+    var headers = ['Bill Date','Title','Item','Category','Qty','Unit Price','Total','Location','Vendor','Status','Approval','Created By','Approved/Rejected By','Description'];
     var rows = allPurchases.map(function(p){
         var approvedBy = p.approvedBy || p.rejectedBy || '';
         var approvalLabel = p.approvalType === 'none' ? 'No approval needed'
             : p.approvalType === 'pre-approved' ? 'Pre-approved by ' + (p.preApprovedBy||'')
             : p.approvalOther || p.approvalType || '';
         return [
-            APP.formatDate(p.createdAt), p.title||'', p.itemName||'', p.quantity||1,
-            parseFloat(p.price)||0, parseFloat(p.total)||0, p.location||'', p.vendor||'',
+            p.billDate ? APP.formatDate(p.billDate) : APP.formatDate(p.createdAt), p.title||'', p.itemName||'', p.category||'',
+            p.quantity||1, parseFloat(p.price)||0, parseFloat(p.total)||0, p.location||'', p.vendor||'',
             p.status, approvalLabel, p.createdByName||p.createdBy||'', approvedBy, p.description||''
         ];
     });
