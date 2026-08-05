@@ -51,7 +51,7 @@ function renderAmbulance(container) {
                     <table>
                         <thead><tr>
                             <th>${T('ambmod_th_vehicle_no')}</th><th>${T('ambmod_th_driver')}</th><th>${T('ambmod_th_phone')}</th><th>${T('ambmod_th_status')}</th>
-                            <th>${T('ambmod_th_location')}</th><th>${T('ambmod_th_speed')}</th><th>${T('ambmod_th_last_updated')}</th><th>${T('ambmod_th_actions')}</th>
+                            <th>${T('ambmod_th_last_updated')}</th><th>${T('ambmod_th_actions')}</th>
                         </tr></thead>
                         <tbody id="ambTableBody"></tbody>
                     </table>
@@ -224,8 +224,6 @@ function renderAmbList() {
             <td>${a.driverName || '-'}</td>
             <td>${a.driverPhone || '-'}</td>
             <td><span class="badge ${a.status === 'available' ? 'badge-success' : a.status === 'on-duty' ? 'badge-info' : 'badge-warning'}">${a.status}</span></td>
-            <td>${a.latitude && a.longitude ? `${a.latitude.toFixed(4)}, ${a.longitude.toFixed(4)}` : T('ambmod_not_tracked')}</td>
-            <td>${a.speed || 0} km/h</td>
             <td>${a.lastUpdated ? APP.formatDateTime(a.lastUpdated) : '-'}</td>
             <td>
                 <button class="btn btn-sm btn-primary" onclick="editAmb('${a.id}')">${T('ambmod_edit')}</button>
@@ -234,7 +232,7 @@ function renderAmbList() {
                 <button class="btn btn-sm btn-danger" onclick="deleteAmb('${a.id}')">${T('ambmod_del')}</button>
             </td>
         </tr>
-    `).join('') || `<tr><td colspan="8" class="empty-state">${T('ambmod_no_ambulances')}</td></tr>`;
+    `).join('') || `<tr><td colspan="6" class="empty-state">${T('ambmod_no_ambulances')}</td></tr>`;
 }
 
 function showAmbForm(amb) {
@@ -279,14 +277,7 @@ function showAmbForm(amb) {
                         <option value="mobile" ${amb?.ambType === 'mobile' ? 'selected' : ''}>${T('ambmod_opt_mobile_icu')}</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>${T('ambmod_lbl_latitude')}</label>
-                    <input type="number" name="latitude" step="0.0001" class="form-control" value="${amb?.latitude || 12.9716}">
-                </div>
-                <div class="form-group">
-                    <label>${T('ambmod_lbl_longitude')}</label>
-                    <input type="number" name="longitude" step="0.0001" class="form-control" value="${amb?.longitude || 77.5946}">
-                </div>
+
             </div>
             <div class="form-group">
                 <label>${T('ambmod_lbl_equipment')}</label>
@@ -302,8 +293,7 @@ function saveAmb() {
     if (!data.vehicleNo) { APP.notify(T('ambmod_vehicle_number_required'), 'error'); return; }
     data.speed = 0;
     data.lastUpdated = new Date().toISOString();
-    if (data.latitude) data.latitude = parseFloat(data.latitude);
-    if (data.longitude) data.longitude = parseFloat(data.longitude);
+
     if (data.id) {
         DB.update('ambulance', data.id, data);
         APP.notify(T('ambmod_ambulance_updated'), 'success');
@@ -350,7 +340,7 @@ function startAmbulanceTracking() {
         if (coordsEl) {
             if (onDuty.length > 0) {
                 coordsEl.innerHTML = onDuty.map(a =>
-                    `🚑 ${a.vehicleNo}: ${a.latitude?.toFixed(4) || 'N/A'}, ${a.longitude?.toFixed(4) || 'N/A'} | Speed: ${a.speed || 0} km/h`
+                    `🚑 ${a.vehicleNo}: Speed: ${a.speed || 0} km/h`
                 ).join(' &nbsp;|&nbsp; ');
             } else {
                 coordsEl.innerHTML = T('ambmod_no_on_duty_tracking');
@@ -371,12 +361,8 @@ function simulateAmbulanceMovement() {
         return;
     }
     onDuty.forEach(a => {
-        const lat = (a.latitude || 12.9716) + (Math.random() - 0.5) * 0.008;
-        const lng = (a.longitude || 77.5946) + (Math.random() - 0.5) * 0.008;
         const speed = Math.round(15 + Math.random() * 65);
         DB.update('ambulance', a.id, {
-            latitude: parseFloat(lat.toFixed(6)),
-            longitude: parseFloat(lng.toFixed(6)),
             speed,
             lastUpdated: new Date().toISOString()
         });
@@ -410,7 +396,7 @@ function showTripForm(prefillAmb) {
                 </div>
                 <div class="form-group">
                     <label>${T('ambmod_lbl_patient_name')}</label>
-                    <input type="text" name="patientName" class="form-control" required>
+                    <input type="text" name="patientName" class="form-control">
                 </div>
                 <div class="form-group">
                     <label>${T('ambmod_lbl_patient_age')}</label>
@@ -471,7 +457,7 @@ function showTripForm(prefillAmb) {
 
 function saveTrip() {
     const data = getFormData('tripForm');
-    if (!data.ambulanceId || !data.patientName || !data.pickupLocation || !data.dropLocation || !data.kilometers) {
+    if (!data.ambulanceId || !data.pickupLocation || !data.dropLocation || !data.kilometers) {
         APP.notify(T('ambmod_fill_required'), 'error'); return;
     }
     const amb = DB.getById('ambulance', data.ambulanceId);
