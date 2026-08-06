@@ -74,11 +74,12 @@
     .stat-card.purple { background: linear-gradient(135deg, #8B5CF6, #6D28D9); }
     .stat-val { font-size: 28px; font-weight: 700; }
 
-    .card { background: var(--surface); border-radius: var(--radius); padding: 20px; border: 1px solid var(--border); box-shadow: var(--shadow); margin-bottom: 20px; }
     .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
     .badge.success { background: rgba(16, 185, 129, 0.15); color: var(--success); }
     .badge.warning { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
     .badge.danger { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+    .badge.purple { background: rgba(126, 34, 206, 0.15); color: #7e22ce; }
+    .badge.teal { background: rgba(13, 148, 136, 0.15); color: #0d9488; }
 
     .table { width: 100%; border-collapse: collapse; margin-top: 12px; }
     .table th, .table td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; }
@@ -243,7 +244,9 @@
       { id: 'PAT-1001', name: 'Rajesh Kumar', age: 45, gender: 'Male', ward: 'ICU Ward A', room: '102-A', doctor: 'Dr. A. Sharma', status: 'ICU' },
       { id: 'PAT-1002', name: 'Priya Patel', age: 32, gender: 'Female', ward: 'General Ward B', room: '204', doctor: 'Dr. V. Mehta', status: 'Admitted' },
       { id: 'PAT-1003', name: 'Sunil Verma', age: 61, gender: 'Male', ward: 'Deluxe Suite', room: '401', doctor: 'Dr. R. Gupta', status: 'Observation' },
-      { id: 'PAT-1004', name: 'Ananya Roy', age: 28, gender: 'Female', ward: 'Maternity Ward', room: '305', doctor: 'Dr. S. Kulkarni', status: 'Admitted' }
+      { id: 'PAT-1004', name: 'Ananya Roy', age: 28, gender: 'Female', ward: 'Maternity Ward', room: '305', doctor: 'Dr. S. Kulkarni', status: 'Admitted' },
+      { id: 'PAT-1005', name: 'Vikram Singh', age: 52, gender: 'Male', ward: 'Surgical Ward', room: '501-A', doctor: 'Dr. M. Joshi', status: 'PRE OP' },
+      { id: 'PAT-1006', name: 'Sonal Patel', age: 41, gender: 'Female', ward: 'Recovery Unit', room: '502-B', doctor: 'Dr. K. Shah', status: 'POST OP' }
     ];
 
     const checklists = [
@@ -306,7 +309,7 @@
           <td>${p.age} / ${p.gender}</td>
           <td>${p.ward} (${p.room})</td>
           <td>${p.doctor}</td>
-          <td><span class="badge ${p.status === 'ICU' ? 'danger' : p.status === 'Observation' ? 'warning' : 'success'}">${p.status}</span></td>
+          <td><span class="badge ${p.status === 'ICU' ? 'danger' : p.status === 'Observation' ? 'warning' : p.status === 'PRE OP' ? 'purple' : p.status === 'POST OP' ? 'teal' : 'success'}">${p.status}</span></td>
         </tr>
       `).join('');
       document.getElementById('patientListTable').innerHTML = pRows;
