@@ -384,12 +384,14 @@ function _rSummary(el) {
         });
         _rMakeChart('rsum_adm', {
             type: 'pie',
-            data: { labels: ['Regular','Emergency','ICU'],
+            data: { labels: ['Regular','Emergency','ICU','Pre OP','Post OP'],
                 datasets: [{ data: [
-                    adms.filter(function(a){ return a.type==='regular'; }).length,
+                    adms.filter(function(a){ return a.type==='regular'||!a.type; }).length,
                     adms.filter(function(a){ return a.type==='emergency'; }).length,
-                    adms.filter(function(a){ return a.type==='icu'; }).length
-                ], backgroundColor: ['#34a853','#ea4335','#fbbc04'], borderWidth: 2 }] },
+                    adms.filter(function(a){ return a.type==='icu'; }).length,
+                    adms.filter(function(a){ return a.type==='pre-op'||a.type==='pre_op'; }).length,
+                    adms.filter(function(a){ return a.type==='post-op'||a.type==='post_op'; }).length
+                ], backgroundColor: ['#34a853','#ea4335','#fbbc04','#7e22ce','#0d9488'], borderWidth: 2 }] },
             options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ font:{ size:11 } } } } }
         });
         _rMakeChart('rsum_prob', {
@@ -463,12 +465,14 @@ function _rOverview(el) {
         _rMakeChart('rc_admType', {
             type: 'pie',
             data: {
-                labels: ['Regular','Emergency','ICU'],
+                labels: ['Regular','Emergency','ICU','Pre OP','Post OP'],
                 datasets: [{ data: [
-                    adms.filter(function(a){ return a.type==='regular'; }).length,
+                    adms.filter(function(a){ return a.type==='regular'||!a.type; }).length,
                     adms.filter(function(a){ return a.type==='emergency'; }).length,
-                    adms.filter(function(a){ return a.type==='icu'; }).length
-                ], backgroundColor: ['#34a853','#ea4335','#fbbc04'], borderWidth: 2 }]
+                    adms.filter(function(a){ return a.type==='icu'; }).length,
+                    adms.filter(function(a){ return a.type==='pre-op'||a.type==='pre_op'; }).length,
+                    adms.filter(function(a){ return a.type==='post-op'||a.type==='post_op'; }).length
+                ], backgroundColor: ['#34a853','#ea4335','#fbbc04','#7e22ce','#0d9488'], borderWidth: 2 }]
             },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
         });
@@ -660,9 +664,15 @@ function _rAdmissions(el) {
     setTimeout(function() {
         _rMakeChart('ra_type', {
             type: 'pie',
-            data: { labels: ['Regular','Emergency','ICU'],
-                datasets: [{ data: [adms.filter(function(a){ return a.type==='regular'; }).length, emergency.length, icu.length],
-                backgroundColor: ['#34a853','#ea4335','#fbbc04'], borderWidth: 2 }] },
+            data: { labels: ['Regular','Emergency','ICU','Pre OP','Post OP'],
+                datasets: [{ data: [
+                    adms.filter(function(a){ return a.type==='regular'||!a.type; }).length,
+                    emergency.length,
+                    icu.length,
+                    adms.filter(function(a){ return a.type==='pre-op'||a.type==='pre_op'; }).length,
+                    adms.filter(function(a){ return a.type==='post-op'||a.type==='post_op'; }).length
+                ],
+                backgroundColor: ['#34a853','#ea4335','#fbbc04','#7e22ce','#0d9488'], borderWidth: 2 }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
         });
         _rMakeChart('ra_status', {
