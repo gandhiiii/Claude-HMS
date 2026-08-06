@@ -98,7 +98,8 @@ const Router = {
             { id: 'departmental-checklist', label: _t('nav_departmental_checklist'), icon: '📋', permission: 'departmental-checklist' },
             { id: 'department-meetings', label: _t('nav_department_meetings'), icon: '🤝', permission: 'department-meetings' },
             { id: 'staff-deployment', label: '🧹 Staff Deployment', icon: '🧹', permission: 'staff-deployment' },
-            { id: 'security-deployment', label: '🛡️ Security Deployment', icon: '🛡️', permission: 'security-deployment' }
+            { id: 'security-deployment', label: '🛡️ Security Deployment', icon: '🛡️', permission: 'security-deployment' },
+            { id: 'patient-shifting', label: '🚑 Patient Shifting', icon: '🚑', permission: 'patient-shifting' }
         ];
         let html = '';
         items.forEach(item => {
@@ -165,6 +166,7 @@ const Router = {
             'department-meetings': 'nav_department_meetings',
             'staff-deployment': 'nav_staff_deployment',
             'security-deployment': 'nav_security_deployment',
+            'patient-shifting': 'nav_patient_shifting',
             'material-requests': 'nav_material_requests', suggestions: 'nav_suggestions',
             budget: 'nav_budget',
             'quarterly-priorities': 'nav_quarterly',
@@ -208,6 +210,7 @@ const Router = {
             'department-meetings': renderDeptMeetings,
             'staff-deployment': renderStaffDeployment,
             'security-deployment': renderSecurityDeployment,
+            'patient-shifting': renderPatientShifting,
             'material-requests': renderMaterialRequests,
             suggestions: renderSuggestions,
             budget: renderBudget,

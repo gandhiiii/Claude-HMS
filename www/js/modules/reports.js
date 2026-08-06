@@ -1352,6 +1352,11 @@ var _rSections = [
         id: 'security_deployment', label: 'Security Deployment', icon: '🛡️', color: '#b71c1c', dbKey: 'securityDeployment',
         headers: ['Date','Staff Type','Floor','Place / Location','Time','Staff Name','Shift','Duty','Added By','Added At'],
         getRow: function(e){ return [e.date||'', e.staffType==='supervisor'?'Supervisor':'Guard', e.floor||'', e.place||'', e.time||'', e.staffName||'', e.shift||'', e.duty||'', e.createdByName||e.createdBy||'', APP.formatDate(e.createdAt)]; }
+    },
+    {
+        id: 'patient_shifting', label: 'Patient Shifting', icon: '🚑', color: '#00695c', dbKey: 'patientShiftings',
+        headers: ['Date','Time','Staff Name','Staff Category','From Place','To Place','Added By','Added At'],
+        getRow: function(e){ return [e.date||'', e.time||'', e.staffName||'', e.category||'', e.fromPlace||'', e.toPlace||'', e.createdByName||e.createdBy||'', APP.formatDate(e.createdAt)]; }
     }
 ];
 

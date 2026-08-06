@@ -291,6 +291,7 @@ function renderEmployeeDashboard(container) {
         ...(isFacilityGrp ? [{ id: 'handover', label: '🔄 ' + T('empd2_tab_handover') }] : []),
         ...(isFacilityGrp ? [{ id: 'staffdeploy', label: '🧹 Staff Deployment' }] : []),
         ...(isFacilityGrp ? [{ id: 'securitydeploy', label: '🛡️ Security Deployment' }] : []),
+        ...(isFacilityGrp ? [{ id: 'patientshift', label: '🚑 Patient Shifting' }] : []),
         { id: 'performance', label: T('empd2_tab_performance') },
         { id: 'qgoals',      label: T('empd2_tab_qgoals') }
     ];
@@ -398,6 +399,7 @@ function _renderEmpTab(tab) {
     if (tab === 'handover')    { renderEmpHandoverTab(el); return; }
     if (tab === 'staffdeploy') { if (typeof StaffDeployment !== 'undefined') { StaffDeployment.renderTab(el); } else { el.innerHTML = '<div class="empty-state">Staff Deployment module not loaded</div>'; } return; }
     if (tab === 'securitydeploy') { if (typeof SecurityDeployment !== 'undefined') { SecurityDeployment.renderTab(el); } else { el.innerHTML = '<div class="empty-state">Security Deployment module not loaded</div>'; } return; }
+    if (tab === 'patientshift') { if (typeof PatientShifting !== 'undefined') { PatientShifting.renderTab(el); } else { el.innerHTML = '<div class="empty-state">Patient Shifting module not loaded</div>'; } return; }
     if (tab === 'performance') { renderEmpPerformanceTab(el); return; }
     if (tab === 'qgoals')     { renderEmpQGoalsTab(el); return; }
     if (tab === 'equipbackdown') { renderEmpBreakdownTab(el); return; }

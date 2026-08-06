@@ -154,6 +154,7 @@
             nav_lost_found: 'Lost & Found',
             nav_staff_deployment: 'Staff Deployment',
             nav_security_deployment: 'Security Deployment',
+            nav_patient_shifting: 'Patient Shifting',
 
             clTitle: 'Checklists', clTabFill: 'Fill Checklist', clTabStatus: 'Status',
             clTabHistory: 'History', clTabManage: 'Manage', clTabMasters: 'Masters',
@@ -306,6 +307,7 @@
             nav_lost_found: 'खोया-पाया',
             nav_staff_deployment: 'स्टाफ तैनाती',
             nav_security_deployment: 'सुरक्षा तैनाती',
+            nav_patient_shifting: 'मरीज़ शिफ्टिंग',
 
             clTitle: 'चेकलिस्ट', clTabFill: 'चेकलिस्ट भरें', clTabStatus: 'स्थिति',
             clTabHistory: 'इतिहास', clTabManage: 'प्रबंधन', clTabMasters: 'मास्टर्स',
@@ -458,6 +460,7 @@
             nav_lost_found: 'ખોવાયેલ-મળેલ',
             nav_staff_deployment: 'સ્ટાફ ડિપ્લોયમેન્ટ',
             nav_security_deployment: 'સિક્યુરિટી ડિપ્લોયમેન્ટ',
+            nav_patient_shifting: 'દર્દી શિફ્ટિંગ',
 
             clTitle: 'ચેકલિસ્ટ', clTabFill: 'ચેકલિસ્ટ ભરો', clTabStatus: 'સ્થિતિ',
             clTabHistory: 'ઇતિહાસ', clTabManage: 'વ્યવસ્થાપન', clTabMasters: 'માસ્ટર્સ',

@@ -169,6 +169,7 @@
             nav_department_meetings: 'Department Meetings',
             nav_staff_deployment: 'Staff Deployment',
             nav_security_deployment: 'Security Deployment',
+            nav_patient_shifting: 'Patient Shifting',
             ui_live: 'LIVE',
             ui_logout: 'Logout',
 
@@ -338,6 +339,7 @@
             nav_department_meetings: 'विभागीय बैठकें',
             nav_staff_deployment: 'स्टाफ तैनाती',
             nav_security_deployment: 'सुरक्षा तैनाती',
+            nav_patient_shifting: 'मरीज़ शिफ्टिंग',
             ui_live: 'लाइव',
             ui_logout: 'लॉगआउट',
 
@@ -507,6 +509,7 @@
             nav_department_meetings: 'વિભાગીય મીટિંગ',
             nav_staff_deployment: 'સ્ટાફ ડિપ્લોયમેન્ટ',
             nav_security_deployment: 'સિક્યુરિટી ડિપ્લોયમેન્ટ',
+            nav_patient_shifting: 'દર્દી શિફ્ટિંગ',
             ui_live: 'લાઇવ',
             ui_logout: 'લોગઆઉટ',
 
