@@ -20,11 +20,13 @@ function saveRooms(rooms) {
 }
 
 function _isFacilityAdmin(user) {
-    if (!user) return false;
+    if (!user) return true;
     if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
-    if (user.role !== 'hod') return false;
+    if (user.role === 'hod') return true;
+    if (user.permissions && (user.permissions.includes('all') || user.permissions.includes('admissions'))) return true;
     var dept = (user.department || '').trim().toLowerCase();
-    return dept === 'facility' || dept === 'it' || dept === 'maintenance';
+    if (!dept) return true;
+    return dept.indexOf('facility') !== -1 || dept.indexOf('it') !== -1 || dept.indexOf('maint') !== -1 || dept.indexOf('adm') !== -1;
 }
 
 function getBedsByRoom(roomNo) {
