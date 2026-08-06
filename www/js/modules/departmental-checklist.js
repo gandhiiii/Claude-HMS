@@ -464,7 +464,7 @@ function dchkRenderFill() {
         return;
     }
     const myAssignments = CHECKLISTS.myAssignments(user);
-    const dateStr = new Date().toISOString().slice(0, 10);
+    const dateStr = window.CHECKLISTS.operDate ? window.CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
 
     if (myAssignments.length === 0) {
         content.innerHTML = '<div class="empty-state">' + T('dchk_no_assignments') + '</div>';
@@ -605,7 +605,7 @@ function dchkRenderFill() {
 function dchkSubmitFill(assignmentId) {
     if (!window.CHECKLISTS) return;
     const user = AUTH.currentUser();
-    const dateStr = new Date().toISOString().slice(0, 10);
+    const dateStr = window.CHECKLISTS.operDate ? window.CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
 
     const startResult = CHECKLISTS.startAssignmentEntry(user, assignmentId, dateStr);
     if (!startResult.success) { APP.notify(startResult.message, 'error'); return; }
@@ -636,7 +636,7 @@ function dchkRenderOversight() {
         return;
     }
     const depts = DB.get('departments') || [];
-    const dateStr = new Date().toISOString().slice(0, 10);
+    const dateStr = window.CHECKLISTS.operDate ? window.CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
     const selectedDept = document.getElementById('dchkOversightDept')?.value || '';
 
     content.innerHTML = `

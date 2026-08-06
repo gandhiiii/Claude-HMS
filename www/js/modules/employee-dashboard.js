@@ -460,7 +460,7 @@ function renderEmpOverview(el) {
         if (typeof CHECKLISTS !== 'undefined') {
             _myDchkAssignments = CHECKLISTS.myAssignments(d.user);
         }
-        var _todayStr = new Date().toISOString().slice(0, 10);
+        var _todayStr = (typeof CHECKLISTS !== 'undefined' && CHECKLISTS.operDate) ? CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
         var _pendingDchk = _myDchkAssignments.filter(function(a) {
             return !CHECKLISTS.hasAssignmentEntry(a.id, _todayStr);
         });
@@ -832,7 +832,7 @@ function _renderEmpChecklists(checklists) {
         return;
     }
 
-    var today = new Date().toISOString().slice(0, 10);
+    var today = (typeof CHECKLISTS !== 'undefined' && CHECKLISTS.operDate) ? CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
     var html = '';
 
     /* ─── Render CHECKLISTS API assignments ─── */
@@ -993,7 +993,7 @@ function _renderEmpChecklists(checklists) {
 function empSubmitDeptAsgn(assignmentId) {
     if (!window.CHECKLISTS) return;
     var user = AUTH.currentUser();
-    var today = new Date().toISOString().slice(0, 10);
+    var today = (typeof CHECKLISTS !== 'undefined' && CHECKLISTS.operDate) ? CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
     var startResult = CHECKLISTS.startAssignmentEntry(user, assignmentId, today);
     if (!startResult.success) { APP.notify(startResult.message, 'error'); return; }
     var entry = startResult.entry;

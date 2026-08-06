@@ -6596,7 +6596,7 @@ function hodDchkDoRevoke(assignmentId) {
 
 /* ── OVERSIGHT SUB-TAB ── */
 function _hodDchkOversight(el, user, dept, assignments, team) {
-    var dateStr = new Date().toISOString().slice(0,10);
+    var dateStr = (typeof CHECKLISTS !== 'undefined' && CHECKLISTS.operDate) ? CHECKLISTS.operDate() : new Date().toISOString().slice(0,10);
 
     var html = '<div style="font-weight:600;font-size:14px;margin-bottom:8px;">Oversight — ' + APP.formatDate(dateStr) + '</div>'
         + '<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Whether each team member has submitted their assigned checklist today.</div>';
