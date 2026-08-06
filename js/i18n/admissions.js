@@ -173,7 +173,10 @@
             admmod_th_completed: 'Completed',
             admmod_th_completed_by: 'Completed By',
             admmod_msg_cleaning_started: 'Cleaning started',
-            admmod_msg_room_clean: 'Room marked clean — now available for new admissions!'
+            admmod_msg_room_clean: 'Room marked clean — now available for new admissions!',
+            admmod_edit_admission: 'Edit Admission',
+            admmod_msg_adm_updated: 'Admission record updated successfully.',
+            admmod_msg_only_facility_admin_edit: 'Only Admin and Facility HOD can edit or delete admission records.'
         },
         hi: {
             admmod_search_ph: 'मरीज़ खोजें...',
@@ -347,7 +350,10 @@
             admmod_th_completed: 'पूर्ण',
             admmod_th_completed_by: 'द्वारा पूर्ण',
             admmod_msg_cleaning_started: 'सफाई शुरू हुई',
-            admmod_msg_room_clean: 'कक्ष साफ़ चिह्नित — अब नई भर्ती के लिए उपलब्ध!'
+            admmod_msg_room_clean: 'कक्ष साफ़ चिह्नित — अब नई भर्ती के लिए उपलब्ध!',
+            admmod_edit_admission: 'भर्ती संपादित करें',
+            admmod_msg_adm_updated: 'भर्ती रिकॉर्ड सफलतापूर्वक अपडेट किया गया।',
+            admmod_msg_only_facility_admin_edit: 'केवल एडमिन और फैसिलिटी एचओडी भर्ती रिकॉर्ड संपादित या हटा सकते हैं।'
         },
         gu: {
             admmod_search_ph: 'દર્દી શોધો...',
@@ -518,7 +524,10 @@
             admmod_th_completed: 'પૂર્ણ',
             admmod_th_completed_by: 'દ્વારા પૂર્ણ',
             admmod_msg_cleaning_started: 'સફાઈ શરૂ થઈ',
-            admmod_msg_room_clean: 'ઓરડો સ્વચ્છ ચિહ્નિત — હવે નવા દાખલા માટે ઉપલબ્ધ!'
+            admmod_msg_room_clean: 'ઓરડો સ્વચ્છ ચિહ્નિત — હવે નવા દાખલા માટે ઉપલબ્ધ!',
+            admmod_edit_admission: 'દાખલો સંપાદિત કરો',
+            admmod_msg_adm_updated: 'દાખલ રેકોર્ડ સફળતાપૂર્વક અપડેટ થયો.',
+            admmod_msg_only_facility_admin_edit: 'માત્ર એડમિન અને ફેસિલિટી HOD દાખલો સંપાદિત અથવા કાઢી શકે છે.'
         }
     });
 })();

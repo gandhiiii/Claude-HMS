@@ -210,7 +210,9 @@ function renderAdmList() {
     for (var r = filtered.length - 1; r >= 0; r--) {
         var adm = filtered[r];
         var bedLabel = adm.bedId ? ' (' + adm.bedId + ')' : '';
-        rows += '<tr><td><strong>' + adm.patientName + '</strong></td><td>' + (adm.patientId || '#' + adm.id.slice(-6)) + '</td><td>' + adm.roomNo + bedLabel + '</td><td>' + (adm.doctorName || '-') + '</td><td>' + APP.formatDate(adm.admissionDate) + '</td><td><span class="badge ' + getAdmTypeBadgeClass(adm.type) + '">' + (adm.type || 'regular').toUpperCase() + '</span></td><td><span class="badge ' + APP.getStatusBadge(adm.status) + '">' + adm.status + '</span></td><td><button class="btn btn-sm btn-primary" onclick="viewAdm(\'' + adm.id + '\')">' + T('admmod_btn_view') + '</button>' + (adm.status === 'admitted' ? '<button class="btn btn-sm btn-warning" onclick="showDischargeForm(\'' + adm.id + '\')">' + T('admmod_btn_discharge') + '</button>' : '') + '<button class="btn btn-sm btn-danger" onclick="deleteAdm(\'' + adm.id + '\')">' + T('admmod_btn_del') + '</button></td></tr>';
+        var editBtn = isAdmin ? '<button class="btn btn-sm btn-secondary" onclick="editAdm(\'' + adm.id + '\')">✏️ ' + T('admmod_btn_edit') + '</button> ' : '';
+        var delBtn = isAdmin ? '<button class="btn btn-sm btn-danger" onclick="deleteAdm(\'' + adm.id + '\')">' + T('admmod_btn_del') + '</button>' : '';
+        rows += '<tr><td><strong>' + adm.patientName + '</strong></td><td>' + (adm.patientId || '#' + adm.id.slice(-6)) + '</td><td>' + adm.roomNo + bedLabel + '</td><td>' + (adm.doctorName || '-') + '</td><td>' + APP.formatDate(adm.admissionDate) + '</td><td><span class="badge ' + getAdmTypeBadgeClass(adm.type) + '">' + (adm.type || 'regular').toUpperCase() + '</span></td><td><span class="badge ' + APP.getStatusBadge(adm.status) + '">' + adm.status + '</span></td><td><button class="btn btn-sm btn-primary" onclick="viewAdm(\'' + adm.id + '\')">' + T('admmod_btn_view') + '</button> ' + editBtn + (adm.status === 'admitted' ? '<button class="btn btn-sm btn-warning" onclick="showDischargeForm(\'' + adm.id + '\')">' + T('admmod_btn_discharge') + '</button> ' : '') + delBtn + '</td></tr>';
     }
     tbody.innerHTML = rows || '<tr><td colspan="8" class="empty-state">' + T('admmod_no_admissions') + '</td></tr>';
 }
@@ -837,12 +839,124 @@ function saveAdm() {
     renderAdmContent();
 }
 
+function editAdm(id) {
+    var user = AUTH.currentUser();
+    if (!_isFacilityAdmin(user)) {
+        APP.notify(T('admmod_msg_only_facility_admin_edit'), 'error');
+        return;
+    }
+    var adm = DB.getById('admissions', id);
+    if (!adm) {
+        APP.notify(T('admmod_no_admissions'), 'error');
+        return;
+    }
+
+    var rooms = getRooms();
+    var roomOpts = '';
+    for (var i = 0; i < rooms.length; i++) {
+        var rm = rooms[i];
+        var occupied = getOccupiedBeds(rm.roomNo);
+        var totalBeds = rm.beds || ['A'];
+        var avail = totalBeds.length - occupied.length;
+        if (rm.roomNo === adm.roomNo) avail += 1;
+        var statusLabel = avail > 0 ? avail + '/' + totalBeds.length + ' ' + T('admmod_free') : T('admmod_full');
+        var selected = rm.roomNo === adm.roomNo ? ' selected' : '';
+        roomOpts += '<option value="' + rm.roomNo + '" data-beds="' + rm.beds.join(',') + '"' + selected + '>' + rm.roomNo + ' - ' + rm.category + ' (' + statusLabel + ')</option>';
+    }
+    if (!roomOpts) roomOpts = '<option value="">' + T('admmod_opt_no_rooms') + '</option>';
+
+    var form = '<form id="editAdmForm"><input type="hidden" name="id" value="' + id + '"><div class="grid-2">' +
+        '<div class="form-group"><label>' + T('admmod_lbl_patient_name') + '</label><input type="text" name="patientName" class="form-control" value="' + esc(adm.patientName) + '" required></div>' +
+        '<div class="form-group"><label>' + T('admmod_lbl_patient_id') + '</label><input type="text" name="patientId" class="form-control" value="' + esc(adm.patientId || '') + '"></div>' +
+        '<div class="form-group"><label>' + T('admmod_lbl_age') + '</label><input type="number" name="age" class="form-control" value="' + esc(adm.age) + '" required></div>' +
+        '<div class="form-group"><label>' + T('admmod_lbl_gender') + '</label><select name="gender" class="form-control" required>' +
+        '<option value="Male"' + (adm.gender === 'Male' ? ' selected' : '') + '>Male</option>' +
+        '<option value="Female"' + (adm.gender === 'Female' ? ' selected' : '') + '>Female</option>' +
+        '<option value="Other"' + (adm.gender === 'Other' ? ' selected' : '') + '>Other</option></select></div>' +
+        '<div class="form-group"><label>' + T('admmod_lbl_contact_phone') + '</label><input type="text" name="phone" class="form-control" value="' + esc(adm.phone) + '" required></div>' +
+        '<div class="form-group"><label>' + T('admmod_lbl_emergency') + '</label><input type="text" name="emergencyContact" class="form-control" value="' + esc(adm.emergencyContact || '') + '"></div>' +
+        '<div class="form-group"><label>' + T('admmod_lbl_room') + '</label><select name="roomNo" id="editAdmRoomSelect" class="form-control" onchange="updateEditAdmBedOptions(\'' + esc(adm.bedId || '') + '\')" required>' + roomOpts + '</select></div>' +
+        '<div class="form-group"><label>' + T('admmod_lbl_bed') + '</label><select name="bedId" id="editAdmBedSelect" class="form-control" required></select></div>' +
+        '<div class="form-group"><label>' + T('admmod_lbl_doctor_name') + '</label><input type="text" name="doctorName" class="form-control" value="' + esc(adm.doctorName) + '" required></div>' +
+        '<div class="form-group"><label>' + T('admmod_lbl_adm_type') + '</label><select name="type" class="form-control" required>' +
+        '<option value="regular"' + (adm.type === 'regular' ? ' selected' : '') + '>Regular</option>' +
+        '<option value="emergency"' + (adm.type === 'emergency' ? ' selected' : '') + '>Emergency</option>' +
+        '<option value="icu"' + (adm.type === 'icu' ? ' selected' : '') + '>ICU</option>' +
+        '<option value="pre-op"' + (adm.type === 'pre-op' ? ' selected' : '') + '>' + (T('admmod_opt_pre_op') || 'PRE OP') + '</option>' +
+        '<option value="post-op"' + (adm.type === 'post-op' ? ' selected' : '') + '>' + (T('admmod_opt_post_op') || 'POST OP') + '</option></select></div>' +
+        '<div class="form-group"><label>' + T('admmod_lbl_privileged') + '</label><select name="privileged" class="form-control">' +
+        '<option value="no"' + (adm.privileged === 'no' ? ' selected' : '') + '>' + T('admmod_privileged_no') + '</option>' +
+        '<option value="yes"' + (adm.privileged === 'yes' ? ' selected' : '') + '>' + T('admmod_privileged_yes') + '</option></select></div>' +
+        '<div class="form-group"><label>' + T('admmod_lbl_adm_date') + '</label><input type="date" name="admissionDate" class="form-control" value="' + (adm.admissionDate ? adm.admissionDate.split('T')[0] : new Date().toISOString().split('T')[0]) + '" required></div>' +
+        '</div>' +
+        '<div class="form-group"><label>' + T('admmod_lbl_diagnosis') + '</label><textarea name="diagnosis" class="form-control" rows="2">' + esc(adm.diagnosis || '') + '</textarea></div>' +
+        '<div class="form-group"><label>' + T('admmod_lbl_notes') + '</label><textarea name="notes" class="form-control" rows="2">' + esc(adm.notes || '') + '</textarea></div></form>';
+
+    openFormModal(T('admmod_edit_admission'), form, 'updateAdm("' + id + '")');
+    setTimeout(function() { updateEditAdmBedOptions(adm.bedId); }, 50);
+}
+
+function updateEditAdmBedOptions(currentBedId) {
+    var roomSelect = document.getElementById('editAdmRoomSelect');
+    var bedSelect = document.getElementById('editAdmBedSelect');
+    if (!roomSelect || !bedSelect) return;
+    var selectedOption = roomSelect.options[roomSelect.selectedIndex];
+    if (!selectedOption || !selectedOption.value) { bedSelect.innerHTML = '<option value="">' + T('admmod_opt_select_room') + '</option>'; return; }
+    var beds = (selectedOption.getAttribute('data-beds') || 'A').split(',');
+    var roomNo = selectedOption.value;
+    var adms = DB.get('admissions') || [];
+    var editAdmId = (document.getElementById('editAdmForm') ? (document.getElementById('editAdmForm').querySelector('input[name="id"]') ? document.getElementById('editAdmForm').querySelector('input[name="id"]').value : '') : '');
+    var occupied = [];
+    for (var i = 0; i < adms.length; i++) {
+        if (adms[i].roomNo === roomNo && adms[i].status === 'admitted' && adms[i].id !== editAdmId) {
+            occupied.push(adms[i].bedId || 'A');
+        }
+    }
+    var html = '';
+    for (var b = 0; b < beds.length; b++) {
+        var bed = beds[b].trim();
+        if (!bed) continue;
+        var taken = false;
+        for (var oc = 0; oc < occupied.length; oc++) {
+            if (occupied[oc] === bed) { taken = true; break; }
+        }
+        var isCurrent = (bed === currentBedId);
+        html += '<option value="' + bed + '" ' + (taken ? 'disabled' : '') + (isCurrent ? ' selected' : '') + '>' + bed + (taken ? ' (' + T('admmod_occupied_cap') + ')' : ' (' + T('admmod_available') + ')') + '</option>';
+    }
+    bedSelect.innerHTML = html || '<option value="">' + T('admmod_opt_no_beds') + '</option>';
+}
+
+function updateAdm(id) {
+    var user = AUTH.currentUser();
+    if (!_isFacilityAdmin(user)) {
+        APP.notify(T('admmod_msg_only_facility_admin_edit'), 'error');
+        return;
+    }
+    var data = getFormData('editAdmForm');
+    if (!data.patientName || !data.age || !data.phone || !data.roomNo || !data.doctorName || !data.bedId) {
+        APP.notify(T('admmod_msg_fill_required'), 'error'); return;
+    }
+    var adms = DB.get('admissions') || [];
+    for (var i = 0; i < adms.length; i++) {
+        if (adms[i].id !== id && adms[i].roomNo === data.roomNo && adms[i].bedId === data.bedId && adms[i].status === 'admitted') {
+            APP.notify(T('admmod_bed_word') + ' ' + data.bedId + ' ' + T('admmod_in_room') + ' ' + data.roomNo + ' ' + T('admmod_bed_occupied'), 'error'); return;
+        }
+    }
+    DB.update('admissions', id, data);
+    APP.notify(T('admmod_msg_adm_updated'), 'success');
+    renderAdmContent();
+    closeModal();
+}
+
 function viewAdm(id) {
     var a = DB.getById('admissions', id);
     if (!a) return;
+    var user = AUTH.currentUser();
+    var isAdmin = !user || _isFacilityAdmin(user);
+    var editBtnHtml = isAdmin ? '<button class="btn btn-sm btn-secondary" onclick="document.querySelector(\'.modal.active\')?.remove();editAdm(\'' + a.id + '\')">✏️ ' + T('admmod_btn_edit') + '</button> ' : '';
     var stayDays = a.status === 'admitted' ? APP.daysBetween(a.admissionDate, new Date().toISOString()) : (a.dischargeDate ? APP.daysBetween(a.admissionDate, a.dischargeDate) : 0);
     var bedLabel = a.bedId ? ' (' + T('admmod_bed_word') + ' ' + a.bedId + ')' : '';
-    showModal('<div class="modal-header"><h3>' + a.patientName + ' - ' + (a.patientId || '#' + a.id.slice(-6)) + '</h3><button class="modal-close" onclick="this.closest(\'.modal\').remove()">&times;</button></div><div class="grid-2"><div><strong>' + T('admmod_f_age_gender') + '</strong> ' + a.age + '/' + a.gender + '</div><div><strong>' + T('admmod_f_phone') + '</strong> ' + a.phone + '</div><div><strong>' + T('admmod_f_room') + '</strong> ' + a.roomNo + bedLabel + '</div><div><strong>' + T('admmod_f_department') + '</strong> ' + (a.department || '-') + '</div><div><strong>' + T('admmod_f_doctor') + '</strong> ' + a.doctorName + '</div><div><strong>' + T('admmod_f_type') + '</strong> <span class="badge ' + getAdmTypeBadgeClass(a.type) + '">' + (a.type || 'regular').toUpperCase() + '</span></div><div><strong>' + T('admmod_f_admitted') + '</strong> ' + APP.formatDate(a.admissionDate) + '</div><div><strong>' + T('admmod_f_stay') + '</strong> ' + stayDays + ' ' + T('admmod_days_suffix') + '</div><div><strong>' + T('admmod_f_status') + '</strong> <span class="badge ' + APP.getStatusBadge(a.status) + '">' + a.status.toUpperCase() + '</span></div>' + (a.emergencyContact ? '<div><strong>' + T('admmod_f_emergency') + '</strong> ' + a.emergencyContact + '</div>' : '') + (a.billAmount ? '<div><strong>' + T('admmod_f_bill') + '</strong> ₹' + a.billAmount + '</div>' : '') + (a.paymentStatus ? '<div><strong>' + T('admmod_f_payment') + '</strong> <span class="badge ' + (a.paymentStatus === 'paid' ? 'badge-success' : 'badge-warning') + '">' + a.paymentStatus + '</span></div>' : '') + '</div>' + (a.diagnosis ? '<div class="mt-4"><strong>' + T('admmod_f_diagnosis') + '</strong><br>' + a.diagnosis + '</div>' : '') + (a.notes ? '<div class="mt-2"><strong>' + T('admmod_f_notes') + '</strong><br>' + a.notes + '</div>' : '') + (a.dischargeSummary ? '<div class="mt-2"><strong>' + T('admmod_f_discharge_summary') + '</strong><br>' + a.dischargeSummary + '</div>' : '') + (a.dischargeDate ? '<div class="mt-2"><strong>' + T('admmod_f_discharged') + '</strong> ' + APP.formatDateTime(a.dischargeDate) + '</div>' : ''));
+    showModal('<div class="modal-header"><h3>' + a.patientName + ' - ' + (a.patientId || '#' + a.id.slice(-6)) + '</h3><div>' + editBtnHtml + '<button class="modal-close" onclick="this.closest(\'.modal\').remove()">&times;</button></div></div><div class="grid-2"><div><strong>' + T('admmod_f_age_gender') + '</strong> ' + a.age + '/' + a.gender + '</div><div><strong>' + T('admmod_f_phone') + '</strong> ' + a.phone + '</div><div><strong>' + T('admmod_f_room') + '</strong> ' + a.roomNo + bedLabel + '</div><div><strong>' + T('admmod_f_department') + '</strong> ' + (a.department || '-') + '</div><div><strong>' + T('admmod_f_doctor') + '</strong> ' + a.doctorName + '</div><div><strong>' + T('admmod_f_type') + '</strong> <span class="badge ' + getAdmTypeBadgeClass(a.type) + '">' + (a.type || 'regular').toUpperCase() + '</span></div><div><strong>' + T('admmod_f_admitted') + '</strong> ' + APP.formatDate(a.admissionDate) + '</div><div><strong>' + T('admmod_f_stay') + '</strong> ' + stayDays + ' ' + T('admmod_days_suffix') + '</div><div><strong>' + T('admmod_f_status') + '</strong> <span class="badge ' + APP.getStatusBadge(a.status) + '">' + a.status.toUpperCase() + '</span></div>' + (a.emergencyContact ? '<div><strong>' + T('admmod_f_emergency') + '</strong> ' + a.emergencyContact + '</div>' : '') + (a.billAmount ? '<div><strong>' + T('admmod_f_bill') + '</strong> ₹' + a.billAmount + '</div>' : '') + (a.paymentStatus ? '<div><strong>' + T('admmod_f_payment') + '</strong> <span class="badge ' + (a.paymentStatus === 'paid' ? 'badge-success' : 'badge-warning') + '">' + a.paymentStatus + '</span></div>' : '') + '</div>' + (a.diagnosis ? '<div class="mt-4"><strong>' + T('admmod_f_diagnosis') + '</strong><br>' + a.diagnosis + '</div>' : '') + (a.notes ? '<div class="mt-2"><strong>' + T('admmod_f_notes') + '</strong><br>' + a.notes + '</div>' : '') + (a.dischargeSummary ? '<div class="mt-2"><strong>' + T('admmod_f_discharge_summary') + '</strong><br>' + a.dischargeSummary + '</div>' : '') + (a.dischargeDate ? '<div class="mt-2"><strong>' + T('admmod_f_discharged') + '</strong> ' + APP.formatDateTime(a.dischargeDate) + '</div>' : ''));
 }
 
 function showDischargeForm(id) {
@@ -901,6 +1015,11 @@ function saveDischarge() {
 }
 
 function deleteAdm(id) {
+    var user = AUTH.currentUser();
+    if (!_isFacilityAdmin(user)) {
+        APP.notify(T('admmod_msg_only_facility_admin_edit'), 'error');
+        return;
+    }
     var adm = DB.getById('admissions', id);
     confirmAction(T('admmod_confirm_delete_adm'), function() {
         if (adm && adm.status === 'admitted') {
