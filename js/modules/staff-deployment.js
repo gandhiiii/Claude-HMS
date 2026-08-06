@@ -101,6 +101,8 @@ var StaffDeployment = (function () {
         var staffName = (data.staffName || '').trim();
         var shift = data.shift || 'Morning';
         var duty  = (data.duty || '').trim();
+        var time  = (data.time || '').trim();
+        var place = (data.place || '').trim();
         if (!floor) { APP.notify('Enter the floor', 'error'); return null; }
         if (!staffName) { APP.notify('Enter the staff name', 'error'); return null; }
         var entry = DB.add(KEY, {
@@ -110,6 +112,8 @@ var StaffDeployment = (function () {
             staffName: staffName,
             shift: shift,
             duty: duty,
+            time: time,
+            place: place,
             createdBy: user ? user.username : '',
             createdByName: user ? (user.fullName || user.username) : ''
         });
@@ -135,14 +139,14 @@ var StaffDeployment = (function () {
         }
         var rows = _filter(fromDate, toDate, type);
         if (rows.length === 0) { APP.notify('No data to export', 'info'); return; }
-        var headers = ['Date', 'Staff Type', 'Floor', 'Staff Name', 'Shift', 'Duty / Remarks', 'Added By'];
+        var headers = ['Date', 'Staff Type', 'Floor', 'Place / Location', 'Time', 'Staff Name', 'Shift', 'Duty / Remarks', 'Added By'];
         var data = rows.map(function (e) {
-            return [e.date || '', _labelType(e), e.floor || '', e.staffName || '',
-                    e.shift || '', e.duty || '', e.createdByName || e.createdBy || ''];
+            return [e.date || '', _labelType(e), e.floor || '', e.place || '', e.time || '',
+                    e.staffName || '', e.shift || '', e.duty || '', e.createdByName || e.createdBy || ''];
         });
         var wb = XLSX.utils.book_new();
         var ws = XLSX.utils.aoa_to_sheet([headers].concat(data));
-        ws['!cols'] = [12, 16, 18, 24, 12, 30, 22].map(function (w) { return { wch: w }; });
+        ws['!cols'] = [12, 16, 18, 24, 10, 24, 12, 30, 22].map(function (w) { return { wch: w }; });
         XLSX.utils.book_append_sheet(wb, ws, 'Staff Deployment');
         var range = (fromDate || 'all') + '_to_' + (toDate || 'all');
         XLSX.writeFile(wb, 'Staff_Deployment_' + range + '.xlsx');
@@ -166,6 +170,10 @@ var StaffDeployment = (function () {
             + '<div class="form-group"><label style="font-size:12px;">Floor *</label>'
             + '<input type="text" id="sdpFloor" list="sdpFloorList" class="form-control" placeholder="e.g. Second Floor">'
             + '<datalist id="sdpFloorList">' + floors.map(function (f) { return '<option value="' + _esc(f) + '">'; }).join('') + '</datalist></div>'
+            + '<div class="form-group"><label style="font-size:12px;">Time</label>'
+            + '<input type="time" id="sdpTime" class="form-control"></div>'
+            + '<div class="form-group"><label style="font-size:12px;">Place / Location</label>'
+            + '<input type="text" id="sdpPlace" class="form-control" placeholder="e.g. Room 201, Corridor B"></div>'
             + '<div class="form-group"><label style="font-size:12px;">Staff Name *</label>'
             + '<input type="text" id="sdpStaffName" list="sdpStaffList" class="form-control" placeholder="Staff name">'
             + '<datalist id="sdpStaffList"></datalist></div>'
@@ -191,12 +199,14 @@ var StaffDeployment = (function () {
             html += '<div style="color:var(--gray);font-size:13px;padding:14px;">No entries.</div>';
         } else {
             html += '<div class="table-responsive"><table><thead><tr>'
-                + '<th>Date</th><th>Floor</th><th>Staff Name</th><th>Shift</th><th>Duty</th><th>Added By</th><th></th>'
+                + '<th>Date</th><th>Floor / Place</th><th>Time</th><th>Staff Name</th><th>Shift</th><th>Duty</th><th>Added By</th><th></th>'
                 + '</tr></thead><tbody>';
             rows.forEach(function (e) {
                 html += '<tr>'
                     + '<td>' + _esc(e.date || '') + '</td>'
-                    + '<td><strong>' + _esc(e.floor || '') + '</strong></td>'
+                    + '<td><strong>' + _esc(e.floor || '') + '</strong>'
+                    + (e.place ? '<div style="font-size:11px;color:var(--gray);">' + _esc(e.place) + '</div>' : '') + '</td>'
+                    + '<td>' + _esc(e.time || '') + '</td>'
                     + '<td>' + _esc(e.staffName || '') + '</td>'
                     + '<td>' + _esc(e.shift || '') + '</td>'
                     + '<td>' + _esc(e.duty || '') + '</td>'
@@ -364,15 +374,20 @@ var StaffDeployment = (function () {
             var staffName = (document.getElementById('sdpStaffName') || {}).value || '';
             var shift = (document.getElementById('sdpShift') || {}).value || 'Morning';
             var duty = (document.getElementById('sdpDuty') || {}).value || '';
+            var time = (document.getElementById('sdpTime') || {}).value || '';
+            var place = (document.getElementById('sdpPlace') || {}).value || '';
             var entry = _addEntry({
                 staffType: type, date: date, floor: floor,
-                staffName: staffName, shift: shift, duty: duty
+                staffName: staffName, shift: shift, duty: duty,
+                time: time, place: place
             });
             if (!entry) return;
             if (document.getElementById('sdpFloor')) {
                 var f = document.getElementById('sdpFloor'); if (f) f.value = '';
                 var s = document.getElementById('sdpStaffName'); if (s) s.value = '';
                 var du = document.getElementById('sdpDuty'); if (du) du.value = '';
+                var t = document.getElementById('sdpTime'); if (t) t.value = '';
+                var pl = document.getElementById('sdpPlace'); if (pl) pl.value = '';
                 StaffDeployment.updateStaffList();
             }
             if (_mode === 'module') renderStaffDeployment(document.getElementById('pageContent'));
