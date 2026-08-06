@@ -27,6 +27,16 @@ class StatusBadge extends StatelessWidget {
       case 'medium':
         color = AppTheme.warningAmber;
         break;
+      case 'pre-op':
+      case 'pre op':
+      case 'preop':
+        color = Colors.purple;
+        break;
+      case 'post-op':
+      case 'post op':
+      case 'postop':
+        color = Colors.teal;
+        break;
       default:
         color = AppTheme.primaryLight;
     }

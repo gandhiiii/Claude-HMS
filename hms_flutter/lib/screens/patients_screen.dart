@@ -15,7 +15,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
   String _searchQuery = '';
   String _selectedFilter = 'All';
 
-  final List<String> _filters = ['All', 'Admitted', 'ICU', 'Observation'];
+  final List<String> _filters = ['All', 'Admitted', 'ICU', 'Observation', 'Pre-OP', 'Post-OP'];
 
   void _showAddPatientDialog() {
     final nameCtrl = TextEditingController();
@@ -75,7 +75,7 @@ class _PatientsScreenState extends State<PatientsScreen> {
                 DropdownButtonFormField<String>(
                   value: status,
                   decoration: const InputDecoration(labelText: 'Admission Status'),
-                  items: ['Admitted', 'ICU', 'Observation'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                  items: ['Admitted', 'ICU', 'Observation', 'Pre-OP', 'Post-OP'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                   onChanged: (val) { if (val != null) status = val; },
                 ),
               ],

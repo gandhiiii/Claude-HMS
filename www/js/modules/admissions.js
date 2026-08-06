@@ -1,5 +1,16 @@
 const ROOM_CATEGORIES = ['Super Deluxe', 'Deluxe Special', 'Semi Special', 'Twin', 'Triple'];
 const BED_LABELS = ['A', 'B', 'C'];
+
+function getAdmTypeBadgeClass(type) {
+    if (!type) return 'badge-info';
+    var t = String(type).toLowerCase();
+    if (t === 'emergency') return 'badge-danger';
+    if (t === 'icu') return 'badge-warning';
+    if (t === 'pre-op' || t === 'pre_op' || t === 'pre op' || t === 'preop') return 'badge-purple';
+    if (t === 'post-op' || t === 'post_op' || t === 'post op' || t === 'postop') return 'badge-teal';
+    return 'badge-info';
+}
+
 function getRooms() {
     return DB.get('rooms');
 }
@@ -95,6 +106,8 @@ function renderAdmissions(container) {
             <button class="tab-btn ${admFilter === 'all' ? 'active' : ''}" onclick="switchAdmFilter('all',this)">${T('admmod_tab_all')}</button>
             <button class="tab-btn ${admFilter === 'admitted' ? 'active' : ''}" onclick="switchAdmFilter('admitted',this)">${T('admmod_tab_admitted')}</button>
             <button class="tab-btn ${admFilter === 'discharged' ? 'active' : ''}" onclick="switchAdmFilter('discharged',this)">${T('admmod_tab_discharged')}</button>
+            <button class="tab-btn ${admFilter === 'pre-op' ? 'active' : ''}" onclick="switchAdmFilter('pre-op',this)">🔪 ${T('admmod_tab_pre_op')}</button>
+            <button class="tab-btn ${admFilter === 'post-op' ? 'active' : ''}" onclick="switchAdmFilter('post-op',this)">🩹 ${T('admmod_tab_post_op')}</button>
             <button class="tab-btn ${admFilter === 'rooms' ? 'active' : ''}" onclick="switchAdmFilter('rooms',this)">🏥 ${T('admmod_tab_rooms')}</button>
             <button class="tab-btn ${admFilter === 'cleaning' ? 'active' : ''}" onclick="switchAdmFilter('cleaning',this)">🧹 ${T('admmod_tab_cleaning')} <span id="cleaningBadge" style="display:inline-block;background:var(--danger);color:#fff;border-radius:10px;padding:0 6px;font-size:10px;font-weight:700;margin-left:4px;vertical-align:middle;"></span></button>
             <button class="tab-btn ${admFilter === 'report' ? 'active' : ''}" onclick="switchAdmFilter('report',this)">📊 ${T('admmod_tab_report')}</button>
@@ -166,7 +179,7 @@ function renderAdmList() {
             }
         }
         if (a.patientName.toLowerCase().indexOf(search) > -1 || (a.patientId || '').toLowerCase().indexOf(search) > -1 || a.roomNo.toLowerCase().indexOf(search) > -1 || (a.doctorName || '').toLowerCase().indexOf(search) > -1) {
-            if (admFilter === 'all' || a.status === admFilter) filtered.push(a);
+            if (admFilter === 'all' || a.status === admFilter || (a.type || '').toLowerCase() === admFilter.toLowerCase()) filtered.push(a);
         }
     }
 
@@ -197,7 +210,7 @@ function renderAdmList() {
     for (var r = filtered.length - 1; r >= 0; r--) {
         var adm = filtered[r];
         var bedLabel = adm.bedId ? ' (' + adm.bedId + ')' : '';
-        rows += '<tr><td><strong>' + adm.patientName + '</strong></td><td>' + (adm.patientId || '#' + adm.id.slice(-6)) + '</td><td>' + adm.roomNo + bedLabel + '</td><td>' + (adm.doctorName || '-') + '</td><td>' + APP.formatDate(adm.admissionDate) + '</td><td><span class="badge ' + (adm.type === 'emergency' ? 'badge-danger' : adm.type === 'icu' ? 'badge-warning' : 'badge-info') + '">' + adm.type + '</span></td><td><span class="badge ' + APP.getStatusBadge(adm.status) + '">' + adm.status + '</span></td><td><button class="btn btn-sm btn-primary" onclick="viewAdm(\'' + adm.id + '\')">' + T('admmod_btn_view') + '</button>' + (adm.status === 'admitted' ? '<button class="btn btn-sm btn-warning" onclick="showDischargeForm(\'' + adm.id + '\')">' + T('admmod_btn_discharge') + '</button>' : '') + '<button class="btn btn-sm btn-danger" onclick="deleteAdm(\'' + adm.id + '\')">' + T('admmod_btn_del') + '</button></td></tr>';
+        rows += '<tr><td><strong>' + adm.patientName + '</strong></td><td>' + (adm.patientId || '#' + adm.id.slice(-6)) + '</td><td>' + adm.roomNo + bedLabel + '</td><td>' + (adm.doctorName || '-') + '</td><td>' + APP.formatDate(adm.admissionDate) + '</td><td><span class="badge ' + getAdmTypeBadgeClass(adm.type) + '">' + (adm.type || 'regular').toUpperCase() + '</span></td><td><span class="badge ' + APP.getStatusBadge(adm.status) + '">' + adm.status + '</span></td><td><button class="btn btn-sm btn-primary" onclick="viewAdm(\'' + adm.id + '\')">' + T('admmod_btn_view') + '</button>' + (adm.status === 'admitted' ? '<button class="btn btn-sm btn-warning" onclick="showDischargeForm(\'' + adm.id + '\')">' + T('admmod_btn_discharge') + '</button>' : '') + '<button class="btn btn-sm btn-danger" onclick="deleteAdm(\'' + adm.id + '\')">' + T('admmod_btn_del') + '</button></td></tr>';
     }
     tbody.innerHTML = rows || '<tr><td colspan="8" class="empty-state">' + T('admmod_no_admissions') + '</td></tr>';
 }
@@ -582,7 +595,7 @@ function showRoomDetail(roomNo) {
             patientHtml += '<div><strong>' + T('admmod_f_doctor') + '</strong> ' + (pat.doctorName || '-') + '</div>';
             patientHtml += '<div><strong>' + T('admmod_f_department') + '</strong> ' + (pat.department || '-') + '</div>';
             patientHtml += '<div><strong>' + T('admmod_f_admitted') + '</strong> ' + APP.formatDate(pat.admissionDate) + '</div>';
-            patientHtml += '<div><strong>' + T('admmod_f_type') + '</strong> <span class="badge ' + (pat.type === 'emergency' ? 'badge-danger' : pat.type === 'icu' ? 'badge-warning' : 'badge-info') + '">' + pat.type + '</span></div>';
+            patientHtml += '<div><strong>' + T('admmod_f_type') + '</strong> <span class="badge ' + getAdmTypeBadgeClass(pat.type) + '">' + (pat.type || 'regular').toUpperCase() + '</span></div>';
             patientHtml += '</div>';
             if (pat.phone) patientHtml += '<div style="font-size:13px;margin-top:4px;"><strong>' + T('admmod_f_phone') + '</strong> ' + pat.phone + '</div>';
             if (pat.diagnosis) patientHtml += '<div style="font-size:13px;margin-top:4px;"><strong>' + T('admmod_f_diagnosis') + '</strong> ' + pat.diagnosis + '</div>';
@@ -765,7 +778,7 @@ function showAdmForm() {
     }
     if (!roomOpts) roomOpts = '<option value="">' + T('admmod_opt_no_rooms') + '</option>';
 
-    var form = '<form id="admForm"><div class="grid-2"><div class="form-group"><label>' + T('admmod_lbl_patient_name') + '</label><input type="text" name="patientName" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_patient_id') + '</label><input type="text" name="patientId" class="form-control"></div><div class="form-group"><label>' + T('admmod_lbl_age') + '</label><input type="number" name="age" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_gender') + '</label><select name="gender" class="form-control" required><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div><div class="form-group"><label>' + T('admmod_lbl_contact_phone') + '</label><input type="text" name="phone" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_emergency') + '</label><input type="text" name="emergencyContact" class="form-control"></div><div class="form-group"><label>' + T('admmod_lbl_room') + '</label><select name="roomNo" id="admRoomSelect" class="form-control" onchange="updateAdmBedOptions()" required>' + roomOpts + '</select></div><div class="form-group"><label>' + T('admmod_lbl_bed') + '</label><select name="bedId" id="admBedSelect" class="form-control" required></select></div><div class="form-group"><label>' + T('admmod_lbl_doctor_name') + '</label><input type="text" name="doctorName" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_adm_type') + '</label><select name="type" class="form-control" required><option value="regular">Regular</option><option value="emergency">Emergency</option><option value="icu">ICU</option></select></div><div class="form-group"><label>' + T('admmod_lbl_adm_date') + '</label><input type="date" name="admissionDate" class="form-control" value="' + new Date().toISOString().split('T')[0] + '" required></div></div><div class="form-group"><label>' + T('admmod_lbl_diagnosis') + '</label><textarea name="diagnosis" class="form-control" rows="2"></textarea></div><div class="form-group"><label>' + T('admmod_lbl_notes') + '</label><textarea name="notes" class="form-control" rows="2"></textarea></div></form>';
+    var form = '<form id="admForm"><div class="grid-2"><div class="form-group"><label>' + T('admmod_lbl_patient_name') + '</label><input type="text" name="patientName" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_patient_id') + '</label><input type="text" name="patientId" class="form-control"></div><div class="form-group"><label>' + T('admmod_lbl_age') + '</label><input type="number" name="age" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_gender') + '</label><select name="gender" class="form-control" required><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div><div class="form-group"><label>' + T('admmod_lbl_contact_phone') + '</label><input type="text" name="phone" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_emergency') + '</label><input type="text" name="emergencyContact" class="form-control"></div><div class="form-group"><label>' + T('admmod_lbl_room') + '</label><select name="roomNo" id="admRoomSelect" class="form-control" onchange="updateAdmBedOptions()" required>' + roomOpts + '</select></div><div class="form-group"><label>' + T('admmod_lbl_bed') + '</label><select name="bedId" id="admBedSelect" class="form-control" required></select></div><div class="form-group"><label>' + T('admmod_lbl_doctor_name') + '</label><input type="text" name="doctorName" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_adm_type') + '</label><select name="type" class="form-control" required><option value="regular">Regular</option><option value="emergency">Emergency</option><option value="icu">ICU</option><option value="pre-op">' + (T('admmod_opt_pre_op') || 'PRE OP') + '</option><option value="post-op">' + (T('admmod_opt_post_op') || 'POST OP') + '</option></select></div><div class="form-group"><label>' + T('admmod_lbl_privileged') + '</label><select name="privileged" class="form-control"><option value="no">' + T('admmod_privileged_no') + '</option><option value="yes">' + T('admmod_privileged_yes') + '</option></select></div><div class="form-group"><label>' + T('admmod_lbl_adm_date') + '</label><input type="date" name="admissionDate" class="form-control" value="' + new Date().toISOString().split('T')[0] + '" required></div></div><div class="form-group"><label>' + T('admmod_lbl_diagnosis') + '</label><textarea name="diagnosis" class="form-control" rows="2"></textarea></div><div class="form-group"><label>' + T('admmod_lbl_notes') + '</label><textarea name="notes" class="form-control" rows="2"></textarea></div></form>';
     openFormModal(T('admmod_new_admission'), form, 'saveAdm()');
     setTimeout(function() { updateAdmBedOptions(); }, 50);
 }
@@ -829,7 +842,7 @@ function viewAdm(id) {
     if (!a) return;
     var stayDays = a.status === 'admitted' ? APP.daysBetween(a.admissionDate, new Date().toISOString()) : (a.dischargeDate ? APP.daysBetween(a.admissionDate, a.dischargeDate) : 0);
     var bedLabel = a.bedId ? ' (' + T('admmod_bed_word') + ' ' + a.bedId + ')' : '';
-    showModal('<div class="modal-header"><h3>' + a.patientName + ' - ' + (a.patientId || '#' + a.id.slice(-6)) + '</h3><button class="modal-close" onclick="this.closest(\'.modal\').remove()">&times;</button></div><div class="grid-2"><div><strong>' + T('admmod_f_age_gender') + '</strong> ' + a.age + '/' + a.gender + '</div><div><strong>' + T('admmod_f_phone') + '</strong> ' + a.phone + '</div><div><strong>' + T('admmod_f_room') + '</strong> ' + a.roomNo + bedLabel + '</div><div><strong>' + T('admmod_f_department') + '</strong> ' + (a.department || '-') + '</div><div><strong>' + T('admmod_f_doctor') + '</strong> ' + a.doctorName + '</div><div><strong>' + T('admmod_f_type') + '</strong> <span class="badge ' + (a.type === 'emergency' ? 'badge-danger' : a.type === 'icu' ? 'badge-warning' : 'badge-info') + '">' + a.type.toUpperCase() + '</span></div><div><strong>' + T('admmod_f_admitted') + '</strong> ' + APP.formatDate(a.admissionDate) + '</div><div><strong>' + T('admmod_f_stay') + '</strong> ' + stayDays + ' ' + T('admmod_days_suffix') + '</div><div><strong>' + T('admmod_f_status') + '</strong> <span class="badge ' + APP.getStatusBadge(a.status) + '">' + a.status.toUpperCase() + '</span></div>' + (a.emergencyContact ? '<div><strong>' + T('admmod_f_emergency') + '</strong> ' + a.emergencyContact + '</div>' : '') + (a.billAmount ? '<div><strong>' + T('admmod_f_bill') + '</strong> ₹' + a.billAmount + '</div>' : '') + (a.paymentStatus ? '<div><strong>' + T('admmod_f_payment') + '</strong> <span class="badge ' + (a.paymentStatus === 'paid' ? 'badge-success' : 'badge-warning') + '">' + a.paymentStatus + '</span></div>' : '') + '</div>' + (a.diagnosis ? '<div class="mt-4"><strong>' + T('admmod_f_diagnosis') + '</strong><br>' + a.diagnosis + '</div>' : '') + (a.notes ? '<div class="mt-2"><strong>' + T('admmod_f_notes') + '</strong><br>' + a.notes + '</div>' : '') + (a.dischargeSummary ? '<div class="mt-2"><strong>' + T('admmod_f_discharge_summary') + '</strong><br>' + a.dischargeSummary + '</div>' : '') + (a.dischargeDate ? '<div class="mt-2"><strong>' + T('admmod_f_discharged') + '</strong> ' + APP.formatDateTime(a.dischargeDate) + '</div>' : ''));
+    showModal('<div class="modal-header"><h3>' + a.patientName + ' - ' + (a.patientId || '#' + a.id.slice(-6)) + '</h3><button class="modal-close" onclick="this.closest(\'.modal\').remove()">&times;</button></div><div class="grid-2"><div><strong>' + T('admmod_f_age_gender') + '</strong> ' + a.age + '/' + a.gender + '</div><div><strong>' + T('admmod_f_phone') + '</strong> ' + a.phone + '</div><div><strong>' + T('admmod_f_room') + '</strong> ' + a.roomNo + bedLabel + '</div><div><strong>' + T('admmod_f_department') + '</strong> ' + (a.department || '-') + '</div><div><strong>' + T('admmod_f_doctor') + '</strong> ' + a.doctorName + '</div><div><strong>' + T('admmod_f_type') + '</strong> <span class="badge ' + getAdmTypeBadgeClass(a.type) + '">' + (a.type || 'regular').toUpperCase() + '</span></div><div><strong>' + T('admmod_f_admitted') + '</strong> ' + APP.formatDate(a.admissionDate) + '</div><div><strong>' + T('admmod_f_stay') + '</strong> ' + stayDays + ' ' + T('admmod_days_suffix') + '</div><div><strong>' + T('admmod_f_status') + '</strong> <span class="badge ' + APP.getStatusBadge(a.status) + '">' + a.status.toUpperCase() + '</span></div>' + (a.emergencyContact ? '<div><strong>' + T('admmod_f_emergency') + '</strong> ' + a.emergencyContact + '</div>' : '') + (a.billAmount ? '<div><strong>' + T('admmod_f_bill') + '</strong> ₹' + a.billAmount + '</div>' : '') + (a.paymentStatus ? '<div><strong>' + T('admmod_f_payment') + '</strong> <span class="badge ' + (a.paymentStatus === 'paid' ? 'badge-success' : 'badge-warning') + '">' + a.paymentStatus + '</span></div>' : '') + '</div>' + (a.diagnosis ? '<div class="mt-4"><strong>' + T('admmod_f_diagnosis') + '</strong><br>' + a.diagnosis + '</div>' : '') + (a.notes ? '<div class="mt-2"><strong>' + T('admmod_f_notes') + '</strong><br>' + a.notes + '</div>' : '') + (a.dischargeSummary ? '<div class="mt-2"><strong>' + T('admmod_f_discharge_summary') + '</strong><br>' + a.dischargeSummary + '</div>' : '') + (a.dischargeDate ? '<div class="mt-2"><strong>' + T('admmod_f_discharged') + '</strong> ' + APP.formatDateTime(a.dischargeDate) + '</div>' : ''));
 }
 
 function showDischargeForm(id) {
@@ -926,7 +939,8 @@ function renderAdmReport(container) {
         '<div class="form-group" style="margin:0;min-width:120px;"><label style="font-size:12px;">Type</label>' +
         '<select id="rptType" class="form-control" onchange="refreshAdmReport()">' +
         '<option value="">All Types</option><option value="regular">Regular</option>' +
-        '<option value="emergency">Emergency</option><option value="icu">ICU</option></select></div>' +
+        '<option value="emergency">Emergency</option><option value="icu">ICU</option>' +
+        '<option value="pre-op">PRE OP</option><option value="post-op">POST OP</option></select></div>' +
         '<div class="form-group" style="margin:0;min-width:120px;"><label style="font-size:12px;">Status</label>' +
         '<select id="rptStatus" class="form-control" onchange="refreshAdmReport()">' +
         '<option value="">All Status</option><option value="admitted">Admitted</option>' +
@@ -1017,7 +1031,7 @@ function refreshAdmReport() {
             '<td>' + esc(a.age || '—') + ' / ' + esc(a.gender || '—') + '</td>' +
             '<td>' + esc(a.roomNo) + esc(bedLabel) + '</td>' +
             '<td>' + esc(a.doctorName || '—') + '</td>' +
-            '<td><span class="badge ' + (a.type === 'emergency' ? 'badge-danger' : a.type === 'icu' ? 'badge-warning' : 'badge-info') + '">' + esc(a.type) + '</span></td>' +
+            '<td><span class="badge ' + getAdmTypeBadgeClass(a.type) + '">' + esc(a.type || 'regular').toUpperCase() + '</span></td>' +
             '<td>' + APP.formatDate(a.admissionDate) + '</td>' +
             '<td>' + (a.dischargeDate ? APP.formatDate(a.dischargeDate) : '—') + '</td>' +
             '<td>' + stay + '</td>' +

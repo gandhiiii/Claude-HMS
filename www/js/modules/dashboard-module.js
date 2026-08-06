@@ -585,6 +585,7 @@ function _renderDashProbContent(freq) {
         + '<th style="padding:8px;text-align:left;border-bottom:2px solid var(--border);">Raised On</th>'
         + '<th style="padding:8px;text-align:left;border-bottom:2px solid var(--border);">Status</th>'
         + '<th style="padding:8px;text-align:left;border-bottom:2px solid var(--border);">Solution</th>'
+        + '<th style="padding:8px;text-align:left;border-bottom:2px solid var(--border);">Actions</th>'
         + '</tr></thead><tbody>';
 
     filtered.forEach(function(p) {
@@ -597,6 +598,11 @@ function _renderDashProbContent(freq) {
         var solution = (p.solution || '').replace(/&/g,'&amp;').replace(/</g,'&lt;');
         if (solution.length > 90) solution = solution.slice(0, 90) + '…';
         var raisedOn = p.createdAt ? new Date(p.createdAt).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',hour12:true}) : '-';
+        var canSolve = p.status !== 'resolved';
+        var actionsHtml = '<button class="btn btn-sm btn-primary" style="padding:2px 7px;font-size:11px;" onclick="viewProb(\'' + p.id + '\')">View</button>'
+            + (canSolve ? ' <button class="btn btn-sm btn-success" style="padding:2px 7px;font-size:11px;" onclick="resolveProb(\'' + p.id + '\')">✓ Solve</button>' : '')
+            + ' <button class="btn btn-sm btn-danger" style="padding:2px 7px;font-size:11px;" onclick="deleteProb(\'' + p.id + '\',\'' + title.replace(/'/g,"\\'") + '\')">Delete</button>';
+
         html += '<tr style="border-bottom:1px solid var(--border);">'
             + '<td style="padding:7px 8px;font-family:monospace;font-size:11px;white-space:nowrap;">' + ticket + '</td>'
             + '<td style="padding:7px 8px;">' + title + '</td>'
@@ -604,6 +610,7 @@ function _renderDashProbContent(freq) {
             + '<td style="padding:7px 8px;font-size:11px;color:var(--gray);white-space:nowrap;">' + raisedOn + '</td>'
             + '<td style="padding:7px 8px;"><span style="background:' + sc + ';color:#fff;font-size:10px;padding:2px 7px;border-radius:20px;white-space:nowrap;">' + sl + '</span></td>'
             + '<td style="padding:7px 8px;font-size:12px;color:' + (solution ? 'var(--text)' : 'var(--gray)') + ';">' + (solution || '—') + '</td>'
+            + '<td style="padding:7px 8px;white-space:nowrap;">' + actionsHtml + '</td>'
             + '</tr>';
     });
 

@@ -13,6 +13,7 @@ function _probStatusLabel(status) {
         open: T('probmod_status_open'),
         assigned: T('probmod_status_assigned'),
         in_progress: T('probmod_status_inprogress'),
+        rca_completed: 'RCA Completed',
         resolved: T('probmod_status_resolved')
     };
     return map[status] || map.open;
@@ -30,12 +31,14 @@ function _probPriorityLabel(priority) {
 function _probCanDelete(user, p) {
     if (!user) return false;
     if (user.isSuperAdmin || user.role === 'admin') return true;
-    // Facility HOD (or its aliases) may remove problems routed to their department
-    var lowDept = (user.department || '').trim().toLowerCase();
-    var isFacilityHod = user.role === 'hod' && (lowDept === 'facility' || lowDept === 'it' || lowDept === 'maintenance');
-    if (!isFacilityHod) return false;
-    var routed = (p.routedTo || p.department || '').trim().toLowerCase();
-    return routed === lowDept;
+    var uDept = (user.department || '').trim().toLowerCase();
+    if (!uDept) return false;
+    if (user.role === 'hod') {
+        var routed = (p.routedTo || '').trim().toLowerCase();
+        var reportedFrom = (p.department || '').trim().toLowerCase();
+        return (routed && routed === uDept) || (reportedFrom && reportedFrom === uDept);
+    }
+    return false;
 }
 
 function renderProblems(container) {
@@ -75,8 +78,10 @@ function renderProbList() {
         if (!user) return false;
         if (user.isSuperAdmin || user.role === 'admin') return true;
         if (user.role === 'hod') {
-            // HOD sees problems routed to their department
-            return p.routedTo === user.department || (!p.routedTo && p.department === user.department);
+            var uDept = (user.department || '').trim().toLowerCase();
+            var rDept = (p.routedTo || p.department || '').trim().toLowerCase();
+            var fDept = (p.department || '').trim().toLowerCase();
+            return (rDept && rDept === uDept) || (fDept && fDept === uDept);
         }
         // Storekeeper and employees see only their own reports + problems assigned to them
         return p.createdBy === user.username || p.assignedTo === user.username;
@@ -107,11 +112,14 @@ function renderProbList() {
         var priBadge = p.priority === 'high' ? 'badge-danger' : p.priority === 'medium' ? 'badge-warning' : 'badge-info';
         var statusBadge = p.status === 'resolved' ? 'badge-success'
             : p.status === 'in_progress' ? 'badge-info'
+            : p.status === 'rca_completed' ? 'badge-info'
             : p.status === 'assigned' ? 'badge-warning'
             : 'badge-danger';
 
-        var isHodOfDept = user && user.role === 'hod' &&
-            (p.routedTo === user.department || (!p.routedTo && p.department === user.department));
+        var userDept = (user && user.department ? user.department : '').trim().toLowerCase();
+        var routedDept = (p.routedTo || p.department || '').trim().toLowerCase();
+        var reportedFromDept = (p.department || '').trim().toLowerCase();
+        var isHodOfDept = user && user.role === 'hod' && userDept && (routedDept === userDept || reportedFromDept === userDept);
         var isAdmin = user && (user.isSuperAdmin || user.role === 'admin');
         var canAssign  = (isAdmin || isHodOfDept) && p.status !== 'resolved';
         var canResolve = p.status !== 'resolved' && (isAdmin || isHodOfDept || (p.assignedTo && p.assignedTo === user.username));
@@ -284,8 +292,10 @@ function viewProb(id) {
         : p.status === 'assigned' ? 'badge-warning' : 'badge-danger';
 
     var isAdmin = user && (user.isSuperAdmin || user.role === 'admin');
-    var isHodOfDept = user && user.role === 'hod' &&
-        (p.routedTo === user.department || (!p.routedTo && p.department === user.department));
+    var userDept = (user && user.department ? user.department : '').trim().toLowerCase();
+    var routedDept = (p.routedTo || p.department || '').trim().toLowerCase();
+    var reportedFromDept = (p.department || '').trim().toLowerCase();
+    var isHodOfDept = user && user.role === 'hod' && userDept && (routedDept === userDept || reportedFromDept === userDept);
     var canMarkInProgress = p.status === 'assigned' && user && p.assignedTo === user.username;
     var canResolve = p.status !== 'resolved' && (isAdmin || isHodOfDept || (user && p.assignedTo === user.username));
 
