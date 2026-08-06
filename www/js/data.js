@@ -97,6 +97,7 @@ const DB = {
         'inventory_movements', 'material_returns', 'sk_reports',
         'security_incidents',
         'staffDeployment',
+        'securityDeployment',
         'hospital_settings',
         '_deleted_ids'
     ],
@@ -412,7 +413,7 @@ const AUTH = {
         // Storekeeper auto-gets inventory and material-requests access
         if (user.role === 'storekeeper' && ['inventory','material-requests','problems'].indexOf(permission) !== -1) return true;
         // HOD auto-gets admissions, checklists, material-requests so they can manage their dept
-        if (user.role === 'hod' && ['admissions','checklists','departmental-checklist','material-requests','problems','tasks','department-meetings','staff-deployment'].indexOf(permission) !== -1) return true;
+        if (user.role === 'hod' && ['admissions','checklists','departmental-checklist','material-requests','problems','tasks','department-meetings','staff-deployment','security-deployment'].indexOf(permission) !== -1) return true;
         // HOD and employees can file indoor incidents (complaints)
         if (permission === 'complaints' && (user.role === 'hod' || user.role === 'employee')) return true;
         return user.permissions && user.permissions.includes(permission);
@@ -845,7 +846,8 @@ const APP = {
             'employee-dashboard': renderEmployeeDashboard,
             'hod-dashboard': renderHodDashboard,
             'storekeeper-dashboard': renderStorekeeperDashboard,
-            'staff-deployment': renderStaffDeployment
+            'staff-deployment': renderStaffDeployment,
+            'security-deployment': renderSecurityDeployment
         };
         if (renderers[mod]) {
             renderers[mod](content);

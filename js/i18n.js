@@ -167,6 +167,8 @@
             nav_checklists: 'Checklists',
             nav_departmental_checklist: 'Departmental Checklist',
             nav_department_meetings: 'Department Meetings',
+            nav_staff_deployment: 'Staff Deployment',
+            nav_security_deployment: 'Security Deployment',
             ui_live: 'LIVE',
             ui_logout: 'Logout',
 
@@ -334,6 +336,8 @@
             nav_checklists: 'चेकलिस्ट',
             nav_departmental_checklist: 'विभागीय चेकलिस्ट',
             nav_department_meetings: 'विभागीय बैठकें',
+            nav_staff_deployment: 'स्टाफ तैनाती',
+            nav_security_deployment: 'सुरक्षा तैनाती',
             ui_live: 'लाइव',
             ui_logout: 'लॉगआउट',
 
@@ -501,6 +505,8 @@
             nav_checklists: 'ચેકલિસ્ટ',
             nav_departmental_checklist: 'વિભાગીય ચેકલિસ્ટ',
             nav_department_meetings: 'વિભાગીય મીટિંગ',
+            nav_staff_deployment: 'સ્ટાફ ડિપ્લોયમેન્ટ',
+            nav_security_deployment: 'સિક્યુરિટી ડિપ્લોયમેન્ટ',
             ui_live: 'લાઇવ',
             ui_logout: 'લોગઆઉટ',
 

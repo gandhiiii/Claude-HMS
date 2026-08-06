@@ -18,7 +18,7 @@ var SYNC = (function () {
         'budgets', 'budget_expenses',
         'quarterly_priorities', 'pwResetRequests',
         'material_returns', 'sk_reports',
-        'security_incidents', 'staffDeployment', '_deleted_ids'
+        'security_incidents', 'staffDeployment', 'securityDeployment', '_deleted_ids'
     ];
 
     var _pushing    = {};  // key -> true while a Firebase write is in-flight

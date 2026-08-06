@@ -1347,6 +1347,11 @@ var _rSections = [
         id: 'staff_deployment', label: 'Staff Deployment', icon: '🧹', color: '#00796b', dbKey: 'staffDeployment',
         headers: ['Date','Staff Type','Floor','Place / Location','Time','Staff Name','Shift','Duty','Added By','Added At'],
         getRow: function(e){ return [e.date||'', e.staffType==='pca'?'PCA':'Housekeeping', e.floor||'', e.place||'', e.time||'', e.staffName||'', e.shift||'', e.duty||'', e.createdByName||e.createdBy||'', APP.formatDate(e.createdAt)]; }
+    },
+    {
+        id: 'security_deployment', label: 'Security Deployment', icon: '🛡️', color: '#b71c1c', dbKey: 'securityDeployment',
+        headers: ['Date','Staff Type','Floor','Place / Location','Time','Staff Name','Shift','Duty','Added By','Added At'],
+        getRow: function(e){ return [e.date||'', e.staffType==='supervisor'?'Supervisor':'Guard', e.floor||'', e.place||'', e.time||'', e.staffName||'', e.shift||'', e.duty||'', e.createdByName||e.createdBy||'', APP.formatDate(e.createdAt)]; }
     }
 ];
 
