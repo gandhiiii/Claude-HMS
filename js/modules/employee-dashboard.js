@@ -289,6 +289,7 @@ function renderEmployeeDashboard(container) {
         { id: 'reports',     label: T('empd2_tab_reports') },
         ...(dept !== 'IT' ? [{ id: 'cleaning', label: T('empd2_tab_cleaning'), badge: _empData.pendingCleaning.length, badgeClass: 'badge-danger' }] : []),
         ...(isFacilityGrp ? [{ id: 'handover', label: '🔄 ' + T('empd2_tab_handover') }] : []),
+        ...(isFacilityGrp ? [{ id: 'staffdeploy', label: '🧹 Staff Deployment' }] : []),
         { id: 'performance', label: T('empd2_tab_performance') },
         { id: 'qgoals',      label: T('empd2_tab_qgoals') }
     ];
@@ -394,6 +395,7 @@ function _renderEmpTab(tab) {
     if (tab === 'reports')     { renderEmpReportsTab(el); return; }
     if (tab === 'cleaning')    { renderEmpCleaningSection(el); return; }
     if (tab === 'handover')    { renderEmpHandoverTab(el); return; }
+    if (tab === 'staffdeploy') { if (typeof StaffDeployment !== 'undefined') { StaffDeployment.renderTab(el); } else { el.innerHTML = '<div class="empty-state">Staff Deployment module not loaded</div>'; } return; }
     if (tab === 'performance') { renderEmpPerformanceTab(el); return; }
     if (tab === 'qgoals')     { renderEmpQGoalsTab(el); return; }
     if (tab === 'equipbackdown') { renderEmpBreakdownTab(el); return; }
@@ -2300,6 +2302,16 @@ function empSaveReturn() {
 /* ═══════════════════════════════════════════════
    EMPLOYEE HANDOVER TAB (Facility/IT/Maintenance)
    ═══════════════════════════════════════════════ */
+function _empCanManageHandover(user) {
+    if (!user) return false;
+    if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
+    if (user.role === 'hod') {
+        var managed = user.managedDepartments || (user.department ? [user.department] : []);
+        return managed.some(function(d){ return ['it','facility','maintenance'].indexOf((d||'').trim().toLowerCase()) !== -1; });
+    }
+    return false;
+}
+
 function renderEmpHandoverTab(el) {
     try {
         if (!el) el = document.getElementById('empTabContent');
@@ -2307,6 +2319,7 @@ function renderEmpHandoverTab(el) {
         var user = AUTH.currentUser();
         if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
         var dept = user.department || '';
+        var canManage = _empCanManageHandover(user);
 
         var allHandovers = (DB.get('handovers') || []).filter(function(h) {
             return (h.department||'').trim().toLowerCase() === (dept||'').trim().toLowerCase();
@@ -2317,30 +2330,32 @@ function renderEmpHandoverTab(el) {
 
         var html = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
             + '<div style="font-weight:700;font-size:16px;">🔄 ' + T('empd2_handover_title') + '</div>'
-            + '<button class="btn btn-sm btn-primary" onclick="empHandoverShowForm()">+ ' + T('empd2_handover_new') + '</button>'
+            + (canManage ? '<button class="btn btn-sm btn-primary" onclick="empHandoverShowForm()">+ ' + T('empd2_handover_new') + '</button>' : '')
             + '</div>';
 
-        // ── Submit handover form ──
-        html += '<div id="empHandoverFormWrap" style="display:block;background:var(--light-gray);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;">'
-            + '<div style="font-weight:600;font-size:14px;margin-bottom:10px;">📤 ' + T('empd2_handover_submit_title') + '</div>'
-            + '<div class="form-group"><label style="font-size:13px;font-weight:600;">👤 ' + T('empd2_handover_name') + ' *</label>'
-            + '<input type="text" id="empHandoverName" class="form-control" value="' + _escHtml(user.fullName || user.username || '') + '" placeholder="' + T('empd2_handover_name_ph') + '" style="width:100%;padding:9px 12px;font-size:14px;"></div>'
-            + '<div class="grid-2">'
-            + '<div class="form-group"><label>' + T('empd2_handover_shift') + ' *</label>'
-            + '<select id="empHandoverShift" class="form-control">'
-            + shifts.map(function(s){ return '<option value="' + s + '">' + s + '</option>'; }).join('')
-            + '</select></div>'
-            + '<div class="form-group"><label>' + T('empd2_handover_date') + ' *</label>'
-            + '<input type="date" id="empHandoverDate" class="form-control" value="' + new Date().toISOString().slice(0,10) + '"></div>'
-            + '</div>'
-            + '<div class="form-group"><label>' + T('empd2_handover_summary') + '</label>'
-            + '<textarea id="empHandoverSummary" rows="3" class="form-control" placeholder="' + T('empd2_handover_summary_ph') + '"></textarea></div>'
-            + '<div class="form-group"><label>' + T('empd2_handover_pending') + '</label>'
-            + '<textarea id="empHandoverPending" rows="3" class="form-control" placeholder="' + T('empd2_handover_pending_ph') + '"></textarea></div>'
-            + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-            + '<button class="btn btn-sm btn-success" onclick="empHandoverSubmit()">📤 ' + T('empd2_handover_btn_submit') + '</button>'
-            + '<button class="btn btn-sm btn-outline" onclick="empHandoverHideForm()">' + T('empd2_handover_btn_cancel') + '</button>'
-            + '</div></div>';
+        // ── Submit handover form (Facility HOD / admin only) ──
+        if (canManage) {
+            html += '<div id="empHandoverFormWrap" style="display:block;background:var(--light-gray);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;">'
+                + '<div style="font-weight:600;font-size:14px;margin-bottom:10px;">📤 ' + T('empd2_handover_submit_title') + '</div>'
+                + '<div class="form-group"><label style="font-size:13px;font-weight:600;">👤 ' + T('empd2_handover_name') + ' *</label>'
+                + '<input type="text" id="empHandoverName" class="form-control" value="' + _escHtml(user.fullName || user.username || '') + '" placeholder="' + T('empd2_handover_name_ph') + '" style="width:100%;padding:9px 12px;font-size:14px;"></div>'
+                + '<div class="grid-2">'
+                + '<div class="form-group"><label>' + T('empd2_handover_shift') + ' *</label>'
+                + '<select id="empHandoverShift" class="form-control">'
+                + shifts.map(function(s){ return '<option value="' + s + '">' + s + '</option>'; }).join('')
+                + '</select></div>'
+                + '<div class="form-group"><label>' + T('empd2_handover_date') + ' *</label>'
+                + '<input type="date" id="empHandoverDate" class="form-control" value="' + new Date().toISOString().slice(0,10) + '"></div>'
+                + '</div>'
+                + '<div class="form-group"><label>' + T('empd2_handover_summary') + '</label>'
+                + '<textarea id="empHandoverSummary" rows="3" class="form-control" placeholder="' + T('empd2_handover_summary_ph') + '"></textarea></div>'
+                + '<div class="form-group"><label>' + T('empd2_handover_pending') + '</label>'
+                + '<textarea id="empHandoverPending" rows="3" class="form-control" placeholder="' + T('empd2_handover_pending_ph') + '"></textarea></div>'
+                + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+                + '<button class="btn btn-sm btn-success" onclick="empHandoverSubmit()">📤 ' + T('empd2_handover_btn_submit') + '</button>'
+                + '<button class="btn btn-sm btn-outline" onclick="empHandoverHideForm()">' + T('empd2_handover_btn_cancel') + '</button>'
+                + '</div></div>';
+        }
 
         // ── My recent handovers ──
         html += '<div style="font-weight:600;font-size:14px;margin-bottom:8px;">👤 ' + T('empd2_handover_mine') + ' (' + mine.length + ')</div>';
@@ -2351,7 +2366,9 @@ function renderEmpHandoverTab(el) {
                 return '<div class="work-item" style="flex-direction:column;align-items:stretch;gap:4px;margin-bottom:8px;border-left-color:#7b1fa2;">'
                     + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">'
                     + '<div style="font-weight:600;font-size:13px;">' + _escHtml(h.employeeName || '') + ' · ' + _escHtml(h.shift || '') + ' · ' + (h.date || (h.createdAt||'').slice(0,10)) + '</div>'
-                    + '<span style="font-size:11px;color:var(--gray);">' + APP.formatDate(h.createdAt) + '</span></div>'
+                    + '<span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--gray);">' + APP.formatDate(h.createdAt)
+                    + (canManage ? '<button class="btn btn-sm btn-outline" style="font-size:10px;color:var(--danger);border-color:var(--danger);padding:1px 7px;" onclick="empHandoverDelete(\'' + h.id + '\')">🗑 ' + T('empd2_handover_delete') + '</button>' : '')
+                    + '</span></div>'
                     + (h.summary ? '<div style="font-size:12px;color:var(--text);white-space:pre-wrap;">' + _escHtml(h.summary) + '</div>' : '')
                     + (h.pending ? '<div style="font-size:12px;color:#e65100;white-space:pre-wrap;background:#fff3e0;border-radius:6px;padding:6px 8px;"><strong>⏳ ' + T('empd2_handover_pending') + ':</strong> ' + _escHtml(h.pending) + '</div>' : '')
                     + '</div>';
@@ -2367,7 +2384,9 @@ function renderEmpHandoverTab(el) {
                 return '<div class="work-item" style="flex-direction:column;align-items:stretch;gap:4px;margin-bottom:8px;">'
                     + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">'
                     + '<div style="font-weight:600;font-size:13px;">' + _escHtml(h.employeeName || '') + ' · ' + _escHtml(h.shift || '') + ' · ' + (h.date || (h.createdAt||'').slice(0,10)) + '</div>'
-                    + '<span style="font-size:11px;color:var(--gray);">' + APP.formatDate(h.createdAt) + '</span></div>'
+                    + '<span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--gray);">' + APP.formatDate(h.createdAt)
+                    + (canManage ? '<button class="btn btn-sm btn-outline" style="font-size:10px;color:var(--danger);border-color:var(--danger);padding:1px 7px;" onclick="empHandoverDelete(\'' + h.id + '\')">🗑 ' + T('empd2_handover_delete') + '</button>' : '')
+                    + '</span></div>'
                     + (h.summary ? '<div style="font-size:12px;color:var(--text);white-space:pre-wrap;">' + _escHtml(h.summary) + '</div>' : '')
                     + (h.pending ? '<div style="font-size:12px;color:#e65100;white-space:pre-wrap;background:#fff3e0;border-radius:6px;padding:6px 8px;"><strong>⏳ ' + T('empd2_handover_pending') + ':</strong> ' + _escHtml(h.pending) + '</div>' : '')
                     + '</div>';
@@ -2397,6 +2416,10 @@ function empHandoverHideForm() {
 function empHandoverSubmit() {
     var user = AUTH.currentUser();
     if (!user) return;
+    if (!_empCanManageHandover(user)) {
+        APP.notify(T('empd2_handover_no_perm'), 'error');
+        return;
+    }
     var name = document.getElementById('empHandoverName')?.value?.trim() || '';
     var shift = document.getElementById('empHandoverShift')?.value || '';
     var date  = document.getElementById('empHandoverDate')?.value || new Date().toISOString().slice(0, 10);
@@ -2426,6 +2449,22 @@ function empHandoverSubmit() {
     }
     APP.notify(T('empd2_handover_saved'), 'success');
     empHandoverHideForm();
+    renderEmpHandoverTab();
+}
+
+function empHandoverDelete(id) {
+    var user = AUTH.currentUser();
+    if (!user || !_empCanManageHandover(user)) {
+        APP.notify(T('empd2_handover_no_perm'), 'error');
+        return;
+    }
+    if (!confirm(T('empd2_handover_confirm_delete'))) return;
+    DB.delete('handovers', id);
+    APP.notify(T('empd2_handover_deleted'), 'success');
+    if (typeof WS_NOTIFY !== 'undefined' && WS_NOTIFY.push) {
+        WS_NOTIFY.push(T('empd2_handover_deleted'),
+            T('empd2_handover_deleted'), 'info', 'handovers');
+    }
     renderEmpHandoverTab();
 }
 

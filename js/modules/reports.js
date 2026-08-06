@@ -1342,6 +1342,11 @@ var _rSections = [
         adminOnly: true,
         headers: ['Department','Category','Amount (₹)','Description','Date','Added By'],
         getRow: function(e){ return [e.department||'', e.category||'', e.amount||0, e.description||'', e.expenseDate||APP.formatDate(e.createdAt), e.createdByName||e.createdBy||'']; }
+    },
+    {
+        id: 'staff_deployment', label: 'Staff Deployment', icon: '🧹', color: '#00796b', dbKey: 'staffDeployment',
+        headers: ['Date','Staff Type','Floor','Staff Name','Shift','Duty','Added By','Added At'],
+        getRow: function(e){ return [e.date||'', e.staffType==='pca'?'PCA':'Housekeeping', e.floor||'', e.staffName||'', e.shift||'', e.duty||'', e.createdByName||e.createdBy||'', APP.formatDate(e.createdAt)]; }
     }
 ];
 
