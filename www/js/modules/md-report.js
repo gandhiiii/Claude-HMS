@@ -327,7 +327,7 @@ function _mdrAdmissionsTab(el) {
                 + '<td>' + _mdrEsc(a.age || '—') + ' / ' + _mdrEsc(a.gender || '—') + '</td>'
                 + '<td>' + _mdrEsc(a.roomNo) + _mdrEsc(bedLabel) + '</td>'
                 + '<td>' + _mdrEsc(a.doctorName || '—') + '</td>'
-                + '<td><span class="badge ' + _admTypeBadge(a.type) + '">' + _mdrEsc(_admTypeLabel(a.type)) + '</span></td>'
+                + '<td><span class="badge ' + (typeof getAdmTypeBadgeClass === 'function' ? getAdmTypeBadgeClass(a.type) : (a.type === 'emergency' ? 'badge-danger' : a.type === 'icu' ? 'badge-warning' : 'badge-info')) + '">' + _mdrEsc(a.type || 'regular').toUpperCase() + '</span></td>'
                 + '<td>' + APP.formatDate(a.admissionDate) + '</td>'
                 + '<td>' + (a.dischargeDate ? APP.formatDate(a.dischargeDate) : '—') + '</td>'
                 + '<td>' + stay + '</td>'

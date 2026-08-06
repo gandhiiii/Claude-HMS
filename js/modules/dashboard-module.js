@@ -263,18 +263,26 @@ function renderDashboard(container) {
 
         <div class="card">
             <div class="card-header"><h2>📈 Admission Trends</h2></div>
-            <div class="grid-4">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;">
                 <div style="text-align:center;padding:16px;background:#e8f0fe;border-radius:8px;">
                     <div style="font-size:28px;font-weight:700;color:var(--primary);">${admissions.filter(a=>a.type==='emergency').length}</div>
                     <div style="font-size:12px;color:var(--gray);">Emergency</div>
                 </div>
                 <div style="text-align:center;padding:16px;background:#e6f4ea;border-radius:8px;">
-                    <div style="font-size:28px;font-weight:700;color:var(--secondary);">${admissions.filter(a=>a.type==='regular').length}</div>
+                    <div style="font-size:28px;font-weight:700;color:var(--secondary);">${admissions.filter(a=>a.type==='regular'||!a.type).length}</div>
                     <div style="font-size:12px;color:var(--gray);">Regular</div>
                 </div>
                 <div style="text-align:center;padding:16px;background:#fef7e0;border-radius:8px;">
                     <div style="font-size:28px;font-weight:700;color:#e37400;">${admissions.filter(a=>a.type==='icu').length}</div>
                     <div style="font-size:12px;color:var(--gray);">ICU</div>
+                </div>
+                <div style="text-align:center;padding:16px;background:#f3e8ff;border-radius:8px;">
+                    <div style="font-size:28px;font-weight:700;color:#7e22ce;">${admissions.filter(a=>a.type==='pre-op'||a.type==='pre_op').length}</div>
+                    <div style="font-size:12px;color:var(--gray);">Pre OP</div>
+                </div>
+                <div style="text-align:center;padding:16px;background:#e6fffa;border-radius:8px;">
+                    <div style="font-size:28px;font-weight:700;color:#0d9488;">${admissions.filter(a=>a.type==='post-op'||a.type==='post_op').length}</div>
+                    <div style="font-size:12px;color:var(--gray);">Post OP</div>
                 </div>
                 <div style="text-align:center;padding:16px;background:#fce8e6;border-radius:8px;">
                     <div style="font-size:28px;font-weight:700;color:var(--danger);">${admissions.filter(a=>a.status==='discharged').length}</div>
