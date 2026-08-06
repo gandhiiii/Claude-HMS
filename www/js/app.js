@@ -96,7 +96,8 @@ const Router = {
             { id: 'storekeeper-dashboard', label: _t('nav_storekeeper_dashboard'), icon: '🏪', permission: 'storekeeper-dashboard' },
             { id: 'checklists', label: _t('nav_checklists'), icon: '✅', permission: 'checklists' },
             { id: 'departmental-checklist', label: _t('nav_departmental_checklist'), icon: '📋', permission: 'departmental-checklist' },
-            { id: 'department-meetings', label: _t('nav_department_meetings'), icon: '🤝', permission: 'department-meetings' }
+            { id: 'department-meetings', label: _t('nav_department_meetings'), icon: '🤝', permission: 'department-meetings' },
+            { id: 'staff-deployment', label: '🧹 Staff Deployment', icon: '🧹', permission: 'staff-deployment' }
         ];
         let html = '';
         items.forEach(item => {
@@ -161,6 +162,7 @@ const Router = {
             'admin-checklists': 'nav_admin_checklists', checklists: 'nav_checklists',
             'departmental-checklist': 'nav_departmental_checklist',
             'department-meetings': 'nav_department_meetings',
+            'staff-deployment': 'nav_staff_deployment',
             'material-requests': 'nav_material_requests', suggestions: 'nav_suggestions',
             budget: 'nav_budget',
             'quarterly-priorities': 'nav_quarterly',
@@ -202,6 +204,7 @@ const Router = {
             checklists: renderChecklists,
             'departmental-checklist': renderDeptChecklists,
             'department-meetings': renderDeptMeetings,
+            'staff-deployment': renderStaffDeployment,
             'material-requests': renderMaterialRequests,
             suggestions: renderSuggestions,
             budget: renderBudget,

@@ -289,6 +289,7 @@ function renderEmployeeDashboard(container) {
         { id: 'reports',     label: T('empd2_tab_reports') },
         ...(dept !== 'IT' ? [{ id: 'cleaning', label: T('empd2_tab_cleaning'), badge: _empData.pendingCleaning.length, badgeClass: 'badge-danger' }] : []),
         ...(isFacilityGrp ? [{ id: 'handover', label: '🔄 ' + T('empd2_tab_handover') }] : []),
+        ...(isFacilityGrp ? [{ id: 'staffdeploy', label: '🧹 Staff Deployment' }] : []),
         { id: 'performance', label: T('empd2_tab_performance') },
         { id: 'qgoals',      label: T('empd2_tab_qgoals') }
     ];
@@ -394,6 +395,7 @@ function _renderEmpTab(tab) {
     if (tab === 'reports')     { renderEmpReportsTab(el); return; }
     if (tab === 'cleaning')    { renderEmpCleaningSection(el); return; }
     if (tab === 'handover')    { renderEmpHandoverTab(el); return; }
+    if (tab === 'staffdeploy') { if (typeof StaffDeployment !== 'undefined') { StaffDeployment.renderTab(el); } else { el.innerHTML = '<div class="empty-state">Staff Deployment module not loaded</div>'; } return; }
     if (tab === 'performance') { renderEmpPerformanceTab(el); return; }
     if (tab === 'qgoals')     { renderEmpQGoalsTab(el); return; }
     if (tab === 'equipbackdown') { renderEmpBreakdownTab(el); return; }
