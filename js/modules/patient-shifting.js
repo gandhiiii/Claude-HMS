@@ -364,6 +364,9 @@ var PatientShifting = (function () {
         var body = document.getElementById('psTabBody');
         if (!body) return;
         var rows = _filter(today, today);
+        if (!_isManager(user)) {
+            rows = rows.filter(function (e) { return e.createdBy === (user ? user.username : ''); });
+        }
         body.innerHTML = _summaryCards(rows) + _entriesTable(rows, user);
     }
 

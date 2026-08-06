@@ -339,6 +339,9 @@ var StaffDeployment = (function () {
         var body = document.getElementById('sdpTabBody');
         if (!body) return;
         var rows = _filter(today, today, 'all');
+        if (!(user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'hod'))) {
+            rows = rows.filter(function (e) { return e.createdBy === (user ? user.username : ''); });
+        }
         var sm = _summary(rows);
         var hk = rows.filter(function (e) { return e.staffType !== 'pca'; });
         var pca = rows.filter(function (e) { return e.staffType === 'pca'; });

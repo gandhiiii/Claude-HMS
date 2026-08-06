@@ -408,6 +408,9 @@ var SecurityDeployment = (function () {
         var body = document.getElementById('sedTabBody');
         if (!body) return;
         var rows = _filter(today, today, 'all');
+        if (!_isManager(user)) {
+            rows = rows.filter(function (e) { return e.createdBy === (user ? user.username : ''); });
+        }
         var sm = _summary(rows);
         var guards = rows.filter(function (e) { return e.staffType !== 'supervisor'; });
         var supervisors = rows.filter(function (e) { return e.staffType === 'supervisor'; });
