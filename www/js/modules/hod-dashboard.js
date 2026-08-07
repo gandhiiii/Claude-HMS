@@ -1699,8 +1699,58 @@ function hodConfirmReceipt(id) {
    PURCHASES TAB — Daily Purchase & Expense Requests
 ═══════════════════════════════════════════════ */
 function _hodEnsureSamplePurchases() {
-    var records = DB.get('hodPurchases');
-    if (!records || records.length === 0) {
+    var primary = DB.get('hodPurchases') || [];
+    var alt1    = DB.get('purchases') || [];
+    var alt2    = DB.get('hod_purchases') || [];
+    var alt3    = DB.get('material_requests') || [];
+    var alt4    = DB.get('inventory_receipts') || [];
+    var alt5    = DB.get('hodRequests') || [];
+
+    var map = {};
+    var merged = [];
+
+    function addRecord(r) {
+        if (!r) return;
+        var idKey = r.id || ((r.title || '') + '|' + (r.createdAt || '') + '|' + (r.itemName || ''));
+        if (map[idKey]) return;
+        map[idKey] = true;
+
+        var qty = parseFloat(r.quantity || r.qty) || 1;
+        var price = parseFloat(r.price || r.unitPrice || r.cost) || 0;
+        var total = parseFloat(r.total || r.totalPrice) || (qty * price);
+
+        merged.push({
+            id: r.id || 'pur_' + (merged.length + 100),
+            title: r.title || r.itemName || r.item_name || r.name || 'Purchase Record',
+            itemName: r.itemName || r.item_name || r.name || r.title || '—',
+            category: r.category || 'consumable',
+            quantity: qty,
+            price: price,
+            total: total,
+            location: r.location || r.store || 'Facility Store',
+            vendor: r.vendor || r.supplier || '—',
+            description: r.description || r.purpose || r.notes || '',
+            department: r.department || r.dept || 'Facility',
+            billDate: r.billDate || r.invoiceDate || (r.createdAt ? r.createdAt.slice(0,10) : ''),
+            billNo: r.billNo || r.invoiceNo || '',
+            status: r.status || 'approved',
+            approvalType: r.approvalType || 'none',
+            approvedBy: r.approvedBy || '',
+            preApprovedBy: r.preApprovedBy || '',
+            createdBy: r.createdBy || r.username || 'System',
+            createdByName: r.createdByName || r.createdBy || 'System',
+            createdAt: r.createdAt || new Date().toISOString()
+        });
+    }
+
+    primary.forEach(addRecord);
+    alt1.forEach(addRecord);
+    alt2.forEach(addRecord);
+    alt3.forEach(addRecord);
+    alt4.forEach(addRecord);
+    alt5.forEach(addRecord);
+
+    if (merged.length === 0) {
         var samples = [
             {
                 id: 'pur_101',
@@ -1768,10 +1818,18 @@ function _hodEnsureSamplePurchases() {
                 createdAt: new Date().toISOString()
             }
         ];
-        DB.set('hodPurchases', samples);
-        return samples;
+        samples.forEach(addRecord);
     }
-    return records;
+
+    DB.set('hodPurchases', merged);
+    return merged;
+}
+
+function hodRestoreOldPurchases() {
+    _hodEnsureSamplePurchases();
+    if (typeof APP !== 'undefined' && APP.notify) APP.notify('All old purchase and expense data restored!', 'success');
+    var el = document.getElementById('hodTabContent');
+    if (el) _hodPurchases(el);
 }
 
 function hodFilterPurchaseTable() {
@@ -1820,6 +1878,7 @@ function _hodPurchases(el) {
         + '<div><div style="font-size:18px;font-weight:700;">💰 Daily Purchases & Expenses — ' + dept + '</div>'
         + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + purchases.length + ' records · ₹' + totalVal.toFixed(2) + ' total</div></div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,.25);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodRestoreOldPurchases()">🔄 Restore All Historical Data</button>'
         + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodCreatePurchase()">+ New Purchase Request</button>'
         + '</div></div>'
 
