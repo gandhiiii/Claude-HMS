@@ -1699,19 +1699,15 @@ function hodConfirmReceipt(id) {
    PURCHASES TAB — Daily Purchase & Expense Requests
 ═══════════════════════════════════════════════ */
 function _hodEnsureSamplePurchases() {
-    var primary = DB.get('hodPurchases') || [];
-    var alt1    = DB.get('purchases') || [];
-    var alt2    = DB.get('hod_purchases') || [];
-    var alt3    = DB.get('material_requests') || [];
-    var alt4    = DB.get('inventory_receipts') || [];
-    var alt5    = DB.get('hodRequests') || [];
-
-    var map = {};
     var merged = [];
+    var map = {};
 
     function addRecord(r) {
-        if (!r) return;
-        var idKey = r.id || ((r.title || '') + '|' + (r.createdAt || '') + '|' + (r.itemName || ''));
+        if (!r || typeof r !== 'object') return;
+        var title = r.title || r.itemName || r.item_name || r.name || r.description || '';
+        if (!title && !r.total && !r.price && !r.itemName && !r.item_name) return;
+
+        var idKey = r.id || (title + '|' + (r.createdAt || '') + '|' + (r.total || ''));
         if (map[idKey]) return;
         map[idKey] = true;
 
@@ -1721,8 +1717,8 @@ function _hodEnsureSamplePurchases() {
 
         merged.push({
             id: r.id || 'pur_' + (merged.length + 100),
-            title: r.title || r.itemName || r.item_name || r.name || 'Purchase Record',
-            itemName: r.itemName || r.item_name || r.name || r.title || '—',
+            title: title || 'Purchase Record',
+            itemName: r.itemName || r.item_name || r.name || title || '—',
             category: r.category || 'consumable',
             quantity: qty,
             price: price,
@@ -1731,7 +1727,7 @@ function _hodEnsureSamplePurchases() {
             vendor: r.vendor || r.supplier || '—',
             description: r.description || r.purpose || r.notes || '',
             department: r.department || r.dept || 'Facility',
-            billDate: r.billDate || r.invoiceDate || (r.createdAt ? r.createdAt.slice(0,10) : ''),
+            billDate: r.billDate || r.invoiceDate || (r.createdAt ? String(r.createdAt).slice(0,10) : ''),
             billNo: r.billNo || r.invoiceNo || '',
             status: r.status || 'approved',
             approvalType: r.approvalType || 'none',
@@ -1743,13 +1739,27 @@ function _hodEnsureSamplePurchases() {
         });
     }
 
-    primary.forEach(addRecord);
-    alt1.forEach(addRecord);
-    alt2.forEach(addRecord);
-    alt3.forEach(addRecord);
-    alt4.forEach(addRecord);
-    alt5.forEach(addRecord);
+    // 1. Standard DB keys
+    ['hodPurchases', 'purchases', 'hod_purchases', 'material_requests', 'inventory_receipts', 'hodRequests', 'expenses', 'dailyPurchases', 'daily_purchases'].forEach(function(k) {
+        var arr = DB.get(k);
+        if (Array.isArray(arr)) arr.forEach(addRecord);
+    });
 
+    // 2. Direct localStorage scan for any key (with or without 'hms_' prefix)
+    try {
+        for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (k && (k.toLowerCase().indexOf('pur') !== -1 || k.toLowerCase().indexOf('exp') !== -1 || k.toLowerCase().indexOf('mat') !== -1 || k.toLowerCase().indexOf('req') !== -1)) {
+                try {
+                    var parsed = JSON.parse(localStorage.getItem(k));
+                    if (Array.isArray(parsed)) parsed.forEach(addRecord);
+                    else if (parsed && typeof parsed === 'object') addRecord(parsed);
+                } catch(e) {}
+            }
+        }
+    } catch(e) {}
+
+    // 3. Fallback sample data if completely empty
     if (merged.length === 0) {
         var samples = [
             {
