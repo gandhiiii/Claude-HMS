@@ -2094,7 +2094,7 @@ function _hodPurchases(el) {
                 : (p.approvalOther || p.approvalType || '—');
             var isFac = user && user.role === 'hod' && (user.department || '').trim().toLowerCase() === 'facility';
             var canManage = user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || isFac);
-            var canEdit = canManage || (user.role === 'hod');
+            var canEdit = user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || user.role === 'hod');
 
             html += '<tr class="hod-pur-row" data-isweek="' + isWeek + '" data-ismonth="' + isMonth + '" data-istoday="' + isToday + '" data-search="' + (p.title + ' ' + p.itemName + ' ' + (p.vendor||'') + ' ' + (p.billNo||'') + ' ' + p.department).toLowerCase() + '">'
                 + '<td>' + dateStr + (p.billNo ? '<br><small style="color:var(--gray);">' + p.billNo + '</small>' : '') + '</td>'
@@ -2114,8 +2114,8 @@ function _hodPurchases(el) {
                 + (canEdit
                     ? '<button class="btn btn-sm btn-outline" style="padding:2px 6px;font-size:10px;" title="Edit" onclick="hodEditPurchase(\'' + p.id + '\')">✎</button>'
                     : '')
-                + (canEdit && p.status === 'pending'
-                    ? '<button class="btn btn-sm btn-outline" style="padding:2px 6px;font-size:10px;color:var(--danger);" title="Delete" onclick="hodDeletePurchase(\'' + p.id + '\')">🗑</button>'
+                + (canEdit
+                    ? '<button class="btn btn-sm btn-outline" style="padding:2px 6px;font-size:10px;" title="Delete" onclick="hodDeletePurchase(\'' + p.id + '\')">🗑</button>'
                     : '')
                 + '</div></td></tr>';
         });
@@ -2201,7 +2201,7 @@ function _hodPurchaseCard(p, user) {
         + (canEdit
             ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--primary);border-color:var(--primary);" onclick="hodEditPurchase(\'' + p.id + '\')">✎ Edit</button>'
             : '')
-        + (canEdit && p.status === 'pending'
+        + (canEdit
             ? '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--danger);border-color:var(--danger);" onclick="hodDeletePurchase(\'' + p.id + '\')">🗑 Delete</button>'
             : '')
         + '</div></div></div>';
@@ -2363,8 +2363,9 @@ function hodDeletePurchase(id) {
     if (!user) return;
     var p = DB.getById('hodPurchases', id);
     if (!p) { APP.notify('Request not found', 'error'); return; }
-    if (p.createdBy !== user.username && !user.isSuperAdmin && user.role !== 'admin' && user.role !== 'super_admin') {
-        APP.notify('You can only delete your own requests', 'error'); return;
+    var isHodAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || user.role === 'hod';
+    if (!isHodAdmin) {
+        APP.notify('Only Admin/HOD can delete purchase data', 'error'); return;
     }
     confirmAction('Delete this purchase request?', function () {
         DB.delete('hodPurchases', id);
@@ -2378,8 +2379,14 @@ function hodDeletePurchase(id) {
 }
 
 function hodEditPurchase(id) {
+    var user = AUTH.currentUser();
+    if (!user) return;
     var p = DB.getById('hodPurchases', id);
     if (!p) { APP.notify('Request not found', 'error'); return; }
+    var isHodAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || user.role === 'hod';
+    if (!isHodAdmin) {
+        APP.notify('Only Admin/HOD can edit purchase data', 'error'); return;
+    }
     _hodEditingPurchaseId = id;
     var esc = function(v){ return String(v||'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
     var form = '<form id="hodPurchaseEditForm">'
