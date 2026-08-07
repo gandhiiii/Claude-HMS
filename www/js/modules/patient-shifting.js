@@ -92,6 +92,55 @@ var PatientShifting = (function () {
         });
     }
 
+    function _dateStrOf(d) {
+        var dt = d || new Date();
+        return dt.getFullYear() + '-' + _p(dt.getMonth() + 1) + '-' + _p(dt.getDate());
+    }
+
+    function _periodRange(period) {
+        var now = new Date();
+        var y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+        var start, end;
+        if (period === 'today') {
+            start = new Date(y, m, d); end = new Date(y, m, d);
+        } else if (period === 'weekly') {
+            var dow = now.getDay() || 7;
+            start = new Date(y, m, d - dow + 1);
+            end = new Date(y, m, d + (7 - dow));
+        } else {
+            start = new Date(y, m, 1); end = new Date(y, m + 1, 0);
+        }
+        return { from: _dateStrOf(start), to: _dateStrOf(end) };
+    }
+
+    function _periodLabel(period) {
+        if (period === 'today') return 'Today';
+        if (period === 'weekly') return 'This Week';
+        return 'This Month';
+    }
+
+    function _periodRows(period) {
+        var r = _periodRange(period);
+        return _filter(r.from, r.to);
+    }
+
+    function _reportSectionHtml() {
+        var periods = ['today', 'weekly', 'monthly'];
+        var cards = periods.map(function (p) {
+            var rows = _periodRows(p);
+            return '<div class="card" style="flex:1;min-width:150px;border-top:3px solid #b71c1c;padding:14px;">'
+                + '<div style="font-size:13px;font-weight:700;color:#b71c1c;">📅 ' + _periodLabel(p) + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);margin:2px 0 10px;">' + rows.length + ' shifts · '
+                + '🛡️ ' + rows.filter(function (e) { return (e.category || '') === 'Security'; }).length + ' · '
+                + '🙏 ' + rows.filter(function (e) { return (e.category || '') === 'Attendant' || e.category === 'Housekeeping'; }).length + '</div>'
+                + '<button class="btn btn-sm btn-success" style="width:100%;font-size:12px;" '
+                + 'onclick="PatientShifting.exportPeriod(\'' + p + '\')">📊 Excel</button></div>';
+        }).join('');
+        return '<div class="card" style="padding:16px;margin-bottom:16px;border-top:3px solid #ef5350;">'
+            + '<div style="font-size:14px;font-weight:700;margin-bottom:12px;">📊 Today · Weekly · Monthly Report</div>'
+            + '<div style="display:flex;gap:12px;flex-wrap:wrap;">' + cards + '</div></div>';
+    }
+
     function _addEntry(data) {
         var user = AUTH.currentUser();
         var date  = data.date || _dateStr();
@@ -328,6 +377,7 @@ var PatientShifting = (function () {
             + '<div id="psAddWrap" style="display:none;">' + _addFormHtml() + '</div>'
 
             + '<div id="psSummary"></div>'
+            + '<div id="psReports">' + _reportSectionHtml() + '</div>'
             + '<div id="psTables"></div>';
 
         container.innerHTML = html;
@@ -359,6 +409,7 @@ var PatientShifting = (function () {
             + '<button class="btn btn-sm btn-success" onclick="PatientShifting.exportToday()">📊 Excel</button>'
             + '</div></div>'
             + '<div id="psAddWrap" style="display:none;margin-bottom:14px;">' + _addFormHtml() + '</div>'
+            + _reportSectionHtml()
             + '<div id="psTabBody"></div>';
 
         el.innerHTML = html;
@@ -464,6 +515,10 @@ var PatientShifting = (function () {
         },
         exportToday: function () {
             _export(_dateStr(), _dateStr());
+        },
+        exportPeriod: function (period) {
+            var r = _periodRange(period);
+            _export(r.from, r.to);
         }
     };
 })();
