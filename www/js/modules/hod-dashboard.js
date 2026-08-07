@@ -2090,9 +2090,22 @@ function _hodCategoryOptions(selected) {
     return html;
 }
 
+function _hodDeptOptions(selected) {
+    var depts = (DB.get('departments') || []).filter(function (d) { return d.active !== false; });
+    var current = window._hodActiveDept || (AUTH.currentUser() || {}).department || '';
+    if (!selected) selected = current;
+    if (depts.length === 0) return '<option value="">Facility</option>';
+    var html = '<option value="">Select department</option>';
+    depts.forEach(function (d) {
+        html += '<option value="' + esc(d.name) + '"' + (d.name === selected ? ' selected' : '') + '>' + esc(d.name) + '</option>';
+    });
+    return html;
+}
+
 function hodCreatePurchase() {
     var form = '<form id="hodPurchaseForm">'
-        + '<div class="form-group"><label>Request Title *</label><input type="text" name="title" class="form-control" required placeholder="e.g. Purchase of cleaning supplies"></div>'
+        + '<div class="form-group"><label>Department *</label>'
+        + '<select name="department" class="form-control" required>' + _hodDeptOptions('') + '</select></div>'
         + '<div class="form-group"><label>Item / Goods Name *</label><input type="text" name="itemName" class="form-control" required placeholder="e.g. Floor disinfectant 5L"></div>'
         + '<div class="form-group"><label>Category *</label>'
         + '<select name="category" class="form-control" required>'
@@ -2137,7 +2150,7 @@ function hodSavePurchase() {
     var user = AUTH.currentUser();
     if (!user) return false;
     var data = getFormData('hodPurchaseForm');
-    if (!data.title || !data.itemName || !data.price || !data.location || !data.description || !data.category) {
+    if (!data.itemName || !data.price || !data.location || !data.description || !data.category || !data.department) {
         APP.notify('Please fill all required fields', 'error'); return false;
     }
     var qty = parseFloat(data.quantity) || 1;
@@ -2147,9 +2160,10 @@ function hodSavePurchase() {
     var approvalOther = data.approvalOther || '';
     var preApprovedBy = data.preApprovedBy || '';
     var recStatus = approvalType === 'none' ? 'approved' : (approvalType === 'pre-approved' ? 'approved' : 'pending');
-    var dept = window._hodActiveDept || user.department || '';
+    var dept = data.department || window._hodActiveDept || user.department || '';
+    var title = data.itemName;
     DB.add('hodPurchases', {
-        title: data.title,
+        title: title,
         itemName: data.itemName,
         category: data.category,
         quantity: qty,
@@ -2248,7 +2262,8 @@ function hodEditPurchase(id) {
     _hodEditingPurchaseId = id;
     var esc = function(v){ return String(v||'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
     var form = '<form id="hodPurchaseEditForm">'
-        + '<div class="form-group"><label>Request Title *</label><input type="text" name="title" class="form-control" required value="' + esc(p.title) + '"></div>'
+        + '<div class="form-group"><label>Department *</label>'
+        + '<select name="department" class="form-control" required>' + _hodDeptOptions(p.department) + '</select></div>'
         + '<div class="form-group"><label>Item / Goods Name *</label><input type="text" name="itemName" class="form-control" required value="' + esc(p.itemName) + '"></div>'
         + '<div class="form-group"><label>Category *</label>'
         + '<select name="category" class="form-control" required>' + _hodCategoryOptions(p.category) + '</select></div>'
@@ -2303,7 +2318,7 @@ function hodUpdatePurchase() {
     var user = AUTH.currentUser();
     if (!user) return false;
     var data = getFormData('hodPurchaseEditForm');
-    if (!data.title || !data.itemName || !data.price || !data.location || !data.description) {
+    if (!data.itemName || !data.price || !data.location || !data.description || !data.department) {
         APP.notify('Please fill all required fields', 'error'); return false;
     }
     var qty = parseFloat(data.quantity) || 1;
@@ -2313,7 +2328,8 @@ function hodUpdatePurchase() {
     var approvalOther = data.approvalOther || '';
     var preApprovedBy = data.preApprovedBy || '';
     var upd = {
-        title: data.title,
+        title: data.itemName,
+        department: data.department,
         itemName: data.itemName,
         category: data.category,
         quantity: qty,
