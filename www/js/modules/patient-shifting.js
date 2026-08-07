@@ -86,8 +86,8 @@ var PatientShifting = (function () {
             return true;
         });
         return out.sort(function (a, b) {
-            var ka = (a.date || '') + '|' + (a.time || '') + '|' + (a.createdAt || '');
-            var kb = (b.date || '') + '|' + (b.time || '') + '|' + (b.createdAt || '');
+            var ka = (a.date || '') + '|' + (a.goTime || '') + '|' + (a.createdAt || '');
+            var kb = (b.date || '') + '|' + (b.goTime || '') + '|' + (b.createdAt || '');
             return kb.localeCompare(ka);
         });
     }
@@ -95,7 +95,6 @@ var PatientShifting = (function () {
     function _addEntry(data) {
         var user = AUTH.currentUser();
         var date  = data.date || _dateStr();
-        var time  = data.time || '';
         var goTime = data.goTime || '';
         var inTime = data.inTime || '';
         var staffName = (data.staffName || '').trim();
@@ -105,10 +104,8 @@ var PatientShifting = (function () {
         if (!fromPlace) { APP.notify('Enter the place/room you are shifting from', 'error'); return null; }
         if (!toPlace) { APP.notify('Enter the place/room you are shifting to', 'error'); return null; }
         if (!staffName) { APP.notify('Enter the staff name', 'error'); return null; }
-        if (!time) { APP.notify('Enter the time', 'error'); return null; }
         var entry = DB.add(KEY, {
             date: date,
-            time: time,
             goTime: goTime,
             inTime: inTime,
             staffName: staffName,
@@ -129,7 +126,6 @@ var PatientShifting = (function () {
         if (!entry) { APP.notify('Entry not found', 'error'); return null; }
         var updates = {
             date: data.date || entry.date,
-            time: (data.time || '').trim(),
             goTime: (data.goTime || '').trim(),
             inTime: (data.inTime || '').trim(),
             staffName: (data.staffName || '').trim(),
@@ -140,7 +136,6 @@ var PatientShifting = (function () {
         if (!updates.fromPlace) { APP.notify('Enter the place/room you are shifting from', 'error'); return null; }
         if (!updates.toPlace) { APP.notify('Enter the place/room you are shifting to', 'error'); return null; }
         if (!updates.staffName) { APP.notify('Enter the staff name', 'error'); return null; }
-        if (!updates.time) { APP.notify('Enter the time', 'error'); return null; }
         var updated = DB.update(KEY, id, updates);
         if (updated) APP.notify('Entry updated ✓', 'success');
         return updated;
@@ -164,14 +159,14 @@ var PatientShifting = (function () {
         }
         var rows = _filter(fromDate, toDate);
         if (rows.length === 0) { APP.notify('No data to export', 'info'); return; }
-        var headers = ['Date', 'Time', 'Go Time', 'In Time', 'Staff Name', 'Staff Category', 'From Place', 'To Place', 'Added By'];
+        var headers = ['Date', 'Go Time', 'In Time', 'Staff Name', 'Staff Category', 'From Place', 'To Place', 'Added By'];
         var data = rows.map(function (e) {
-            return [e.date || '', e.time || '', e.goTime || '', e.inTime || '', e.staffName || '', e.category || '',
+            return [e.date || '', e.goTime || '', e.inTime || '', e.staffName || '', e.category || '',
                     e.fromPlace || '', e.toPlace || '', e.createdByName || e.createdBy || ''];
         });
         var wb = XLSX.utils.book_new();
         var ws = XLSX.utils.aoa_to_sheet([headers].concat(data));
-        ws['!cols'] = [12, 10, 10, 10, 24, 18, 24, 24, 22].map(function (w) { return { wch: w }; });
+        ws['!cols'] = [12, 10, 10, 24, 18, 24, 24, 22].map(function (w) { return { wch: w }; });
         XLSX.utils.book_append_sheet(wb, ws, 'Patient Shifting');
         var range = (fromDate || 'all') + '_to_' + (toDate || 'all');
         XLSX.writeFile(wb, 'Patient_Shifting_' + range + '.xlsx');
@@ -189,8 +184,6 @@ var PatientShifting = (function () {
         return '<div class="grid-2">'
             + '<div class="form-group"><label style="font-size:12px;">Date *</label>'
             + '<input type="date" id="psDate" class="form-control" value="' + _dateStr() + '"></div>'
-            + '<div class="form-group"><label style="font-size:12px;">Time *</label>'
-            + '<input type="time" id="psTime" class="form-control"></div>'
             + '<div class="form-group"><label style="font-size:12px;">Go Time</label>'
             + '<input type="time" id="psGoTime" class="form-control"></div>'
             + '<div class="form-group"><label style="font-size:12px;">In Time</label>'
@@ -221,8 +214,6 @@ var PatientShifting = (function () {
         return '<div class="grid-2">'
             + '<div class="form-group"><label style="font-size:12px;">Date *</label>'
             + '<input type="date" id="psEditDate" class="form-control" value="' + _esc(e.date || '') + '"></div>'
-            + '<div class="form-group"><label style="font-size:12px;">Time *</label>'
-            + '<input type="time" id="psEditTime" class="form-control" value="' + _esc(e.time || '') + '"></div>'
             + '<div class="form-group"><label style="font-size:12px;">Go Time</label>'
             + '<input type="time" id="psEditGoTime" class="form-control" value="' + _esc(e.goTime || '') + '"></div>'
             + '<div class="form-group"><label style="font-size:12px;">In Time</label>'
@@ -249,7 +240,7 @@ var PatientShifting = (function () {
             html += '<div style="color:var(--gray);font-size:13px;padding:14px;">No entries.</div>';
         } else {
             html += '<div class="table-responsive"><table><thead><tr>'
-                + '<th>Date</th><th>Time</th><th>Go Time</th><th>In Time</th><th>Staff</th><th>Category</th><th>From</th><th>To</th><th>Added By</th><th></th>'
+                + '<th>Date</th><th>Go Time</th><th>In Time</th><th>Staff</th><th>Category</th><th>From</th><th>To</th><th>Added By</th><th></th>'
                 + '</tr></thead><tbody>';
             rows.forEach(function (e) {
                 var actions = '';
@@ -261,7 +252,6 @@ var PatientShifting = (function () {
                 }
                 html += '<tr>'
                     + '<td>' + _esc(e.date || '') + '</td>'
-                    + '<td>' + _esc(e.time || '') + '</td>'
                     + '<td>' + _esc(e.goTime || '') + '</td>'
                     + '<td>' + _esc(e.inTime || '') + '</td>'
                     + '<td><strong>' + _esc(e.staffName || '') + '</strong></td>'
@@ -411,7 +401,6 @@ var PatientShifting = (function () {
         },
         submitAdd: function () {
             var date = (document.getElementById('psDate') || {}).value || _dateStr();
-            var time = (document.getElementById('psTime') || {}).value || '';
             var goTime = (document.getElementById('psGoTime') || {}).value || '';
             var inTime = (document.getElementById('psInTime') || {}).value || '';
             var staffName = (document.getElementById('psStaffName') || {}).value || '';
@@ -419,14 +408,13 @@ var PatientShifting = (function () {
             var fromPlace = (document.getElementById('psFromPlace') || {}).value || '';
             var toPlace = (document.getElementById('psToPlace') || {}).value || '';
             var entry = _addEntry({
-                date: date, time: time, goTime: goTime, inTime: inTime, staffName: staffName,
+                date: date, goTime: goTime, inTime: inTime, staffName: staffName,
                 category: category, fromPlace: fromPlace, toPlace: toPlace
             });
             if (!entry) return;
             var s = document.getElementById('psStaffName'); if (s) s.value = '';
             var f = document.getElementById('psFromPlace'); if (f) f.value = '';
             var t = document.getElementById('psToPlace'); if (t) t.value = '';
-            var tm = document.getElementById('psTime'); if (tm) tm.value = '';
             PatientShifting.updateStaffList();
             if (_mode === 'module') renderPatientShifting(document.getElementById('pageContent'));
             else { var tabEl = document.getElementById('empTabContent'); if (tabEl) renderTab(tabEl); }
@@ -443,7 +431,6 @@ var PatientShifting = (function () {
             if (!id) return false;
             var updated = _editEntry(id, {
                 date: (document.getElementById('psEditDate') || {}).value || '',
-                time: (document.getElementById('psEditTime') || {}).value || '',
                 goTime: (document.getElementById('psEditGoTime') || {}).value || '',
                 inTime: (document.getElementById('psEditInTime') || {}).value || '',
                 staffName: (document.getElementById('psEditStaffName') || {}).value || '',

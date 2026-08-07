@@ -1365,8 +1365,8 @@ var _rSections = [
     },
     {
         id: 'patient_shifting', label: 'Patient Shifting', icon: '🚑', color: '#00695c', dbKey: 'patientShiftings',
-        headers: ['Date','Time','Staff Name','Staff Category','From Place','To Place','Added By','Added At'],
-        getRow: function(e){ return [e.date||'', e.time||'', e.staffName||'', e.category||'', e.fromPlace||'', e.toPlace||'', e.createdByName||e.createdBy||'', APP.formatDate(e.createdAt)]; }
+        headers: ['Date','Go Time','In Time','Staff Name','Staff Category','From Place','To Place','Added By','Added At'],
+        getRow: function(e){ return [e.date||'', e.goTime||'', e.inTime||'', e.staffName||'', e.category||'', e.fromPlace||'', e.toPlace||'', e.createdByName||e.createdBy||'', APP.formatDate(e.createdAt)]; }
     }
 ];
 
