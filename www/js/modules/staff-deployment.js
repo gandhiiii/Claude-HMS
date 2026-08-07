@@ -93,6 +93,57 @@ var StaffDeployment = (function () {
         return e.staffType === 'pca' ? 'PCA' : 'Housekeeping';
     }
 
+    function _periodRange(period, ref) {
+        var now = ref || new Date();
+        var y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+        var start, end;
+        if (period === 'today') {
+            start = new Date(y, m, d);
+            end = new Date(y, m, d);
+        } else if (period === 'weekly') {
+            var dow = now.getDay() || 7; // Mon=1..Sun=7
+            start = new Date(y, m, d - dow + 1);
+            end = new Date(y, m, d + (7 - dow));
+        } else if (period === 'monthly') {
+            start = new Date(y, m, 1);
+            end = new Date(y, m + 1, 0);
+        } else {
+            start = new Date(y, m, d);
+            end = new Date(y, m, d);
+        }
+        return { from: _dateStr(start), to: _dateStr(end) };
+    }
+
+    function _periodLabel(period) {
+        if (period === 'today') return 'Today';
+        if (period === 'weekly') return 'This Week';
+        if (period === 'monthly') return 'This Month';
+        return 'Period';
+    }
+
+    function _periodRows(period, type) {
+        var r = _periodRange(period);
+        return _filter(r.from, r.to, type || 'all');
+    }
+
+    // Today / Weekly / Monthly report section with per-period Excel download
+    function _reportSectionHtml() {
+        var periods = ['today', 'weekly', 'monthly'];
+        var cards = periods.map(function (p) {
+            var rows = _periodRows(p, _state.type);
+            var sm = _summary(rows);
+            return '<div class="card" style="flex:1;min-width:150px;border-top:3px solid #00695c;padding:14px;">'
+                + '<div style="font-size:13px;font-weight:700;color:#00695c;">📅 ' + _periodLabel(p) + '</div>'
+                + '<div style="font-size:11px;color:var(--gray);margin:2px 0 10px;">' + rows.length + ' entries · '
+                + '🧹 ' + sm.housekeeping + ' · 🤝 ' + sm.pca + '</div>'
+                + '<button class="btn btn-sm btn-success" style="width:100%;font-size:12px;" '
+                + 'onclick="StaffDeployment.exportPeriod(\'' + p + '\')">📊 Excel</button></div>';
+        }).join('');
+        return '<div class="card" style="padding:16px;margin-bottom:16px;border-top:3px solid #0097a7;">'
+            + '<div style="font-size:14px;font-weight:700;margin-bottom:12px;">📊 Today · Weekly · Monthly Report</div>'
+            + '<div style="display:flex;gap:12px;flex-wrap:wrap;">' + cards + '</div></div>';
+    }
+
     function _addEntry(data) {
         var user = AUTH.currentUser();
         var staffType = data.staffType === 'pca' ? 'pca' : 'housekeeping';
@@ -307,6 +358,9 @@ var StaffDeployment = (function () {
             // Summary
             + '<div id="sdpSummary"></div>'
 
+            // Today / Weekly / Monthly report section
+            + '<div id="sdpReports">' + _reportSectionHtml() + '</div>'
+
             // Tables
             + '<div id="sdpTables"></div>';
 
@@ -347,6 +401,7 @@ var StaffDeployment = (function () {
             + '<button class="btn btn-sm btn-success" onclick="StaffDeployment.exportToday()">📊 Excel</button>'
             + '</div></div>'
             + '<div id="sdpAddWrap" style="display:none;margin-bottom:14px;">' + _addFormHtml() + '</div>'
+            + _reportSectionHtml()
             + '<div id="sdpTabBody"></div>';
 
         el.innerHTML = html;
@@ -438,6 +493,10 @@ var StaffDeployment = (function () {
         },
         exportToday: function () {
             _export(_dateStr(), _dateStr(), 'all');
+        },
+        exportPeriod: function (period) {
+            var r = _periodRange(period);
+            _export(r.from, r.to, _state.type);
         }
     };
 })();
