@@ -274,6 +274,9 @@ function renderHodDashboard(container) {
         tabs.push({ id: 'handover', label: '🔄 Handover', badge: (DB.get('handovers') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU; }).length, bc: 'badge-info' });
     }
 
+    var activeTab = window._hodTargetTab || _hodTab || 'overview';
+    window._hodTargetTab = null;
+
     var html = ''
         + '<div style="background:linear-gradient(135deg,#6a1b9a,#4a148c);border-radius:14px;padding:20px 24px;color:#fff;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
         + '<div style="display:flex;align-items:center;gap:14px;">'
@@ -326,14 +329,14 @@ function renderHodDashboard(container) {
         + '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:4px 4px 0;display:flex;flex-wrap:wrap;gap:2px;border-bottom:none;">'
         + tabs.map(function (t) {
             var lbl = t.label + (t.badge > 0 ? ' <span class="badge ' + (t.bc || 'badge-primary') + '" style="font-size:10px;margin-left:2px;">' + t.badge + '</span>' : '');
-            return '<button class="hod-tab-btn' + (t.id === 'overview' ? ' active' : '') + '" data-tab="' + t.id + '" onclick="hodTabSwitch(\'' + t.id + '\')">' + lbl + '</button>';
+            return '<button class="hod-tab-btn' + (t.id === activeTab ? ' active' : '') + '" data-tab="' + t.id + '" onclick="hodTabSwitch(\'' + t.id + '\')">' + lbl + '</button>';
         }).join('')
         + '</div>'
         + '<div style="background:var(--card);border:1px solid var(--border);border-top:3px solid #6a1b9a;border-radius:0 0 12px 12px;padding:18px;" id="hodTabContent"></div>';
 
     container.innerHTML = html;
-    _hodTab = 'overview';
-    _renderHodTab('overview');
+    _hodTab = activeTab;
+    _renderHodTab(activeTab);
 
     // Start background browser-notification check (30-min interval, once per session)
     if (typeof HMS_REM !== 'undefined') HMS_REM.scheduleCheck(user);
@@ -453,6 +456,8 @@ function _hodOverview(el) {
         + '<div style="font-weight:700;font-size:14px;margin-bottom:10px;">⚡ Quick Actions</div>'
         + '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
         + '<button class="btn btn-primary" onclick="hodCreateTask()">📝 Assign Task</button>'
+        + '<button class="btn btn-outline" style="background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7;font-weight:600;" onclick="hodTabSwitch(\'purchases\')">💰 Daily Purchases</button>'
+        + '<button class="btn btn-outline" style="background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7;font-weight:600;" onclick="hodCreatePurchase()">+ New Purchase</button>'
         + '<button class="btn btn-outline" onclick="hodTabSwitch(\'admissions\')">🏥 Admissions</button>'
         + '<button class="btn btn-outline" onclick="hodTabSwitch(\'team\')">👥 Add Member</button>'
         + '<button class="btn btn-outline" onclick="hodCreateRequest()">📦 Material Request</button>'

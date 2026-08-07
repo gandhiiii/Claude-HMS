@@ -398,6 +398,7 @@ const AUTH = {
         // Budget is strictly admin-only — cannot be granted via feature rights
         if (permission === 'budget') return user.isSuperAdmin || user.role === 'admin';
         if (permission === 'quarterly-priorities') return user.isSuperAdmin || user.role === 'admin';
+        if (permission === 'purchases') return user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || user.role === 'hod';
         if (permission === 'md-report') {
             if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
             if (user.role === 'hod') {

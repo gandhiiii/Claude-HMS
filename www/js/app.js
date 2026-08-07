@@ -91,6 +91,7 @@ const Router = {
             { id: 'hospital-settings', label: _t('nav_hospital_settings'), icon: '⚙️', permission: 'dashboard', adminOnly: true },
             { id: 'reports', label: _t('nav_reports'), icon: '📈', permission: 'reports' },
             { id: 'md-report', label: _t('nav_md_report'), icon: '📋', permission: 'md-report' },
+            { id: 'purchases', label: '💰 Daily Purchases', icon: '💰', permission: 'purchases' },
             { id: 'hod-dashboard', label: _t('nav_hod_dashboard'), icon: '👔', permission: 'hod-dashboard' },
             { id: 'employee-dashboard', label: _t('nav_employee_dashboard'), icon: '📊', permission: 'employee-dashboard' },
             { id: 'storekeeper-dashboard', label: _t('nav_storekeeper_dashboard'), icon: '🏪', permission: 'storekeeper-dashboard' },
@@ -115,6 +116,10 @@ const Router = {
     navigate(module) {
         var u = AUTH.currentUser();
         if (!u) { window.location.href = 'index.html'; return; }
+        if (module === 'purchases') {
+            window._hodTargetTab = 'purchases';
+            module = 'hod-dashboard';
+        }
         if (module === 'dashboard' && u && u.role === 'employee') module = 'employee-dashboard';
         if (module === 'dashboard' && u && u.role === 'hod') module = 'hod-dashboard';
         if (module === 'dashboard' && u && u.role === 'storekeeper') module = 'storekeeper-dashboard';
