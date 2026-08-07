@@ -1952,14 +1952,11 @@ function _hodIsRecordInMonth(p) {
     if (isNaN(recDate.getTime())) return true;
 
     var now = new Date();
-
-    // Check same calendar month and year
-    if (recDate.getFullYear() === now.getFullYear() && recDate.getMonth() === now.getMonth()) return true;
-
-    // Or within the past 45 days
     var diffMs = now.getTime() - recDate.getTime();
     var diffDays = diffMs / (1000 * 60 * 60 * 24);
-    return diffDays >= -1 && diffDays <= 45;
+    if (diffDays >= -1 && diffDays <= 31) return true;
+
+    return recDate.getFullYear() === now.getFullYear() && recDate.getMonth() === now.getMonth();
 }
 
 function hodRestoreOldPurchases() {
@@ -1982,7 +1979,7 @@ function hodSetPurchaseDateFilter(period) {
 
 function hodFilterPurchaseTable() {
     var query = (document.getElementById('hodPurchaseTableSearch')?.value || '').toLowerCase();
-    var period = window._hodPurchasePeriodFilter || 'all';
+    var period = window._hodPurchasePeriodFilter || 'month';
     document.querySelectorAll('.hod-pur-row').forEach(function(tr) {
         var searchStr = tr.dataset.search || '';
         var isWeek = tr.dataset.isweek === 'true';
@@ -2024,12 +2021,6 @@ function _hodPurchases(el) {
 
     var totalVal = purchases.reduce(function (s, p) { return s + (parseFloat(p.total) || 0); }, 0);
 
-    function pBadge(status) {
-        if (status === 'approved') return '<span class="badge badge-success" style="font-size:10px;">✓ Approved</span>';
-        if (status === 'rejected') return '<span class="badge badge-danger" style="font-size:10px;">✗ Rejected</span>';
-        return '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>';
-    }
-
     var html = ''
 
         // Header
@@ -2039,16 +2030,7 @@ function _hodPurchases(el) {
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-sm" style="background:rgba(255,255,255,.25);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodRestoreOldPurchases()">🔄 Restore All Historical Data</button>'
         + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodCreatePurchase()">+ New Purchase Request</button>'
-        + '</div></div>'
-
-        // KPI cards
-        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;">'
-        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#2e7d32;">' + purchases.length + '</div><div style="font-size:11px;color:var(--gray);">Total Records</div></div>'
-        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#e65100;">' + pendingP.length + '</div><div style="font-size:11px;color:var(--gray);">Pending</div></div>'
-        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#2e7d32;">' + approved.length + '</div><div style="font-size:11px;color:var(--gray);">Approved</div></div>'
-        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#c62828;">' + rejected.length + '</div><div style="font-size:11px;color:var(--gray);">Rejected</div></div>'
-        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#6a1b9a;">₹' + totalVal.toFixed(2) + '</div><div style="font-size:11px;color:var(--gray);">Total Value</div></div>'
-        + '</div>';
+        + '</div></div>';
 
     if (purchases.length === 0) {
         html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
@@ -2081,7 +2063,7 @@ function _hodPurchases(el) {
             + '</div></div>';
 
         // Filter Bar & Table View of All Purchase Records
-        var activePeriod = window._hodPurchasePeriodFilter || 'all';
+        var activePeriod = window._hodPurchasePeriodFilter || 'month';
 
         html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px;">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
@@ -7024,7 +7006,7 @@ function hodDchkDoRevoke(assignmentId) {
 
 /* ── OVERSIGHT SUB-TAB ── */
 function _hodDchkOversight(el, user, dept, assignments, team) {
-    var dateStr = new Date().toISOString().slice(0,10);
+    var dateStr = (typeof CHECKLISTS !== 'undefined' && CHECKLISTS.operDate) ? CHECKLISTS.operDate() : new Date().toISOString().slice(0,10);
 
     var html = '<div style="font-weight:600;font-size:14px;margin-bottom:8px;">Oversight — ' + APP.formatDate(dateStr) + '</div>'
         + '<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Whether each team member has submitted their assigned checklist today.</div>';

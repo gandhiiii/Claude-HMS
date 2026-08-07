@@ -1979,7 +1979,7 @@ function hodSetPurchaseDateFilter(period) {
 
 function hodFilterPurchaseTable() {
     var query = (document.getElementById('hodPurchaseTableSearch')?.value || '').toLowerCase();
-    var period = window._hodPurchasePeriodFilter || 'all';
+    var period = window._hodPurchasePeriodFilter || 'month';
     document.querySelectorAll('.hod-pur-row').forEach(function(tr) {
         var searchStr = tr.dataset.search || '';
         var isWeek = tr.dataset.isweek === 'true';
@@ -2063,7 +2063,7 @@ function _hodPurchases(el) {
             + '</div></div>';
 
         // Filter Bar & Table View of All Purchase Records
-        var activePeriod = window._hodPurchasePeriodFilter || 'all';
+        var activePeriod = window._hodPurchasePeriodFilter || 'month';
 
         html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px;">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
