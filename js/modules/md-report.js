@@ -15,8 +15,11 @@ function _mdrAccessOk(user) {
 
 function _mdrScope() {
     var u = AUTH.currentUser();
-    if (u && (u.isSuperAdmin || u.role === 'admin' || u.role === 'super_admin')) return 'all';
-    return (u && u.department) || '';
+    if (!u) return '';
+    if (u.isSuperAdmin || u.role === 'admin' || u.role === 'super_admin') return 'all';
+    var d = (u.department || '').trim().toLowerCase();
+    if (d === 'facility' || d === 'it' || d === 'maintenance') return 'all';
+    return u.department || '';
 }
 
 function _mdrEsc(v) {

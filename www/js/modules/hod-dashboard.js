@@ -178,6 +178,17 @@ function renderHodDashboard(container) {
                r.createdBy !== user.username;
     });
 
+    var pendingCl  = myCl.filter(function (c) { return c.status !== 'completed'; }).length;
+    var hodTodosList = (DB.get('hodTodos') || []).filter(function (t) { return t.createdBy === u || t.department === dept; });
+    var hodPendingTodos = hodTodosList.filter(function (t) { return t.status !== 'completed'; }).length;
+    var deptLow2 = dept.trim().toLowerCase();
+    var isFacOrAdmin = (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') || deptLow2 === 'facility';
+    var deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) {
+        if (isFacOrAdmin) return true;
+        return (p.department||'').trim().toLowerCase() === deptLow2;
+    });
+    var pendingPurchases = deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
+
     _hodData = {
         user: user, dept: dept, u: u,
         team: team, teamNames: teamNames,
@@ -204,12 +215,6 @@ function renderHodDashboard(container) {
         hodPendingTodos: hodPendingTodos
     };
 
-    var pendingCl  = myCl.filter(function (c) { return c.status !== 'completed'; }).length;
-    var hodTodosList = (DB.get('hodTodos') || []).filter(function (t) { return t.createdBy === u || t.department === dept; });
-    var hodPendingTodos = hodTodosList.filter(function (t) { return t.status !== 'completed'; }).length;
-    var deptLow2 = dept.trim().toLowerCase();
-    var deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return (p.department||'').trim().toLowerCase() === deptLow2; });
-    var pendingPurchases = deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
     var pendingReq = myReqs.filter(function (r) { return r.status === 'pending'; }).length + pendingMatApprovals.length + pendingGateApprovals.length;
     var openProblems = routedProblems.length;
     var deptInventory = (DB.get('inventory') || []).filter(function (i) {
@@ -1658,7 +1663,11 @@ function _hodPurchases(el) {
 
     var allPurchases = DB.get('hodPurchases') || [];
     var deptLow = dept.trim().toLowerCase();
-    var purchases = allPurchases.filter(function (p) { return (p.department||'').trim().toLowerCase() === deptLow; }).slice().reverse();
+    var isFacOrAdmin = (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') || deptLow === 'facility';
+    var purchases = allPurchases.filter(function (p) {
+        if (isFacOrAdmin) return true;
+        return (p.department||'').trim().toLowerCase() === deptLow;
+    }).slice().reverse();
     var pendingP = purchases.filter(function (p) { return p.status === 'pending'; });
     var approved = purchases.filter(function (p) { return p.status === 'approved'; });
     var rejected = purchases.filter(function (p) { return p.status === 'rejected'; });
