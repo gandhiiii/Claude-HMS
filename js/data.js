@@ -88,7 +88,7 @@ const DB = {
         'inventory', 'inventory_receipts',
         'gatesecurity', 'phase2Tasks',
         'projects', 'ambulance', 'ambulance_trips',
-        'problems', 'tasks', 'hodTasks', 'hodRequests',
+        'problems', 'tasks', 'hodTasks', 'hodRequests', 'hodPurchases',
         'complaints', 'roomchecklists', 'admissions', 'rooms', 'roomStatus',
         'lostfound', 'adminChecklist', 'checklists',
         'material_requests', 'suggestions', 'reports',

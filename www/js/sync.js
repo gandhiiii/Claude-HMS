@@ -14,7 +14,7 @@ var SYNC = (function () {
         'lostfound', 'adminChecklist', 'checklists',
         'material_requests', 'suggestions', 'reports',
         'roomCleaningTasks', 'floorItems', 'resetTokens', 'handovers',
-        'hodTasks', 'hodRequests',
+        'hodTasks', 'hodRequests', 'hodPurchases',
         'budgets', 'budget_expenses',
         'quarterly_priorities', 'pwResetRequests',
         'material_returns', 'sk_reports',
