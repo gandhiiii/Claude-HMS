@@ -417,6 +417,8 @@ const AUTH = {
         if (user.role === 'hod' && ['admissions','checklists','departmental-checklist','material-requests','problems','tasks','department-meetings','staff-deployment','security-deployment','patient-shifting'].indexOf(permission) !== -1) return true;
         // HOD and employees can file indoor incidents (complaints)
         if (permission === 'complaints' && (user.role === 'hod' || user.role === 'employee')) return true;
+        // Employees auto-get access to checklists, deployments, and shifting
+        if (user.role === 'employee' && ['checklists','departmental-checklist','staff-deployment','security-deployment','patient-shifting'].indexOf(permission) !== -1) return true;
         return user.permissions && user.permissions.includes(permission);
     },
     canAccess(permission) {
