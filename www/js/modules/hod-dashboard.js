@@ -1835,6 +1835,45 @@ function _hodEnsureSamplePurchases() {
     return merged;
 }
 
+function _hodIsRecordInWeek(p) {
+    var dStr = p.billDate || p.createdAt;
+    if (!dStr) return true;
+    var recDate = new Date(dStr);
+    if (isNaN(recDate.getTime())) return true;
+
+    var now = new Date();
+    var day = now.getDay();
+    var diffToMonday = now.getDate() - day + (day === 0 ? -6 : 1);
+    var startOfWeek = new Date(now.getFullYear(), now.getMonth(), diffToMonday);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    var endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(endOfWeek.getDate() + 7);
+
+    return recDate >= startOfWeek && recDate < endOfWeek;
+}
+
+function _hodIsRecordInMonth(p) {
+    var dStr = p.billDate || p.createdAt;
+    if (!dStr) return true;
+    var recDate = new Date(dStr);
+    if (isNaN(recDate.getTime())) return true;
+
+    var now = new Date();
+    return recDate.getFullYear() === now.getFullYear() && recDate.getMonth() === now.getMonth();
+}
+
+function hodSetPurchaseDateFilter(period) {
+    window._hodPurchasePeriodFilter = period;
+    document.querySelectorAll('.hod-pur-period-btn').forEach(function(btn){
+        var isActive = btn.dataset.period === period;
+        btn.style.background = isActive ? '#1b5e20' : 'var(--card)';
+        btn.style.color = isActive ? '#fff' : 'var(--text)';
+        btn.style.borderColor = isActive ? '#1b5e20' : 'var(--border)';
+    });
+    hodFilterPurchaseTable();
+}
+
 function hodRestoreOldPurchases() {
     _hodEnsureSamplePurchases();
     if (typeof APP !== 'undefined' && APP.notify) APP.notify('All old purchase and expense data restored!', 'success');
@@ -1844,9 +1883,20 @@ function hodRestoreOldPurchases() {
 
 function hodFilterPurchaseTable() {
     var query = (document.getElementById('hodPurchaseTableSearch')?.value || '').toLowerCase();
+    var period = window._hodPurchasePeriodFilter || 'all';
     document.querySelectorAll('.hod-pur-row').forEach(function(tr) {
-        var s = tr.dataset.search || '';
-        tr.style.display = s.indexOf(query) !== -1 ? '' : 'none';
+        var searchStr = tr.dataset.search || '';
+        var isWeek = tr.dataset.isweek === 'true';
+        var isMonth = tr.dataset.ismonth === 'true';
+        var isToday = tr.dataset.istoday === 'true';
+
+        var periodOk = period === 'all' ? true
+            : period === 'week' ? isWeek
+            : period === 'month' ? isMonth
+            : period === 'today' ? isToday : true;
+        var searchOk = searchStr.indexOf(query) !== -1;
+
+        tr.style.display = (periodOk && searchOk) ? '' : 'none';
     });
 }
 
@@ -1875,12 +1925,6 @@ function _hodPurchases(el) {
 
     var totalVal = purchases.reduce(function (s, p) { return s + (parseFloat(p.total) || 0); }, 0);
 
-    function pBadge(status) {
-        if (status === 'approved') return '<span class="badge badge-success" style="font-size:10px;">✓ Approved</span>';
-        if (status === 'rejected') return '<span class="badge badge-danger" style="font-size:10px;">✗ Rejected</span>';
-        return '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>';
-    }
-
     var html = ''
 
         // Header
@@ -1890,16 +1934,7 @@ function _hodPurchases(el) {
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-sm" style="background:rgba(255,255,255,.25);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodRestoreOldPurchases()">🔄 Restore All Historical Data</button>'
         + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodCreatePurchase()">+ New Purchase Request</button>'
-        + '</div></div>'
-
-        // KPI cards
-        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;">'
-        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#2e7d32;">' + purchases.length + '</div><div style="font-size:11px;color:var(--gray);">Total Records</div></div>'
-        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#e65100;">' + pendingP.length + '</div><div style="font-size:11px;color:var(--gray);">Pending</div></div>'
-        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#2e7d32;">' + approved.length + '</div><div style="font-size:11px;color:var(--gray);">Approved</div></div>'
-        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#c62828;">' + rejected.length + '</div><div style="font-size:11px;color:var(--gray);">Rejected</div></div>'
-        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#6a1b9a;">₹' + totalVal.toFixed(2) + '</div><div style="font-size:11px;color:var(--gray);">Total Value</div></div>'
-        + '</div>';
+        + '</div></div>';
 
     if (purchases.length === 0) {
         html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
@@ -1908,30 +1943,42 @@ function _hodPurchases(el) {
             + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Click "+ New Purchase Request" to submit one for approval.</div>'
             + '<button class="btn btn-primary" onclick="hodCreatePurchase()">+ New Purchase Request</button></div>';
     } else {
-        // ── Daily Report Summary ──
+        // ── Daily & Weekly Report Summary ──
         var todayStr = new Date().toISOString().slice(0,10);
-        var todayPurchases = purchases.filter(function(p){ return p.createdAt && p.createdAt.slice(0,10) === todayStr; });
+        var todayPurchases = purchases.filter(function(p){ var d = p.billDate || (p.createdAt ? p.createdAt.slice(0,10) : ''); return d === todayStr; });
+        var thisWeekPurchases = purchases.filter(_hodIsRecordInWeek);
+        var thisMonthPurchases = purchases.filter(_hodIsRecordInMonth);
+        var thisWeekVal = thisWeekPurchases.reduce(function(s,p){ return s + (parseFloat(p.total)||0); }, 0);
+        var thisMonthVal = thisMonthPurchases.reduce(function(s,p){ return s + (parseFloat(p.total)||0); }, 0);
         var approvedVal = approved.reduce(function(s,p){ return s + (parseFloat(p.total)||0); }, 0);
         var pendingVal = pendingP.reduce(function(s,p){ return s + (parseFloat(p.total)||0); }, 0);
 
         html += '<div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:12px;padding:16px;margin-bottom:16px;">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
-            + '<div><div style="font-weight:700;font-size:15px;">📊 Daily Purchases & Expenses Report</div>'
+            + '<div><div style="font-weight:700;font-size:15px;">📊 Daily & Weekly Purchases Summary</div>'
             + '<div style="font-size:12px;color:var(--gray);">' + new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) + '</div></div>'
             + '<button class="btn btn-sm" style="background:#1b5e20;color:#fff;border:none;padding:6px 14px;font-size:12px;" onclick="hodDownloadPurchasesReport()">📥 Download Report</button>'
             + '</div>'
-            + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">'
-            + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:20px;font-weight:700;color:#2e7d32;">' + purchases.length + '</div><div style="font-size:11px;color:var(--gray);">All Time Records</div></div>'
-            + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:20px;font-weight:700;color:#1565c0;">' + todayPurchases.length + '</div><div style="font-size:11px;color:var(--gray);">Today\'s Records</div></div>'
-            + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:20px;font-weight:700;color:#2e7d32;">₹' + approvedVal.toFixed(2) + '</div><div style="font-size:11px;color:var(--gray);">Approved Value</div></div>'
-            + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:20px;font-weight:700;color:#e65100;">₹' + pendingVal.toFixed(2) + '</div><div style="font-size:11px;color:var(--gray);">Pending Value</div></div>'
+            + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">'
+            + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:18px;font-weight:700;color:#2e7d32;">' + purchases.length + '</div><div style="font-size:11px;color:var(--gray);">All Time</div></div>'
+            + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:18px;font-weight:700;color:#1565c0;">' + thisWeekPurchases.length + '</div><div style="font-size:11px;color:var(--gray);">📅 This Week</div></div>'
+            + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:18px;font-weight:700;color:#2e7d32;">₹' + thisWeekVal.toFixed(2) + '</div><div style="font-size:11px;color:var(--gray);">Week Value</div></div>'
+            + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:18px;font-weight:700;color:#6a1b9a;">₹' + thisMonthVal.toFixed(2) + '</div><div style="font-size:11px;color:var(--gray);">Month Value</div></div>'
             + '</div></div>';
 
-        // Table View of All Purchase Records
+        // Filter Bar & Table View of All Purchase Records
+        var activePeriod = window._hodPurchasePeriodFilter || 'all';
+
         html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px;">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
-            + '<div style="font-weight:700;font-size:15px;">📋 All Purchase & Expense Data Records (' + purchases.length + ')</div>'
-            + '<input type="text" class="form-control" id="hodPurchaseTableSearch" placeholder="🔍 Search records..." style="width:240px;font-size:12px;" oninput="hodFilterPurchaseTable()">'
+            + '<div style="font-weight:700;font-size:15px;">📋 Purchase & Expense Records (' + purchases.length + ')</div>'
+            + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+            + '<button class="btn btn-sm hod-pur-period-btn" data-period="all" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid ' + (activePeriod === 'all' ? '#1b5e20' : 'var(--border)') + ';background:' + (activePeriod === 'all' ? '#1b5e20' : 'var(--card)') + ';color:' + (activePeriod === 'all' ? '#fff' : 'var(--text)') + ';" onclick="hodSetPurchaseDateFilter(\'all\')">🌐 All (' + purchases.length + ')</button>'
+            + '<button class="btn btn-sm hod-pur-period-btn" data-period="week" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid ' + (activePeriod === 'week' ? '#1b5e20' : 'var(--border)') + ';background:' + (activePeriod === 'week' ? '#1b5e20' : 'var(--card)') + ';color:' + (activePeriod === 'week' ? '#fff' : 'var(--text)') + ';" onclick="hodSetPurchaseDateFilter(\'week\')">📅 This Week (' + thisWeekPurchases.length + ')</button>'
+            + '<button class="btn btn-sm hod-pur-period-btn" data-period="month" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid ' + (activePeriod === 'month' ? '#1b5e20' : 'var(--border)') + ';background:' + (activePeriod === 'month' ? '#1b5e20' : 'var(--card)') + ';color:' + (activePeriod === 'month' ? '#fff' : 'var(--text)') + ';" onclick="hodSetPurchaseDateFilter(\'month\')">📆 This Month (' + thisMonthPurchases.length + ')</button>'
+            + '<button class="btn btn-sm hod-pur-period-btn" data-period="today" style="padding:4px 10px;font-size:11px;border-radius:6px;border:1px solid ' + (activePeriod === 'today' ? '#1b5e20' : 'var(--border)') + ';background:' + (activePeriod === 'today' ? '#1b5e20' : 'var(--card)') + ';color:' + (activePeriod === 'today' ? '#fff' : 'var(--text)') + ';" onclick="hodSetPurchaseDateFilter(\'today\')">☀️ Today (' + todayPurchases.length + ')</button>'
+            + '</div>'
+            + '<input type="text" class="form-control" id="hodPurchaseTableSearch" placeholder="🔍 Search records..." style="width:200px;font-size:12px;" oninput="hodFilterPurchaseTable()">'
             + '</div>'
             + '<div class="table-responsive"><table class="table" style="font-size:12px;"><thead><tr>'
             + '<th>Date / Bill</th><th>Title / Item</th><th>Dept</th><th>Category</th><th>Qty</th><th>Price</th><th>Total</th><th>Status</th><th>Approval</th><th>Actions</th>'
@@ -1939,6 +1986,10 @@ function _hodPurchases(el) {
 
         purchases.forEach(function(p) {
             var dateStr = p.billDate ? APP.formatDate(p.billDate) : APP.formatDate(p.createdAt);
+            var isWeek = _hodIsRecordInWeek(p);
+            var isMonth = _hodIsRecordInMonth(p);
+            var isToday = (p.billDate || (p.createdAt ? p.createdAt.slice(0,10) : '')) === todayStr;
+
             var statusBadge = p.status === 'approved' ? '<span class="badge badge-success" style="font-size:10px;">✓ Approved</span>'
                 : p.status === 'rejected' ? '<span class="badge badge-danger" style="font-size:10px;">✗ Rejected</span>'
                 : '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>';
@@ -1949,7 +2000,7 @@ function _hodPurchases(el) {
             var canManage = user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || isFac);
             var canEdit = canManage || (user.role === 'hod');
 
-            html += '<tr class="hod-pur-row" data-search="' + (p.title + ' ' + p.itemName + ' ' + (p.vendor||'') + ' ' + (p.billNo||'') + ' ' + p.department).toLowerCase() + '">'
+            html += '<tr class="hod-pur-row" data-isweek="' + isWeek + '" data-ismonth="' + isMonth + '" data-istoday="' + isToday + '" data-search="' + (p.title + ' ' + p.itemName + ' ' + (p.vendor||'') + ' ' + (p.billNo||'') + ' ' + p.department).toLowerCase() + '">'
                 + '<td>' + dateStr + (p.billNo ? '<br><small style="color:var(--gray);">' + p.billNo + '</small>' : '') + '</td>'
                 + '<td><strong>' + (p.title || 'Purchase') + '</strong><br><small style="color:var(--gray);">' + (p.itemName || '—') + '</small></td>'
                 + '<td><span class="badge badge-info" style="font-size:10px;">' + (p.department || 'Facility') + '</span></td>'
