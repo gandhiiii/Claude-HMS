@@ -1540,8 +1540,22 @@ function rDownloadReport(sectionId, format) {
     var raw   = DB.get(cfg.dbKey) || [];
     var items = (sectionId === 'staff' || sectionId === 'departments' || sectionId === 'inventory' || cfg.adminOnly)
         ? raw : _rRoleFilter(raw, user);
-    var rows  = items.map(cfg.getRow);
 
+    if (items.length === 0) { APP.notify('No data to export', 'info'); return; }
+
+    // Category-wise tabs for Staff Deployment (Housekeeping / PCA)
+    if (format === 'excel' && sectionId === 'staff_deployment') {
+        var hkItems = items.filter(function (e) { return e.staffType !== 'pca'; });
+        var pcaItems = items.filter(function (e) { return e.staffType === 'pca'; });
+        var tabSheets = [];
+        if (hkItems.length) tabSheets.push({ name: 'Housekeeping', rows: hkItems.map(cfg.getRow) });
+        if (pcaItems.length) tabSheets.push({ name: 'PCA', rows: pcaItems.map(cfg.getRow) });
+        tabSheets.push({ name: 'All', rows: items.map(cfg.getRow) });
+        _rExportExcelTabs(cfg.label, cfg.headers, tabSheets);
+        return;
+    }
+
+    var rows  = items.map(cfg.getRow);
     if (rows.length === 0) { APP.notify('No data to export', 'info'); return; }
 
     if (format === 'excel') {
@@ -1549,6 +1563,30 @@ function rDownloadReport(sectionId, format) {
     } else {
         _rExportPDF(cfg.label, cfg.headers, rows);
     }
+}
+
+function _rExportExcelTabs(title, headers, tabs) {
+    if (typeof XLSX === 'undefined') {
+        APP.notify('Excel library not loaded yet — please wait a moment and retry', 'error');
+        return;
+    }
+    var wb = XLSX.utils.book_new();
+    tabs.forEach(function (tab) {
+        var wsData = [headers].concat(tab.rows);
+        var ws = XLSX.utils.aoa_to_sheet(wsData);
+        ws['!cols'] = headers.map(function(h, ci) {
+            var max = h.length;
+            tab.rows.forEach(function(r) {
+                var cell = r[ci] != null ? String(r[ci]) : '';
+                if (cell.length > max) max = cell.length;
+            });
+            return { wch: Math.min(max + 2, 45) };
+        });
+        XLSX.utils.book_append_sheet(wb, ws, tab.name.substring(0, 31));
+    });
+    var fname = title.replace(/\s+/g, '_') + '_' + new Date().toISOString().substring(0, 10) + '.xlsx';
+    XLSX.writeFile(wb, fname);
+    APP.notify('Downloaded: ' + fname, 'success');
 }
 
 function _rExportExcel(title, headers, rows) {

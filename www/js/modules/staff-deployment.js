@@ -140,14 +140,33 @@ var StaffDeployment = (function () {
         var rows = _filter(fromDate, toDate, type);
         if (rows.length === 0) { APP.notify('No data to export', 'info'); return; }
         var headers = ['Date', 'Staff Type', 'Floor', 'Place / Location', 'Time', 'Staff Name', 'Shift', 'Duty / Remarks', 'Added By'];
-        var data = rows.map(function (e) {
-            return [e.date || '', _labelType(e), e.floor || '', e.place || '', e.time || '',
-                    e.staffName || '', e.shift || '', e.duty || '', e.createdByName || e.createdBy || ''];
-        });
+        function _sheetRows(list) {
+            return list.map(function (e) {
+                return [e.date || '', _labelType(e), e.floor || '', e.place || '', e.time || '',
+                        e.staffName || '', e.shift || '', e.duty || '', e.createdByName || e.createdBy || ''];
+            });
+        }
+        function _widths(sheet) { sheet['!cols'] = [12, 16, 18, 24, 10, 24, 12, 30, 22].map(function (w) { return { wch: w }; }); }
+
         var wb = XLSX.utils.book_new();
-        var ws = XLSX.utils.aoa_to_sheet([headers].concat(data));
-        ws['!cols'] = [12, 16, 18, 24, 10, 24, 12, 30, 22].map(function (w) { return { wch: w }; });
-        XLSX.utils.book_append_sheet(wb, ws, 'Staff Deployment');
+        var hk = rows.filter(function (e) { return e.staffType !== 'pca'; });
+        var pca = rows.filter(function (e) { return e.staffType === 'pca'; });
+
+        // Category-wise tabs (Housekeeping, PCA, plus an All tab)
+        if (hk.length > 0) {
+            var wsHk = XLSX.utils.aoa_to_sheet([headers].concat(_sheetRows(hk)));
+            _widths(wsHk);
+            XLSX.utils.book_append_sheet(wb, wsHk, 'Housekeeping');
+        }
+        if (pca.length > 0) {
+            var wsPca = XLSX.utils.aoa_to_sheet([headers].concat(_sheetRows(pca)));
+            _widths(wsPca);
+            XLSX.utils.book_append_sheet(wb, wsPca, 'PCA');
+        }
+        var wsAll = XLSX.utils.aoa_to_sheet([headers].concat(_sheetRows(rows)));
+        _widths(wsAll);
+        XLSX.utils.book_append_sheet(wb, wsAll, 'All');
+
         var range = (fromDate || 'all') + '_to_' + (toDate || 'all');
         XLSX.writeFile(wb, 'Staff_Deployment_' + range + '.xlsx');
         APP.notify('Excel report downloaded ✓', 'success');
