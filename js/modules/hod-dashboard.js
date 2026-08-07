@@ -2339,7 +2339,12 @@ function hodDownloadPurchasesReport() {
     var dept = window._hodActiveDept || user.department || '';
     if (!_hodInDeptList(dept, 'purchases')) return;
     var dLow = dept.trim().toLowerCase();
-    var allPurchases = (DB.get('hodPurchases') || []).filter(function(p){ return (p.department||'').trim().toLowerCase() === dLow; });
+    var uLow = (user.department || '').trim().toLowerCase();
+    var isFacOrAdmin = (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') || uLow === 'facility' || dLow === 'facility';
+    var allPurchases = _hodEnsureSamplePurchases().filter(function (p) {
+        if (isFacOrAdmin) return true;
+        return (p.department || '').trim().toLowerCase() === dLow;
+    });
 
     var todayStr = new Date().toISOString().slice(0,10);
     var today = allPurchases.filter(function(p){ return p.createdAt && p.createdAt.slice(0,10) === todayStr; });
