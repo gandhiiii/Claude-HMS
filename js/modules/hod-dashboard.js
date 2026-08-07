@@ -1748,7 +1748,8 @@ function _hodPurchases(el) {
 }
 
 function _hodPurchaseCard(p, user) {
-    var canManage = user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin');
+    var isFacHod = user && user.role === 'hod' && (user.department || '').trim().toLowerCase() === 'facility';
+    var canManage = user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || isFacHod);
     var canEdit = canManage || (user.role === 'hod');
     var statusBadge = p.status === 'approved' ? '<span class="badge badge-success" style="font-size:10px;">✓ Approved</span>'
         : p.status === 'rejected' ? '<span class="badge badge-danger" style="font-size:10px;">✗ Rejected</span>'
@@ -1860,6 +1861,81 @@ function hodCreatePurchase() {
         + '<option value="pre-approved">Already approved — enter who approved</option>'
         + '<option value="MD">MD</option>'
         + '<option value="Chairman">Chairman</option>'
+        + '<option value="Vice Chairman">Vice Chairman</option>'
+        + '<option value="MD+Chairman">MD + Chairman</option>'
+        + '<option value="MD+Vice Chairman">MD + Vice Chairman</option>'
+        + '<option value="Chairman+Vice Chairman">Chairman + Vice Chairman</option>'
+        + '<option value="All">All (MD, Chairman, Vice Chairman)</option>'
+        + '<option value="other">Other (specify)</option>'
+        + '</select>'
+        + '<div id="hodApprovalOtherWrap" style="display:none;"><input type="text" name="approvalOther" class="form-control" placeholder="e.g. Board of Directors"></div>'
+        + '<div id="hodPreApprovedWrap" style="display:none;"><input type="text" name="preApprovedBy" class="form-control" placeholder="Who already approved this? e.g. MD"></div>'
+        + '</div>'
+        + '</form>';
+    openFormModal('💰 New Purchase / Expense Request', form, 'hodSavePurchase()', true);
+}
+
+function hodSavePurchase() {
+    var user = AUTH.currentUser();
+    if (!user) return false;
+    var data = getFormData('hodPurchaseForm');
+    if (!data.title || !data.itemName || !data.price || !data.location || !data.description || !data.category) {
+        APP.notify('Please fill all required fields', 'error'); return false;
+    }
+    var qty = parseFloat(data.quantity) || 1;
+    var price = parseFloat(data.price) || 0;
+    if (price <= 0) { APP.notify('Enter a valid price', 'error'); return false; }
+    var approvalType = data.approvalType || 'none';
+    var approvalOther = data.approvalOther || '';
+    var preApprovedBy = data.preApprovedBy || '';
+    var recStatus = approvalType === 'none' ? 'approved' : (approvalType === 'pre-approved' ? 'approved' : 'pending');
+    var dept = window._hodActiveDept || user.department || '';
+    DB.add('hodPurchases', {
+        title: data.title,
+        itemName: data.itemName,
+        category: data.category,
+        quantity: qty,
+        price: price,
+        total: qty * price,
+        location: data.location,
+        vendor: data.vendor || '',
+        description: data.description,
+        department: dept,
+        billDate: data.billDate || '',
+        billNo: data.billNo || '',
+        status: recStatus,
+        approvalType: approvalType,
+        approvalOther: approvalOther,
+        preApprovedBy: preApprovedBy,
+        approvedBy: recStatus === 'approved' ? (preApprovedBy || (approvalType === 'none' ? 'No approval needed' : '')) : '',
+        approvedAt: recStatus === 'approved' ? new Date().toISOString() : '',
+        createdBy: user.username,
+        createdByName: user.fullName,
+        createdAt: new Date().toISOString()
+    });
+    APP.notify('Purchase request submitted for approval!', 'success');
+    var deptLow = dept.trim().toLowerCase();
+    _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return (p.department||'').trim().toLowerCase() === deptLow; });
+    _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
+    _renderHodTab('purchases');
+    return true;
+}
+
+function hodApprovePurchase(id) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    confirmAction('Approve this purchase request?', function () {
+        DB.update('hodPurchases', id, {
+            status: 'approved',
+            approvedBy: user.fullName,
+            approvedAt: new Date().toISOString()
+        });
+        APP.notify('Purchase request approved', 'success');
+        var _d = window._hodActiveDept || user.department || '';
+        var _dl = _d.trim().toLowerCase();
+        _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return (p.department||'').trim().toLowerCase() === _dl; });
+        _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
+        _renderHodTab('purchases');
     });
 }
     

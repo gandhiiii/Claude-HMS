@@ -1748,7 +1748,8 @@ function _hodPurchases(el) {
 }
 
 function _hodPurchaseCard(p, user) {
-    var canManage = user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin');
+    var isFacHod = user && user.role === 'hod' && (user.department || '').trim().toLowerCase() === 'facility';
+    var canManage = user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || isFacHod);
     var canEdit = canManage || (user.role === 'hod');
     var statusBadge = p.status === 'approved' ? '<span class="badge badge-success" style="font-size:10px;">✓ Approved</span>'
         : p.status === 'rejected' ? '<span class="badge badge-danger" style="font-size:10px;">✗ Rejected</span>'
