@@ -96,6 +96,8 @@ var PatientShifting = (function () {
         var user = AUTH.currentUser();
         var date  = data.date || _dateStr();
         var time  = data.time || '';
+        var goTime = data.goTime || '';
+        var inTime = data.inTime || '';
         var staffName = (data.staffName || '').trim();
         var category  = (data.category || '').trim();
         var fromPlace = (data.fromPlace || '').trim();
@@ -107,6 +109,8 @@ var PatientShifting = (function () {
         var entry = DB.add(KEY, {
             date: date,
             time: time,
+            goTime: goTime,
+            inTime: inTime,
             staffName: staffName,
             category: category || 'Attendant',
             fromPlace: fromPlace,
@@ -126,6 +130,8 @@ var PatientShifting = (function () {
         var updates = {
             date: data.date || entry.date,
             time: (data.time || '').trim(),
+            goTime: (data.goTime || '').trim(),
+            inTime: (data.inTime || '').trim(),
             staffName: (data.staffName || '').trim(),
             category: (data.category || '').trim(),
             fromPlace: (data.fromPlace || '').trim(),
@@ -158,14 +164,14 @@ var PatientShifting = (function () {
         }
         var rows = _filter(fromDate, toDate);
         if (rows.length === 0) { APP.notify('No data to export', 'info'); return; }
-        var headers = ['Date', 'Time', 'Staff Name', 'Staff Category', 'From Place', 'To Place', 'Added By'];
+        var headers = ['Date', 'Time', 'Go Time', 'In Time', 'Staff Name', 'Staff Category', 'From Place', 'To Place', 'Added By'];
         var data = rows.map(function (e) {
-            return [e.date || '', e.time || '', e.staffName || '', e.category || '',
+            return [e.date || '', e.time || '', e.goTime || '', e.inTime || '', e.staffName || '', e.category || '',
                     e.fromPlace || '', e.toPlace || '', e.createdByName || e.createdBy || ''];
         });
         var wb = XLSX.utils.book_new();
         var ws = XLSX.utils.aoa_to_sheet([headers].concat(data));
-        ws['!cols'] = [12, 10, 24, 18, 24, 24, 22].map(function (w) { return { wch: w }; });
+        ws['!cols'] = [12, 10, 10, 10, 24, 18, 24, 24, 22].map(function (w) { return { wch: w }; });
         XLSX.utils.book_append_sheet(wb, ws, 'Patient Shifting');
         var range = (fromDate || 'all') + '_to_' + (toDate || 'all');
         XLSX.writeFile(wb, 'Patient_Shifting_' + range + '.xlsx');
@@ -185,6 +191,10 @@ var PatientShifting = (function () {
             + '<input type="date" id="psDate" class="form-control" value="' + _dateStr() + '"></div>'
             + '<div class="form-group"><label style="font-size:12px;">Time *</label>'
             + '<input type="time" id="psTime" class="form-control"></div>'
+            + '<div class="form-group"><label style="font-size:12px;">Go Time</label>'
+            + '<input type="time" id="psGoTime" class="form-control"></div>'
+            + '<div class="form-group"><label style="font-size:12px;">In Time</label>'
+            + '<input type="time" id="psInTime" class="form-control"></div>'
             + '<div class="form-group"><label style="font-size:12px;">Staff Name *</label>'
             + '<input type="text" id="psStaffName" list="psStaffList" class="form-control" placeholder="Staff name">'
             + '<datalist id="psStaffList"></datalist></div>'
@@ -213,6 +223,10 @@ var PatientShifting = (function () {
             + '<input type="date" id="psEditDate" class="form-control" value="' + _esc(e.date || '') + '"></div>'
             + '<div class="form-group"><label style="font-size:12px;">Time *</label>'
             + '<input type="time" id="psEditTime" class="form-control" value="' + _esc(e.time || '') + '"></div>'
+            + '<div class="form-group"><label style="font-size:12px;">Go Time</label>'
+            + '<input type="time" id="psEditGoTime" class="form-control" value="' + _esc(e.goTime || '') + '"></div>'
+            + '<div class="form-group"><label style="font-size:12px;">In Time</label>'
+            + '<input type="time" id="psEditInTime" class="form-control" value="' + _esc(e.inTime || '') + '"></div>'
             + '<div class="form-group"><label style="font-size:12px;">Staff Name *</label>'
             + '<input type="text" id="psEditStaffName" class="form-control" value="' + _esc(e.staffName || '') + '"></div>'
             + '<div class="form-group"><label style="font-size:12px;">Staff Category *</label>'
@@ -235,7 +249,7 @@ var PatientShifting = (function () {
             html += '<div style="color:var(--gray);font-size:13px;padding:14px;">No entries.</div>';
         } else {
             html += '<div class="table-responsive"><table><thead><tr>'
-                + '<th>Date</th><th>Time</th><th>Staff</th><th>Category</th><th>From</th><th>To</th><th>Added By</th><th></th>'
+                + '<th>Date</th><th>Time</th><th>Go Time</th><th>In Time</th><th>Staff</th><th>Category</th><th>From</th><th>To</th><th>Added By</th><th></th>'
                 + '</tr></thead><tbody>';
             rows.forEach(function (e) {
                 var actions = '';
@@ -248,6 +262,8 @@ var PatientShifting = (function () {
                 html += '<tr>'
                     + '<td>' + _esc(e.date || '') + '</td>'
                     + '<td>' + _esc(e.time || '') + '</td>'
+                    + '<td>' + _esc(e.goTime || '') + '</td>'
+                    + '<td>' + _esc(e.inTime || '') + '</td>'
                     + '<td><strong>' + _esc(e.staffName || '') + '</strong></td>'
                     + '<td>' + _esc(e.category || '') + '</td>'
                     + '<td><span style="display:inline-block;background:#e0f2f1;color:#00695c;border-radius:6px;padding:2px 8px;font-size:12px;">' + _esc(e.fromPlace || '') + '</span></td>'
@@ -396,12 +412,14 @@ var PatientShifting = (function () {
         submitAdd: function () {
             var date = (document.getElementById('psDate') || {}).value || _dateStr();
             var time = (document.getElementById('psTime') || {}).value || '';
+            var goTime = (document.getElementById('psGoTime') || {}).value || '';
+            var inTime = (document.getElementById('psInTime') || {}).value || '';
             var staffName = (document.getElementById('psStaffName') || {}).value || '';
             var category = (document.getElementById('psCategory') || {}).value || 'Attendant';
             var fromPlace = (document.getElementById('psFromPlace') || {}).value || '';
             var toPlace = (document.getElementById('psToPlace') || {}).value || '';
             var entry = _addEntry({
-                date: date, time: time, staffName: staffName,
+                date: date, time: time, goTime: goTime, inTime: inTime, staffName: staffName,
                 category: category, fromPlace: fromPlace, toPlace: toPlace
             });
             if (!entry) return;
@@ -426,6 +444,8 @@ var PatientShifting = (function () {
             var updated = _editEntry(id, {
                 date: (document.getElementById('psEditDate') || {}).value || '',
                 time: (document.getElementById('psEditTime') || {}).value || '',
+                goTime: (document.getElementById('psEditGoTime') || {}).value || '',
+                inTime: (document.getElementById('psEditInTime') || {}).value || '',
                 staffName: (document.getElementById('psEditStaffName') || {}).value || '',
                 category: (document.getElementById('psEditCategory') || {}).value || 'Attendant',
                 fromPlace: (document.getElementById('psEditFrom') || {}).value || '',
