@@ -1916,6 +1916,13 @@ function _hodIsRecordInMonth(p) {
     return recDate.getFullYear() === now.getFullYear() && recDate.getMonth() === now.getMonth();
 }
 
+function hodRestoreOldPurchases() {
+    _hodEnsureSamplePurchases();
+    if (typeof APP !== 'undefined' && APP.notify) APP.notify('All old purchase and expense data restored!', 'success');
+    var el = document.getElementById('hodTabContent');
+    if (el) _hodPurchases(el);
+}
+
 function hodSetPurchaseDateFilter(period) {
     window._hodPurchasePeriodFilter = period;
     document.querySelectorAll('.hod-pur-period-btn').forEach(function(btn){
@@ -1925,13 +1932,6 @@ function hodSetPurchaseDateFilter(period) {
         btn.style.borderColor = isActive ? '#1b5e20' : 'var(--border)';
     });
     hodFilterPurchaseTable();
-}
-
-function hodRestoreOldPurchases() {
-    _hodEnsureSamplePurchases();
-    if (typeof APP !== 'undefined' && APP.notify) APP.notify('All old purchase and expense data restored!', 'success');
-    var el = document.getElementById('hodTabContent');
-    if (el) _hodPurchases(el);
 }
 
 function hodFilterPurchaseTable() {

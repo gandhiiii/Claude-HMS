@@ -1836,80 +1836,46 @@ function _hodEnsureSamplePurchases() {
     return merged;
 }
 
-function hodRestoreOldPurchases() {
-    _hodEnsureSamplePurchases();
-    if (typeof APP !== 'undefined' && APP.notify) APP.notify('All old purchase and expense data restored!', 'success');
-    var el = document.getElementById('hodTabContent');
-    if (el) _hodPurchases(el);
-}
-
-function hodFilterPurchaseTable() {
-    var query = (document.getElementById('hodPurchaseTableSearch')?.value || '').toLowerCase();
-    document.querySelectorAll('.hod-pur-row').forEach(function(tr) {
-        var s = tr.dataset.search || '';
-        tr.style.display = s.indexOf(query) !== -1 ? '' : 'none';
-    });
-}
-
-function _hodPurchases(el) {
-    var user = AUTH.currentUser();
-    if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
-    var dept = window._hodActiveDept || user.department || '';
-    if (!_hodInDeptList(dept, 'purchases')) {
-        el.innerHTML = '<div class="empty-state">Purchases module not enabled for your department.</div>';
-        return;
-    }
-
-    var allPurchases = _hodEnsureSamplePurchases();
-    var deptLow = dept.trim().toLowerCase();
-    var userDeptLow = (user.department || '').trim().toLowerCase();
-    var isFacOrAdmin = (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') || userDeptLow === 'facility' || deptLow === 'facility';
-    var purchases = allPurchases.filter(function (p) {
-        if (isFacOrAdmin) return true;
-        return (p.department||'').trim().toLowerCase() === deptLow;
-    }).slice().reverse();
-
-    var pendingP = purchases.filter(function (p) { return p.status === 'pending'; });
-    var approved = purchases.filter(function (p) { return p.status === 'approved'; });
-    var rejected = purchases.filter(function (p) { return p.status === 'rejected'; });
-    var otherP    = purchases.filter(function (p) { return p.status !== 'pending' && p.status !== 'approved' && p.status !== 'rejected'; });
-
-    var totalVal = purchases.reduce(function (s, p) { return s + (parseFloat(p.total) || 0); }, 0);
-
-    function pBadge(status) {
-        if (status === 'approved') return '<span class="badge badge-success" style="font-size:10px;">✓ Approved</span>';
-        if (status === 'rejected') return '<span class="badge badge-danger" style="font-size:10px;">✗ Rejected</span>';
-        return '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>';
-    }
-
-    var html = ''
-
 function _hodIsRecordInWeek(p) {
     var dStr = p.billDate || p.createdAt;
     if (!dStr) return true;
+
+    if (typeof dStr === 'string' && dStr.length === 10) dStr = dStr + 'T00:00:00';
     var recDate = new Date(dStr);
     if (isNaN(recDate.getTime())) return true;
 
     var now = new Date();
+    var diffMs = now.getTime() - recDate.getTime();
+    var diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+    if (diffDays >= -1 && diffDays <= 7) return true;
+
     var day = now.getDay();
     var diffToMonday = now.getDate() - day + (day === 0 ? -6 : 1);
-    var startOfWeek = new Date(now.getFullYear(), now.getMonth(), diffToMonday);
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    var endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(endOfWeek.getDate() + 7);
-
-    return recDate >= startOfWeek && recDate < endOfWeek;
+    var startOfWeek = new Date(now.getFullYear(), now.getMonth(), diffToMonday, 0, 0, 0);
+    return recDate >= startOfWeek;
 }
 
 function _hodIsRecordInMonth(p) {
     var dStr = p.billDate || p.createdAt;
     if (!dStr) return true;
+    if (typeof dStr === 'string' && dStr.length === 10) dStr = dStr + 'T00:00:00';
     var recDate = new Date(dStr);
     if (isNaN(recDate.getTime())) return true;
 
     var now = new Date();
+    var diffMs = now.getTime() - recDate.getTime();
+    var diffDays = diffMs / (1000 * 60 * 60 * 24);
+    if (diffDays >= -1 && diffDays <= 31) return true;
+
     return recDate.getFullYear() === now.getFullYear() && recDate.getMonth() === now.getMonth();
+}
+
+function hodRestoreOldPurchases() {
+    _hodEnsureSamplePurchases();
+    if (typeof APP !== 'undefined' && APP.notify) APP.notify('All old purchase and expense data restored!', 'success');
+    var el = document.getElementById('hodTabContent');
+    if (el) _hodPurchases(el);
 }
 
 function hodSetPurchaseDateFilter(period) {
