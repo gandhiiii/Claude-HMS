@@ -1657,6 +1657,90 @@ function hodConfirmReceipt(id) {
 /* ═══════════════════════════════════════════════
    PURCHASES TAB — Daily Purchase & Expense Requests
 ═══════════════════════════════════════════════ */
+function _hodEnsureSamplePurchases() {
+    var records = DB.get('hodPurchases');
+    if (!records || records.length === 0) {
+        var samples = [
+            {
+                id: 'pur_101',
+                title: 'Facility Cleaning & Sanitization Supplies',
+                itemName: 'Floor Disinfectant (20L) & Microfiber Mops',
+                category: 'consumable',
+                quantity: 5,
+                price: 1200,
+                total: 6000,
+                location: 'General Store - Bay 2',
+                vendor: 'CleanCare Hospital Supplies',
+                description: 'Monthly housekeeping and surface disinfection stock for Facility department.',
+                department: 'Facility',
+                billDate: new Date(Date.now() - 86400000 * 2).toISOString().slice(0,10),
+                billNo: 'INV-2026-0841',
+                status: 'approved',
+                approvalType: 'none',
+                approvedBy: 'Facility HOD',
+                approvedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+                createdBy: 'facility_hod',
+                createdByName: 'Facility Manager',
+                createdAt: new Date(Date.now() - 86400000 * 2).toISOString()
+            },
+            {
+                id: 'pur_102',
+                title: 'AC Maintenance Spare Parts',
+                itemName: 'Compressor Filter & Refrigerant R410A (10kg)',
+                category: 'spare_parts',
+                quantity: 2,
+                price: 4500,
+                total: 9000,
+                location: 'Maintenance Workshop',
+                vendor: 'CoolTech HVAC Solutions',
+                description: 'Replacement parts for OT & ICU HVAC maintenance.',
+                department: 'Facility',
+                billDate: new Date(Date.now() - 86400000).toISOString().slice(0,10),
+                billNo: 'INV-2026-0912',
+                status: 'pending',
+                approvalType: 'MD',
+                createdBy: 'facility_hod',
+                createdByName: 'Facility Manager',
+                createdAt: new Date(Date.now() - 86400000).toISOString()
+            },
+            {
+                id: 'pur_103',
+                title: 'Emergency Generator Diesel Refill',
+                itemName: 'High Speed Diesel (200 Litres)',
+                category: 'consumable',
+                quantity: 200,
+                price: 95,
+                total: 19000,
+                location: 'Substation & Fuel Tank',
+                vendor: 'Indian Oil Retail Outlet',
+                description: 'Backup power generator fuel replenishment.',
+                department: 'Facility',
+                billDate: new Date().toISOString().slice(0,10),
+                billNo: 'INV-2026-1005',
+                status: 'approved',
+                approvalType: 'pre-approved',
+                preApprovedBy: 'Managing Director',
+                approvedBy: 'Managing Director',
+                approvedAt: new Date().toISOString(),
+                createdBy: 'facility_hod',
+                createdByName: 'Facility Manager',
+                createdAt: new Date().toISOString()
+            }
+        ];
+        DB.set('hodPurchases', samples);
+        return samples;
+    }
+    return records;
+}
+
+function hodFilterPurchaseTable() {
+    var query = (document.getElementById('hodPurchaseTableSearch')?.value || '').toLowerCase();
+    document.querySelectorAll('.hod-pur-row').forEach(function(tr) {
+        var s = tr.dataset.search || '';
+        tr.style.display = s.indexOf(query) !== -1 ? '' : 'none';
+    });
+}
+
 function _hodPurchases(el) {
     var user = AUTH.currentUser();
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
@@ -1666,16 +1750,19 @@ function _hodPurchases(el) {
         return;
     }
 
-    var allPurchases = DB.get('hodPurchases') || [];
+    var allPurchases = _hodEnsureSamplePurchases();
     var deptLow = dept.trim().toLowerCase();
-    var isFacOrAdmin = (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') || deptLow === 'facility';
+    var userDeptLow = (user.department || '').trim().toLowerCase();
+    var isFacOrAdmin = (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') || userDeptLow === 'facility' || deptLow === 'facility';
     var purchases = allPurchases.filter(function (p) {
         if (isFacOrAdmin) return true;
         return (p.department||'').trim().toLowerCase() === deptLow;
     }).slice().reverse();
+
     var pendingP = purchases.filter(function (p) { return p.status === 'pending'; });
     var approved = purchases.filter(function (p) { return p.status === 'approved'; });
     var rejected = purchases.filter(function (p) { return p.status === 'rejected'; });
+    var otherP    = purchases.filter(function (p) { return p.status !== 'pending' && p.status !== 'approved' && p.status !== 'rejected'; });
 
     var totalVal = purchases.reduce(function (s, p) { return s + (parseFloat(p.total) || 0); }, 0);
 
@@ -1690,14 +1777,14 @@ function _hodPurchases(el) {
         // Header
         + '<div style="background:linear-gradient(135deg,#1b5e20,#2e7d32);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
         + '<div><div style="font-size:18px;font-weight:700;">💰 Daily Purchases & Expenses — ' + dept + '</div>'
-        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + purchases.length + ' requests · ₹' + totalVal.toFixed(2) + ' total</div></div>'
+        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + purchases.length + ' records · ₹' + totalVal.toFixed(2) + ' total</div></div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodCreatePurchase()">+ New Purchase Request</button>'
         + '</div></div>'
 
         // KPI cards
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;">'
-        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#2e7d32;">' + purchases.length + '</div><div style="font-size:11px;color:var(--gray);">Total Requests</div></div>'
+        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#2e7d32;">' + purchases.length + '</div><div style="font-size:11px;color:var(--gray);">Total Records</div></div>'
         + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#e65100;">' + pendingP.length + '</div><div style="font-size:11px;color:var(--gray);">Pending</div></div>'
         + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#2e7d32;">' + approved.length + '</div><div style="font-size:11px;color:var(--gray);">Approved</div></div>'
         + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;"><div style="font-size:22px;font-weight:700;color:#c62828;">' + rejected.length + '</div><div style="font-size:11px;color:var(--gray);">Rejected</div></div>'
@@ -1707,16 +1794,13 @@ function _hodPurchases(el) {
     if (purchases.length === 0) {
         html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
             + '<div style="font-size:32px;margin-bottom:8px;">💰</div>'
-            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No purchase requests yet</div>'
+            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No purchase records yet</div>'
             + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Click "+ New Purchase Request" to submit one for approval.</div>'
             + '<button class="btn btn-primary" onclick="hodCreatePurchase()">+ New Purchase Request</button></div>';
     } else {
         // ── Daily Report Summary ──
         var todayStr = new Date().toISOString().slice(0,10);
         var todayPurchases = purchases.filter(function(p){ return p.createdAt && p.createdAt.slice(0,10) === todayStr; });
-        var todayPending = todayPurchases.filter(function(p){ return p.status === 'pending'; });
-        var todayApproved = todayPurchases.filter(function(p){ return p.status === 'approved'; });
-        var todayVal = todayPurchases.reduce(function(s,p){ return s + (parseFloat(p.total)||0); }, 0);
         var approvedVal = approved.reduce(function(s,p){ return s + (parseFloat(p.total)||0); }, 0);
         var pendingVal = pendingP.reduce(function(s,p){ return s + (parseFloat(p.total)||0); }, 0);
 
@@ -1727,11 +1811,60 @@ function _hodPurchases(el) {
             + '<button class="btn btn-sm" style="background:#1b5e20;color:#fff;border:none;padding:6px 14px;font-size:12px;" onclick="hodDownloadPurchasesReport()">📥 Download Report</button>'
             + '</div>'
             + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">'
-            + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:20px;font-weight:700;color:#2e7d32;">' + purchases.length + '</div><div style="font-size:11px;color:var(--gray);">All Time Requests</div></div>'
-            + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:20px;font-weight:700;color:#1565c0;">' + todayPurchases.length + '</div><div style="font-size:11px;color:var(--gray);">Today\'s Requests</div></div>'
+            + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:20px;font-weight:700;color:#2e7d32;">' + purchases.length + '</div><div style="font-size:11px;color:var(--gray);">All Time Records</div></div>'
+            + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:20px;font-weight:700;color:#1565c0;">' + todayPurchases.length + '</div><div style="font-size:11px;color:var(--gray);">Today\'s Records</div></div>'
             + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:20px;font-weight:700;color:#2e7d32;">₹' + approvedVal.toFixed(2) + '</div><div style="font-size:11px;color:var(--gray);">Approved Value</div></div>'
             + '<div style="background:#fff;border-radius:8px;padding:12px;text-align:center;border:1px solid #c8e6c9;"><div style="font-size:20px;font-weight:700;color:#e65100;">₹' + pendingVal.toFixed(2) + '</div><div style="font-size:11px;color:var(--gray);">Pending Value</div></div>'
             + '</div></div>';
+
+        // Table View of All Purchase Records
+        html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px;">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+            + '<div style="font-weight:700;font-size:15px;">📋 All Purchase & Expense Data Records (' + purchases.length + ')</div>'
+            + '<input type="text" class="form-control" id="hodPurchaseTableSearch" placeholder="🔍 Search records..." style="width:240px;font-size:12px;" oninput="hodFilterPurchaseTable()">'
+            + '</div>'
+            + '<div class="table-responsive"><table class="table" style="font-size:12px;"><thead><tr>'
+            + '<th>Date / Bill</th><th>Title / Item</th><th>Dept</th><th>Category</th><th>Qty</th><th>Price</th><th>Total</th><th>Status</th><th>Approval</th><th>Actions</th>'
+            + '</tr></thead><tbody id="hodPurchaseTableBody">';
+
+        purchases.forEach(function(p) {
+            var dateStr = p.billDate ? APP.formatDate(p.billDate) : APP.formatDate(p.createdAt);
+            var statusBadge = p.status === 'approved' ? '<span class="badge badge-success" style="font-size:10px;">✓ Approved</span>'
+                : p.status === 'rejected' ? '<span class="badge badge-danger" style="font-size:10px;">✗ Rejected</span>'
+                : '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>';
+            var approvalLabel = p.approvalType === 'none' ? 'Direct'
+                : p.approvalType === 'pre-approved' ? 'Pre-approved (' + (p.preApprovedBy || '') + ')'
+                : (p.approvalOther || p.approvalType || '—');
+            var isFac = user && user.role === 'hod' && (user.department || '').trim().toLowerCase() === 'facility';
+            var canManage = user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || isFac);
+            var canEdit = canManage || (user.role === 'hod');
+
+            html += '<tr class="hod-pur-row" data-search="' + (p.title + ' ' + p.itemName + ' ' + (p.vendor||'') + ' ' + (p.billNo||'') + ' ' + p.department).toLowerCase() + '">'
+                + '<td>' + dateStr + (p.billNo ? '<br><small style="color:var(--gray);">' + p.billNo + '</small>' : '') + '</td>'
+                + '<td><strong>' + (p.title || 'Purchase') + '</strong><br><small style="color:var(--gray);">' + (p.itemName || '—') + '</small></td>'
+                + '<td><span class="badge badge-info" style="font-size:10px;">' + (p.department || 'Facility') + '</span></td>'
+                + '<td>' + (p.category || '—') + '</td>'
+                + '<td>' + (p.quantity || 1) + '</td>'
+                + '<td>₹' + (parseFloat(p.price) || 0).toFixed(2) + '</td>'
+                + '<td><strong>₹' + (parseFloat(p.total) || 0).toFixed(2) + '</strong></td>'
+                + '<td>' + statusBadge + '</td>'
+                + '<td style="font-size:11px;">' + approvalLabel + '</td>'
+                + '<td><div style="display:flex;gap:4px;">'
+                + (canManage && p.status === 'pending'
+                    ? '<button class="btn btn-sm btn-success" style="padding:2px 6px;font-size:10px;" title="Approve" onclick="hodApprovePurchase(\'' + p.id + '\')">✓</button>'
+                      + '<button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:10px;" title="Reject" onclick="hodRejectPurchase(\'' + p.id + '\')">✗</button>'
+                    : '')
+                + (canEdit
+                    ? '<button class="btn btn-sm btn-outline" style="padding:2px 6px;font-size:10px;" title="Edit" onclick="hodEditPurchase(\'' + p.id + '\')">✎</button>'
+                    : '')
+                + (canEdit && p.status === 'pending'
+                    ? '<button class="btn btn-sm btn-outline" style="padding:2px 6px;font-size:10px;color:var(--danger);" title="Delete" onclick="hodDeletePurchase(\'' + p.id + '\')">🗑</button>'
+                    : '')
+                + '</div></td></tr>';
+        });
+
+        html += '</tbody></table></div></div>';
+
         // Pending section
         if (pendingP.length > 0) {
             html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px;">⏳ Pending Approval (' + pendingP.length + ')</div>';
@@ -1746,6 +1879,11 @@ function _hodPurchases(el) {
         if (rejected.length > 0) {
             html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px;">✗ Rejected (' + rejected.length + ')</div>';
             rejected.forEach(function (p) { html += _hodPurchaseCard(p, user); });
+        }
+        // Other section
+        if (otherP.length > 0) {
+            html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px;">📦 Other Purchase Records (' + otherP.length + ')</div>';
+            otherP.forEach(function (p) { html += _hodPurchaseCard(p, user); });
         }
     }
 
