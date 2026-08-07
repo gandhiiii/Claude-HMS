@@ -1766,6 +1766,8 @@ function _hodEnsureSamplePurchases() {
         var d2 = new Date(Date.now() - 86400000 * 2).toISOString().slice(0,10);
         var d3 = new Date(Date.now() - 86400000 * 3).toISOString().slice(0,10);
         var d4 = new Date(Date.now() - 86400000 * 4).toISOString().slice(0,10);
+        var d5 = new Date(Date.now() - 86400000 * 5).toISOString().slice(0,10);
+        var d6 = new Date(Date.now() - 86400000 * 6).toISOString().slice(0,10);
 
         var samples = [
             {
@@ -1792,12 +1794,17 @@ function _hodEnsureSamplePurchases() {
             },
             {
                 id: 'pur_102',
-                total: 9000,
+                title: 'OT & ICU Air Conditioner Servicing Spare Parts',
+                itemName: 'Compressor Filters & R410A Gas Cylinder',
+                category: 'spare_parts',
+                quantity: 3,
+                price: 3200,
+                total: 9600,
                 location: 'Maintenance Workshop',
-                vendor: 'CoolTech HVAC Solutions',
-                description: 'Replacement parts for OT & ICU HVAC maintenance.',
+                vendor: 'CoolTech HVAC Systems',
+                description: 'Urgent replacement parts for OT & ICU HVAC maintenance.',
                 department: 'Facility',
-                billDate: new Date(Date.now() - 86400000).toISOString().slice(0,10),
+                billDate: d1,
                 billNo: 'INV-2026-0912',
                 status: 'pending',
                 approvalType: 'MD',
@@ -1807,17 +1814,17 @@ function _hodEnsureSamplePurchases() {
             },
             {
                 id: 'pur_103',
-                title: 'Emergency Generator Diesel Refill',
-                itemName: 'High Speed Diesel (200 Litres)',
+                title: 'Emergency Fuel Tank Diesel Refill',
+                itemName: 'High Speed Diesel (300 Litres)',
                 category: 'consumable',
-                quantity: 200,
-                price: 95,
-                total: 19000,
-                location: 'Substation & Fuel Tank',
-                vendor: 'Indian Oil Retail Outlet',
-                description: 'Backup power generator fuel replenishment.',
+                quantity: 300,
+                price: 94,
+                total: 28200,
+                location: 'Main Substation Tank',
+                vendor: 'Indian Oil Retail Depot',
+                description: 'Weekly backup generator fuel replenishment.',
                 department: 'Facility',
-                billDate: new Date().toISOString().slice(0,10),
+                billDate: todayISO,
                 billNo: 'INV-2026-1005',
                 status: 'approved',
                 approvalType: 'pre-approved',
@@ -1827,6 +1834,87 @@ function _hodEnsureSamplePurchases() {
                 createdBy: 'facility_hod',
                 createdByName: 'Facility Manager',
                 createdAt: new Date().toISOString()
+            },
+            {
+                id: 'pur_104',
+                title: 'Plumbing & Water Line Replacement Valves',
+                itemName: 'Brass Gate Valves & PVC Connectors',
+                category: 'spare_parts',
+                quantity: 8,
+                price: 450,
+                total: 3600,
+                location: 'Facility Store Room',
+                vendor: 'Apex Hardware & Sanitary',
+                description: 'Plumbing repairs for 2nd Floor Ward washrooms.',
+                department: 'Facility',
+                billDate: d3,
+                billNo: 'INV-2026-0780',
+                status: 'approved',
+                approvalType: 'none',
+                createdBy: 'facility_hod',
+                createdByName: 'Facility Manager',
+                createdAt: new Date(Date.now() - 86400000 * 3).toISOString()
+            },
+            {
+                id: 'pur_105',
+                title: 'Staff Safety Gloves & Biohazard Bags',
+                itemName: 'Nitrile Gloves (10 Boxes) & Yellow Bags (100 Roll)',
+                category: 'consumable',
+                quantity: 10,
+                price: 650,
+                total: 6500,
+                location: 'Central Waste Station',
+                vendor: 'MedSafe Hygiene Products',
+                description: 'Weekly biomedical waste disposal consumables for Facility team.',
+                department: 'Facility',
+                billDate: d4,
+                billNo: 'INV-2026-0650',
+                status: 'approved',
+                approvalType: 'none',
+                createdBy: 'facility_hod',
+                createdByName: 'Facility Manager',
+                createdAt: new Date(Date.now() - 86400000 * 4).toISOString()
+            },
+            {
+                id: 'pur_106',
+                title: 'Electrical Substation Panel Spares & Switches',
+                itemName: 'Industrial MCB Breakers & Copper Lug Wire',
+                category: 'spare_parts',
+                quantity: 5,
+                price: 2900,
+                total: 14500,
+                location: 'Substation Electrical Room',
+                vendor: 'Siemens Authorized Distributor',
+                description: 'Monthly electrical panel preventive maintenance spares for Facility.',
+                department: 'Facility',
+                billDate: d5,
+                billNo: 'INV-2026-0512',
+                status: 'approved',
+                approvalType: 'pre-approved',
+                preApprovedBy: 'Facility HOD',
+                createdBy: 'facility_hod',
+                createdByName: 'Facility Manager',
+                createdAt: new Date(Date.now() - 86400000 * 5).toISOString()
+            },
+            {
+                id: 'pur_107',
+                title: 'Fire Safety Extinguishers Refill & Testing',
+                itemName: 'CO2 & ABC Powder Extinguisher Refills (15 Cylinders)',
+                category: 'service',
+                quantity: 15,
+                price: 746,
+                total: 11200,
+                location: 'All Hospital Floors',
+                vendor: 'SafeShield Fire Equipment Services',
+                description: 'Monthly fire safety equipment refill and hydrostatic test certificate.',
+                department: 'Facility',
+                billDate: d6,
+                billNo: 'INV-2026-0420',
+                status: 'approved',
+                approvalType: 'none',
+                createdBy: 'facility_hod',
+                createdByName: 'Facility Manager',
+                createdAt: new Date(Date.now() - 86400000 * 6).toISOString()
             }
         ];
         samples.forEach(addRecord);
@@ -1864,11 +1952,14 @@ function _hodIsRecordInMonth(p) {
     if (isNaN(recDate.getTime())) return true;
 
     var now = new Date();
+
+    // Check same calendar month and year
+    if (recDate.getFullYear() === now.getFullYear() && recDate.getMonth() === now.getMonth()) return true;
+
+    // Or within the past 45 days
     var diffMs = now.getTime() - recDate.getTime();
     var diffDays = diffMs / (1000 * 60 * 60 * 24);
-    if (diffDays >= -1 && diffDays <= 31) return true;
-
-    return recDate.getFullYear() === now.getFullYear() && recDate.getMonth() === now.getMonth();
+    return diffDays >= -1 && diffDays <= 45;
 }
 
 function hodRestoreOldPurchases() {

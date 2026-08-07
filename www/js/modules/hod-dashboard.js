@@ -1766,6 +1766,8 @@ function _hodEnsureSamplePurchases() {
         var d2 = new Date(Date.now() - 86400000 * 2).toISOString().slice(0,10);
         var d3 = new Date(Date.now() - 86400000 * 3).toISOString().slice(0,10);
         var d4 = new Date(Date.now() - 86400000 * 4).toISOString().slice(0,10);
+        var d5 = new Date(Date.now() - 86400000 * 5).toISOString().slice(0,10);
+        var d6 = new Date(Date.now() - 86400000 * 6).toISOString().slice(0,10);
 
         var samples = [
             {
@@ -1872,6 +1874,47 @@ function _hodEnsureSamplePurchases() {
                 createdBy: 'facility_hod',
                 createdByName: 'Facility Manager',
                 createdAt: new Date(Date.now() - 86400000 * 4).toISOString()
+            },
+            {
+                id: 'pur_106',
+                title: 'Electrical Substation Panel Spares & Switches',
+                itemName: 'Industrial MCB Breakers & Copper Lug Wire',
+                category: 'spare_parts',
+                quantity: 5,
+                price: 2900,
+                total: 14500,
+                location: 'Substation Electrical Room',
+                vendor: 'Siemens Authorized Distributor',
+                description: 'Monthly electrical panel preventive maintenance spares for Facility.',
+                department: 'Facility',
+                billDate: d5,
+                billNo: 'INV-2026-0512',
+                status: 'approved',
+                approvalType: 'pre-approved',
+                preApprovedBy: 'Facility HOD',
+                createdBy: 'facility_hod',
+                createdByName: 'Facility Manager',
+                createdAt: new Date(Date.now() - 86400000 * 5).toISOString()
+            },
+            {
+                id: 'pur_107',
+                title: 'Fire Safety Extinguishers Refill & Testing',
+                itemName: 'CO2 & ABC Powder Extinguisher Refills (15 Cylinders)',
+                category: 'service',
+                quantity: 15,
+                price: 746,
+                total: 11200,
+                location: 'All Hospital Floors',
+                vendor: 'SafeShield Fire Equipment Services',
+                description: 'Monthly fire safety equipment refill and hydrostatic test certificate.',
+                department: 'Facility',
+                billDate: d6,
+                billNo: 'INV-2026-0420',
+                status: 'approved',
+                approvalType: 'none',
+                createdBy: 'facility_hod',
+                createdByName: 'Facility Manager',
+                createdAt: new Date(Date.now() - 86400000 * 6).toISOString()
             }
         ];
         samples.forEach(addRecord);
