@@ -43,8 +43,10 @@ function _mdrRange() {
 }
 
 function _mdrInRange(ts) {
+    if (!ts) return true;
     var r = _mdrRange();
-    var t = ts ? new Date(ts).getTime() : 0;
+    var t = new Date(ts).getTime();
+    if (isNaN(t) || t === 0) return true;
     return t >= r.from && t <= r.to;
 }
 
