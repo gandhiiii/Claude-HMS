@@ -1761,20 +1761,26 @@ function _hodEnsureSamplePurchases() {
 
     // 3. Fallback sample data if completely empty
     if (merged.length === 0) {
+        var todayISO = new Date().toISOString().slice(0,10);
+        var d1 = new Date(Date.now() - 86400000).toISOString().slice(0,10);
+        var d2 = new Date(Date.now() - 86400000 * 2).toISOString().slice(0,10);
+        var d3 = new Date(Date.now() - 86400000 * 3).toISOString().slice(0,10);
+        var d4 = new Date(Date.now() - 86400000 * 4).toISOString().slice(0,10);
+
         var samples = [
             {
                 id: 'pur_101',
-                title: 'Facility Cleaning & Sanitization Supplies',
-                itemName: 'Floor Disinfectant (20L) & Microfiber Mops',
+                title: 'Facility Housekeeping & Disinfectants',
+                itemName: 'Floor Sanitizer (50L) & Dusting Cloths',
                 category: 'consumable',
-                quantity: 5,
-                price: 1200,
-                total: 6000,
-                location: 'General Store - Bay 2',
+                quantity: 10,
+                price: 850,
+                total: 8500,
+                location: 'General Store - Block A',
                 vendor: 'CleanCare Hospital Supplies',
-                description: 'Monthly housekeeping and surface disinfection stock for Facility department.',
+                description: 'Weekly cleaning chemicals and housekeeping stock for Facility.',
                 department: 'Facility',
-                billDate: new Date(Date.now() - 86400000 * 2).toISOString().slice(0,10),
+                billDate: d2,
                 billNo: 'INV-2026-0841',
                 status: 'approved',
                 approvalType: 'none',
@@ -1786,11 +1792,6 @@ function _hodEnsureSamplePurchases() {
             },
             {
                 id: 'pur_102',
-                title: 'AC Maintenance Spare Parts',
-                itemName: 'Compressor Filter & Refrigerant R410A (10kg)',
-                category: 'spare_parts',
-                quantity: 2,
-                price: 4500,
                 total: 9000,
                 location: 'Maintenance Workshop',
                 vendor: 'CoolTech HVAC Solutions',

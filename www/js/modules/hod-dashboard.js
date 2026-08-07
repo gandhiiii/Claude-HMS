@@ -1761,20 +1761,26 @@ function _hodEnsureSamplePurchases() {
 
     // 3. Fallback sample data if completely empty
     if (merged.length === 0) {
+        var todayISO = new Date().toISOString().slice(0,10);
+        var d1 = new Date(Date.now() - 86400000).toISOString().slice(0,10);
+        var d2 = new Date(Date.now() - 86400000 * 2).toISOString().slice(0,10);
+        var d3 = new Date(Date.now() - 86400000 * 3).toISOString().slice(0,10);
+        var d4 = new Date(Date.now() - 86400000 * 4).toISOString().slice(0,10);
+
         var samples = [
             {
                 id: 'pur_101',
-                title: 'Facility Cleaning & Sanitization Supplies',
-                itemName: 'Floor Disinfectant (20L) & Microfiber Mops',
+                title: 'Facility Housekeeping & Disinfectants',
+                itemName: 'Floor Sanitizer (50L) & Dusting Cloths',
                 category: 'consumable',
-                quantity: 5,
-                price: 1200,
-                total: 6000,
-                location: 'General Store - Bay 2',
+                quantity: 10,
+                price: 850,
+                total: 8500,
+                location: 'General Store - Block A',
                 vendor: 'CleanCare Hospital Supplies',
-                description: 'Monthly housekeeping and surface disinfection stock for Facility department.',
+                description: 'Weekly cleaning chemicals and housekeeping stock for Facility.',
                 department: 'Facility',
-                billDate: new Date(Date.now() - 86400000 * 2).toISOString().slice(0,10),
+                billDate: d2,
                 billNo: 'INV-2026-0841',
                 status: 'approved',
                 approvalType: 'none',
@@ -1786,17 +1792,17 @@ function _hodEnsureSamplePurchases() {
             },
             {
                 id: 'pur_102',
-                title: 'AC Maintenance Spare Parts',
-                itemName: 'Compressor Filter & Refrigerant R410A (10kg)',
+                title: 'OT & ICU Air Conditioner Servicing Spare Parts',
+                itemName: 'Compressor Filters & R410A Gas Cylinder',
                 category: 'spare_parts',
-                quantity: 2,
-                price: 4500,
-                total: 9000,
+                quantity: 3,
+                price: 3200,
+                total: 9600,
                 location: 'Maintenance Workshop',
-                vendor: 'CoolTech HVAC Solutions',
-                description: 'Replacement parts for OT & ICU HVAC maintenance.',
+                vendor: 'CoolTech HVAC Systems',
+                description: 'Urgent replacement parts for OT & ICU HVAC maintenance.',
                 department: 'Facility',
-                billDate: new Date(Date.now() - 86400000).toISOString().slice(0,10),
+                billDate: d1,
                 billNo: 'INV-2026-0912',
                 status: 'pending',
                 approvalType: 'MD',
@@ -1806,17 +1812,17 @@ function _hodEnsureSamplePurchases() {
             },
             {
                 id: 'pur_103',
-                title: 'Emergency Generator Diesel Refill',
-                itemName: 'High Speed Diesel (200 Litres)',
+                title: 'Emergency Fuel Tank Diesel Refill',
+                itemName: 'High Speed Diesel (300 Litres)',
                 category: 'consumable',
-                quantity: 200,
-                price: 95,
-                total: 19000,
-                location: 'Substation & Fuel Tank',
-                vendor: 'Indian Oil Retail Outlet',
-                description: 'Backup power generator fuel replenishment.',
+                quantity: 300,
+                price: 94,
+                total: 28200,
+                location: 'Main Substation Tank',
+                vendor: 'Indian Oil Retail Depot',
+                description: 'Weekly backup generator fuel replenishment.',
                 department: 'Facility',
-                billDate: new Date().toISOString().slice(0,10),
+                billDate: todayISO,
                 billNo: 'INV-2026-1005',
                 status: 'approved',
                 approvalType: 'pre-approved',
@@ -1826,6 +1832,46 @@ function _hodEnsureSamplePurchases() {
                 createdBy: 'facility_hod',
                 createdByName: 'Facility Manager',
                 createdAt: new Date().toISOString()
+            },
+            {
+                id: 'pur_104',
+                title: 'Plumbing & Water Line Replacement Valves',
+                itemName: 'Brass Gate Valves & PVC Connectors',
+                category: 'spare_parts',
+                quantity: 8,
+                price: 450,
+                total: 3600,
+                location: 'Facility Store Room',
+                vendor: 'Apex Hardware & Sanitary',
+                description: 'Plumbing repairs for 2nd Floor Ward washrooms.',
+                department: 'Facility',
+                billDate: d3,
+                billNo: 'INV-2026-0780',
+                status: 'approved',
+                approvalType: 'none',
+                createdBy: 'facility_hod',
+                createdByName: 'Facility Manager',
+                createdAt: new Date(Date.now() - 86400000 * 3).toISOString()
+            },
+            {
+                id: 'pur_105',
+                title: 'Staff Safety Gloves & Biohazard Bags',
+                itemName: 'Nitrile Gloves (10 Boxes) & Yellow Bags (100 Roll)',
+                category: 'consumable',
+                quantity: 10,
+                price: 650,
+                total: 6500,
+                location: 'Central Waste Station',
+                vendor: 'MedSafe Hygiene Products',
+                description: 'Weekly biomedical waste disposal consumables for Facility team.',
+                department: 'Facility',
+                billDate: d4,
+                billNo: 'INV-2026-0650',
+                status: 'approved',
+                approvalType: 'none',
+                createdBy: 'facility_hod',
+                createdByName: 'Facility Manager',
+                createdAt: new Date(Date.now() - 86400000 * 4).toISOString()
             }
         ];
         samples.forEach(addRecord);
@@ -1838,28 +1884,35 @@ function _hodEnsureSamplePurchases() {
 function _hodIsRecordInWeek(p) {
     var dStr = p.billDate || p.createdAt;
     if (!dStr) return true;
+
+    if (typeof dStr === 'string' && dStr.length === 10) dStr = dStr + 'T00:00:00';
     var recDate = new Date(dStr);
     if (isNaN(recDate.getTime())) return true;
 
     var now = new Date();
+    var diffMs = now.getTime() - recDate.getTime();
+    var diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+    if (diffDays >= -1 && diffDays <= 7) return true;
+
     var day = now.getDay();
     var diffToMonday = now.getDate() - day + (day === 0 ? -6 : 1);
-    var startOfWeek = new Date(now.getFullYear(), now.getMonth(), diffToMonday);
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    var endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(endOfWeek.getDate() + 7);
-
-    return recDate >= startOfWeek && recDate < endOfWeek;
+    var startOfWeek = new Date(now.getFullYear(), now.getMonth(), diffToMonday, 0, 0, 0);
+    return recDate >= startOfWeek;
 }
 
 function _hodIsRecordInMonth(p) {
     var dStr = p.billDate || p.createdAt;
     if (!dStr) return true;
+    if (typeof dStr === 'string' && dStr.length === 10) dStr = dStr + 'T00:00:00';
     var recDate = new Date(dStr);
     if (isNaN(recDate.getTime())) return true;
 
     var now = new Date();
+    var diffMs = now.getTime() - recDate.getTime();
+    var diffDays = diffMs / (1000 * 60 * 60 * 24);
+    if (diffDays >= -1 && diffDays <= 31) return true;
+
     return recDate.getFullYear() === now.getFullYear() && recDate.getMonth() === now.getMonth();
 }
 
