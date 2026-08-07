@@ -2075,18 +2075,28 @@ function hodToggleApprovalFields() {
     if (preWrap) preWrap.style.display = v === 'pre-approved' ? '' : 'none';
 }
 
+function _hodCategoryOptions(selected) {
+    var cats = [
+        { v: 'consumable',   l: 'Consumable' },
+        { v: 'spare_parts',  l: 'Spare Parts' },
+        { v: 'replacement',  l: 'Replacement' },
+        { v: 'service_cost', l: 'Service Cost' },
+        { v: 'other',        l: 'Other' }
+    ];
+    var html = '<option value="">Select category</option>';
+    cats.forEach(function (c) {
+        html += '<option value="' + c.v + '"' + (c.v === selected ? ' selected' : '') + '>' + c.l + '</option>';
+    });
+    return html;
+}
+
 function hodCreatePurchase() {
     var form = '<form id="hodPurchaseForm">'
         + '<div class="form-group"><label>Request Title *</label><input type="text" name="title" class="form-control" required placeholder="e.g. Purchase of cleaning supplies"></div>'
         + '<div class="form-group"><label>Item / Goods Name *</label><input type="text" name="itemName" class="form-control" required placeholder="e.g. Floor disinfectant 5L"></div>'
         + '<div class="form-group"><label>Category *</label>'
         + '<select name="category" class="form-control" required>'
-        + '<option value="">Select category</option>'
-        + '<option value="consumable">Consumable</option>'
-        + '<option value="new_purchase">New Purchase</option>'
-        + '<option value="replacement">Replacement</option>'
-        + '<option value="spare_parts">Spare Parts</option>'
-        + '<option value="other">Other</option>'
+        + _hodCategoryOptions('')
         + '</select></div>'
         + '<div class="grid-3" style="gap:10px;">'
         + '<div class="form-group"><label>Quantity</label><input type="number" name="quantity" class="form-control" min="1" value="1" oninput="hodPurchaseCalcTotal()"></div>'
@@ -2240,6 +2250,8 @@ function hodEditPurchase(id) {
     var form = '<form id="hodPurchaseEditForm">'
         + '<div class="form-group"><label>Request Title *</label><input type="text" name="title" class="form-control" required value="' + esc(p.title) + '"></div>'
         + '<div class="form-group"><label>Item / Goods Name *</label><input type="text" name="itemName" class="form-control" required value="' + esc(p.itemName) + '"></div>'
+        + '<div class="form-group"><label>Category *</label>'
+        + '<select name="category" class="form-control" required>' + _hodCategoryOptions(p.category) + '</select></div>'
         + '<div class="grid-3" style="gap:10px;">'
         + '<div class="form-group"><label>Quantity</label><input type="number" name="quantity" class="form-control" min="1" value="' + (p.quantity||1) + '" oninput="hodPurchaseCalcTotalEdit()"></div>'
         + '<div class="form-group"><label>Price per Unit (₹) *</label><input type="number" name="price" class="form-control" step="0.01" min="0" required value="' + (parseFloat(p.price)||0) + '" oninput="hodPurchaseCalcTotalEdit()"></div>'
@@ -2303,6 +2315,7 @@ function hodUpdatePurchase() {
     var upd = {
         title: data.title,
         itemName: data.itemName,
+        category: data.category,
         quantity: qty,
         price: price,
         total: qty * price,
