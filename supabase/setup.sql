@@ -40,6 +40,8 @@ alter table public.hms_live_pops enable row level security;
 
 drop policy if exists "hms_store_anon_access"     on public.hms_store;
 drop policy if exists "hms_live_pops_anon_access" on public.hms_live_pops;
+drop policy if exists "hms_store_auth_access"     on public.hms_store;
+drop policy if exists "hms_live_pops_auth_access" on public.hms_live_pops;
 
 create policy "hms_store_anon_access"
   on public.hms_store
