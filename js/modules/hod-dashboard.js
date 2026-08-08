@@ -268,15 +268,8 @@ function renderHodDashboard(container) {
     }
     var canLocker = true;
     if (canLocker) {
-        var _isAll = !_dlowU || _dlowU === 'all' || _dlowU === 'all departments';
-        tabs.push({ id: 'locker', label: '🔐 Locker', badge: (DB.get('hodLockers') || []).filter(function(x){
-            var xd = (x.department||'').trim().toLowerCase();
-            return (_isAll || canUniform || !xd || xd === _dlowU) && x.status === 'pending';
-        }).length, bc: 'badge-warning' });
-        tabs.push({ id: 'lockerreturn', label: '↩️ Locker Return', badge: (DB.get('hodLockers') || []).filter(function(x){
-            var xd = (x.department||'').trim().toLowerCase();
-            return (_isAll || canUniform || !xd || xd === _dlowU) && x.status === 'returned';
-        }).length, bc: 'badge-secondary' });
+        tabs.push({ id: 'locker', label: '🔐 Locker', badge: (DB.get('hodLockers') || []).filter(function(x){ return x && x.status === 'pending'; }).length, bc: 'badge-warning' });
+        tabs.push({ id: 'lockerreturn', label: '↩️ Locker Return', badge: (DB.get('hodLockers') || []).filter(function(x){ return x && x.status === 'returned'; }).length, bc: 'badge-secondary' });
     }
     var canHandover = (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') ||
         ['it', 'facility', 'maintenance'].indexOf(_dlowU) !== -1;
@@ -3453,22 +3446,16 @@ function hodDownloadUniformPdf() {
    LOCKER TAB — Locker allocation management
    ═══════════════════════════════════════════════ */
 function _filterHodLockers(user, dept, excludeStatus) {
-    var deptLow = (dept || '').trim().toLowerCase();
-    var isAllDept = !deptLow || deptLow === 'all' || deptLow === 'all departments';
-    var uDept = (user.department || '').trim().toLowerCase();
-    var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || user.role === 'hod';
-    var isFacility = uDept.indexOf('facility') !== -1 || uDept.indexOf('maintenance') !== -1 || uDept.indexOf('housekeeping') !== -1 || uDept.indexOf('admin') !== -1;
     var lockers = DB.get('hodLockers') || [];
-
     var selDept = (window._hodLockerDept || 'all').trim().toLowerCase();
 
     return lockers.filter(function(l) {
+        if (!l) return false;
         if (excludeStatus && l.status === excludeStatus) return false;
         if (selDept !== 'all' && selDept !== 'all departments') {
             return (l.department || '').trim().toLowerCase() === selDept;
         }
-        if (isAllDept || admin || isFacility) return true;
-        return (l.department || '').trim().toLowerCase() === deptLow || !l.department;
+        return true;
     });
 }
 
@@ -3483,6 +3470,8 @@ function _hodLocker(el) {
     var returned = rawAll.filter(function(l){ return l.status === 'returned'; });
 
     var totalCount = rawAll.length;
+
+    var depts = DB.get('departments') || [];
 
     var html = ''
 
@@ -3499,7 +3488,13 @@ function _hodLocker(el) {
         // Department name display & department selector
         + '<div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:13px;font-weight:600;">'
         + '<div>🏢 Context Department: <span style="color:#4527a0;">' + (dept || 'All') + '</span></div>'
-        + '</div>'
+        + '<div style="display:flex;align-items:center;gap:6px;">Filter Dept: <select class="form-control" style="font-size:12px;padding:3px 8px;width:auto;display:inline-block;" onchange="window._hodLockerDept=this.value;_renderHodTab(\'locker\')">'
+        + '<option value="all" ' + (!window._hodLockerDept || window._hodLockerDept === 'all' ? 'selected' : '') + '>All Departments</option>'
+        + depts.map(function(d){
+            var dName = typeof d === 'object' ? (d.name || '') : d;
+            return '<option value="' + String(dName).replace(/"/g,'&quot;') + '" ' + (window._hodLockerDept === dName ? 'selected' : '') + '>' + dName + '</option>';
+          }).join('')
+        + '</select></div></div>'
 
         // Locker graphic grid
         + '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px;">'
