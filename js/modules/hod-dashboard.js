@@ -6289,6 +6289,16 @@ var _HOD_SPECIAL_INV = {
 function _hodLinenInventory(el) { _hodSpecialInv(el, 'linen'); }
 function _hodHousekeepingInventory(el) { _hodSpecialInv(el, 'housekeeping'); }
 
+var _HOD_LINEN_SIZES = ['6-20', '8-20', '10-20', '12-20', '14-20', '16-20', '18-20', '22-10', '30-10', '34-10', 'Small', 'Medium', 'Large', 'XL', 'XXL', 'XXXL', 'XXXXL'];
+
+function _hodLinenSizeOptions(selected) {
+    var html = '<option value="">Select size</option>';
+    _HOD_LINEN_SIZES.forEach(function (s) {
+        html += '<option value="' + s + '"' + (s === selected ? ' selected' : '') + '>' + s + '</option>';
+    });
+    return html;
+}
+
 function _hodSpecialInv(el, type) {
     var user = AUTH.currentUser();
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
@@ -6346,23 +6356,31 @@ function _hodSpecialInv(el, type) {
         return;
     }
 
+    var linenCols = type === 'linen';
     html += '<div class="card"><div class="card-header"><h3>📋 Items</h3></div>'
-        + '<div class="table-responsive"><table><thead><tr><th>#</th><th>Item Name</th><th>Category</th><th>Qty</th><th>Unit</th><th>Price/Unit</th><th>Value</th><th>Supplier</th><th>Location</th><th>Expiry</th><th>Stock</th><th>Actions</th></tr></thead><tbody>'
+        + '<div class="table-responsive"><table><thead><tr><th>#</th><th>Item Name</th><th>Category</th>' + (linenCols ? '<th>Size</th>' : '') + '<th>Qty</th><th>Unit</th><th>Price/Unit</th><th>Value</th><th>Supplier</th><th>Location</th>' + (linenCols ? '<th>Purchase Date</th>' : '<th>Expiry</th>') + '<th>Stock</th><th>Actions</th></tr></thead><tbody>'
         + items.map(function (i, idx) {
             var ss = st(i);
             var es = exp(i);
             var expBadge = es ? '<span class="inv-badge" style="background:' + es.b + ';color:' + es.c + ';">' + es.l + '</span>' : '<span style="font-size:11px;color:var(--gray);">—</span>';
+            var sizeCell = linenCols
+                ? '<td>' + (i.size || '-') + '</td>'
+                : '';
+            var dateExpCell = linenCols
+                ? '<td>' + (i.purchaseDate ? APP.formatDate(i.purchaseDate) : '-') + '</td>'
+                : '<td>' + expBadge + '</td>';
             return '<tr>'
                 + '<td>' + (idx + 1) + '</td>'
                 + '<td><strong>' + (i.name || '-') + '</strong></td>'
                 + '<td>' + (i.category || '-') + '</td>'
+                + sizeCell
                 + '<td style="display:flex;align-items:center;gap:6px;"><button class="btn btn-xs" style="min-width:22px;padding:1px 6px;font-size:12px;line-height:1;" onclick="hodSpecialInvQty(\'' + type + '\',\'' + i.id + '\',-1)">−</button><strong>' + (parseFloat(i.quantity) || 0) + '</strong><button class="btn btn-xs" style="min-width:22px;padding:1px 6px;font-size:12px;line-height:1;" onclick="hodSpecialInvQty(\'' + type + '\',\'' + i.id + '\',1)">+</button></td>'
                 + '<td>' + (i.unit || 'pcs') + '</td>'
                 + '<td>₹' + (parseFloat(i.price) || 0).toFixed(2) + '</td>'
                 + '<td>₹' + ((parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0)).toFixed(2) + '</td>'
                 + '<td>' + (i.supplier || '-') + '</td>'
                 + '<td>' + (i.location || '-') + '</td>'
-                + '<td>' + expBadge + '</td>'
+                + dateExpCell
                 + '<td><span class="inv-badge" style="background:' + ss.b + ';color:' + ss.c + ';border:1px solid ' + ss.c + ';">' + ss.l + '</span></td>'
                 + '<td style="white-space:nowrap;">'
                 + '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--primary);border-color:var(--primary);padding:2px 8px;" onclick="hodSpecialInvEdit(\'' + type + '\',\'' + i.id + '\')">✎ Edit</button> '
@@ -6396,7 +6414,10 @@ function hodSpecialInvAdd(type) {
         + '<div class="form-group"><label>Supplier</label><input type="text" name="supplier" class="form-control" placeholder="e.g. Vendor name"></div>'
         + '</div>'
         + '<div class="grid-2" style="gap:10px;">'
-        + '<div class="form-group"><label>Expiry Date</label><input type="date" name="expiryDate" class="form-control"></div>'
+        + (type === 'linen'
+            ? '<div class="form-group"><label>Size</label><select name="size" class="form-control">' + _hodLinenSizeOptions('') + '</select></div>'
+            + '<div class="form-group"><label>Purchase Date</label><input type="date" name="purchaseDate" class="form-control"></div>'
+            : '<div class="form-group"><label>Expiry Date</label><input type="date" name="expiryDate" class="form-control"></div>')
         + '<div class="form-group"><label>Location</label><input type="text" name="location" class="form-control" placeholder="e.g. Store Room A"></div>'
         + '</div>'
         + '<div class="form-group"><label>Department</label><input type="text" name="department" class="form-control" value="' + dept.replace(/"/g, '&quot;') + '"></div>'
@@ -6412,14 +6433,17 @@ function hodSpecialInvSave() {
     if (!data.name) { APP.notify('Item name is required', 'error'); return false; }
     var cfg = _HOD_SPECIAL_INV[_hodSpecialInvType];
     if (!cfg) return false;
+    var isLinen = _hodSpecialInvType === 'linen';
     DB.add(cfg.store, {
         name: data.name.trim(),
         category: data.category || '',
+        size: isLinen ? (data.size || '') : undefined,
         quantity: parseInt(data.quantity) || 0,
         unit: data.unit || 'pcs',
         price: parseFloat(data.price) || 0,
         supplier: data.supplier || '',
-        expiryDate: data.expiryDate || '',
+        expiryDate: isLinen ? undefined : (data.expiryDate || ''),
+        purchaseDate: isLinen ? (data.purchaseDate || '') : undefined,
         location: data.location || '',
         department: data.department || user.department || 'Facility',
         notes: data.notes || '',
@@ -6452,7 +6476,10 @@ function hodSpecialInvEdit(type, id) {
         + '<div class="form-group"><label>Supplier</label><input type="text" name="supplier" class="form-control" value="' + esc(item.supplier) + '"></div>'
         + '</div>'
         + '<div class="grid-2" style="gap:10px;">'
-        + '<div class="form-group"><label>Expiry Date</label><input type="date" name="expiryDate" class="form-control" value="' + esc(item.expiryDate) + '"></div>'
+        + (type === 'linen'
+            ? '<div class="form-group"><label>Size</label><select name="size" class="form-control">' + _hodLinenSizeOptions(item.size || '') + '</select></div>'
+            + '<div class="form-group"><label>Purchase Date</label><input type="date" name="purchaseDate" class="form-control" value="' + esc(item.purchaseDate) + '"></div>'
+            : '<div class="form-group"><label>Expiry Date</label><input type="date" name="expiryDate" class="form-control" value="' + esc(item.expiryDate) + '"></div>')
         + '<div class="form-group"><label>Location</label><input type="text" name="location" class="form-control" value="' + esc(item.location) + '"></div>'
         + '</div>'
         + '<div class="form-group"><label>Department</label><input type="text" name="department" class="form-control" value="' + esc(item.department) + '"></div>'
@@ -6470,14 +6497,17 @@ function hodSpecialInvUpdate() {
     if (!cfg) return false;
     var data = getFormData('hodSpecialInvForm');
     if (!data.name) { APP.notify('Item name is required', 'error'); return false; }
+    var isLinen = _hodSpecialInvType === 'linen';
     DB.update(cfg.store, id, {
         name: data.name.trim(),
         category: data.category || '',
+        size: isLinen ? (data.size || '') : undefined,
         quantity: parseInt(data.quantity) || 0,
         unit: data.unit || 'pcs',
         price: parseFloat(data.price) || 0,
         supplier: data.supplier || '',
-        expiryDate: data.expiryDate || '',
+        expiryDate: isLinen ? undefined : (data.expiryDate || ''),
+        purchaseDate: isLinen ? (data.purchaseDate || '') : undefined,
         location: data.location || '',
         department: data.department || user.department || 'Facility',
         notes: data.notes || '',
@@ -6538,8 +6568,14 @@ function hodSpecialInvExcel(type) {
     var items = _hodSpecialInvData(type);
     if (items.length === 0) { APP.notify('No ' + cfg.title + ' data to download', 'info'); return; }
     if (typeof XLSX === 'undefined') { APP.notify('Excel library not loaded', 'error'); return; }
-    var headers = ['#', 'Item Name', 'Category', 'Quantity', 'Unit', 'Price/Unit', 'Total Value', 'Supplier', 'Location', 'Expiry Date', 'Notes'];
+    var isLinen = type === 'linen';
+    var headers = isLinen
+        ? ['#', 'Item Name', 'Category', 'Size', 'Quantity', 'Unit', 'Price/Unit', 'Total Value', 'Supplier', 'Location', 'Purchase Date', 'Notes']
+        : ['#', 'Item Name', 'Category', 'Quantity', 'Unit', 'Price/Unit', 'Total Value', 'Supplier', 'Location', 'Expiry Date', 'Notes'];
     var rows = items.map(function (i, idx) {
+        if (isLinen) {
+            return [idx + 1, i.name || '-', i.category || '-', i.size || '-', parseFloat(i.quantity) || 0, i.unit || 'pcs', (parseFloat(i.price) || 0).toFixed(2), ((parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0)).toFixed(2), i.supplier || '-', i.location || '-', i.purchaseDate ? APP.formatDate(i.purchaseDate) : '-', i.notes || ''];
+        }
         return [idx + 1, i.name || '-', i.category || '-', parseFloat(i.quantity) || 0, i.unit || 'pcs', (parseFloat(i.price) || 0).toFixed(2), ((parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0)).toFixed(2), i.supplier || '-', i.location || '-', i.expiryDate ? APP.formatDate(i.expiryDate) : '-', i.notes || ''];
     });
     var wb = XLSX.utils.book_new();
@@ -6558,8 +6594,14 @@ function hodSpecialInvPdf(type) {
     var cfg = _HOD_SPECIAL_INV[type];
     var items = _hodSpecialInvData(type);
     if (items.length === 0) { APP.notify('No ' + cfg.title + ' data to download', 'info'); return; }
-    var headers = ['#', 'Item Name', 'Category', 'Quantity', 'Unit', 'Price/Unit', 'Total Value', 'Supplier', 'Location'];
+    var isLinen = type === 'linen';
+    var headers = isLinen
+        ? ['#', 'Item Name', 'Category', 'Size', 'Quantity', 'Unit', 'Price/Unit', 'Total Value', 'Supplier', 'Location', 'Purchase Date']
+        : ['#', 'Item Name', 'Category', 'Quantity', 'Unit', 'Price/Unit', 'Total Value', 'Supplier', 'Location'];
     var rows = items.map(function (i, idx) {
+        if (isLinen) {
+            return [idx + 1, i.name || '-', i.category || '-', i.size || '-', parseFloat(i.quantity) || 0, i.unit || 'pcs', '₹' + (parseFloat(i.price) || 0).toFixed(2), '₹' + ((parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0)).toFixed(2), i.supplier || '-', i.location || '-', i.purchaseDate ? APP.formatDate(i.purchaseDate) : '-'];
+        }
         return [idx + 1, i.name || '-', i.category || '-', parseFloat(i.quantity) || 0, i.unit || 'pcs', '₹' + (parseFloat(i.price) || 0).toFixed(2), '₹' + ((parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0)).toFixed(2), i.supplier || '-', i.location || '-'];
     });
     _hodPdfExport(cfg.title + ' Report', headers, rows);
