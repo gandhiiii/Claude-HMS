@@ -15,9 +15,12 @@
 -- ============================================================
 
 -- ---------- main data store ----------
+-- note: the app reads/writes this table via supabase-js as
+-- { key, data } (see js/sync.js: hms_store.upsert({key, data})),
+-- so the payload column is named "data", not "payload".
 create table if not exists public.hms_store (
   key        text primary key,
-  payload    jsonb not null,
+  data       jsonb not null,
   updated_at timestamptz not null default now()
 );
 
