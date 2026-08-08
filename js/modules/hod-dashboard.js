@@ -3485,7 +3485,6 @@ function _hodLocker(el) {
         + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + all.length + ' records · ' + pending.length + ' pending · ' + allocated.length + ' allocated</div></div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-sm" style="background:#fff;color:#4527a0;border:none;padding:6px 14px;font-size:12px;font-weight:600;" onclick="hodAddLocker()">+ New Locker Entry</button>'
-        + '<button class="btn btn-sm" style="background:#f59e0b;color:#fff;border:none;padding:6px 14px;font-size:12px;font-weight:600;" onclick="hodLoadThisWeekLockers()">📅 Load This Week\'s Data</button>'
         + '<button class="btn btn-sm" style="background:#1b5e20;color:#fff;border:none;padding:6px 14px;font-size:12px;" onclick="hodDownloadLockerReport()">📥 Excel</button>'
         + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadLockerPdf()">📕 PDF</button>'
         + '</div></div>'
@@ -3830,15 +3829,6 @@ function hodDeleteLocker(id) {
 }
 
 /* Download Locker Report as Excel */
-function hodLoadThisWeekLockers() {
-    confirmAction('Reset and populate locker data for this week?', function() {
-        var lockers = DB.generateThisWeekLockers ? DB.generateThisWeekLockers() : [];
-        DB.set('hodLockers', lockers);
-        APP.notify('This week\'s locker data updated!', 'success');
-        _renderHodTab('locker');
-    });
-}
-
 function hodDownloadLockerReport() {
     var user = AUTH.currentUser();
     if (!user) return;
