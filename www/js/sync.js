@@ -197,6 +197,11 @@ var SYNC = (function () {
 
             if (cb) cb();
         }).catch(function (e) {
+            if (window.isSupabaseSchemaMissing && window.isSupabaseSchemaMissing(e)) {
+                console.warn('[HMS] Supabase tables missing — run supabase/setup.sql in the Supabase SQL Editor.');
+                if (cb) cb();
+                return;
+            }
             console.warn('[HMS] Supabase pull error:', (e && e.message) || e);
             if (cb) cb();
         });

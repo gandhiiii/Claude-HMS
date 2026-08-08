@@ -71,6 +71,26 @@ var SUPABASE_CONFIG = {
     }
 })();
 
+// ═══════════════════════════════════════════════════════════════════
+// Supabase error helpers
+// ═══════════════════════════════════════════════════════════════════
+// Returns true when the error is the classic "table not created yet" /
+// "schema cache" PostgREST error, so the app can show a setup hint
+// instead of raw SQL jargon.
+window.isSupabaseSchemaMissing = function (err) {
+    if (!err) return false;
+    var m = (err.message || '').toLowerCase();
+    var c = (err.code || '');
+    return m.indexOf('could not find the table') !== -1
+        || m.indexOf('schema cache') !== -1
+        || m.indexOf('relationship') !== -1 && m.indexOf('between') !== -1
+        || c === 'PGRST205'
+        || c === '42P01';
+};
+
+// Friendly setup hint used when the schema/tables have not been created yet.
+window.SB_SETUP_HINT = 'Cloud database is not set up yet. Run supabase/setup.sql in the Supabase Dashboard (SQL Editor) — see the README/instructions.';
+
 // ── WebSocket Notification Server URL ───────────────────────────────
 // Dynamically resolves to current host IP/hostname when accessed over LAN/WAN
 (function () {
