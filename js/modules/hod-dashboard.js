@@ -3455,12 +3455,18 @@ function hodDownloadUniformPdf() {
 function _filterHodLockers(user, dept, excludeStatus) {
     var deptLow = (dept || '').trim().toLowerCase();
     var isAllDept = !deptLow || deptLow === 'all' || deptLow === 'all departments';
-    var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
-    var isFacility = (user.department || '').trim().toLowerCase() === 'facility';
+    var uDept = (user.department || '').trim().toLowerCase();
+    var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || user.role === 'hod';
+    var isFacility = uDept.indexOf('facility') !== -1 || uDept.indexOf('maintenance') !== -1 || uDept.indexOf('housekeeping') !== -1 || uDept.indexOf('admin') !== -1;
     var lockers = DB.get('hodLockers') || [];
+
+    var selDept = (window._hodLockerDept || 'all').trim().toLowerCase();
 
     return lockers.filter(function(l) {
         if (excludeStatus && l.status === excludeStatus) return false;
+        if (selDept !== 'all' && selDept !== 'all departments') {
+            return (l.department || '').trim().toLowerCase() === selDept;
+        }
         if (isAllDept || admin || isFacility) return true;
         return (l.department || '').trim().toLowerCase() === deptLow || !l.department;
     });
@@ -3470,53 +3476,58 @@ function _hodLocker(el) {
     var user = AUTH.currentUser();
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = window._hodActiveDept || user.department || '';
-    var all = _filterHodLockers(user, dept, 'returned');
-    var pending = all.filter(function(l){ return l.status === 'pending'; });
-    var allocated = all.filter(function(l){ return l.status === 'allocated'; });
-    var returned = all.filter(function(l){ return l.status === 'returned'; });
 
-    var totalCount = all.length;
+    var rawAll = _filterHodLockers(user, dept);
+    var pending = rawAll.filter(function(l){ return l.status === 'pending'; });
+    var allocated = rawAll.filter(function(l){ return l.status === 'allocated'; });
+    var returned = rawAll.filter(function(l){ return l.status === 'returned'; });
+
+    var totalCount = rawAll.length;
 
     var html = ''
 
         // Header
         + '<div style="background:linear-gradient(135deg,#4527a0,#311b92);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
         + '<div><div style="font-size:18px;font-weight:700;">🔐 Locker Allocation Management</div>'
-        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + all.length + ' records · ' + pending.length + ' pending · ' + allocated.length + ' allocated</div></div>'
+        + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + totalCount + ' total records · ' + pending.length + ' pending · ' + allocated.length + ' allocated · ' + returned.length + ' returned</div></div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
         + '<button class="btn btn-sm" style="background:#fff;color:#4527a0;border:none;padding:6px 14px;font-size:12px;font-weight:600;" onclick="hodAddLocker()">+ New Locker Entry</button>'
         + '<button class="btn btn-sm" style="background:#1b5e20;color:#fff;border:none;padding:6px 14px;font-size:12px;" onclick="hodDownloadLockerReport()">📥 Excel</button>'
         + '<button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 14px;font-size:12px;" onclick="hodDownloadLockerPdf()">📕 PDF</button>'
         + '</div></div>'
 
-        // Department name display
-        + '<div style="margin-bottom:10px;font-size:13px;font-weight:600;">🏢 Department: <span style="color:#4527a0;">' + (dept || '-') + '</span></div>'
+        // Department name display & department selector
+        + '<div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:13px;font-weight:600;">'
+        + '<div>🏢 Context Department: <span style="color:#4527a0;">' + (dept || 'All') + '</span></div>'
+        + '</div>'
 
         // Locker graphic grid
         + '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px;">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
         + '<div style="font-weight:700;font-size:15px;">🗄️ Locker Grid</div>'
-        + '<span style="font-size:11px;color:var(--gray);">' + _hodLockerGridCount(all) + ' locker(s) mapped</span>'
+        + '<span style="font-size:11px;color:var(--gray);">' + _hodLockerGridCount(rawAll) + ' locker(s) mapped</span>'
         + '</div>'
-        + _hodLockerGrid(all, user)
+        + _hodLockerGrid(rawAll, user)
         + '</div>'
 
         // Filter buttons
         + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;">'
-        + '<button class="tab-btn' + (_hodLockerFilter==='all'?' active':'') + '" onclick="_hodLockerFilter=\'all\';_renderHodTab(\'locker\')">All (' + all.length + ')</button>'
+        + '<button class="tab-btn' + (_hodLockerFilter==='all'?' active':'') + '" onclick="_hodLockerFilter=\'all\';_renderHodTab(\'locker\')">All (' + rawAll.length + ')</button>'
         + '<button class="tab-btn' + (_hodLockerFilter==='pending'?' active':'') + '" onclick="_hodLockerFilter=\'pending\';_renderHodTab(\'locker\')">⏳ Pending (' + pending.length + ')</button>'
         + '<button class="tab-btn' + (_hodLockerFilter==='allocated'?' active':'') + '" onclick="_hodLockerFilter=\'allocated\';_renderHodTab(\'locker\')">✓ Allocated (' + allocated.length + ')</button>'
+        + '<button class="tab-btn' + (_hodLockerFilter==='returned'?' active':'') + '" onclick="_hodLockerFilter=\'returned\';_renderHodTab(\'locker\')">↩️ Returned (' + returned.length + ')</button>'
         + '</div>';
 
     var shown = [];
     if (_hodLockerFilter === 'pending') shown = pending;
     else if (_hodLockerFilter === 'allocated') shown = allocated;
-    else shown = all;
+    else if (_hodLockerFilter === 'returned') shown = returned;
+    else shown = rawAll;
 
     if (shown.length === 0) {
         html += '<div style="background:var(--light-gray);border-radius:10px;padding:32px;text-align:center;">'
             + '<div style="font-size:32px;margin-bottom:8px;">🔐</div>'
-            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No locker records</div>'
+            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px;">No locker records found</div>'
             + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Click "+ New Locker Entry" to add locker allocation details.</div>'
             + '<button class="btn btn-primary" onclick="hodAddLocker()">+ New Locker Entry</button></div>';
     } else {
@@ -3525,11 +3536,14 @@ function _hodLocker(el) {
             + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#4527a0;">' + totalCount + '</div><div style="font-size:11px;color:var(--gray);">Total</div></div>'
             + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#e65100;">' + pending.length + '</div><div style="font-size:11px;color:var(--gray);">Pending</div></div>'
             + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#2e7d32;">' + allocated.length + '</div><div style="font-size:11px;color:var(--gray);">Allocated</div></div>'
+            + '<div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:#6a1b9a;">' + returned.length + '</div><div style="font-size:11px;color:var(--gray);">Returned</div></div>'
             + '</div>';
 
         // Section headers
         var pendShown = shown.filter(function(l){ return l.status === 'pending'; });
         var allocShown = shown.filter(function(l){ return l.status === 'allocated'; });
+        var retShown = shown.filter(function(l){ return l.status === 'returned'; });
+
         if (pendShown.length > 0) {
             html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">⏳ Pending (' + pendShown.length + ')</div>';
             pendShown.forEach(function(l){ html += _hodLockerCard(l, user); });
@@ -3537,6 +3551,10 @@ function _hodLocker(el) {
         if (allocShown.length > 0) {
             html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">✓ Allocated (' + allocShown.length + ')</div>';
             allocShown.forEach(function(l){ html += _hodLockerCard(l, user); });
+        }
+        if (retShown.length > 0) {
+            html += '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin:12px 0 8px;">↩️ Returned (' + retShown.length + ')</div>';
+            retShown.forEach(function(l){ html += _hodLockerCard(l, user); });
         }
     }
 
