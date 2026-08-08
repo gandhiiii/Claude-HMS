@@ -102,8 +102,11 @@
 
     <script src="js/data.js?v=156"></script>
     <script src="js/supabase-config.js?v=1"></script>
+    <script src="js/sync.js?v=4"></script>
     <script>
-        // ── Import via QR / shared link: index.html#import=BASE64 ──
+        // ── Start sync early so DB.set hooks are installed before any
+        // ── setup/import writes happen (first admin uploads to cloud) ──
+        try { SYNC.init(); } catch(e) {}
         (function () {
             try {
                 var m = window.location.hash.match(/[#&]import=([A-Za-z0-9+\/=%]+)/);
