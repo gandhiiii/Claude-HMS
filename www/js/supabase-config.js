@@ -108,7 +108,7 @@ window.SB_SETUP_HINT = 'Cloud database is not set up yet. Run supabase/setup.sql
 //           NOT in this repo.
 window.HMS_PUSH_CONFIG = {
     vapidPublicKey: "BA1kZgG9Rbo/CIkAC5wPTxTjg+D/utXfuwoH+ZD9spnqw0wHH6iXvrSnXfUhqenwGpEDncqzFujfyQtJ+dM2gm8=",
-    relayUrl: null // e.g. https://hpjexrelsmdjkjgohele.supabase.co/functions/v1/push-relay
+    relayUrl: "https://hpjexrelsmdjkjgohele.supabase.co/functions/v1/push-relay"
 };
 
 // Convert a base64url VAPID public key to a Uint8Array for PushManager.

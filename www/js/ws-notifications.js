@@ -686,6 +686,12 @@ var WS_NOTIFY = (function () {
             ? '<span style="color:#34A853;font-size:10px;font-weight:600;" title="Notifications run even when app is closed">⚡ BG Worker Active</span>'
             : '<span style="color:#1a73e8;font-size:10px;font-weight:600;" title="Tap to enable background notifications">⚡ BG Ready</span>';
 
+        var pushStatus = _pushReady
+            ? '<span style="color:#34A853;font-size:10px;font-weight:600;">📲 Push Subscribed</span>'
+            : (window.HMS_PUSH_CONFIG && window.HMS_PUSH_CONFIG.vapidPublicKey)
+                ? '<span style="color:#888;font-size:10px;font-weight:600;" title="Allow notifications on first use, then reload">📲 Push Pending</span>'
+                : '<span style="color:#888;font-size:10px;font-weight:600;">📲 Push Off</span>';
+
         var items = _notifications.length === 0
             ? '<div style="padding:32px 16px;text-align:center;color:#888;font-size:13px;">No notifications yet</div>'
             : _notifications.map(function (n) {
@@ -706,8 +712,15 @@ var WS_NOTIFY = (function () {
           +   '</div>'
           +   '<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">'
           +     '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + sbStatus + ' ' + wsStatus + ' ' + swStatus + '</div>'
-          +     '<button onclick="WS_NOTIFY.testPop()" style="border:1px solid #c2d7f8;background:#e8f0fe;color:#1a73e8;cursor:pointer;font-size:10px;font-weight:600;padding:2px 8px;border-radius:12px;">Test Pop 🚀</button>'
           +   '</div>'
+          +   '<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">'
+          +     '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + pushStatus + '</div>'
+          +     '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+          +       '<button onclick="WS_NOTIFY.testPop()" style="border:1px solid #c2d7f8;background:#e8f0fe;color:#1a73e8;cursor:pointer;font-size:10px;font-weight:600;padding:2px 8px;border-radius:12px;">Pop 🚀</button>'
+          +       '<button id="wsTestBgPushBtn" onclick="WS_NOTIFY.testBackgroundPush()" style="border:1px solid #c2d7f8;background:#e8f0fe;color:#1a73e8;cursor:pointer;font-size:10px;font-weight:600;padding:2px 8px;border-radius:12px;">BG Push 📲</button>'
+          +     '</div>'
+          +   '</div>'
+          +   '<div id="wsBgPushResult" style="margin-top:6px;font-size:10px;color:#1a73e8;display:none;"></div>'
           + '</div>'
           + items;
 
@@ -855,8 +868,7 @@ var WS_NOTIFY = (function () {
             }
         },
 
-        testPop: function () {
-            var user = _getUser();
+        testPop: function () {            var user = _getUser();
             var senderName = user ? (user.fullName || user.username) : 'User';
             var title = '🔔 Test Background Pop Notification';
             var body = 'Real-time background pop notification triggered by ' + senderName;
@@ -880,6 +892,72 @@ var WS_NOTIFY = (function () {
 
             // Broadcast to all other devices over Supabase Realtime Database
             _broadcastSupabase(title, body, 'info');
+        },
+
+        /* Send a real background Web Push through the push-relay Edge Function
+           so the tester can verify subscription → relay → phone/desktop OS banner.
+           Sends to ALL subscribed devices (including this one) with no senderId
+           exclusion, so it doubles as a full-stack test. */
+        testBackgroundPush: function () {
+            var resultEl = document.getElementById('wsBgPushResult');
+            function show(text, color) {
+                if (!resultEl) return;
+                resultEl.textContent = text;
+                resultEl.style.color = color || '#1a73e8';
+                resultEl.style.display = 'block';
+            }
+            function ensureVisible() {
+                var p = document.getElementById('wsNotifPanel');
+                if (p) p.style.display = 'block';
+            }
+
+            if (!window.HMS_PUSH_CONFIG || !window.HMS_PUSH_CONFIG.relayUrl) {
+                show('Relay URL not configured.', 'var(--danger)');
+                return;
+            }
+            if (!('Notification' in window) || Notification.permission !== 'granted') {
+                show('Allow notifications first, then reload and try again.', 'var(--danger)');
+                try {
+                    Notification.requestPermission().then(function (perm) {
+                        if (perm === 'granted') { _registerPush(); show('Permission granted — press BG Push again after reload.', '#34A853'); }
+                        else show('Permission denied.', 'var(--danger)');
+                    });
+                } catch (e) {}
+                return;
+            }
+            if (!_pushReady) {
+                _registerPush();
+                show('Subscribing push… press BG Push again in a few seconds.', 'var(--danger)');
+                return;
+            }
+
+            ensureVisible();
+            show('Sending background push…', '#1a73e8');
+
+            var user = _getUser();
+            var senderName = user ? (user.fullName || user.username) : 'User';
+
+            fetch(window.HMS_PUSH_CONFIG.relayUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: '🔔 Background Push Test',
+                    body: 'This is a real Web Push from ' + senderName + '. If you are seeing this with the app closed — background notifications work! 🎉',
+                    notifType: 'success',
+                    key: null,
+                    senderId: null,        // no exclusion → this device gets it too
+                    timestamp: Date.now()
+                })
+            }).then(function (res) { return res.json().catch(function(){ return {}; }).then(function (j) { return { status: res.status, json: j }; }); })
+              .then(function (r) {
+                if (r.status === 200 && r.json && r.json.ok) {
+                    show('Sent ✓ web=' + (r.json.webSent || 0) + ' android=' + (r.json.fcmSent || 0) + ' — check your OS notification.', '#34A853');
+                } else {
+                    show('Relay error ' + r.status + ': ' + (r.json.error || 'see console').slice(0, 120), 'var(--danger)');
+                }
+            }).catch(function (e) {
+                show('Send failed: ' + (e.message || e), 'var(--danger)');
+            });
         },
 
         handleItemClick: function (key) {
@@ -906,7 +984,9 @@ var WS_NOTIFY = (function () {
                 wsConnected: _wsConnected,
                 wsUrl: _wsUrl,
                 sbConnected: !!window.SB_DB,
-                swActive: !!_swReg
+                swActive: !!_swReg,
+                pushReady: _pushReady,
+                fcmToken: !!_fcmToken
             };
         },
 

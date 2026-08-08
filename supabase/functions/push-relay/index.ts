@@ -140,16 +140,27 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 });
 
-/** Supabase Database Webhook body → the live_pop payload object */
+/** Accept both Supabase Database Webhook envelopes and direct client calls. */
 function parseHookPayload(hookBody: any): any {
   try {
-    const record = hookBody?.record ?? hookBody?.new ?? null;
-    if (!record) return null;
-    let p = record.payload ?? record;
-    if (typeof p === "string") {
-      try { p = JSON.parse(p); } catch (e) { return null; }
+    // Webhook: { type, table, record: { payload } } or { new: {...} }
+    if (hookBody && (hookBody.record || hookBody.new)) {
+      const record = hookBody.record ?? hookBody.new;
+      let p = record?.payload ?? record;
+      if (typeof p === "string") {
+        try { p = JSON.parse(p); } catch (e) { return null; }
+      }
+      return p || null;
     }
-    return p || null;
+    // Direct call: the body itself is the payload { title, body, ... }
+    if (hookBody && (hookBody.title || hookBody.payload)) {
+      let p = hookBody.payload ?? hookBody;
+      if (typeof p === "string") {
+        try { p = JSON.parse(p); } catch (e) { return null; }
+      }
+      return p || null;
+    }
+    return null;
   } catch {
     return null;
   }
