@@ -60,7 +60,16 @@ self.addEventListener('push', function (event) {
     };
 
     event.waitUntil(
-        self.registration.showNotification(title, options)
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (clientList) {
+            // If the app is open AND focused right now, the foreground page
+            // already shows an in-app pop card — skip the OS notification so
+            // the user isn't doubled up.
+            var visible = clientList.some(function (c) {
+                return c.visibilityState === 'visible' && c.focused === true;
+            });
+            if (visible) return;
+            return self.registration.showNotification(title, options);
+        })
     );
 });
 

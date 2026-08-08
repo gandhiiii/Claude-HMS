@@ -73,6 +73,46 @@ create policy "hms_live_pops_auth_access"
   using (true)
   with check (true);
 
+-- ---------- push notification subscriptions ----------
+-- One row per browser/desktop/mobile push subscription. The app
+-- registers each device here (client uses ws-notifications.js); the
+-- Supabase Database Webhook on hms_live_pops INSERT calls the
+-- push-relay Edge Function, which reads this table and sends
+-- Web Push / FCM so notifications arrive even when the app is
+-- closed (background/phone/desktop).
+create table if not exists public.hms_push_subs (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    text not null,
+  platform   text not null default 'web',   -- web | android | desktop
+  endpoint   text,
+  p256dh     text,
+  auth       text,
+  fcm_token  text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint hms_push_subs_endpoint_key unique (endpoint),
+  constraint hms_push_subs_fcm_key     unique (fcm_token)
+);
+
+alter table public.hms_push_subs enable row level security;
+
+drop policy if exists "hms_push_subs_anon_access" on public.hms_push_subs;
+drop policy if exists "hms_push_subs_auth_access" on public.hms_push_subs;
+
+create policy "hms_push_subs_anon_access"
+  on public.hms_push_subs
+  for all
+  to anon
+  using (true)
+  with check (true);
+
+create policy "hms_push_subs_auth_access"
+  on public.hms_push_subs
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
 -- ---------- realtime publication ----------
 alter table public.hms_store     replica identity full;
 alter table public.hms_live_pops replica identity full;

@@ -29,6 +29,9 @@ var WS_NOTIFY = (function () {
     var _sbInited      = false;
     var _sbChannel     = null;
     var _swReg         = null; // ServiceWorkerRegistration instance
+    var _pushSub       = null; // PushSubscription (web push)
+    var _fcmToken      = null; // Android FCM token
+    var _pushReady     = false;
 
     /* ────────────────────────────────────────────────────────────
        Dynamic Server Host Resolution
@@ -469,16 +472,112 @@ var WS_NOTIFY = (function () {
 
     function _requestPermission() {
         if (!('Notification' in window)) return;
+        _initServiceWorker();
+        _registerCapacitorPush();
         if (Notification.permission === 'default') {
             try {
                 Notification.requestPermission().then(function (perm) {
                     if (perm === 'granted') {
                         console.log('[WS_NOTIFY] Background notification permission granted ✓');
+                        _registerPush();
                     }
                 }).catch(function () {});
             } catch (e) {}
+        } else if (Notification.permission === 'granted') {
+            _registerPush();
         }
-        _initServiceWorker();
+    }
+
+    /* ─── Web Push subscription (works after the app/browser is closed) ───
+       Subscribes this device via PushManager, then upserts it into
+       'hms_push_subs' so the push-relay Edge Function can reach it.   */
+    function _registerPush() {
+        if (_pushReady) return;
+        if (!window.HMS_PUSH_CONFIG || !window.HMS_PUSH_CONFIG.vapidPublicKey) return;
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+        navigator.serviceWorker.ready.then(function (reg) {
+            _swReg = reg;
+            var appKey = window.urlBase64ToUint8Array(window.HMS_PUSH_CONFIG.vapidPublicKey);
+            if (!appKey) return;
+
+            return reg.pushManager.getSubscription().then(function (sub) {
+                if (sub) return sub;
+                return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: appKey });
+            }).then(function (sub) {
+                _pushSub = sub;
+                _pushReady = true;
+                _savePushSub();
+                console.log('[WS_NOTIFY] Web Push subscribed ✓');
+            });
+        }).catch(function (e) {
+            console.warn('[WS_NOTIFY] Web Push subscribe notice:', e && e.message);
+        });
+    }
+
+    function _savePushSub() {
+        if (!_pushSub || !window.SB_DB) return;
+        try {
+            var user = _getUser();
+            var row = {
+                user_id:  user ? (user.id || user.username) : 'anon',
+                platform: 'web',
+                endpoint: _pushSub.endpoint,
+                p256dh:   _pushSub.getKey('p256dh') ? btoa(String.fromCharCode.apply(null, new Uint8Array(_pushSub.getKey('p256dh')))) : null,
+                auth:     _pushSub.getKey('auth')   ? btoa(String.fromCharCode.apply(null, new Uint8Array(_pushSub.getKey('auth')))) : null,
+                fcm_token: null
+            };
+            window.SB_DB.from('hms_push_subs').upsert(row, { onConflict: 'endpoint' }).then(function (res) {
+                if (res && res.error) console.warn('[WS_NOTIFY] push subscription upsert notice:', res.error.message);
+            });
+        } catch (e) { console.warn('[WS_NOTIFY] save push sub notice:', e); }
+    }
+
+    /* ─── Capacitor / FCM push (Android APK) ─── */
+    function _registerCapacitorPush() {
+        try {
+            var Cap = window.Capacitor;
+            if (!Cap || !Cap.isNativePlatform || !Cap.isNativePlatform()) return;
+            var PushAPI = Cap.Plugins && Cap.Plugins.PushNotifications;
+            if (!PushAPI) return;
+
+            PushAPI.requestPermissions().then(function (res) {
+                if (!res || res.receive !== 'granted') return;
+                PushAPI.register().then(function (r) {
+                    if (r && r.status === 'denied') return;
+                }).catch(function () {});
+            }).catch(function () {
+                try { PushAPI.register().then(function(){}, function(){}); } catch (e) {}
+            });
+
+            PushAPI.addListener('registration', function (tokenObj) {
+                try {
+                    _fcmToken = tokenObj && tokenObj.value;
+                    if (_fcmToken && window.SB_DB) {
+                        var user = _getUser();
+                        window.SB_DB.from('hms_push_subs').upsert({
+                            user_id:  user ? (user.id || user.username) : 'anon',
+                            platform: 'android',
+                            endpoint: null,
+                            p256dh:   null,
+                            auth:     null,
+                            fcm_token: _fcmToken
+                        }, { onConflict: 'fcm_token' }).then(function (res) {
+                            if (res && res.error) console.warn('[WS_NOTIFY] FCM token upsert notice:', res.error.message);
+                        });
+                    }
+                } catch (e) {}
+            });
+
+            PushAPI.addListener('pushNotificationReceived', function (info) {
+                try {
+                    var n = info.notification || {} ;
+                    var t = n.title || (info.data && info.data.title) || '';
+                    var b = n.body  || (info.data && info.data.body)  || '';
+                    if (t) _push(t, b, 'info', true, (info.data && info.data.key) || null);
+                } catch (e) {}
+            });
+        } catch (e) {}
     }
 
     function _browserNotify(title, body, key) {

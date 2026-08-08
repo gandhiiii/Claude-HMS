@@ -1,0 +1,9 @@
+# HMS Supabase project configuration
+# Used by the Supabase CLI (official client: https://supabase.com/docs/guides/cli).
+# The push-relay function is invoked by a Database Webhook — it must NOT
+# require a user JWT, so verify_jwt is disabled for it.
+
+project_id = "hpjexrelsmdjkjgohele"
+
+[functions.push-relay]
+verify_jwt = false

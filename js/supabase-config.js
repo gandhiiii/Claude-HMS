@@ -91,6 +91,42 @@ window.isSupabaseSchemaMissing = function (err) {
 // Friendly setup hint used when the schema/tables have not been created yet.
 window.SB_SETUP_HINT = 'Cloud database is not set up yet. Run supabase/setup.sql in the Supabase Dashboard (SQL Editor) — see the README/instructions.';
 
+// ═══════════════════════════════════════════════════════════════════
+// Push notifications (background / app closed)
+// ═══════════════════════════════════════════════════════════════════
+// The app subscribes each device to Web Push using the VAPID public
+// key below. When a live pop is inserted into hms_live_pops, a Supabase
+// Database Webhook calls the push-relay Edge Function which delivers the
+// message via Web Push (browser/desktop) and FCM (Android APK) even when
+// the app is closed.
+//
+// To (re)generate the key pair run:
+//   node -e "const c=require('crypto').createECDH('prime256v1');c.generateKeys();console.log(c.getPublicKey('base64','uncompressed'));console.log(c.getPrivateKey('base64'))"
+// Public  → put below.
+// Private → keep it in the Edge Function env var VAPID_PRIVATE_KEY
+//           (Supabase Dashboard → Edge Functions → push-relay → Secrets),
+//           NOT in this repo.
+window.HMS_PUSH_CONFIG = {
+    vapidPublicKey: "BA1kZgG9Rbo/CIkAC5wPTxTjg+D/utXfuwoH+ZD9spnqw0wHH6iXvrSnXfUhqenwGpEDncqzFujfyQtJ+dM2gm8=",
+    relayUrl: null // e.g. https://hpjexrelsmdjkjgohele.supabase.co/functions/v1/push-relay
+};
+
+// Convert a base64url VAPID public key to a Uint8Array for PushManager.
+// Falls back to base64 when the key doesn't use base64url padding.
+window.urlBase64ToUint8Array = function (base64String) {
+    try {
+        var padding = '='.repeat((4 - base64String.length % 4) % 4);
+        var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        var raw = atob(base64);
+        var output = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; ++i) output[i] = raw.charCodeAt(i);
+        return output;
+    } catch (e) {
+        console.warn('[HMS] urlBase64ToUint8Array failed:', e.message);
+        return null;
+    }
+};
+
 // ── WebSocket Notification Server URL ───────────────────────────────
 // Dynamically resolves to current host IP/hostname when accessed over LAN/WAN
 (function () {
