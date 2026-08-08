@@ -1,6 +1,6 @@
-// HMS — Multi-Device Sync via Firebase Realtime Database
+// HMS — Multi-Device Sync via Supabase (PostgreSQL + Realtime)
 // Falls back gracefully to localStorage-only (BroadcastChannel) when
-// Firebase is not configured or unavailable.
+// Supabase is not configured or unavailable.
 
 var SYNC = (function () {
     // Only these keys are shared across devices — session/auth keys are excluded
@@ -25,14 +25,15 @@ var SYNC = (function () {
         'security_incidents', 'staffDeployment', 'securityDeployment', 'patientShiftings', '_deleted_ids'
     ];
 
-    var _pushing    = {};  // key -> true while a Firebase write is in-flight
+    var _pushing    = {};  // key -> true while a Supabase write is in-flight
     var _pending    = {};  // key -> latest data queued while a write is in-flight
     var _pushedKeys = {};  // key -> timestamp of last local push (per-key echo prevention)
     var _inited     = false;
+    var _channel    = null;
 
     /* ── Queue-based push — never drops a write even when multiple saves fire quickly ── */
-    function fbPush(key, data) {
-        if (!window.FB_DB) return;
+    function sbPush(key, data) {
+        if (!window.SB_DB) return;
         if (SHARED_KEYS.indexOf(key) === -1) return;
         _pushedKeys[key] = Date.now();      // per-key echo prevention timestamp
         _pending[key] = data;               // always store the latest value
@@ -45,9 +46,15 @@ var SYNC = (function () {
         delete _pending[key];
         _pushing[key] = true;
         try {
-            window.FB_DB.ref('hms/' + key).set(data, function () {
+            window.SB_DB.from('hms_store').upsert({ key: key, data: data }, { onConflict: 'key' }).then(function (res) {
                 _pushing[key] = false;
+                if (res && res.error) {
+                    console.warn('[HMS] Supabase upsert failed for ' + key + ':', res.error.message);
+                }
                 if (key in _pending) _flush(key); // send next queued value
+            }).catch(function (e) {
+                _pushing[key] = false;
+                if (key in _pending) _flush(key);
             });
         } catch (e) {
             _pushing[key] = false;
@@ -56,7 +63,7 @@ var SYNC = (function () {
 
     /* ── Merge remote data into local storage, preserving locally-created items ──
        For object arrays (items have an .id): remote wins for shared ids,
-       but local-only items are kept and scheduled to be pushed back to Firebase.
+       but local-only items are kept and scheduled to be pushed back.
        For anything else: remote wins outright.                                  */
     function _mergeIntoLocal(key, remoteData) {
         try {
@@ -83,11 +90,11 @@ var SYNC = (function () {
                 if (delRaw) deletedMap = JSON.parse(delRaw);
             } catch(e) {}
 
-            // If Firebase has null/undefined for this key, keep local data & schedule cloud upload
+            // If Supabase has null for this key, keep local data & schedule cloud upload
             if (remoteData === null || remoteData === undefined) {
                 if (localData !== null && localData !== undefined) {
                     var hasData = Array.isArray(localData) ? localData.length > 0 : !!localData;
-                    if (hasData) return true; // hasLocalOnly = true -> triggers fbPush
+                    if (hasData) return true; // hasLocalOnly = true -> triggers sbPush
                 }
                 return false;
             }
@@ -131,13 +138,27 @@ var SYNC = (function () {
         }
     }
 
-    /* ── Pull ALL shared keys from Firebase; merge to protect locally-created data ── */
-    function fbPullAll(cb) {
-        if (!window.FB_DB) { if (cb) cb(); return; }
-        window.FB_DB.ref('hms').once('value').then(function (snap) {
-            var remote = snap.val() || {};
+    // Convert a JSONB payload that leaked an object-array into a real array
+    function _normalize(data) {
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+            var ks = Object.keys(data);
+            if (ks.length > 0 && ks.filter(function(k){ return /^\d+$/.test(k); }).length === ks.length) {
+                return ks.map(function(k){ return data[k]; });
+            }
+        }
+        return data;
+    }
 
-            // Step 1: merge keys Firebase has into local storage
+    /* ── Pull ALL shared keys from Supabase; merge to protect locally-created data ── */
+    function sbPullAll(cb) {
+        if (!window.SB_DB) { if (cb) cb(); return; }
+        window.SB_DB.from('hms_store').select('key, data').then(function (res) {
+            if (res.error) throw res.error;
+            var remote = {};
+            (res.data || []).forEach(function (row) {
+                remote[row.key] = _normalize(row.data);
+            });
+
             // Deletions MUST merge first, otherwise stale local copies of
             // deleted records get re-added as "local-only" and re-pushed.
             Object.keys(remote).sort(function (a, b) {
@@ -150,12 +171,12 @@ var SYNC = (function () {
                 if (hadLocalOnly) {
                     try {
                         var merged = JSON.parse(localStorage.getItem('hms_' + key));
-                        fbPush(key, merged);
+                        sbPush(key, merged);
                     } catch (e) {}
                 }
             });
 
-            // Step 2: push local keys that Firebase doesn't have yet
+            // Push local keys that Supabase doesn't have yet
             var _pushedCount = 0;
             SHARED_KEYS.forEach(function (key) {
                 if (remote.hasOwnProperty(key)) return; // already handled above
@@ -164,7 +185,7 @@ var SYNC = (function () {
                     if (raw) {
                         var d = JSON.parse(raw);
                         var hasData = Array.isArray(d) ? d.length > 0 : !!d;
-                        if (hasData) { fbPush(key, d); _pushedCount++; }
+                        if (hasData) { sbPush(key, d); _pushedCount++; }
                     }
                 } catch (e) {}
             });
@@ -176,64 +197,86 @@ var SYNC = (function () {
 
             if (cb) cb();
         }).catch(function (e) {
-            console.warn('[HMS] Firebase pull error:', e.message);
+            console.warn('[HMS] Supabase pull error:', (e && e.message) || e);
             if (cb) cb();
         });
     }
 
-    /* ── Listen for real-time changes from OTHER devices ── */
-    function fbListen() {
-        if (!window.FB_DB) return;
-        window.FB_DB.ref('hms').on('value', function (snap) {
-            var remote = snap.val();
-            if (!remote) return;
-            var changed = false;
-            // Deletions MUST be applied before data keys, otherwise a deleted
-            // record still present in a stale local copy gets resurrected.
-            Object.keys(remote).sort(function (a, b) {
-                if (a === '_deleted_ids') return -1;
-                if (b === '_deleted_ids') return 1;
-                return 0;
-            }).forEach(function (key) {
-                if (SHARED_KEYS.indexOf(key) === -1) return;
-                // Per-key echo prevention: skip keys that WE pushed within the last 2 seconds
-                if (_pushedKeys[key] && Date.now() - _pushedKeys[key] < 2000) return;
-                try {
-                    var data = remote[key];
-                    var delMap = null;
-                    try {
-                        var delRaw = localStorage.getItem('hms__deleted_ids');
-                        if (delRaw) delMap = JSON.parse(delRaw);
-                    } catch (e2) {}
-                    if (Array.isArray(data) && delMap) {
-                        data = data.filter(function (i) { return !(i && i.id && delMap[i.id]); });
-                    }
-                    var json = JSON.stringify(data);
-                    var existing = localStorage.getItem('hms_' + key);
-                    if (existing !== json) {
-                        localStorage.setItem('hms_' + key, json);
-                        sessionStorage.setItem('hms_' + key, json);
-                        changed = true;
-                    }
-                } catch (e) {}
-            });
-            if (changed) {
-                try { if (typeof APP_SYNC !== 'undefined') APP_SYNC._flash(); } catch (e) {}
-                clearTimeout(SYNC._refreshTimer);
-                SYNC._refreshTimer = setTimeout(function () {
-                    try { if (typeof APP !== 'undefined') APP.refreshCurrent(); } catch (e) {}
-                }, 300);
+    // Apply a single changed key from Realtime into localStorage
+    function _applyLiveChange(key, data) {
+        if (SHARED_KEYS.indexOf(key) === -1) return false;
+        if (_pushedKeys[key] && Date.now() - _pushedKeys[key] < 2000) return false;
+        try {
+            var delMap = null;
+            try {
+                var delRaw = localStorage.getItem('hms__deleted_ids');
+                if (delRaw) delMap = JSON.parse(delRaw);
+            } catch (e2) {}
+            if (Array.isArray(data) && delMap) {
+                data = data.filter(function (i) { return !(i && i.id && delMap[i.id]); });
             }
-        });
+            var json = JSON.stringify(data);
+            var existing = localStorage.getItem('hms_' + key);
+            if (existing !== json) {
+                localStorage.setItem('hms_' + key, json);
+                sessionStorage.setItem('hms_' + key, json);
+                return true;
+            }
+        } catch (e) {}
+        return false;
     }
 
-    /* ── Intercept DB.set so every local write also goes to Firebase ── */
+    /* ── Listen for real-time changes from OTHER devices (postgres_changes) ── */
+    function sbListen() {
+        if (!window.SB_DB || _channel) return;
+        try {
+            _channel = window.SB_DB
+                .channel('hms-store-realtime')
+                .on('postgres_changes',
+                    { event: '*', schema: 'public', table: 'hms_store' },
+                    function (payload) {
+                        var changed = false;
+                        // Deletions must be applied before writes
+                        if (payload.eventType === 'DELETE') {
+                            var dk = payload.old && payload.old.key;
+                            if (dk && SHARED_KEYS.indexOf(dk) !== -1) {
+                                try { localStorage.removeItem('hms_' + dk); sessionStorage.removeItem('hms_' + dk); } catch (e2) {}
+                                changed = true;
+                            }
+                        } else {
+                            var newRow = payload.new || {};
+                            if (newRow.key === '_deleted_ids') {
+                                _applyLiveChange('_deleted_ids', newRow.data);
+                            }
+                            if (newRow.key) {
+                                changed = _applyLiveChange(newRow.key, _normalize(newRow.data)) || changed;
+                            }
+                        }
+                        if (changed) {
+                            try { if (typeof APP_SYNC !== 'undefined') APP_SYNC._flash(); } catch (e) {}
+                            clearTimeout(SYNC._refreshTimer);
+                            SYNC._refreshTimer = setTimeout(function () {
+                                try { if (typeof APP !== 'undefined') APP.refreshCurrent(); } catch (e) {}
+                            }, 300);
+                        }
+                    })
+                .subscribe(function (status) {
+                    if (status === 'SUBSCRIBED') {
+                        try { if (typeof APP_SYNC !== 'undefined') APP_SYNC._updateStatus(); } catch (e) {}
+                    }
+                });
+        } catch (e) {
+            console.warn('[HMS] Supabase realtime subscribe error:', e.message);
+        }
+    }
+
+    /* ── Intercept DB.set so every local write also goes to Supabase ── */
     function hookDBSet() {
         if (typeof DB === 'undefined') return;
         var _orig = DB.set.bind(DB);
         DB.set = function (key, data) {
             _orig(key, data);
-            fbPush(key, data);
+            sbPush(key, data);
         };
     }
 
@@ -257,11 +300,11 @@ var SYNC = (function () {
 
             hookDBSet();
 
-            if (window.FB_DB) {
+            if (window.SB_DB) {
                 // Pull latest data first (with merge), THEN start listening for live changes
-                fbPullAll(function () {
+                sbPullAll(function () {
                     _recordSyncTs();
-                    fbListen();
+                    sbListen();
                     try { if (typeof APP_SYNC !== 'undefined') APP_SYNC._updateStatus(); } catch (e) {}
                     try { if (typeof APP !== 'undefined') APP.refreshCurrent(); } catch (e) {}
                 });
@@ -273,27 +316,27 @@ var SYNC = (function () {
             try { if (typeof APP_SYNC !== 'undefined') APP_SYNC.init(); } catch (e) {}
         },
 
-        /* Push ALL current localStorage data to Firebase */
+        /* Push ALL current localStorage data to Supabase */
         pushAll: function () {
-            if (!window.FB_DB) { if (typeof APP !== 'undefined') APP.notify('Firebase not configured', 'error'); return; }
+            if (!window.SB_DB) { if (typeof APP !== 'undefined') APP.notify('Cloud database not configured', 'error'); return; }
             SHARED_KEYS.forEach(function (key) {
                 try {
                     var raw = localStorage.getItem('hms_' + key);
-                    if (raw) fbPush(key, JSON.parse(raw));
+                    if (raw) sbPush(key, JSON.parse(raw));
                 } catch (e) {}
             });
             _recordSyncTs();
             if (typeof APP !== 'undefined') APP.notify('All data pushed to cloud', 'success');
         },
 
-        /* Pull ALL data from Firebase into localStorage right now */
+        /* Pull ALL data from the cloud into localStorage right now */
         pullNow: function (cb) {
-            if (!window.FB_DB) {
-                if (typeof APP !== 'undefined') APP.notify('Firebase not configured', 'error');
+            if (!window.SB_DB) {
+                if (typeof APP !== 'undefined') APP.notify('Cloud database not configured', 'error');
                 if (cb) cb(false);
                 return;
             }
-            fbPullAll(function () {
+            sbPullAll(function () {
                 _recordSyncTs();
                 if (typeof APP !== 'undefined') APP.notify('Data pulled from cloud', 'success');
                 if (cb) cb(true);
@@ -303,8 +346,8 @@ var SYNC = (function () {
         /* Return connection + last-sync status */
         status: function () {
             return {
-                connected: !!window.FB_DB,
-                projectId: window.FB_PROJECT_ID || null,
+                connected: !!window.SB_DB,
+                projectId: window.SB_URL || null,
                 lastSync:  this._lastSyncTs
             };
         }

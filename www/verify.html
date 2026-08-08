@@ -36,9 +36,10 @@
 <div id="summary"></div>
 
 <!-- Load the same files the app uses. ?diag= skips the browser cache. -->
+<script src="js/vendor/supabase-sdk.js?diag=1" onerror="fileFail('supabase-sdk.js')"></script>
 <script src="js/i18n.js?diag=1" onerror="fileFail('i18n.js')"></script>
 <script src="js/data.js?diag=1" onerror="fileFail('data.js')"></script>
-<script src="js/firebase-config.js?diag=1" onerror="fileFail('firebase-config.js')"></script>
+<script src="js/supabase-config.js?diag=1" onerror="fileFail('supabase-config.js')"></script>
 <script src="js/checklists.js?diag=1" onerror="fileFail('checklists.js')"></script>
 <script src="js/checklists-seed-it.js?diag=1" onerror="fileFail('checklists-seed-it.js')"></script>
 
@@ -57,9 +58,9 @@
           fix: '<strong>Important:</strong> this is your app\u2019s core file and it was never part of my updates. ' +
                'If it is broken, the wrong file was probably replaced by mistake. Restore <code>data.js</code> ' +
                'from your original app copy or backup \u2014 do NOT copy any of my files over it.' },
-        { file: 'firebase-config.js', ok: function () { return !loadFail['firebase-config.js'] && !runErrors['firebase-config.js']; },
+        { file: 'supabase-config.js', ok: function () { return !loadFail['supabase-config.js'] && typeof SUPABASE_CONFIG !== 'undefined'; },
           extra: function () { return ''; },
-          fix: 'Restore <code>firebase-config.js</code> from your original app copy.' },
+          fix: 'Restore <code>supabase-config.js</code> from your original app copy.' },
         { file: 'checklists.js', ok: function () { return typeof CHECKLISTS !== 'undefined'; },
           extra: function () { return ''; },
           fix: 'Copy <code>checklists.js</code> into the <code>js</code> folder.' },

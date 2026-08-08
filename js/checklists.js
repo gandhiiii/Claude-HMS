@@ -52,7 +52,7 @@
  * in js/data.js if they differ ('hod' vs 'HOD' vs 'head', etc.).
  *
  * SECURITY NOTE: these checks run in the browser and are UX-level guardrails
- * only. Real enforcement requires Firebase Auth + database security rules
+ * only. Real enforcement requires proper cloud Auth + database security rules
  * (see the security review). Do not treat this module as access control.
  *
  * SYNC NOTE: persistence goes through DB.set (whole-array writes), so this
@@ -93,6 +93,21 @@
         return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     }
     function now() { return new Date().toISOString(); }
+
+    /**
+     * Operating-day string (YYYY-MM-DD) using the same 5:00 AM local boundary
+     * as the app's daily checklist reset. Every per-day entry key below uses
+     * this so the "can I fill again" check flips at 5 AM exactly. If entries
+     * were keyed by the raw UTC date, a device east of UTC would show an
+     * assignment as "already submitted today" for up to several hours after
+     * the 5 AM reset (e.g. 00:00–05:29 in UTC +5:30), which locks the
+     * OK/fault options and makes the checklist unfillable after the reset.
+     */
+    function operDate(refDate) {
+        var base = refDate ? new Date(refDate) : new Date();
+        var adj = new Date(base.getTime() - 5 * 60 * 60 * 1000);
+        return adj.getFullYear() + '-' + ('0' + (adj.getMonth() + 1)).slice(-2) + '-' + ('0' + adj.getDate()).slice(-2);
+    }
 
     function ok(payload) {
         var r = { success: true, code: 'OK', message: 'OK' };
@@ -347,7 +362,7 @@
         var unit = getUnit(unitId);
         if (!unit) return err('ERR_NOT_FOUND', 'Please select a valid hospital unit.');
 
-        var date = dateStr || now().slice(0, 10);
+        var date = dateStr || operDate();
         if (hasEntry(templateId, unitId, date)) {
             return err('ERR_DUPLICATE', 'This checklist is already submitted for ' + unit.name + ' on ' + date + '.');
         }
@@ -428,7 +443,7 @@
         if (!canFill(user, tpl.department)) {
             return err('ERR_PERMISSION', 'You can only view checklists for your own department.');
         }
-        var date = dateStr || now().slice(0, 10);
+        var date = dateStr || operDate();
         var entries = load(K_ENTRIES).filter(function (e) {
             return e.templateId === templateId && e.date === date;
         });
@@ -593,7 +608,7 @@
         var items = resolveAssignmentItems(a);
         if (items.length === 0) return err('ERR_VALIDATION', 'This assignment has no remaining points.');
 
-        var date = dateStr || now().slice(0, 10);
+        var date = dateStr || operDate();
         if (hasAssignmentEntry(a.id, date)) {
             return err('ERR_DUPLICATE', 'This assigned checklist is already submitted for ' + date + '.');
         }
@@ -645,7 +660,7 @@
         if (!canManage(user, department)) {
             return err('ERR_PERMISSION', 'You can only view assignment status for your own department.');
         }
-        var date = dateStr || now().slice(0, 10);
+        var date = dateStr || operDate();
         var entries = load(K_ENTRIES).filter(function (e) {
             return e.entryType === 'assignment' && e.date === date;
         });
@@ -667,6 +682,7 @@
     global.CHECKLISTS = {
         ROLES: ROLES,
         FLOOR_DEPARTMENTS: FLOOR_DEPARTMENTS,
+        operDate: operDate,
         requiresFloor: requiresFloor,
         listFloors: listFloors,
         addFloor: addFloor,

@@ -26,7 +26,8 @@ var WS_NOTIFY = (function () {
     var _origLSSet     = null; // original localStorage.setItem
     var _wsConnected   = false;
     var _wsUrl         = null;
-    var _fbInited      = false;
+    var _sbInited      = false;
+    var _sbChannel     = null;
     var _swReg         = null; // ServiceWorkerRegistration instance
 
     /* ────────────────────────────────────────────────────────────
@@ -314,44 +315,53 @@ var WS_NOTIFY = (function () {
     }
 
     /* ────────────────────────────────────────────────────────────
-       Firebase Realtime Database Notification Fan-Out & Listener
+       Supabase (PostgreSQL Realtime) Notification Fan-Out & Listener
     ──────────────────────────────────────────────────────────── */
-    function _initFirebaseListener() {
-        if (!window.FB_DB || _fbInited) return;
-        _fbInited = true;
+    function _initSupabaseListener() {
+        if (!window.SB_DB || _sbInited) return;
+        _sbInited = true;
 
         try {
             var sessionStartTime = Date.now();
-            window.FB_DB.ref('hms/live_pops').limitToLast(10).on('child_added', function (snap) {
-                var val = snap.val();
-                if (!val || !val.timestamp) return;
+            _sbChannel = window.SB_DB
+                .channel('hms-live-pops-realtime')
+                .on('postgres_changes',
+                    { event: 'INSERT', schema: 'public', table: 'hms_live_pops' },
+                    function (payload) {
+                        var val = payload.new && payload.new.payload;
+                        if (!val || !val.timestamp) return;
 
-                // Ignore pop messages from before current session or from self
-                if (val.timestamp < sessionStartTime - 3000) return;
-                var user = _getUser();
-                var myId = user ? (user.id || user.username) : null;
-                if (myId && val.senderId === myId) return;
+                        // Ignore pop messages from before current session or from self
+                        if (val.timestamp < sessionStartTime - 3000) return;
+                        var user = _getUser();
+                        var myId = user ? (user.id || user.username) : null;
+                        if (myId && val.senderId === myId) return;
 
-                // Push pop notification (deduplication prevents double pops)
-                _push(val.title, val.body, val.notifType || val.type || 'info', true, val.key);
-            });
-            console.log('[WS_NOTIFY] Firebase Realtime Database live_pops listener active ✓');
+                        // Push pop notification (deduplication prevents double pops)
+                        _push(val.title, val.body, val.notifType || val.type || 'info', true, val.key);
+                    })
+                .subscribe(function (status) {});
+            console.log('[WS_NOTIFY] Supabase Realtime Database live_pops listener active ✓');
         } catch (e) {
-            console.warn('[WS_NOTIFY] Firebase listener notice:', e.message);
+            console.warn('[WS_NOTIFY] Supabase listener notice:', e.message);
         }
     }
 
-    function _broadcastFirebase(title, body, type, key) {
-        if (!window.FB_DB) return;
+    function _broadcastSupabase(title, body, type, key) {
+        if (!window.SB_DB) return;
         try {
             var user = _getUser();
-            window.FB_DB.ref('hms/live_pops').push({
-                title:     title,
-                body:      body,
-                notifType: type || 'info',
-                key:       key || null,
-                senderId:  user ? (user.id || user.username) : 'anon',
-                timestamp: Date.now()
+            window.SB_DB.from('hms_live_pops').insert({
+                payload: {
+                    title:     title,
+                    body:      body,
+                    notifType: type || 'info',
+                    key:       key || null,
+                    senderId:  user ? (user.id || user.username) : 'anon',
+                    timestamp: Date.now()
+                }
+            }).then(function (res) {
+                if (res && res.error) console.warn('[WS_NOTIFY] live_pops insert error:', res.error.message);
             });
         } catch (e) {}
     }
@@ -391,8 +401,8 @@ var WS_NOTIFY = (function () {
                     } catch (e) {}
                 }
 
-                // Broadcast over Firebase Realtime Database
-                _broadcastFirebase(msg.title, msg.body, 'info', key);
+                // Broadcast over Supabase Realtime Database
+                _broadcastSupabase(msg.title, msg.body, 'info', key);
             }
         });
 
@@ -518,8 +528,8 @@ var WS_NOTIFY = (function () {
         _showPopCard(title, body, type || 'info', key);
 
         if (!isRemote) {
-            // Push via Firebase Realtime Database
-            _broadcastFirebase(title, body, type || 'info', key);
+            // Push via Supabase Realtime Database
+            _broadcastSupabase(title, body, type || 'info', key);
         }
 
         try {
@@ -569,9 +579,9 @@ var WS_NOTIFY = (function () {
             ? '<span style="color:#34A853;font-size:10px;font-weight:600;">● WS Connected</span>'
             : '<span style="color:#888;font-size:10px;font-weight:600;">○ WS Standby</span>';
 
-        var fbStatus = window.FB_DB
-            ? '<span style="color:#34A853;font-size:10px;font-weight:600;">🔥 Firebase Live</span>'
-            : '<span style="color:#888;font-size:10px;font-weight:600;">🔥 Firebase Off</span>';
+        var sbStatus = window.SB_DB
+            ? '<span style="color:#34A853;font-size:10px;font-weight:600;">🗄️ Supabase Live</span>'
+            : '<span style="color:#888;font-size:10px;font-weight:600;">🗄 Supabase Off</span>';
 
         var swStatus = ('serviceWorker' in navigator && navigator.serviceWorker.controller)
             ? '<span style="color:#34A853;font-size:10px;font-weight:600;" title="Notifications run even when app is closed">⚡ BG Worker Active</span>'
@@ -596,7 +606,7 @@ var WS_NOTIFY = (function () {
           +     '<button onclick="WS_NOTIFY.clearAll()" style="border:none;background:none;cursor:pointer;font-size:11px;color:#888;">Clear all</button>'
           +   '</div>'
           +   '<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">'
-          +     '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + fbStatus + ' ' + wsStatus + ' ' + swStatus + '</div>'
+          +     '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + sbStatus + ' ' + wsStatus + ' ' + swStatus + '</div>'
           +     '<button onclick="WS_NOTIFY.testPop()" style="border:1px solid #c2d7f8;background:#e8f0fe;color:#1a73e8;cursor:pointer;font-size:10px;font-weight:600;padding:2px 8px;border-radius:12px;">Test Pop 🚀</button>'
           +   '</div>'
           + '</div>'
@@ -706,9 +716,9 @@ var WS_NOTIFY = (function () {
             _hookLocalStorage();    // auto-detect new items written to localStorage
             _requestPermission();   // request OS push permissions & register sw.js
             _connectWS();           // connect to WebSocket server
-            _initFirebaseListener(); // listen to Firebase Realtime Database live pops
+            _initSupabaseListener(); // listen to Supabase Realtime Database live pops
 
-            console.log('[WS_NOTIFY] Initialised. Hybrid Firebase + WebSocket + Background SW Active.');
+            console.log('[WS_NOTIFY] Initialised. Hybrid Supabase + WebSocket + Background SW Active.');
         },
 
         bellHTML: function () {
@@ -742,7 +752,7 @@ var WS_NOTIFY = (function () {
                 try { _ws.send(JSON.stringify(payload)); } catch (e) {}
             }
             if (payload && payload.title) {
-                _broadcastFirebase(payload.title, payload.body || '', payload.notifType || 'info', payload.key);
+                _broadcastSupabase(payload.title, payload.body || '', payload.notifType || 'info', payload.key);
             }
         },
 
@@ -769,8 +779,8 @@ var WS_NOTIFY = (function () {
                 } catch (e) {}
             }
 
-            // Broadcast to all other devices over Firebase Realtime Database
-            _broadcastFirebase(title, body, 'info');
+            // Broadcast to all other devices over Supabase Realtime Database
+            _broadcastSupabase(title, body, 'info');
         },
 
         handleItemClick: function (key) {
@@ -796,7 +806,7 @@ var WS_NOTIFY = (function () {
             return {
                 wsConnected: _wsConnected,
                 wsUrl: _wsUrl,
-                fbConnected: !!window.FB_DB,
+                sbConnected: !!window.SB_DB,
                 swActive: !!_swReg
             };
         },

@@ -27,11 +27,6 @@ const DB = {
         var json = JSON.stringify(data);
         try { localStorage.setItem('hms_' + key, json); } catch (e) { console.warn('localStorage set error:', e); }
         try { sessionStorage.setItem('hms_' + key, json); } catch (e) { console.warn('sessionStorage set error:', e); }
-        try {
-            if (window.FB_DB) {
-                window.FB_DB.ref('hms/' + key).set(data);
-            }
-        } catch(e) {}
     },
     add(key, item) {
         this._autoSnapBeforeChange(key, 'add');
@@ -87,7 +82,7 @@ const DB = {
         return this.get(key).find(i => i.id === id) || null;
     },
 
-    /* ── All keys synced to Firebase / exported in backups ── */
+    /* ── All keys synced to the cloud / exported in backups ── */
     _ALL_KEYS: [
         'users', 'departments', 'featureRights',
         'inventory', 'inventory_receipts',
@@ -787,7 +782,7 @@ APP_SYNC = {
     _updateStatus() {
         const el = document.getElementById('liveIndicator');
         if (!el) return;
-        if (window.FB_DB) {
+        if (window.SB_DB) {
             el.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#34a853;animation:pulse 2s ease-in-out infinite;display:inline-block;flex-shrink:0;"></span><span style="color:#34a853;font-size:11px;font-weight:700;letter-spacing:0.3px;">LIVE</span>';
             el.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:12px;background:rgba(52,168,83,0.10);border:1px solid rgba(52,168,83,0.3);cursor:default;';
             el.title = 'Real-time sync active — changes on any device appear everywhere instantly';

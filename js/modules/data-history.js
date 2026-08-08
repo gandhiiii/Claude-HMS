@@ -8,7 +8,7 @@ function renderDataHistory(container) {
 }
 
 function _renderDataHistoryContent(container) {
-    var fb = !!window.FB_DB;
+    var fb = !!window.SB_DB;
 
     /* ── Cloud Sync Section ── */
     var cloudHtml = '';
@@ -94,11 +94,11 @@ function _renderDataHistoryContent(container) {
     `;
 }
 
-/* ── Cross-device Firebase config sharing ── */
+/* ── Cross-device Supabase config sharing ── */
 function _dataHistoryGetCfg() {
-    var cfg = window.HMS_FB_CFG || null;
-    if (!cfg) { try { cfg = JSON.parse(localStorage.getItem('hms_firebase_cfg')); } catch(e) {} }
-    return (cfg && cfg.apiKey) ? cfg : null;
+    var cfg = window.HMS_SB_CFG || null;
+    if (!cfg) { try { cfg = JSON.parse(localStorage.getItem('hms_supabase_cfg')); } catch(e) {} }
+    return (cfg && cfg.url) ? cfg : null;
 }
 
 function dataHistoryShareConfig() {
@@ -108,7 +108,7 @@ function dataHistoryShareConfig() {
         var encoded = btoa(JSON.stringify(cfg));
         var href = window.location.href.replace(/#.*$/, '');
         var base = href.substring(0, href.lastIndexOf('/') + 1);
-        var url = base + 'dashboard.html#fbcfg=' + encoded;
+        var url = base + 'dashboard.html#sbcfg=' + encoded;
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(url).then(function() {
                 APP.notify(T('dhmod_msg_link_copied_auto'), 'success');
@@ -129,18 +129,18 @@ function dataHistoryShowQR() {
         var encoded = btoa(JSON.stringify(cfg));
         var href = window.location.href.replace(/#.*$/, '');
         var base = href.substring(0, href.lastIndexOf('/') + 1);
-        var url = base + 'dashboard.html#fbcfg=' + encoded;
+        var url = base + 'dashboard.html#sbcfg=' + encoded;
         var escapedUrl = url.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
         openFormModal(T('dhmod_modal_scan_qr_title'),
             '<div style="text-align:center;padding:8px 0;">'
-            + '<div id="fbConfigQR" style="display:inline-block;margin-bottom:12px;border:6px solid #fff;border-radius:4px;"></div>'
+            + '<div id="sbConfigQR" style="display:inline-block;margin-bottom:12px;border:6px solid #fff;border-radius:4px;"></div>'
             + '<p style="font-size:12px;color:var(--gray);margin-bottom:10px;">' + T('dhmod_qr_instructions') + '</p>'
             + '<p style="font-size:12px;color:var(--gray);margin-bottom:6px;">' + T('dhmod_or_copy_link') + '</p>'
             + '<input type="text" value="' + escapedUrl + '" readonly class="form-control" style="font-size:11px;" onclick="this.select()">'
             + '</div>',
             null, false);
         setTimeout(function() {
-            var qrEl = document.getElementById('fbConfigQR');
+            var qrEl = document.getElementById('sbConfigQR');
             if (qrEl && typeof QRCode !== 'undefined') {
                 new QRCode(qrEl, { text: url, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
             } else if (qrEl) {
@@ -156,50 +156,46 @@ function dataHistoryDownloadFbConfig() {
     function esc(s) { return (s || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"'); }
     var content = [
         '// ═══════════════════════════════════════════════════════════════════',
-        '// HMS — Firebase Configuration (Generated ' + new Date().toLocaleString() + ')',
-        '// Replace js/firebase-config.js with this file, then push to GitHub',
-        '// so ALL devices automatically connect to Firebase.',
+        '// HMS — Supabase Configuration (Generated ' + new Date().toLocaleString() + ')',
+        '// Replace js/supabase-config.js with this file, then push to GitHub',
+        '// so ALL devices automatically connect to the cloud database.',
         '// ═══════════════════════════════════════════════════════════════════',
         '',
-        'var firebaseConfig = {',
-        '    apiKey:            "' + esc(cfg.apiKey) + '",',
-        '    authDomain:        "' + esc(cfg.authDomain || '') + '",',
-        '    databaseURL:       "' + esc(cfg.databaseURL || '') + '",',
-        '    projectId:         "' + esc(cfg.projectId || '') + '",',
-        '    storageBucket:     "' + esc(cfg.storageBucket || '') + '",',
-        '    messagingSenderId: "' + esc(cfg.messagingSenderId || '') + '",',
-        '    appId:             "' + esc(cfg.appId || '') + '"',
+        'var SUPABASE_CONFIG = {',
+        '    url:             "' + esc(cfg.url) + '",',
+        '    publishableKey:  "' + esc(cfg.publishableKey || '') + '"',
         '};',
         '',
         '(function () {',
         '    try {',
-        '        if (typeof firebase === \'undefined\') { window.FB_DB = null; window.FB_CONFIGURED = false; return; }',
-        '        // Hash-fragment sharing: dashboard.html#fbcfg=BASE64',
+        '        if (typeof supabase === \'undefined\') { window.SB_DB = null; window.SB_CONFIGURED = false; return; }',
+        '        // Hash-fragment sharing: dashboard.html#sbcfg=BASE64',
         '        try {',
-        '            var m = (window.location.hash||\'\').match(/[#&]fbcfg=([A-Za-z0-9+\\/=%-]+)/);',
+        '            var m = (window.location.hash||\'\').match(/[#&]sbcfg=([A-Za-z0-9+\\/=%-]+)/);',
         '            if (m) {',
         '                var d = JSON.parse(atob(decodeURIComponent(m[1])));',
-        '                if (d && d.apiKey && !d.apiKey.startsWith(\'REPLACE_\')) {',
-        '                    localStorage.setItem(\'hms_firebase_cfg\', JSON.stringify(d));',
+        '                if (d && d.url && !d.url.startsWith(\'REPLACE_\')) {',
+        '                    localStorage.setItem(\'hms_supabase_cfg\', JSON.stringify(d));',
         '                    try { history.replaceState(null,null,location.pathname+location.search); } catch(e2){}',
-        '                    firebaseConfig = d;',
+        '                    SUPABASE_CONFIG = d;',
         '                }',
         '            }',
         '        } catch(e) {}',
         '        // localStorage override',
         '        try {',
-        '            var s = JSON.parse(localStorage.getItem(\'hms_firebase_cfg\')||\'null\');',
-        '            if (s && s.apiKey && !s.apiKey.startsWith(\'REPLACE_\')) firebaseConfig = s;',
+        '            var s = JSON.parse(localStorage.getItem(\'hms_supabase_cfg\')||\'null\');',
+        '            if (s && s.url && !s.url.startsWith(\'REPLACE_\')) SUPABASE_CONFIG = s;',
         '        } catch(e) {}',
-        '        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);',
-        '        window.FB_DB = firebase.database();',
-        '        window.FB_CONFIGURED = true;',
-        '        window.FB_PROJECT_ID = firebaseConfig.projectId;',
-        '        window.HMS_FB_CFG = firebaseConfig;',
-        '        console.info(\'[HMS] Firebase connected ✓\');',
+        '        if (SUPABASE_CONFIG.url.startsWith(\'REPLACE_\')) { window.SB_DB = null; window.SB_CONFIGURED = false; return; }',
+        '        window.SB_DB = supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.publishableKey);',
+        '        window.SUPABASE = window.SB_DB;',
+        '        window.SB_CONFIGURED = true;',
+        '        window.SB_URL = SUPABASE_CONFIG.url;',
+        '        window.HMS_SB_CFG = SUPABASE_CONFIG;',
+        '        console.info(\'[HMS] Supabase connected ✓\');',
         '    } catch(e) {',
-        '        console.warn(\'[HMS] Firebase init failed:\', e.message);',
-        '        window.FB_DB = null; window.FB_CONFIGURED = false;',
+        '        console.warn(\'[HMS] Supabase init failed:\', e.message);',
+        '        window.SB_DB = null; window.SB_CONFIGURED = false;',
         '    }',
         '})();'
     ].join('\n');
@@ -207,31 +203,26 @@ function dataHistoryDownloadFbConfig() {
         var blob = new Blob([content], { type: 'text/javascript' });
         var bUrl = URL.createObjectURL(blob);
         var a = document.createElement('a');
-        a.href = bUrl; a.download = 'firebase-config.js';
+        a.href = bUrl; a.download = 'supabase-config.js';
         document.body.appendChild(a); a.click();
         setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(bUrl); }, 200);
         APP.notify(T('dhmod_msg_downloaded_fb_config'), 'success');
     } catch(e) { APP.notify(T('dhmod_msg_download_failed_prefix') + e.message, 'error'); }
 }
 
-/* ── Firebase setup ── */
+/* ── Supabase setup ── */
 function dataHistorySaveFbConfig() {
     var cfg = {
-        apiKey:            (document.getElementById('fb_apiKey')            || {}).value || '',
-        authDomain:        (document.getElementById('fb_authDomain')        || {}).value || '',
-        databaseURL:       (document.getElementById('fb_databaseURL')       || {}).value || '',
-        projectId:         (document.getElementById('fb_projectId')         || {}).value || '',
-        storageBucket:     (document.getElementById('fb_storageBucket')     || {}).value || '',
-        messagingSenderId: (document.getElementById('fb_messagingSenderId') || {}).value || '',
-        appId:             (document.getElementById('fb_appId')             || {}).value || ''
+        url:            (document.getElementById('sb_url')  || {}).value || '',
+        publishableKey: (document.getElementById('sb_key')  || {}).value || ''
     };
-    var msgEl = document.getElementById('fbSetupMsg');
-    if (!cfg.apiKey || !cfg.databaseURL || !cfg.projectId || !cfg.appId) {
+    var msgEl = document.getElementById('sbSetupMsg');
+    if (!cfg.url || !cfg.publishableKey) {
         if (msgEl) { msgEl.style.color = 'var(--danger)'; msgEl.textContent = T('dhmod_msg_fb_fields_required'); }
         return;
     }
     try {
-        localStorage.setItem('hms_firebase_cfg', JSON.stringify(cfg));
+        localStorage.setItem('hms_supabase_cfg', JSON.stringify(cfg));
         if (msgEl) { msgEl.style.color = 'var(--secondary)'; msgEl.textContent = T('dhmod_msg_fb_config_saved'); }
         setTimeout(function() { window.location.reload(); }, 1200);
     } catch(e) {
@@ -241,7 +232,7 @@ function dataHistorySaveFbConfig() {
 
 function dataHistoryClearFbConfig() {
     if (!confirm(T('dhmod_confirm_clear_fb_config'))) return;
-    localStorage.removeItem('hms_firebase_cfg');
+    localStorage.removeItem('hms_supabase_cfg');
     APP.notify(T('dhmod_msg_fb_config_cleared'), 'info');
     setTimeout(function() { window.location.reload(); }, 800);
 }

@@ -1450,7 +1450,7 @@ function _rDownload(el) {
         + '<strong>⚠️ Important:</strong> Data is stored in this browser only. '
         + 'Export a JSON backup regularly and keep it safe. '
         + 'Clearing browser data / cache will wipe all records. '
-        + 'To sync across devices, configure Firebase in <code>js/firebase-config.js</code>.'
+        + 'To sync across devices, configure the cloud database in <code>js/supabase-config.js</code>.'
         + '</div></div>';
 
     el.innerHTML = safetyHtml

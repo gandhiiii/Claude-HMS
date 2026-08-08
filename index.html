@@ -8,8 +8,7 @@
     <meta http-equiv="Expires" content="0">
     <title>Stavya Intelligence - Login</title>
     <link rel="stylesheet" href="css/style.css">
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="js/vendor/supabase-sdk.js?v=1"></script>
     <style>
         .reset-section { display: none; }
         .reset-section.active { display: block; }
@@ -101,8 +100,8 @@
         </div>
     </div>
 
-    <script src="js/data.js?v=73"></script>
-    <script src="js/firebase-config.js?v=73"></script>
+    <script src="js/data.js?v=156"></script>
+    <script src="js/supabase-config.js?v=1"></script>
     <script>
         // ── Import via QR / shared link: index.html#import=BASE64 ──
         (function () {
@@ -136,7 +135,7 @@
 
             if (localUsers.length > 0) return; // have local data — nothing else needed
 
-            if (!window.FB_DB) {
+            if (!window.SB_DB) {
                 setMsg('⚠ No cloud configured. Use "New device? Setup" below.', 'orange');
                 return;
             }
@@ -147,25 +146,26 @@
                 setMsg('⚠ Cloud timeout. Check internet or use "New device? Setup".', 'orange');
             }, 10000);
 
-            window.FB_DB.ref('hms').once('value').then(function(snap) {
+            window.SB_DB.from('hms_store').select('key, data').then(function(res) {
                 clearTimeout(_timer);
-                var remote = snap.val();
-                if (!remote || !remote.users) {
+                if (res.error) throw res.error;
+                var remote = {};
+                (res.data || []).forEach(function(row) {
+                    var val = row.data;
+                    if (val && typeof val === 'object' && !Array.isArray(val)) {
+                        var ks = Object.keys(val);
+                        if (ks.length > 0 && ks.every(function(k){ return /^\d+$/.test(k); })) {
+                            val = ks.map(function(k){ return val[k]; });
+                        }
+                    }
+                    remote[row.key] = val;
+                });
+                if (!remote.users) {
                     setMsg('⚠ No accounts in cloud yet. Use "New device? Setup".', 'orange');
                     return;
                 }
-                // Convert Firebase object-arrays back to real arrays
                 Object.keys(remote).forEach(function(key) {
-                    try {
-                        var val = remote[key];
-                        if (val && typeof val === 'object' && !Array.isArray(val)) {
-                            var ks = Object.keys(val);
-                            if (ks.length > 0 && ks.every(function(k){ return /^\d+$/.test(k); })) {
-                                val = ks.map(function(k){ return val[k]; });
-                            }
-                        }
-                        localStorage.setItem('hms_' + key, JSON.stringify(val));
-                    } catch(e2){}
+                    try { localStorage.setItem('hms_' + key, JSON.stringify(remote[key])); } catch(e2){}
                 });
                 localStorage.setItem('hms_last_cloud_sync', new Date().toISOString());
                 var count = 0;
@@ -178,7 +178,7 @@
                 clearTimeout(_timer);
                 var msg = err && err.message ? err.message : 'unknown error';
                 setMsg('⚠ Cloud error: ' + msg + ' — use "New device? Setup".', 'orange');
-                console.error('[HMS] Firebase pull failed:', msg);
+                console.error('[HMS] Supabase pull failed:', msg);
             });
         })();
 

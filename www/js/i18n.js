@@ -10,11 +10,11 @@
  * - Language preference is persisted to localStorage under 'hms_lang' so it
  *   survives reloads on this device. If/when this is tied to a logged-in
  *   user's profile (so it follows them across devices via the existing
- *   Firebase sync), that should live in the user record and be read into
+ *   cloud sync), that should live in the user record and be read into
  *   localStorage at login time — the API below (getLang/setLang) doesn't need
  *   to change for that.
  * - IMPORTANT SCOPE NOTE: messages that originate from AUTH.* / DB.* calls
- *   (js/data.js, js/firebase-config.js) are NOT translated here because their
+ *   (js/data.js, js/supabase-config.js) are NOT translated here because their
  *   English strings are generated in those files, not this one. Translating
  *   them requires either (a) refactoring those functions to return a message
  *   *code* (e.g. 'ERR_INVALID_CREDENTIALS') that this layer maps to text, or

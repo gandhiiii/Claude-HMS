@@ -52,7 +52,7 @@
  * in js/data.js if they differ ('hod' vs 'HOD' vs 'head', etc.).
  *
  * SECURITY NOTE: these checks run in the browser and are UX-level guardrails
- * only. Real enforcement requires Firebase Auth + database security rules
+ * only. Real enforcement requires proper cloud Auth + database security rules
  * (see the security review). Do not treat this module as access control.
  *
  * SYNC NOTE: persistence goes through DB.set (whole-array writes), so this

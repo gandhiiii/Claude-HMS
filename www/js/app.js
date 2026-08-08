@@ -332,7 +332,7 @@ const Router = {
         } catch (e) { APP.notify('Could not generate setup: ' + e.message, 'error'); }
     },
     _syncNow() {
-        if (!window.FB_DB) { APP.notify('No database connection', 'error'); return; }
+        if (!window.SB_DB) { APP.notify('No database connection', 'error'); return; }
         const btn = document.getElementById('syncNowBtn');
         if (btn) { btn.disabled = true; btn.textContent = '⟳ Syncing…'; }
         try { SYNC.pushAll(); } catch (e) {}
