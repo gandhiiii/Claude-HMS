@@ -266,10 +266,17 @@ function renderHodDashboard(container) {
         tabs.push({ id: 'uniform', label: '👕 Uniform', badge: (DB.get('hodUniforms') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU && x.status === 'pending'; }).length, bc: 'badge-warning' });
         tabs.push({ id: 'uniformreturn', label: '↩️ Uniform Return', badge: (DB.get('hodUniforms') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU && x.status === 'returned'; }).length, bc: 'badge-secondary' });
     }
-    var canLocker = canUniform;
+    var canLocker = true;
     if (canLocker) {
-        tabs.push({ id: 'locker', label: '🔐 Locker', badge: (DB.get('hodLockers') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU && x.status === 'pending'; }).length, bc: 'badge-warning' });
-        tabs.push({ id: 'lockerreturn', label: '↩️ Locker Return', badge: (DB.get('hodLockers') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU && x.status === 'returned'; }).length, bc: 'badge-secondary' });
+        var _isAll = !_dlowU || _dlowU === 'all' || _dlowU === 'all departments';
+        tabs.push({ id: 'locker', label: '🔐 Locker', badge: (DB.get('hodLockers') || []).filter(function(x){
+            var xd = (x.department||'').trim().toLowerCase();
+            return (_isAll || canUniform || !xd || xd === _dlowU) && x.status === 'pending';
+        }).length, bc: 'badge-warning' });
+        tabs.push({ id: 'lockerreturn', label: '↩️ Locker Return', badge: (DB.get('hodLockers') || []).filter(function(x){
+            var xd = (x.department||'').trim().toLowerCase();
+            return (_isAll || canUniform || !xd || xd === _dlowU) && x.status === 'returned';
+        }).length, bc: 'badge-secondary' });
     }
     var canHandover = (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') ||
         ['it', 'facility', 'maintenance'].indexOf(_dlowU) !== -1;
@@ -3445,16 +3452,25 @@ function hodDownloadUniformPdf() {
 /* ═══════════════════════════════════════════════
    LOCKER TAB — Locker allocation management
    ═══════════════════════════════════════════════ */
+function _filterHodLockers(user, dept, excludeStatus) {
+    var deptLow = (dept || '').trim().toLowerCase();
+    var isAllDept = !deptLow || deptLow === 'all' || deptLow === 'all departments';
+    var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
+    var isFacility = (user.department || '').trim().toLowerCase() === 'facility';
+    var lockers = DB.get('hodLockers') || [];
+
+    return lockers.filter(function(l) {
+        if (excludeStatus && l.status === excludeStatus) return false;
+        if (isAllDept || admin || isFacility) return true;
+        return (l.department || '').trim().toLowerCase() === deptLow || !l.department;
+    });
+}
+
 function _hodLocker(el) {
     var user = AUTH.currentUser();
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = window._hodActiveDept || user.department || '';
-    var deptLow = dept.trim().toLowerCase();
-    var all = (DB.get('hodLockers') || []).filter(function(l){
-        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
-        var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
-        return (admin || isFacility || (l.department||'').trim().toLowerCase() === deptLow) && l.status !== 'returned';
-    });
+    var all = _filterHodLockers(user, dept, 'returned');
     var pending = all.filter(function(l){ return l.status === 'pending'; });
     var allocated = all.filter(function(l){ return l.status === 'allocated'; });
     var returned = all.filter(function(l){ return l.status === 'returned'; });
@@ -3817,12 +3833,7 @@ function hodDownloadLockerReport() {
     var user = AUTH.currentUser();
     if (!user) return;
     var dept = window._hodActiveDept || user.department || '';
-    var deptLow = dept.trim().toLowerCase();
-    var all = (DB.get('hodLockers') || []).filter(function(l){
-        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
-        var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
-        return admin || isFacility || (l.department||'').trim().toLowerCase() === deptLow;
-    });
+    var all = _filterHodLockers(user, dept);
     try {
         var wb = XLSX.utils.book_new();
         var pending = all.filter(function(l){ return l.status === 'pending'; });
@@ -3867,12 +3878,7 @@ function hodDownloadLockerPdf() {
     if (!user) return;
     var dept = window._hodActiveDept || user.department || '';
     if (typeof window.jspdf==='undefined'){ APP.notify('PDF library not loaded','error'); return; }
-    var deptLow = dept.trim().toLowerCase();
-    var all = (DB.get('hodLockers') || []).filter(function(l){
-        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
-        var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
-        return admin || isFacility || (l.department||'').trim().toLowerCase() === deptLow;
-    });
+    var all = _filterHodLockers(user, dept);
     var pending = all.filter(function(l){ return l.status === 'pending'; });
     var allocated = all.filter(function(l){ return l.status === 'allocated'; });
     var returned = all.filter(function(l){ return l.status === 'returned'; });
@@ -4023,12 +4029,7 @@ function _hodLockerReturn(el) {
     var user = AUTH.currentUser();
     if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = window._hodActiveDept || user.department || '';
-    var deptLow = dept.trim().toLowerCase();
-    var all = (DB.get('hodLockers') || []).filter(function(l){
-        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
-        var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
-        return admin || isFacility || (l.department||'').trim().toLowerCase() === deptLow;
-    });
+    var all = _filterHodLockers(user, dept);
     var allocated = all.filter(function(l){ return l.status === 'allocated'; });
     var returned = all.filter(function(l){ return l.status === 'returned'; });
 
@@ -4119,12 +4120,7 @@ function hodDownloadLockerReturnPdf() {
     if (!user) return;
     var dept = window._hodActiveDept || user.department || '';
     if (typeof window.jspdf==='undefined'){ APP.notify('PDF library not loaded','error'); return; }
-    var deptLow = dept.trim().toLowerCase();
-    var all = (DB.get('hodLockers') || []).filter(function(l){
-        var admin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
-        var isFacility = (user.department||'').trim().toLowerCase() === 'facility';
-        return (admin || isFacility || (l.department||'').trim().toLowerCase() === deptLow) && l.status === 'returned';
-    });
+    var all = _filterHodLockers(user, dept).filter(function(l){ return l.status === 'returned'; });
     var doc = new window.jspdf.jsPDF({ orientation: 'landscape' });
     doc.setFontSize(14);
     doc.text('Locker Return Report — ' + dept, 14, 15);

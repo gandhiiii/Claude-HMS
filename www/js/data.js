@@ -913,6 +913,111 @@ const APP = {
             if (!Array.isArray(floors) || floors.length === 0) {
                 DB.set('floorItems', FLOOR_ITEMS);
             }
+            if (!Array.isArray(DB.get('hodLockers')) || DB.get('hodLockers').length === 0) {
+                DB.set('hodLockers', [
+                    {
+                        id: 'lck-101',
+                        staffName: 'Priya Sharma',
+                        employeeId: 'EMP-101',
+                        lockerNumber: 'A-01',
+                        lockerLocation: 'Ground Floor, Wing A',
+                        department: 'Nursing',
+                        status: 'allocated',
+                        notes: 'Day shift nurse locker',
+                        allocatedBy: 'Facility HOD',
+                        allocatedAt: new Date().toISOString(),
+                        createdBy: 'admin',
+                        createdByName: 'System Admin',
+                        createdAt: new Date().toISOString()
+                    },
+                    {
+                        id: 'lck-102',
+                        staffName: 'Rahul Verma',
+                        employeeId: 'EMP-102',
+                        lockerNumber: 'A-02',
+                        lockerLocation: 'Ground Floor, Wing A',
+                        department: 'Facility',
+                        status: 'allocated',
+                        notes: 'Maintenance staff locker',
+                        allocatedBy: 'Facility HOD',
+                        allocatedAt: new Date().toISOString(),
+                        createdBy: 'admin',
+                        createdByName: 'System Admin',
+                        createdAt: new Date().toISOString()
+                    },
+                    {
+                        id: 'lck-103',
+                        staffName: 'Anil Kumar',
+                        employeeId: 'EMP-105',
+                        lockerNumber: 'A-03',
+                        lockerLocation: 'Ground Floor, Wing A',
+                        department: 'Housekeeping',
+                        status: 'pending',
+                        notes: 'New joinee allocation pending',
+                        createdBy: 'admin',
+                        createdByName: 'System Admin',
+                        createdAt: new Date().toISOString()
+                    },
+                    {
+                        id: 'lck-104',
+                        staffName: 'Sunita Patel',
+                        employeeId: 'EMP-108',
+                        lockerNumber: 'B-01',
+                        lockerLocation: '1st Floor, Wing B',
+                        department: 'ICU',
+                        status: 'allocated',
+                        notes: 'ICU senior nurse locker',
+                        allocatedBy: 'Facility HOD',
+                        allocatedAt: new Date().toISOString(),
+                        createdBy: 'admin',
+                        createdByName: 'System Admin',
+                        createdAt: new Date().toISOString()
+                    },
+                    {
+                        id: 'lck-105',
+                        staffName: 'Vikram Singh',
+                        employeeId: 'EMP-112',
+                        lockerNumber: 'B-02',
+                        lockerLocation: '1st Floor, Wing B',
+                        department: 'Pharmacy',
+                        status: 'pending',
+                        notes: 'Key issued pending verification',
+                        createdBy: 'admin',
+                        createdByName: 'System Admin',
+                        createdAt: new Date().toISOString()
+                    },
+                    {
+                        id: 'lck-106',
+                        staffName: 'Neha Gupta',
+                        employeeId: 'EMP-115',
+                        lockerNumber: 'B-03',
+                        lockerLocation: '1st Floor, Wing B',
+                        department: 'IT',
+                        status: 'allocated',
+                        notes: 'IT Support staff locker',
+                        allocatedBy: 'Facility HOD',
+                        allocatedAt: new Date().toISOString(),
+                        createdBy: 'admin',
+                        createdByName: 'System Admin',
+                        createdAt: new Date().toISOString()
+                    },
+                    {
+                        id: 'lck-107',
+                        staffName: 'Ramesh Yadav',
+                        employeeId: 'EMP-099',
+                        lockerNumber: 'C-01',
+                        lockerLocation: 'Ground Floor, Wing C',
+                        department: 'Facility',
+                        status: 'returned',
+                        notes: 'Resigned staff - key returned',
+                        returnedBy: 'Facility HOD',
+                        returnedAt: new Date().toISOString(),
+                        createdBy: 'admin',
+                        createdByName: 'System Admin',
+                        createdAt: new Date().toISOString()
+                    }
+                ]);
+            }
         } catch (e) {
             console.warn('seedData error:', e);
         }
