@@ -27,6 +27,11 @@ const DB = {
         var json = JSON.stringify(data);
         try { localStorage.setItem('hms_' + key, json); } catch (e) { console.warn('localStorage set error:', e); }
         try { sessionStorage.setItem('hms_' + key, json); } catch (e) { console.warn('sessionStorage set error:', e); }
+        try {
+            if (window.FB_DB) {
+                window.FB_DB.ref('hms/' + key).set(data);
+            }
+        } catch(e) {}
     },
     add(key, item) {
         this._autoSnapBeforeChange(key, 'add');
@@ -235,6 +240,39 @@ const DB = {
             localStorage.setItem('hms_bk_last_change_ts', Date.now().toString());
             this.autoBackup('before-' + action + ':' + key);
         } catch(e) {}
+    },
+
+    /* Auto-recover lost hodLockers data from local backups if primary key was wiped */
+    recoverHodLockers() {
+        try {
+            var current = this.get('hodLockers');
+            if (Array.isArray(current) && current.length > 0) return current;
+            var bkIndex = this.getBackupIndex ? this.getBackupIndex() : [];
+            for (var i = 0; i < bkIndex.length; i++) {
+                var raw = localStorage.getItem('hms_bk_' + bkIndex[i].n);
+                if (raw) {
+                    var snap = JSON.parse(raw);
+                    var data = snap.data || snap;
+                    if (data && Array.isArray(data.hodLockers) && data.hodLockers.length > 0) {
+                        this.set('hodLockers', data.hodLockers);
+                        return data.hodLockers;
+                    }
+                }
+            }
+            var slots = ['hms_backup_1', 'hms_backup_2', 'hms_backup_3'];
+            for (var j = 0; j < slots.length; j++) {
+                var rawSlot = localStorage.getItem(slots[j]);
+                if (rawSlot) {
+                    var snapSlot = JSON.parse(rawSlot);
+                    var dataSlot = snapSlot.data || snapSlot;
+                    if (dataSlot && Array.isArray(dataSlot.hodLockers) && dataSlot.hodLockers.length > 0) {
+                        this.set('hodLockers', dataSlot.hodLockers);
+                        return dataSlot.hodLockers;
+                    }
+                }
+            }
+        } catch(e) {}
+        return [];
     },
 
     /* Return the backup index (newest-first) */
@@ -913,8 +951,8 @@ const APP = {
             if (!Array.isArray(floors) || floors.length === 0) {
                 DB.set('floorItems', FLOOR_ITEMS);
             }
-            if (!Array.isArray(DB.get('hodLockers'))) {
-                DB.set('hodLockers', []);
+            if (!Array.isArray(DB.get('hodLockers')) || DB.get('hodLockers').length === 0) {
+                DB.recoverHodLockers();
             }
         } catch (e) {
             console.warn('seedData error:', e);

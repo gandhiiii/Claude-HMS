@@ -61,13 +61,14 @@ var SYNC = (function () {
     function _mergeIntoLocal(key, remoteData) {
         try {
             var localRaw = localStorage.getItem('hms_' + key);
-            var merged       = remoteData;
-            var hasLocalOnly = false;
+            var localData = null;
+            if (localRaw) {
+                try { localData = JSON.parse(localRaw); } catch(e) {}
+            }
 
             if (key === '_deleted_ids') {
-                var localDel = {};
-                try { if (localRaw) localDel = JSON.parse(localRaw); } catch(e) {}
-                var mergedDel = Object.assign({}, remoteData || {}, localDel || {});
+                var localDel = localData || {};
+                var mergedDel = Object.assign({}, remoteData || {}, localDel);
                 var jsonDel = JSON.stringify(mergedDel);
                 localStorage.setItem('hms_' + key, jsonDel);
                 sessionStorage.setItem('hms_' + key, jsonDel);
@@ -82,38 +83,43 @@ var SYNC = (function () {
                 if (delRaw) deletedMap = JSON.parse(delRaw);
             } catch(e) {}
 
-            if (localRaw) {
-                var localData;
-                try { localData = JSON.parse(localRaw); } catch (e) { localData = null; }
+            // If Firebase has null/undefined for this key, keep local data & schedule cloud upload
+            if (remoteData === null || remoteData === undefined) {
+                if (localData !== null && localData !== undefined) {
+                    var hasData = Array.isArray(localData) ? localData.length > 0 : !!localData;
+                    if (hasData) return true; // hasLocalOnly = true -> triggers fbPush
+                }
+                return false;
+            }
 
-                if (Array.isArray(remoteData) && Array.isArray(localData)) {
-                    var cleanRemote = remoteData.filter(function(i) {
-                        return !(i && i.id && deletedMap[i.id]);
+            var merged = remoteData;
+            var hasLocalOnly = false;
+
+            if (Array.isArray(remoteData) && Array.isArray(localData)) {
+                var cleanRemote = remoteData.filter(function(i) {
+                    return !(i && i.id && deletedMap[i.id]);
+                });
+                var isObjArr = cleanRemote.some(function (i) { return i && typeof i === 'object' && i.id; }) ||
+                               localData.some(function (i)  { return i && typeof i === 'object' && i.id; });
+                if (isObjArr) {
+                    var remoteIds = {};
+                    cleanRemote.forEach(function (i) { if (i && i.id) remoteIds[i.id] = true; });
+                    merged = cleanRemote.slice();
+                    localData.forEach(function (item) {
+                        if (item && item.id && !remoteIds[item.id] && !deletedMap[item.id]) {
+                            merged.push(item);
+                            hasLocalOnly = true;
+                        }
                     });
-                    var isObjArr = cleanRemote.some(function (i) { return i && typeof i === 'object' && i.id; }) ||
-                                   localData.some(function (i)  { return i && typeof i === 'object' && i.id; });
-                    if (isObjArr) {
-                        var remoteIds = {};
-                        cleanRemote.forEach(function (i) { if (i && i.id) remoteIds[i.id] = true; });
-                        merged = cleanRemote.slice();
-                        localData.forEach(function (item) {
-                            if (item && item.id && !remoteIds[item.id] && !deletedMap[item.id]) {
-                                merged.push(item);
-                                hasLocalOnly = true;
-                            }
-                        });
-                    } else {
-                        merged = cleanRemote;
-                    }
-                } else if (Array.isArray(remoteData)) {
-                    merged = remoteData.filter(function(i) {
-                        return !(i && i.id && deletedMap[i.id]);
-                    });
+                } else {
+                    merged = cleanRemote;
                 }
             } else if (Array.isArray(remoteData)) {
                 merged = remoteData.filter(function(i) {
                     return !(i && i.id && deletedMap[i.id]);
                 });
+            } else if (remoteData && typeof remoteData === 'object' && localData && typeof localData === 'object') {
+                merged = Object.assign({}, localData, remoteData);
             }
 
             var json = JSON.stringify(merged);
