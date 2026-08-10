@@ -85,7 +85,7 @@ const DB = {
     /* ── All keys synced to the cloud / exported in backups ── */
     _ALL_KEYS: [
         'users', 'departments', 'featureRights',
-        'inventory', 'inventory_receipts', 'scraps',
+        'inventory', 'inventory_receipts', 'scraps', 'scrapConfig',
         'gatesecurity', 'phase2Tasks',
         'projects', 'ambulance', 'ambulance_trips',
         'problems', 'tasks', 'hodTasks', 'hodRequests', 'hodPurchases',

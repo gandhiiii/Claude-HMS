@@ -2,12 +2,31 @@
 // Records scrap removal with category + unit + quantity.
 // Access: Admin (super_admin/admin) + Facility/Maintenance/IT HOD only.
 
-var SCRAP_UNITS = ['KG', 'Gram', 'Ton', 'Piece', 'Parts', 'Machine', 'Carton', 'Bag', 'Litre', 'Other'];
-var SCRAP_CATEGORIES = [
+var SCRAP_UNITS_DEFAULT = ['KG', 'Gram', 'Ton', 'Piece', 'Parts', 'Machine', 'Carton', 'Bag', 'Litre', 'Other'];
+var SCRAP_CATEGORIES_DEFAULT = [
     'Cardboard', 'Paper', 'Steel', 'MS', 'Aluminium', 'Plastics', 'Glass',
     'Wood', 'Copper', 'Wire / Cable', 'Electronics', 'Machine', 'Parts',
     'Furniture', 'Packaging', 'Iron', 'Foam', 'Rubber', 'Other'
 ];
+
+function _scrapConfig() {
+    var cfg = DB.get('scrapConfig');
+    return cfg && typeof cfg === 'object' ? cfg : { units: [], categories: [] };
+}
+
+function _scrapUnits() {
+    var custom = (_scrapConfig().units || []).filter(Boolean);
+    var merged = custom.slice();
+    SCRAP_UNITS_DEFAULT.forEach(function (u) { if (merged.indexOf(u) === -1) merged.push(u); });
+    return merged;
+}
+
+function _scrapCategories() {
+    var custom = (_scrapConfig().categories || []).filter(Boolean);
+    var merged = custom.slice();
+    SCRAP_CATEGORIES_DEFAULT.forEach(function (c) { if (merged.indexOf(c) === -1) merged.push(c); });
+    return merged;
+}
 
 function renderScrap(container) {
     container.innerHTML = `
@@ -15,7 +34,10 @@ function renderScrap(container) {
             <div class="search-box">
                 <input type="text" class="form-control" id="scrapSearch" placeholder="🔍 Search category / unit / location…" oninput="renderScrapList()">
             </div>
-            <button class="btn btn-primary" onclick="showScrapForm()">➕ Record Scrap Removal</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-sm" onclick="showScrapManage()" title="Add / remove categories & units">⚙️ Manage</button>
+                <button class="btn btn-primary" onclick="showScrapForm()">➕ Record Scrap Removal</button>
+            </div>
         </div>
 
         <div class="grid-3 mb-4" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">
@@ -89,8 +111,8 @@ function _escScrap(s) {
 }
 
 function showScrapForm() {
-    const catOptions = SCRAP_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
-    const unitOptions = SCRAP_UNITS.map(u => `<option value="${u}">${u}</option>`).join('');
+    const catOptions = _scrapCategories().map(c => `<option value="${c}">${c}</option>`).join('');
+    const unitOptions = _scrapUnits().map(u => `<option value="${u}">${u}</option>`).join('');
     const form = `
         <form id="scrapForm">
             <div class="grid-2">
@@ -206,4 +228,96 @@ function confirmScrapDelete(id) {
         APP.notify('Scrap record deleted', 'success');
         renderScrapList();
     });
+}
+
+/* ── Manage categories & units (synced to cloud via scrapConfig) ── */
+function showScrapManage() {
+    const cats = _scrapCategories();
+    const units = _scrapUnits();
+    const catChips = cats.map((c, i) => `
+        <span style="display:inline-flex;align-items:center;gap:6px;background:#eef2fb;border:1px solid #c5cee8;border-radius:14px;padding:4px 10px;font-size:12px;">
+            ${_escScrap(c)}
+            <button onclick="scrapRemoveCat('${_escScrap(c).replace(/'/g, "\\'")}')" style="border:none;background:none;cursor:pointer;color:#e53935;font-size:13px;line-height:1;" title="Remove">×</button>
+        </span>`).join('');
+    const unitChips = units.map((u, i) => `
+        <span style="display:inline-flex;align-items:center;gap:6px;background:#e8f5e9;border:1px solid #bfdcc4;border-radius:14px;padding:4px 10px;font-size:12px;">
+            ${_escScrap(u)}
+            <button onclick="scrapRemoveUnit('${_escScrap(u).replace(/'/g, "\\'")}')" style="border:none;background:none;cursor:pointer;color:#e53935;font-size:13px;line-height:1;" title="Remove">×</button>
+        </span>`).join('');
+    const html = `
+        <div class="modal-header">
+            <h3>⚙️ Manage Scrap Categories & Units</h3>
+            <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
+        </div>
+        <p style="font-size:12px;color:var(--gray);margin-bottom:12px;">Add or remove the values available in the scrap form. Changes sync to the cloud for all devices.</p>
+        <div style="background:#f8f9fa;border:1px solid #e0e0e0;border-radius:10px;padding:12px;margin-bottom:14px;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+                <strong style="font-size:13px;">Categories</strong>
+                <input type="text" id="scrapNewCat" class="form-control" style="width:160px;" placeholder="e.g. Brass">
+                <button class="btn btn-sm btn-primary" onclick="scrapAddCat()">➕ Add</button>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChips || '<span style="color:#aaa;font-size:12px;">No categories</span>'}</div>
+        </div>
+        <div style="background:#f8f9fa;border:1px solid #e0e0e0;border-radius:10px;padding:12px;margin-bottom:14px;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+                <strong style="font-size:13px;">Units</strong>
+                <input type="text" id="scrapNewUnit" class="form-control" style="width:160px;" placeholder="e.g. Boxes">
+                <button class="btn btn-sm btn-primary" onclick="scrapAddUnit()">➕ Add</button>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">${unitChips || '<span style="color:#aaa;font-size:12px;">No units</span>'}</div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;">
+            <button class="btn" onclick="this.closest('.modal').remove()">Close</button>
+        </div>`;
+    showModal(html);
+}
+
+function _scrapSaveConfig(next) {
+    DB.set('scrapConfig', next);
+}
+
+function scrapAddCat() {
+    const val = (document.getElementById('scrapNewCat').value || '').trim();
+    if (!val) { APP.notify('Enter a category name', 'error'); return; }
+    const cfg = _scrapConfig();
+    if (!cfg.categories) cfg.categories = [];
+    if (cfg.categories.indexOf(val) === -1 && SCRAP_CATEGORIES_DEFAULT.indexOf(val) === -1) {
+        cfg.categories.push(val);
+        _scrapSaveConfig(cfg);
+        APP.notify('Category added', 'success');
+    } else {
+        APP.notify('Category already exists', 'warning');
+    }
+    showScrapManage();
+}
+
+function scrapRemoveCat(name) {
+    const cfg = _scrapConfig();
+    cfg.categories = (cfg.categories || []).filter(c => c !== name);
+    _scrapSaveConfig(cfg);
+    APP.notify('Category removed', 'success');
+    showScrapManage();
+}
+
+function scrapAddUnit() {
+    const val = (document.getElementById('scrapNewUnit').value || '').trim();
+    if (!val) { APP.notify('Enter a unit name', 'error'); return; }
+    const cfg = _scrapConfig();
+    if (!cfg.units) cfg.units = [];
+    if (cfg.units.indexOf(val) === -1 && SCRAP_UNITS_DEFAULT.indexOf(val) === -1) {
+        cfg.units.push(val);
+        _scrapSaveConfig(cfg);
+        APP.notify('Unit added', 'success');
+    } else {
+        APP.notify('Unit already exists', 'warning');
+    }
+    showScrapManage();
+}
+
+function scrapRemoveUnit(name) {
+    const cfg = _scrapConfig();
+    cfg.units = (cfg.units || []).filter(u => u !== name);
+    _scrapSaveConfig(cfg);
+    APP.notify('Unit removed', 'success');
+    showScrapManage();
 }
