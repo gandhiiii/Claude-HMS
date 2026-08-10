@@ -72,6 +72,7 @@ const Router = {
             { id: 'departments', label: _t('nav_departments'), icon: '🏢', permission: 'departments' },
             { id: 'feature-rights', label: _t('nav_feature_rights'), icon: '🔐', permission: 'departments' },
             { id: 'inventory', label: _t('nav_inventory'), icon: '📦', permission: 'inventory' },
+            { id: 'scrap', label: '🗑️ Scrap / Disposal', icon: '🗑️', permission: 'scrap' },
             { id: 'gate-security', label: _t('nav_gate_security'), icon: '🛡️', permission: 'gate-security' },
             { id: 'phase2', label: _t('nav_phase2'), icon: '🏗️', permission: 'projects' },
             { id: 'projects', label: _t('nav_projects'), icon: '📋', permission: 'projects' },
@@ -161,6 +162,7 @@ const Router = {
         const navKeyMap = {
             dashboard: 'nav_dashboard', users: 'nav_users', departments: 'nav_departments',
             'feature-rights': 'nav_feature_rights', inventory: 'nav_inventory',
+            scrap: 'Scrap / Disposal',
             'gate-security': 'nav_gate_security', phase2: 'nav_phase2',
             projects: 'nav_projects', ambulance: 'nav_ambulance',
             problems: 'nav_problems', tasks: 'nav_tasks',
@@ -199,6 +201,7 @@ const Router = {
             departments: renderDepartments,
             'feature-rights': renderFeatureRights,
             inventory: renderInventory,
+            scrap: renderScrap,
             'gate-security': renderGateSecurity,
             phase2: renderPhase2,
             projects: renderProjects,

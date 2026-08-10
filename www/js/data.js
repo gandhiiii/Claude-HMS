@@ -85,7 +85,7 @@ const DB = {
     /* ── All keys synced to the cloud / exported in backups ── */
     _ALL_KEYS: [
         'users', 'departments', 'featureRights',
-        'inventory', 'inventory_receipts',
+        'inventory', 'inventory_receipts', 'scraps',
         'gatesecurity', 'phase2Tasks',
         'projects', 'ambulance', 'ambulance_trips',
         'problems', 'tasks', 'hodTasks', 'hodRequests', 'hodPurchases',
@@ -436,6 +436,14 @@ const AUTH = {
         if (permission === 'budget') return user.isSuperAdmin || user.role === 'admin';
         if (permission === 'quarterly-priorities') return user.isSuperAdmin || user.role === 'admin';
         if (permission === 'purchases') return user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || user.role === 'hod';
+        if (permission === 'scrap') {
+            if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
+            if (user.role === 'hod') {
+                var _scrapDept = (user.department || '').trim().toLowerCase();
+                if (_scrapDept === 'facility' || _scrapDept === 'it' || _scrapDept === 'maintenance') return true;
+            }
+            return false;
+        }
         if (permission === 'md-report') {
             if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
             if (user.role === 'hod') {
