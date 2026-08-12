@@ -42,6 +42,14 @@ function getRooms() {
     return DB.get('rooms');
 }
 
+function getRoomCategory(roomNo) {
+    var rooms = DB.get('rooms') || [];
+    for (var i = 0; i < rooms.length; i++) {
+        if (String(rooms[i].roomNo) === String(roomNo)) return rooms[i].category || '';
+    }
+    return '';
+}
+
 function saveRooms(rooms) {
     DB.set('rooms', rooms);
 }
@@ -1160,7 +1168,7 @@ function refreshAdmReport() {
     }
     var html = '<div class="table-responsive"><table><thead><tr>' +
         '<th>#</th><th>Patient Name</th><th>ID</th><th>Age/Gender</th><th>Room/Bed</th>' +
-        '<th>Doctor</th><th>Type</th><th>Admitted</th><th>Discharged</th>' +
+        '<th>Room Category</th><th>Doctor</th><th>Type</th><th>Admitted</th><th>Discharged</th>' +
         '<th>Stay (days)</th><th>Bill (₹)</th><th>Payment</th><th>Status</th></tr></thead><tbody>';
 
     var sorted = rows.slice().sort(function(a, b) {
@@ -1178,6 +1186,7 @@ function refreshAdmReport() {
             '<td>' + esc(a.patientId || '#' + a.id.slice(-6)) + '</td>' +
             '<td>' + esc(a.age || '—') + ' / ' + esc(a.gender || '—') + '</td>' +
             '<td>' + esc(a.roomNo) + esc(bedLabel) + '</td>' +
+            '<td>' + esc(getRoomCategory(a.roomNo) || '—') + '</td>' +
             '<td>' + esc(a.doctorName || '—') + '</td>' +
             '<td><span class="badge ' + getAdmTypeBadgeClass(a.type) + '">' + esc(a.type || 'regular').toUpperCase() + '</span></td>' +
             '<td>' + APP.formatDate(a.admissionDate) + '</td>' +
@@ -1210,7 +1219,7 @@ function exportAdmPDF() {
     var tableRows = rows.slice().sort(function(a,b){ return new Date(b.admissionDate)-new Date(a.admissionDate); }).map(function(a,i){
         var stay = a.status==='discharged'&&a.dischargeDate ? APP.daysBetween(a.admissionDate,a.dischargeDate) : (a.status==='admitted' ? APP.daysBetween(a.admissionDate,new Date().toISOString()) : '—');
         var bedLabel = a.bedId ? ' ('+a.bedId+')' : '';
-        return '<tr><td>'+(i+1)+'</td><td>'+esc(a.patientName)+'</td><td>'+esc(a.patientId||'#'+a.id.slice(-6))+'</td><td>'+esc(a.age||'')+'/'+(a.gender||'')+'</td><td>'+esc(a.roomNo)+esc(bedLabel)+'</td><td>'+esc(a.doctorName||'')+'</td><td>'+esc(a.type)+'</td><td>'+APP.formatDate(a.admissionDate)+'</td><td>'+(a.dischargeDate?APP.formatDate(a.dischargeDate):'—')+'</td><td>'+stay+'</td><td>'+(a.billAmount?'₹'+parseFloat(a.billAmount).toLocaleString('en-IN'):'—')+'</td><td>'+esc(a.paymentStatus||'')+'</td><td>'+esc(a.status)+'</td></tr>';
+        return '<tr><td>'+(i+1)+'</td><td>'+esc(a.patientName)+'</td><td>'+esc(a.patientId||'#'+a.id.slice(-6))+'</td><td>'+esc(a.age||'')+'/'+(a.gender||'')+'</td><td>'+esc(a.roomNo)+esc(bedLabel)+'</td><td>'+esc(getRoomCategory(a.roomNo)||'')+'</td><td>'+esc(a.doctorName||'')+'</td><td>'+esc(a.type)+'</td><td>'+APP.formatDate(a.admissionDate)+'</td><td>'+(a.dischargeDate?APP.formatDate(a.dischargeDate):'—')+'</td><td>'+stay+'</td><td>'+(a.billAmount?'₹'+parseFloat(a.billAmount).toLocaleString('en-IN'):'—')+'</td><td>'+esc(a.paymentStatus||'')+'</td><td>'+esc(a.status)+'</td></tr>';
     }).join('');
 
     var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Admission Report</title><style>' +
@@ -1239,7 +1248,7 @@ function exportAdmPDF() {
         '<div class="sum-card"><div class="sum-val">'+emergency+'</div><div class="sum-lbl">Emergency</div></div>' +
         '<div class="sum-card"><div class="sum-val">₹'+totalBill.toLocaleString('en-IN')+'</div><div class="sum-lbl">Total Revenue</div></div>' +
         '</div>' +
-        '<table><thead><tr><th>#</th><th>Patient</th><th>ID</th><th>Age/Gen</th><th>Room</th><th>Doctor</th><th>Type</th><th>Admitted</th><th>Discharged</th><th>Stay</th><th>Bill</th><th>Payment</th><th>Status</th></tr></thead><tbody>' + tableRows + '</tbody></table>' +
+        '<table><thead><tr><th>#</th><th>Patient</th><th>ID</th><th>Age/Gen</th><th>Room</th><th>Category</th><th>Doctor</th><th>Type</th><th>Admitted</th><th>Discharged</th><th>Stay</th><th>Bill</th><th>Payment</th><th>Status</th></tr></thead><tbody>' + tableRows + '</tbody></table>' +
         '<div class="footer">Stavya Intelligence &nbsp;|&nbsp; Total: '+rows.length+' records &nbsp;|&nbsp; Printed: '+new Date().toLocaleString('en-IN')+'</div>' +
         '</body></html>';
 
@@ -1259,7 +1268,7 @@ function exportAdmExcel() {
     var to = document.getElementById('rptTo') ? document.getElementById('rptTo').value : '';
 
     var headers = ['#','Patient Name','Patient ID','Age','Gender','Phone','Emergency Contact',
-        'Room No','Bed','Doctor','Department','Type','Admission Date','Discharge Date',
+        'Room No','Room Category','Bed','Doctor','Department','Type','Admission Date','Discharge Date',
         'Stay (days)','Diagnosis','Bill Amount (INR)','Payment Status','Status','Notes'];
 
     var csvRows = [headers];
@@ -1278,6 +1287,7 @@ function exportAdmExcel() {
             csvCell(a.phone||''),
             csvCell(a.emergencyContact||''),
             csvCell(a.roomNo),
+            csvCell(getRoomCategory(a.roomNo)||''),
             csvCell(a.bedId||''),
             csvCell(a.doctorName||''),
             csvCell(a.department||''),
