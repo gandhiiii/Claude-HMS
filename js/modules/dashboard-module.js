@@ -277,11 +277,11 @@ function renderDashboard(container) {
                     <div style="font-size:12px;color:var(--gray);">ICU</div>
                 </div>
                 <div style="text-align:center;padding:16px;background:#f3e8ff;border-radius:8px;">
-                    <div style="font-size:28px;font-weight:700;color:#7e22ce;">${admissions.filter(a=>a.type==='pre-op'||a.type==='pre_op').length}</div>
+                    <div style="font-size:28px;font-weight:700;color:#7e22ce;">${admissions.filter(a=>getAdmEffType(a)==='pre-op').length}</div>
                     <div style="font-size:12px;color:var(--gray);">Pre OP</div>
                 </div>
                 <div style="text-align:center;padding:16px;background:#e6fffa;border-radius:8px;">
-                    <div style="font-size:28px;font-weight:700;color:#0d9488;">${admissions.filter(a=>a.type==='post-op'||a.type==='post_op').length}</div>
+                    <div style="font-size:28px;font-weight:700;color:#0d9488;">${admissions.filter(a=>getAdmEffType(a)==='post-op').length}</div>
                     <div style="font-size:12px;color:var(--gray);">Post OP</div>
                 </div>
                 <div style="text-align:center;padding:16px;background:#fce8e6;border-radius:8px;">

@@ -389,8 +389,8 @@ function _rSummary(el) {
                     adms.filter(function(a){ return a.type==='regular'||!a.type; }).length,
                     adms.filter(function(a){ return a.type==='emergency'; }).length,
                     adms.filter(function(a){ return a.type==='icu'; }).length,
-                    adms.filter(function(a){ return a.type==='pre-op'||a.type==='pre_op'; }).length,
-                    adms.filter(function(a){ return a.type==='post-op'||a.type==='post_op'; }).length
+                    adms.filter(function(a){ return getAdmEffType(a)==='pre-op'; }).length,
+                    adms.filter(function(a){ return getAdmEffType(a)==='post-op'; }).length
                 ], backgroundColor: ['#34a853','#ea4335','#fbbc04','#7e22ce','#0d9488'], borderWidth: 2 }] },
             options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ font:{ size:11 } } } } }
         });
@@ -470,8 +470,8 @@ function _rOverview(el) {
                     adms.filter(function(a){ return a.type==='regular'||!a.type; }).length,
                     adms.filter(function(a){ return a.type==='emergency'; }).length,
                     adms.filter(function(a){ return a.type==='icu'; }).length,
-                    adms.filter(function(a){ return a.type==='pre-op'||a.type==='pre_op'; }).length,
-                    adms.filter(function(a){ return a.type==='post-op'||a.type==='post_op'; }).length
+                    adms.filter(function(a){ return getAdmEffType(a)==='pre-op'; }).length,
+                    adms.filter(function(a){ return getAdmEffType(a)==='post-op'; }).length
                 ], backgroundColor: ['#34a853','#ea4335','#fbbc04','#7e22ce','#0d9488'], borderWidth: 2 }]
             },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
@@ -669,8 +669,8 @@ function _rAdmissions(el) {
                     adms.filter(function(a){ return a.type==='regular'||!a.type; }).length,
                     emergency.length,
                     icu.length,
-                    adms.filter(function(a){ return a.type==='pre-op'||a.type==='pre_op'; }).length,
-                    adms.filter(function(a){ return a.type==='post-op'||a.type==='post_op'; }).length
+                    adms.filter(function(a){ return getAdmEffType(a)==='pre-op'; }).length,
+                    adms.filter(function(a){ return getAdmEffType(a)==='post-op'; }).length
                 ],
                 backgroundColor: ['#34a853','#ea4335','#fbbc04','#7e22ce','#0d9488'], borderWidth: 2 }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }

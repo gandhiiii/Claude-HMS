@@ -1,13 +1,40 @@
 const ROOM_CATEGORIES = ['Super Deluxe', 'Deluxe Special', 'Semi Special', 'Twin', 'Triple'];
 const BED_LABELS = ['A', 'B', 'C'];
 
+function _admIsPreOp(t) {
+    t = String(t || '').toLowerCase().trim();
+    return t === 'pre-op' || t === 'pre_op' || t === 'pre op' || t === 'preop';
+}
+
+function _admIsPostOp(t) {
+    t = String(t || '').toLowerCase().trim();
+    return t === 'post-op' || t === 'post_op' || t === 'post op' || t === 'postop';
+}
+
+// Effective type for an admission: falls back to scanning notes/diagnosis
+// text so records where staff typed "Pre op"/"Post op" into Notes still show
+// up in the Pre OP / Post OP tabs.
+function getAdmEffType(a) {
+    if (!a) return 'regular';
+    var t = String(a.type || '').toLowerCase().trim();
+    if (_admIsPreOp(t)) return 'pre-op';
+    if (_admIsPostOp(t)) return 'post-op';
+    if (t === 'emergency') return 'emergency';
+    if (t === 'icu') return 'icu';
+    if (t === 'regular') return 'regular';
+    var text = String((a.notes || '') + ' ' + (a.diagnosis || '')).toLowerCase();
+    if (/\bpre[- ]?op\b/.test(text)) return 'pre-op';
+    if (/\bpost[- ]?op\b/.test(text)) return 'post-op';
+    return t || 'regular';
+}
+
 function getAdmTypeBadgeClass(type) {
     if (!type) return 'badge-info';
     var t = String(type).toLowerCase();
     if (t === 'emergency') return 'badge-danger';
     if (t === 'icu') return 'badge-warning';
-    if (t === 'pre-op' || t === 'pre_op' || t === 'pre op' || t === 'preop') return 'badge-purple';
-    if (t === 'post-op' || t === 'post_op' || t === 'post op' || t === 'postop') return 'badge-teal';
+    if (_admIsPreOp(t)) return 'badge-purple';
+    if (_admIsPostOp(t)) return 'badge-teal';
     return 'badge-info';
 }
 
@@ -181,7 +208,7 @@ function renderAdmList() {
             }
         }
         if (a.patientName.toLowerCase().indexOf(search) > -1 || (a.patientId || '').toLowerCase().indexOf(search) > -1 || a.roomNo.toLowerCase().indexOf(search) > -1 || (a.doctorName || '').toLowerCase().indexOf(search) > -1) {
-            if (admFilter === 'all' || a.status === admFilter || (a.type || '').toLowerCase() === admFilter.toLowerCase()) filtered.push(a);
+            if (admFilter === 'all' || a.status === admFilter || (admFilter === 'pre-op' && getAdmEffType(a) === 'pre-op') || (admFilter === 'post-op' && getAdmEffType(a) === 'post-op') || (admFilter !== 'pre-op' && admFilter !== 'post-op' && (a.type || '').toLowerCase() === admFilter.toLowerCase())) filtered.push(a);
         }
     }
 
@@ -214,7 +241,7 @@ function renderAdmList() {
         var bedLabel = adm.bedId ? ' (' + adm.bedId + ')' : '';
         var editBtn = isAdmin ? '<button class="btn btn-sm btn-secondary" onclick="editAdm(\'' + adm.id + '\')">✏️ ' + T('admmod_btn_edit') + '</button> ' : '';
         var delBtn = isAdmin ? '<button class="btn btn-sm btn-danger" onclick="deleteAdm(\'' + adm.id + '\')">' + T('admmod_btn_del') + '</button>' : '';
-        rows += '<tr><td><strong>' + adm.patientName + '</strong></td><td>' + (adm.patientId || '#' + adm.id.slice(-6)) + '</td><td>' + adm.roomNo + bedLabel + '</td><td>' + (adm.doctorName || '-') + '</td><td>' + APP.formatDate(adm.admissionDate) + '</td><td><span class="badge ' + getAdmTypeBadgeClass(adm.type) + '">' + (adm.type || 'regular').toUpperCase() + '</span></td><td><span class="badge ' + APP.getStatusBadge(adm.status) + '">' + adm.status + '</span></td><td><button class="btn btn-sm btn-primary" onclick="viewAdm(\'' + adm.id + '\')">' + T('admmod_btn_view') + '</button> ' + editBtn + (adm.status === 'admitted' ? '<button class="btn btn-sm btn-warning" onclick="showDischargeForm(\'' + adm.id + '\')">' + T('admmod_btn_discharge') + '</button> ' : '') + delBtn + '</td></tr>';
+        rows += '<tr><td><strong>' + adm.patientName + '</strong></td><td>' + (adm.patientId || '#' + adm.id.slice(-6)) + '</td><td>' + adm.roomNo + bedLabel + '</td><td>' + (adm.doctorName || '-') + '</td><td>' + APP.formatDate(adm.admissionDate) + '</td><td><span class="badge ' + getAdmTypeBadgeClass(getAdmEffType(adm)) + '">' + getAdmEffType(adm).toUpperCase() + '</span></td><td><span class="badge ' + APP.getStatusBadge(adm.status) + '">' + adm.status + '</span></td><td><button class="btn btn-sm btn-primary" onclick="viewAdm(\'' + adm.id + '\')">' + T('admmod_btn_view') + '</button> ' + editBtn + (adm.status === 'admitted' ? '<button class="btn btn-sm btn-warning" onclick="showDischargeForm(\'' + adm.id + '\')">' + T('admmod_btn_discharge') + '</button> ' : '') + delBtn + '</td></tr>';
     }
     tbody.innerHTML = rows || '<tr><td colspan="8" class="empty-state">' + T('admmod_no_admissions') + '</td></tr>';
 }
