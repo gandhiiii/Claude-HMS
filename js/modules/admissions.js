@@ -54,6 +54,45 @@ function saveRooms(rooms) {
     DB.set('rooms', rooms);
 }
 
+function exportRoomsExcel() {
+    var rooms = getRooms() || [];
+    if (rooms.length === 0) { APP.notify(T('admmod_no_rooms'), 'error'); return; }
+    var headers = ['#','Room No','Floor','Category','Beds','Total Beds','Created'];
+    var csvRows = [headers];
+    var sorted = rooms.slice().sort(function(a, b) {
+        return (parseInt(a.floor) || 0) - (parseInt(b.floor) || 0) || String(a.roomNo).localeCompare(String(b.roomNo), undefined, { numeric: true });
+    });
+    sorted.forEach(function(rm, i) {
+        var beds = rm.beds || ['A'];
+        var created = '';
+        var m = String(rm.id || '').match(/_(\d{13})$/);
+        if (m && m[1]) {
+            var d = new Date(parseInt(m[1]));
+            if (!isNaN(d.getTime())) created = d.toLocaleString('en-IN');
+        }
+        csvRows.push([
+            i + 1,
+            csvCell(rm.roomNo),
+            rm.floor != null ? rm.floor : '',
+            csvCell(rm.category || ''),
+            csvCell(beds.join(', ')),
+            beds.length,
+            csvCell(created)
+        ]);
+    });
+    var csv = csvRows.map(function(r) { return r.join(','); }).join('\r\n');
+    var bom = '﻿';
+    var blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'Rooms_Report_' + new Date().toISOString().split('T')[0] + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+    APP.notify('Excel file downloaded (' + rooms.length + ' rooms)', 'success');
+}
+
 function _isFacilityAdmin(user) {
     if (!user) return true;
     if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
@@ -301,7 +340,10 @@ function showRoomManagement() {
             <div class="card" style="padding:12px;">
                 <div class="flex-between" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                     <h4 style="margin:0;font-size:14px;">📋 ${T('admmod_room_list')}</h4>
-                    <button class="btn btn-sm btn-danger" onclick="removeAllRooms()">🗑️ ${T('admmod_remove_all')}</button>
+                    <div style="display:flex;gap:6px;">
+                        <button class="btn btn-sm btn-success" onclick="exportRoomsExcel()">📥 ${T('admmod_export_excel')}</button>
+                        <button class="btn btn-sm btn-danger" onclick="removeAllRooms()">🗑️ ${T('admmod_remove_all')}</button>
+                    </div>
                 </div>
                 <div class="table-responsive" style="max-height:300px;overflow-y:auto;">
                     <table><thead><tr><th>${T('admmod_room_col')}</th><th>${T('admmod_floor')}</th><th>${T('admmod_category')}</th><th>${T('admmod_beds')}</th><th>${T('admmod_action')}</th></tr></thead><tbody>` + listHtml + `</tbody></table>
