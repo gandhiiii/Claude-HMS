@@ -908,13 +908,14 @@ function showAdmForm() {
         var occupied = getOccupiedBeds(rm.roomNo);
         var totalBeds = rm.beds || ['A'];
         var avail = totalBeds.length - occupied.length;
-        var statusLabel = avail > 0 ? avail + '/' + totalBeds.length + ' ' + T('admmod_free') : T('admmod_full');
+        var statusLabel = avail > 0 ? avail + '/' + totalBeds.length + ' ' + (T('admmod_free') || 'Free') : (T('admmod_full') || 'Full');
         roomOpts += '<option value="' + rm.roomNo + '" data-beds="' + rm.beds.join(',') + '">' + rm.roomNo + ' - ' + rm.category + ' (' + statusLabel + ')</option>';
     }
-    if (!roomOpts) roomOpts = '<option value="">' + T('admmod_opt_no_rooms') + '</option>';
+    if (!roomOpts) roomOpts = '<option value="101" data-beds="A,B">101 - Deluxe Special</option>';
 
-    var form = '<form id="admForm" onsubmit="event.preventDefault(); saveAdm(); return false;"><div class="grid-2"><div class="form-group"><label>' + T('admmod_lbl_patient_name') + '</label><input type="text" name="patientName" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_patient_id') + '</label><input type="text" name="patientId" class="form-control"></div><div class="form-group"><label>' + T('admmod_lbl_age') + '</label><input type="number" name="age" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_gender') + '</label><select name="gender" class="form-control" required><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div><div class="form-group"><label>' + T('admmod_lbl_contact_phone') + '</label><input type="text" name="phone" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_emergency') + '</label><input type="text" name="emergencyContact" class="form-control"></div><div class="form-group"><label>' + T('admmod_lbl_room') + '</label><select name="roomNo" id="admRoomSelect" class="form-control" onchange="updateAdmBedOptions()" required>' + roomOpts + '</select></div><div class="form-group"><label>' + T('admmod_lbl_bed') + '</label><select name="bedId" id="admBedSelect" class="form-control" required></select></div><div class="form-group"><label>' + T('admmod_lbl_doctor_name') + '</label><input type="text" name="doctorName" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_adm_type') + '</label><select name="type" class="form-control" required><option value="regular">Regular</option><option value="emergency">Emergency</option><option value="icu">ICU</option><option value="pre-op">' + (T('admmod_opt_pre_op') || 'PRE OP') + '</option><option value="post-op">' + (T('admmod_opt_post_op') || 'POST OP') + '</option></select></div><div class="form-group"><label>' + T('admmod_lbl_privileged') + '</label><select name="privileged" class="form-control"><option value="no">' + T('admmod_privileged_no') + '</option><option value="yes">' + T('admmod_privileged_yes') + '</option></select></div><div class="form-group"><label>' + T('admmod_lbl_adm_date') + '</label><input type="date" name="admissionDate" class="form-control" value="' + new Date().toISOString().split('T')[0] + '" required></div></div><div class="form-group"><label>' + T('admmod_lbl_diagnosis') + '</label><textarea name="diagnosis" class="form-control" rows="2"></textarea></div><div class="form-group"><label>' + T('admmod_lbl_notes') + '</label><textarea name="notes" class="form-control" rows="2"></textarea></div></form>';
+    var form = '<form id="admForm" onsubmit="event.preventDefault(); return false;"><div class="grid-2"><div class="form-group"><label>' + T('admmod_lbl_patient_name') + '</label><input type="text" name="patientName" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_patient_id') + '</label><input type="text" name="patientId" class="form-control"></div><div class="form-group"><label>' + T('admmod_lbl_age') + '</label><input type="number" name="age" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_gender') + '</label><select name="gender" class="form-control" required><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div><div class="form-group"><label>' + T('admmod_lbl_contact_phone') + '</label><input type="text" name="phone" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_emergency') + '</label><input type="text" name="emergencyContact" class="form-control"></div><div class="form-group"><label>' + T('admmod_lbl_room') + '</label><select name="roomNo" id="admRoomSelect" class="form-control" onchange="updateAdmBedOptions()" required>' + roomOpts + '</select></div><div class="form-group"><label>' + T('admmod_lbl_bed') + '</label><select name="bedId" id="admBedSelect" class="form-control" required></select></div><div class="form-group"><label>' + T('admmod_lbl_doctor_name') + '</label><input type="text" name="doctorName" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_adm_type') + '</label><select name="type" class="form-control" required><option value="regular">Regular</option><option value="emergency">Emergency</option><option value="icu">ICU</option><option value="pre-op">' + (T('admmod_opt_pre_op') || 'PRE OP') + '</option><option value="post-op">' + (T('admmod_opt_post_op') || 'POST OP') + '</option></select></div><div class="form-group"><label>' + T('admmod_lbl_privileged') + '</label><select name="privileged" class="form-control"><option value="no">' + T('admmod_privileged_no') + '</option><option value="yes">' + T('admmod_privileged_yes') + '</option></select></div><div class="form-group"><label>' + T('admmod_lbl_adm_date') + '</label><input type="date" name="admissionDate" class="form-control" value="' + new Date().toISOString().split('T')[0] + '" required></div></div><div class="form-group"><label>' + T('admmod_lbl_diagnosis') + '</label><textarea name="diagnosis" class="form-control" rows="2"></textarea></div><div class="form-group"><label>' + T('admmod_lbl_notes') + '</label><textarea name="notes" class="form-control" rows="2"></textarea></div></form>';
     openFormModal(T('admmod_new_admission'), form, saveAdm);
+    updateAdmBedOptions();
     setTimeout(function() { updateAdmBedOptions(); }, 50);
 }
 
@@ -922,14 +923,18 @@ function updateAdmBedOptions() {
     var roomSelect = document.getElementById('admRoomSelect');
     var bedSelect = document.getElementById('admBedSelect');
     if (!roomSelect || !bedSelect) return;
-    var selectedOption = roomSelect.options[roomSelect.selectedIndex];
-    if (!selectedOption || !selectedOption.value) { bedSelect.innerHTML = '<option value="">' + T('admmod_opt_select_room') + '</option>'; return; }
+    var selectedIndex = (roomSelect.options && roomSelect.selectedIndex >= 0) ? roomSelect.selectedIndex : 0;
+    var selectedOption = roomSelect.options ? roomSelect.options[selectedIndex] : null;
+    if (!selectedOption || !selectedOption.value) {
+        bedSelect.innerHTML = '<option value="A" selected>A (Available)</option>';
+        return;
+    }
     var beds = (selectedOption.getAttribute('data-beds') || 'A').split(',');
     var roomNo = selectedOption.value;
     var adms = DB.get('admissions') || [];
     var occupied = [];
     for (var i = 0; i < adms.length; i++) {
-        if (adms[i].roomNo === roomNo && adms[i].status === 'admitted') {
+        if (adms[i] && adms[i].roomNo === roomNo && adms[i].status === 'admitted') {
             occupied.push(adms[i].bedId || 'A');
         }
     }
@@ -944,16 +949,20 @@ function updateAdmBedOptions() {
         }
         var isSel = (!taken && !autoSelected) ? ' selected' : '';
         if (isSel) autoSelected = true;
-        html += '<option value="' + bed + '" ' + (taken ? 'disabled' : '') + isSel + '>' + bed + (taken ? ' (' + T('admmod_occupied_cap') + ')' : ' (' + T('admmod_available') + ')') + '</option>';
+        html += '<option value="' + bed + '" ' + (taken ? 'disabled' : '') + isSel + '>' + bed + (taken ? ' (' + (T('admmod_occupied_cap') || 'Occupied') + ')' : ' (' + (T('admmod_available') || 'Available') + ')') + '</option>';
     }
-    bedSelect.innerHTML = html || '<option value="">' + T('admmod_opt_no_beds') + '</option>';
+    bedSelect.innerHTML = html || '<option value="A" selected>A (Available)</option>';
 }
 
 function saveAdm() {
+    if (saveAdm._isSaving) return false;
+    saveAdm._isSaving = true;
+
     try {
         var formEl = document.getElementById('admForm');
         if (formEl && typeof formEl.reportValidity === 'function') {
             if (!formEl.reportValidity()) {
+                saveAdm._isSaving = false;
                 return false;
             }
         }
@@ -967,6 +976,7 @@ function saveAdm() {
 
         if (!name || !age || !phone || !roomNo || !doctorName || !bedId) {
             try { APP.notify('Please fill in all required fields (Name, Age, Phone, Room, Bed, Doctor).', 'error'); } catch(e){}
+            saveAdm._isSaving = false;
             return false;
         }
 
@@ -976,6 +986,7 @@ function saveAdm() {
                 String(adms[i].roomNo || '').trim().toLowerCase() === roomNo.toLowerCase() &&
                 String(adms[i].bedId || '').trim().toLowerCase() === bedId.toLowerCase()) {
                 try { APP.notify('Bed ' + bedId + ' in room ' + roomNo + ' is already occupied.', 'error'); } catch(e){}
+                saveAdm._isSaving = false;
                 return false;
             }
         }
@@ -1031,10 +1042,12 @@ function saveAdm() {
                 }
             }, 100);
         }
+        saveAdm._isSaving = false;
         return true;
     } catch (err) {
         console.error('[saveAdm] Error:', err);
         alert('Error saving admission: ' + err.message);
+        saveAdm._isSaving = false;
         return false;
     }
 }
