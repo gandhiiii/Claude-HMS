@@ -914,7 +914,7 @@ function showAdmForm() {
     if (!roomOpts) roomOpts = '<option value="">' + T('admmod_opt_no_rooms') + '</option>';
 
     var form = '<form id="admForm" onsubmit="event.preventDefault(); saveAdm(); return false;"><div class="grid-2"><div class="form-group"><label>' + T('admmod_lbl_patient_name') + '</label><input type="text" name="patientName" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_patient_id') + '</label><input type="text" name="patientId" class="form-control"></div><div class="form-group"><label>' + T('admmod_lbl_age') + '</label><input type="number" name="age" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_gender') + '</label><select name="gender" class="form-control" required><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div><div class="form-group"><label>' + T('admmod_lbl_contact_phone') + '</label><input type="text" name="phone" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_emergency') + '</label><input type="text" name="emergencyContact" class="form-control"></div><div class="form-group"><label>' + T('admmod_lbl_room') + '</label><select name="roomNo" id="admRoomSelect" class="form-control" onchange="updateAdmBedOptions()" required>' + roomOpts + '</select></div><div class="form-group"><label>' + T('admmod_lbl_bed') + '</label><select name="bedId" id="admBedSelect" class="form-control" required></select></div><div class="form-group"><label>' + T('admmod_lbl_doctor_name') + '</label><input type="text" name="doctorName" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_adm_type') + '</label><select name="type" class="form-control" required><option value="regular">Regular</option><option value="emergency">Emergency</option><option value="icu">ICU</option><option value="pre-op">' + (T('admmod_opt_pre_op') || 'PRE OP') + '</option><option value="post-op">' + (T('admmod_opt_post_op') || 'POST OP') + '</option></select></div><div class="form-group"><label>' + T('admmod_lbl_privileged') + '</label><select name="privileged" class="form-control"><option value="no">' + T('admmod_privileged_no') + '</option><option value="yes">' + T('admmod_privileged_yes') + '</option></select></div><div class="form-group"><label>' + T('admmod_lbl_adm_date') + '</label><input type="date" name="admissionDate" class="form-control" value="' + new Date().toISOString().split('T')[0] + '" required></div></div><div class="form-group"><label>' + T('admmod_lbl_diagnosis') + '</label><textarea name="diagnosis" class="form-control" rows="2"></textarea></div><div class="form-group"><label>' + T('admmod_lbl_notes') + '</label><textarea name="notes" class="form-control" rows="2"></textarea></div></form>';
-    openFormModal(T('admmod_new_admission'), form, 'saveAdm()');
+    openFormModal(T('admmod_new_admission'), form, saveAdm);
     setTimeout(function() { updateAdmBedOptions(); }, 50);
 }
 
@@ -950,75 +950,93 @@ function updateAdmBedOptions() {
 }
 
 function saveAdm() {
-    var formEl = document.getElementById('admForm');
-    if (formEl && typeof formEl.reportValidity === 'function') {
-        if (!formEl.reportValidity()) {
+    try {
+        var formEl = document.getElementById('admForm');
+        if (formEl && typeof formEl.reportValidity === 'function') {
+            if (!formEl.reportValidity()) {
+                return false;
+            }
+        }
+        var data = getFormData('admForm');
+        var name = (data.patientName || '').trim();
+        var age = (data.age || '').trim();
+        var phone = (data.phone || '').trim();
+        var roomNo = (data.roomNo || '').trim();
+        var doctorName = (data.doctorName || '').trim();
+        var bedId = (data.bedId || '').trim();
+
+        if (!name || !age || !phone || !roomNo || !doctorName || !bedId) {
+            try { APP.notify('Please fill in all required fields (Name, Age, Phone, Room, Bed, Doctor).', 'error'); } catch(e){}
             return false;
         }
-    }
-    var data = getFormData('admForm');
-    if (!data.patientName || !data.age || !data.phone || !data.roomNo || !data.doctorName || !data.bedId) {
-        APP.notify(T('admmod_msg_fill_required') || 'Please fill out all required fields.', 'error');
+
+        var adms = DB.get('admissions') || [];
+        for (var i = 0; i < adms.length; i++) {
+            if (adms[i] && adms[i].status === 'admitted' &&
+                String(adms[i].roomNo || '').trim().toLowerCase() === roomNo.toLowerCase() &&
+                String(adms[i].bedId || '').trim().toLowerCase() === bedId.toLowerCase()) {
+                try { APP.notify('Bed ' + bedId + ' in room ' + roomNo + ' is already occupied.', 'error'); } catch(e){}
+                return false;
+            }
+        }
+        data.patientName = name;
+        data.age = age;
+        data.phone = phone;
+        data.roomNo = roomNo;
+        data.doctorName = doctorName;
+        data.bedId = bedId;
+        data.status = 'admitted';
+        data.admissionDate = data.admissionDate ? new Date(data.admissionDate).toISOString() : new Date().toISOString();
+        data.dischargeDate = '';
+        data.dischargeSummary = '';
+        data.billAmount = '';
+        data.paymentStatus = 'pending';
+        var _adUser = AUTH.currentUser();
+        data.createdBy = _adUser ? (_adUser.username || _adUser.fullName || _adUser.email || String(_adUser.id)) : 'admin';
+        data.createdById = _adUser ? String(_adUser.id) : '';
+        data.createdByName = _adUser ? (_adUser.fullName || _adUser.username || 'Admin') : 'Admin';
+        data.department = _adUser ? (_adUser.department || '') : '';
+
+        var newAdm = DB.add('admissions', data);
+
+        try {
+            var overrides = DB.get('roomStatus') || [];
+            DB.set('roomStatus', overrides.filter(function(r) { return String(r.roomNo || '').trim().toLowerCase() !== roomNo.toLowerCase(); }));
+        } catch(e) {}
+
+        try { APP.notify('Patient admitted to room ' + roomNo + ' (Bed ' + bedId + ')', 'success'); } catch(e){}
+
+        admFilter = 'all';
+        var searchEl = document.getElementById('admSearch');
+        if (searchEl) searchEl.value = '';
+
+        try { renderAdmContent(); } catch(e) {}
+
+        if (typeof SYNC !== 'undefined' && typeof SYNC.pushAll === 'function') {
+            try { SYNC.pushAll(); } catch(e) {}
+        }
+
+        var modal = document.querySelector('.modal.active') || document.querySelector('.modal');
+        if (modal) modal.remove();
+
+        if (newAdm && newAdm.id) {
+            window._lastNewAdmId = newAdm.id;
+            setTimeout(function() {
+                var row = document.querySelector('tr[data-adm-id="' + newAdm.id + '"]');
+                if (row) {
+                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    row.style.transition = 'background 0.5s';
+                    row.style.background = '#e8f5e9';
+                    setTimeout(function() { row.style.background = ''; }, 3000);
+                }
+            }, 100);
+        }
+        return true;
+    } catch (err) {
+        console.error('[saveAdm] Error:', err);
+        alert('Error saving admission: ' + err.message);
         return false;
     }
-    var adms = DB.get('admissions') || [];
-    for (var i = 0; i < adms.length; i++) {
-        if (adms[i] && String(adms[i].roomNo || '').trim().toLowerCase() === String(data.roomNo || '').trim().toLowerCase() && String(adms[i].bedId || '').trim().toLowerCase() === String(data.bedId || '').trim().toLowerCase() && adms[i].status === 'admitted') {
-            APP.notify(T('admmod_bed_word') + ' ' + data.bedId + ' ' + T('admmod_in_room') + ' ' + data.roomNo + ' ' + T('admmod_bed_occupied'), 'error');
-            return false;
-        }
-    }
-    data.status = 'admitted';
-    data.dischargeDate = '';
-    data.dischargeSummary = '';
-    data.billAmount = '';
-    data.paymentStatus = 'pending';
-    var _adUser = AUTH.currentUser();
-    data.createdBy = _adUser ? (_adUser.username || _adUser.fullName || _adUser.email || String(_adUser.id)) : 'admin';
-    data.createdById = _adUser ? String(_adUser.id) : '';
-    data.createdByName = _adUser ? (_adUser.fullName || _adUser.username || 'Admin') : 'Admin';
-    data.department = _adUser ? (_adUser.department || '') : '';
-
-    var newAdm = DB.add('admissions', data);
-
-    var overrides = DB.get('roomStatus') || [];
-    DB.set('roomStatus', overrides.filter(function(r) { return String(r.roomNo || '').trim().toLowerCase() !== String(data.roomNo || '').trim().toLowerCase(); }));
-
-    APP.notify((T('admmod_admitted_pre') || 'Patient admitted to room') + ' ' + data.roomNo + ' (' + (T('admmod_bed_word') || 'Bed') + ' ' + data.bedId + ')', 'success');
-
-    // Reset filter tab & search query so newly added and recent admissions are immediately visible
-    admFilter = 'all';
-    var searchEl = document.getElementById('admSearch');
-    if (searchEl) searchEl.value = '';
-
-    var btns = document.querySelectorAll('.tabs .tab-btn');
-    if (btns && btns.length > 0) {
-        btns.forEach(function(b) { b.classList.remove('active'); });
-        if (btns[0]) btns[0].classList.add('active');
-    }
-
-    renderAdmContent();
-
-    if (typeof SYNC !== 'undefined' && typeof SYNC.pushAll === 'function') {
-        SYNC.pushAll();
-    }
-
-    var modal = document.querySelector('.modal.active') || document.querySelector('.modal');
-    if (modal) modal.remove();
-
-    if (newAdm && newAdm.id) {
-        window._lastNewAdmId = newAdm.id;
-        setTimeout(function() {
-            var row = document.querySelector('tr[data-adm-id="' + newAdm.id + '"]');
-            if (row) {
-                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                row.style.transition = 'background 0.5s';
-                row.style.background = '#e8f5e9';
-                setTimeout(function() { row.style.background = ''; }, 3000);
-            }
-        }, 100);
-    }
-    return true;
 }
 
 function editAdm(id) {
