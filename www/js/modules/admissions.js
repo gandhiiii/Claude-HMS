@@ -1204,13 +1204,22 @@ function updateAdm(id) {
         }
 
         var adms = DB.get('admissions') || [];
+        var editingStatus = '';
         for (var i = 0; i < adms.length; i++) {
-            if (adms[i] && !_isSameRecord(adms[i].id, targetId) &&
-                String(adms[i].roomNo || '').trim().toLowerCase() === roomNo.toLowerCase() &&
-                String(adms[i].bedId || '').trim().toLowerCase() === bedId.toLowerCase() &&
-                (adms[i].status || 'admitted') === 'admitted') {
-                APP.notify((T('admmod_bed_word') || 'Bed') + ' ' + bedId + ' ' + (T('admmod_in_room') || 'in room') + ' ' + roomNo + ' ' + (T('admmod_bed_occupied') || 'is already occupied by another patient.'), 'error');
-                return false;
+            if (adms[i] && _isSameRecord(adms[i].id, targetId)) {
+                editingStatus = String(adms[i].status || 'admitted').trim().toLowerCase();
+                break;
+            }
+        }
+        if (editingStatus !== 'discharged') {
+            for (var i = 0; i < adms.length; i++) {
+                if (adms[i] && !_isSameRecord(adms[i].id, targetId) &&
+                    String(adms[i].roomNo || '').trim().toLowerCase() === roomNo.toLowerCase() &&
+                    String(adms[i].bedId || '').trim().toLowerCase() === bedId.toLowerCase() &&
+                    (adms[i].status || 'admitted') === 'admitted') {
+                    APP.notify((T('admmod_bed_word') || 'Bed') + ' ' + bedId + ' ' + (T('admmod_in_room') || 'in room') + ' ' + roomNo + ' ' + (T('admmod_bed_occupied') || 'is already occupied by another patient.'), 'error');
+                    return false;
+                }
             }
         }
 
