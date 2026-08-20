@@ -1117,12 +1117,25 @@ function editAdm(id) {
     setTimeout(function() { updateEditAdmBedOptions(adm.bedId); }, 50);
 }
 
+function _isSameRecord(id1, id2) {
+    if (!id1 || !id2) return false;
+    var s1 = String(id1).trim().toLowerCase();
+    var s2 = String(id2).trim().toLowerCase();
+    if (s1 === s2) return true;
+    if (s1.replace(/^adm_/, '') === s2.replace(/^adm_/, '')) return true;
+    return false;
+}
+
 function updateEditAdmBedOptions(currentBedId) {
     var roomSelect = document.getElementById('editAdmRoomSelect');
     var bedSelect = document.getElementById('editAdmBedSelect');
     if (!roomSelect || !bedSelect) return;
-    var selectedOption = roomSelect.options[roomSelect.selectedIndex];
-    if (!selectedOption || !selectedOption.value) { bedSelect.innerHTML = '<option value="">' + T('admmod_opt_select_room') + '</option>'; return; }
+    var selectedIndex = (roomSelect.options && roomSelect.selectedIndex >= 0) ? roomSelect.selectedIndex : 0;
+    var selectedOption = roomSelect.options ? roomSelect.options[selectedIndex] : null;
+    if (!selectedOption || !selectedOption.value) {
+        bedSelect.innerHTML = '<option value="A" selected>A (Available)</option>';
+        return;
+    }
     var beds = (selectedOption.getAttribute('data-beds') || 'A').split(',');
     var roomNo = selectedOption.value;
     var adms = DB.get('admissions') || [];
@@ -1131,8 +1144,7 @@ function updateEditAdmBedOptions(currentBedId) {
 
     var occupied = [];
     for (var i = 0; i < adms.length; i++) {
-        var aId = String(adms[i].id || '').trim();
-        if (adms[i].roomNo === roomNo && adms[i].status === 'admitted' && aId !== editAdmId) {
+        if (adms[i] && String(adms[i].roomNo || '').trim() === String(roomNo).trim() && (adms[i].status || 'admitted') === 'admitted' && !_isSameRecord(adms[i].id, editAdmId)) {
             occupied.push(String(adms[i].bedId || 'A').trim());
         }
     }
@@ -1149,29 +1161,26 @@ function updateEditAdmBedOptions(currentBedId) {
                 if (occupied[oc].toLowerCase() === bed.toLowerCase()) { taken = true; break; }
             }
         }
-        html += '<option value="' + bed + '" ' + (taken ? 'disabled' : '') + (isCurrent ? ' selected' : '') + '>' + bed + (taken ? ' (' + T('admmod_occupied_cap') + ')' : ' (' + T('admmod_available') + ')') + '</option>';
+        html += '<option value="' + bed + '" ' + (taken ? 'disabled' : '') + (isCurrent ? ' selected' : '') + '>' + bed + (taken ? ' (' + (T('admmod_occupied_cap') || 'Occupied') + ')' : ' (' + (T('admmod_available') || 'Available') + ')') + '</option>';
     }
     if (!hasSelected && currentBedId) {
         html = '<option value="' + esc(currentBedId) + '" selected>' + esc(currentBedId) + '</option>' + html;
     }
-    bedSelect.innerHTML = html || '<option value="">' + T('admmod_opt_no_beds') + '</option>';
+    bedSelect.innerHTML = html || '<option value="A" selected>A (Available)</option>';
 }
 
 function updateAdm(id) {
-    if (updateAdm._isSaving) return false;
-    updateAdm._isSaving = true;
+    updateAdm._isSaving = false;
 
     try {
         var user = AUTH.currentUser();
         if (!_isFacilityAdmin(user)) {
             APP.notify(T('admmod_msg_only_facility_admin_edit') || 'Only facility admin can edit admissions.', 'error');
-            updateAdm._isSaving = false;
             return false;
         }
         var formEl = document.getElementById('editAdmForm');
         if (formEl && typeof formEl.reportValidity === 'function') {
             if (!formEl.reportValidity()) {
-                updateAdm._isSaving = false;
                 return false;
             }
         }
@@ -1185,33 +1194,29 @@ function updateAdm(id) {
 
         if (!name || !age || !phone || !roomNo || !doctorName || !bedId) {
             APP.notify(T('admmod_msg_fill_required') || 'Please fill in all required fields.', 'error');
-            updateAdm._isSaving = false;
             return false;
         }
 
         var targetId = String(id || data.id || '').trim();
         if (!targetId) {
             APP.notify('Invalid admission record ID', 'error');
-            updateAdm._isSaving = false;
             return false;
         }
 
         var adms = DB.get('admissions') || [];
         for (var i = 0; i < adms.length; i++) {
-            var existingId = String(adms[i].id || '').trim();
-            if (existingId !== targetId &&
+            if (adms[i] && !_isSameRecord(adms[i].id, targetId) &&
                 String(adms[i].roomNo || '').trim().toLowerCase() === roomNo.toLowerCase() &&
                 String(adms[i].bedId || '').trim().toLowerCase() === bedId.toLowerCase() &&
                 (adms[i].status || 'admitted') === 'admitted') {
-                APP.notify((T('admmod_bed_word') || 'Bed') + ' ' + bedId + ' ' + (T('admmod_in_room') || 'in room') + ' ' + roomNo + ' ' + (T('admmod_bed_occupied') || 'is already occupied.'), 'error');
-                updateAdm._isSaving = false;
+                APP.notify((T('admmod_bed_word') || 'Bed') + ' ' + bedId + ' ' + (T('admmod_in_room') || 'in room') + ' ' + roomNo + ' ' + (T('admmod_bed_occupied') || 'is already occupied by another patient.'), 'error');
                 return false;
             }
         }
 
         var updatedIdx = -1;
         for (var j = 0; j < adms.length; j++) {
-            if (String(adms[j].id || '').trim() === targetId) {
+            if (_isSameRecord(adms[j].id, targetId)) {
                 updatedIdx = j;
                 break;
             }
@@ -1225,7 +1230,7 @@ function updateAdm(id) {
                 roomNo: roomNo,
                 bedId: bedId,
                 doctorName: doctorName,
-                type: data.type || 'regular',
+                type: data.type || adms[updatedIdx].type || 'regular',
                 admissionDate: data.admissionDate ? new Date(data.admissionDate).toISOString() : adms[updatedIdx].admissionDate,
                 updatedAt: new Date().toISOString()
             });
@@ -1258,12 +1263,10 @@ function updateAdm(id) {
         var modal = document.querySelector('.modal.active') || document.querySelector('.modal');
         if (modal) modal.remove();
 
-        updateAdm._isSaving = false;
         return true;
     } catch (err) {
         console.error('[updateAdm] Error:', err);
         alert('Error updating admission: ' + err.message);
-        updateAdm._isSaving = false;
         return false;
     }
 }
