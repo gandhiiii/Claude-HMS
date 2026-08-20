@@ -18,6 +18,7 @@ function renderDeptChecklists(container) {
             ${isMgmt ? `<button class="tab-btn ${dchkTab === 'assign' ? 'active' : ''}" onclick="dchkSwitchTab('assign',this)">${T('dchk_tab_assign')}</button>` : ''}
             <button class="tab-btn ${dchkTab === 'fill' ? 'active' : ''}" onclick="dchkSwitchTab('fill',this)">${T('dchk_tab_fill')}</button>
             ${isMgmt ? `<button class="tab-btn ${dchkTab === 'oversight' ? 'active' : ''}" onclick="dchkSwitchTab('oversight',this)">${T('dchk_tab_oversight')}</button>` : ''}
+            <button class="tab-btn ${dchkTab === 'history' ? 'active' : ''}" onclick="dchkSwitchTab('history',this)">📜 ${T('dchk_tab_history') || 'Submission History'}</button>
         </div>
         <div id="dchkContent"></div>
     `;
@@ -36,6 +37,7 @@ function dchkRenderTab() {
     else if (dchkTab === 'assign') dchkRenderAssign();
     else if (dchkTab === 'fill') dchkRenderFill();
     else if (dchkTab === 'oversight') dchkRenderOversight();
+    else if (dchkTab === 'history') dchkRenderHistory();
 }
 
 /* ═══════════════════════ TEMPLATES TAB ═══════════════════════ */
@@ -688,6 +690,8 @@ function dchkSubmitFill(assignmentId) {
 
 /* ═══════════════════════ OVERSIGHT TAB ═══════════════════════ */
 
+/* ═══════════════════════ OVERSIGHT TAB ═══════════════════════ */
+
 function dchkRenderOversight() {
     const content = document.getElementById('dchkContent');
     if (!content) return;
@@ -697,13 +701,16 @@ function dchkRenderOversight() {
         return;
     }
     const depts = DB.get('departments') || [];
-    const dateStr = (typeof CHECKLISTS !== 'undefined' && CHECKLISTS.operDate) ? CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
+    const defaultDate = (typeof CHECKLISTS !== 'undefined' && CHECKLISTS.operDate) ? CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
+    const dateInput = document.getElementById('dchkOversightDate');
+    const dateStr = (dateInput && dateInput.value) ? dateInput.value : (dchkRenderOversight._dateStr || defaultDate);
+    dchkRenderOversight._dateStr = dateStr;
     const selectedDept = document.getElementById('dchkOversightDept')?.value || '';
 
     content.innerHTML = `
-        <div class="flex-between mb-4">
+        <div class="flex-between mb-4 flex-wrap" style="gap:12px;">
             <div class="form-group" style="margin-bottom:0;">
-                <label style="font-size:13px;">${T('dchk_dept_filter')}</label>
+                <label style="font-size:13px;font-weight:600;">${T('dchk_dept_filter')}</label>
                 <select id="dchkOversightDept" class="form-control" onchange="dchkRenderOversight()">
                     <option value="">${T('dchk_select_dept')}</option>
                     ${depts.map(function(d) {
@@ -712,9 +719,12 @@ function dchkRenderOversight() {
                     }).join('')}
                 </select>
             </div>
-            <div style="font-size:13px;color:var(--gray);">${T('dchk_date_label')}: ${dateStr}</div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label style="font-size:13px;font-weight:600;">📅 Date</label>
+                <input type="date" id="dchkOversightDate" class="form-control" value="${dateStr}" onchange="dchkRenderOversight._dateStr=this.value;dchkRenderOversight()">
+            </div>
         </div>
-        <div id="dchkOversightBody">${selectedDept ? dchkRenderOversightDept(user, selectedDept, dateStr) : ''}</div>
+        <div id="dchkOversightBody">${selectedDept ? dchkRenderOversightDept(user, selectedDept, dateStr) : '<div class="empty-state">Select a department above to view oversight.</div>'}</div>
     `;
 }
 
@@ -764,4 +774,134 @@ function dchkRenderOversightDept(user, dept, dateStr) {
         html += '</tbody></table></div></div>';
     }
     return html;
+}
+
+/* ═══════════════════════ SUBMISSION HISTORY TAB ═══════════════════════ */
+
+function dchkRenderHistory() {
+    const content = document.getElementById('dchkContent');
+    if (!content) return;
+    const user = AUTH.currentUser();
+    const entries = DB.get('checklistEntries') || [];
+    const depts = DB.get('departments') || [];
+
+    const selectedDept = document.getElementById('dchkHistDept')?.value || '';
+    const selectedDate = document.getElementById('dchkHistDate')?.value || '';
+
+    let filtered = entries.slice();
+    if (user.role !== 'admin' && !user.isSuperAdmin) {
+        filtered = filtered.filter(e => e.department === user.department);
+    }
+    if (selectedDept) {
+        filtered = filtered.filter(e => e.department === selectedDept);
+    }
+    if (selectedDate) {
+        filtered = filtered.filter(e => e.date === selectedDate);
+    }
+
+    content.innerHTML = `
+        <div class="flex-between mb-4 flex-wrap" style="gap:12px;">
+            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size:13px;font-weight:600;">Department Filter</label>
+                    <select id="dchkHistDept" class="form-control" onchange="dchkRenderHistory()">
+                        <option value="">All Departments</option>
+                        ${depts.map(d => `<option value="${d.name || d}" ${selectedDept === (d.name || d) ? 'selected' : ''}>${d.name || d}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size:13px;font-weight:600;">📅 Select Date</label>
+                    <input type="date" id="dchkHistDate" class="form-control" value="${selectedDate}" onchange="dchkRenderHistory()">
+                </div>
+                ${selectedDate || selectedDept ? `<button class="btn btn-sm btn-secondary" style="margin-top:18px;" onclick="document.getElementById('dchkHistDept').value='';document.getElementById('dchkHistDate').value='';dchkRenderHistory();">Reset Filters</button>` : ''}
+            </div>
+            <div style="font-size:13px;color:var(--gray);margin-top:18px;">Total Submissions Found: <strong>${filtered.length}</strong></div>
+        </div>
+
+        <div class="card">
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Department</th>
+                            <th>Checklist Title</th>
+                            <th>Submitted By</th>
+                            <th>Submitted At</th>
+                            <th>Items Count</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filtered.length === 0 ? `<tr><td colspan="7" class="empty-state">No checklist submissions found matching selected filters.</td></tr>` :
+                        filtered.slice().reverse().map(e => `
+                            <tr>
+                                <td><strong>${e.date || 'N/A'}</strong></td>
+                                <td><span class="badge badge-info">${e.department || 'General'}</span></td>
+                                <td>${e.assignmentTitle || e.templateTitle || 'Checklist'}</td>
+                                <td>${e.filledByName || 'Staff'}</td>
+                                <td>${APP.formatDateTime(e.submittedAt || e.startedAt)}</td>
+                                <td>${(e.items || []).length} items</td>
+                                <td><button class="btn btn-sm btn-primary" onclick="dchkViewEntryDetail('${e.id}')">View Details</button></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+function dchkViewEntryDetail(id) {
+    const entries = DB.get('checklistEntries') || [];
+    const entry = entries.find(e => String(e.id) === String(id));
+    if (!entry) { APP.notify('Checklist entry not found', 'error'); return; }
+
+    const items = entry.items || [];
+    const results = entry.results || {};
+
+    let html = `
+        <div class="modal-header">
+            <h3>${entry.assignmentTitle || entry.templateTitle || 'Checklist Details'}</h3>
+            <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
+        </div>
+        <div class="grid-2 mb-4">
+            <div><strong>Date:</strong> ${entry.date}</div>
+            <div><strong>Submitted By:</strong> ${entry.filledByName || 'Staff'}</div>
+            <div><strong>Department:</strong> ${entry.department || '-'}</div>
+            <div><strong>Submitted At:</strong> ${APP.formatDateTime(entry.submittedAt || entry.startedAt)}</div>
+        </div>
+        <div class="card" style="padding:12px;max-height:300px;overflow-y:auto;">
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Checklist Item</th>
+                            <th>Status</th>
+                            <th>Value / Value Specified</th>
+                            <th>Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.map(it => {
+                            const key = it.itemId || it.id;
+                            const res = results[key] || results[it.itemId] || results[it.id] || {};
+                            const st = res.status || 'pending';
+                            const badgeCls = st === 'ok' ? 'badge-success' : (st === 'fault' ? 'badge-danger' : (st === 'report' ? 'badge-warning' : 'badge-secondary'));
+                            return `
+                                <tr>
+                                    <td><strong>${it.label || it.name || key}</strong> ${it.unit ? '<span style="font-size:11px;color:var(--gray);">[' + it.unit + ']</span>' : ''}</td>
+                                    <td><span class="badge ${badgeCls}">${st.toUpperCase()}</span></td>
+                                    <td>${res.value !== undefined && res.value !== '' ? res.value + (it.unit ? ' ' + it.unit : '') : '-'}</td>
+                                    <td>${res.remarks || '-'}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    showModal(html, true);
 }

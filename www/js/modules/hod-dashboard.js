@@ -7000,10 +7000,17 @@ function hodDchkDoRevoke(assignmentId) {
 
 /* ── OVERSIGHT SUB-TAB ── */
 function _hodDchkOversight(el, user, dept, assignments, team) {
-    var dateStr = (typeof CHECKLISTS !== 'undefined' && CHECKLISTS.operDate) ? CHECKLISTS.operDate() : new Date().toISOString().slice(0,10);
+    var defaultDate = (typeof CHECKLISTS !== 'undefined' && CHECKLISTS.operDate) ? CHECKLISTS.operDate() : new Date().toISOString().slice(0,10);
+    var dateInput = document.getElementById('hodDchkDate');
+    var dateStr = (dateInput && dateInput.value) ? dateInput.value : (_hodDchkOversight._dateStr || defaultDate);
+    _hodDchkOversight._dateStr = dateStr;
 
-    var html = '<div style="font-weight:600;font-size:14px;margin-bottom:8px;">Oversight — ' + APP.formatDate(dateStr) + '</div>'
-        + '<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Whether each team member has submitted their assigned checklist today.</div>';
+    var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+        + '<div><div style="font-weight:600;font-size:14px;">Oversight</div>'
+        + '<div style="font-size:12px;color:var(--gray);">Checklist submissions for selected date.</div></div>'
+        + '<div style="display:flex;align-items:center;gap:6px;"><label style="font-size:12px;font-weight:600;">📅 Date:</label>'
+        + '<input type="date" id="hodDchkDate" class="form-control" style="width:auto;padding:4px 8px;font-size:12px;" value="' + dateStr + '" onchange="_hodDchkOversight._dateStr=this.value;_hodDchkOversight(document.getElementById(\'hodDchkContent\')||el, AUTH.currentUser(), \'' + dept + '\', DB.get(\'checklistAssignments\'), DB.get(\'users\'))"></div>'
+        + '</div>';
 
     var statusResult = typeof CHECKLISTS !== 'undefined' ? CHECKLISTS.assignmentStatus(user, dept, dateStr) : null;
     var rows = statusResult && statusResult.success ? statusResult.assignments : [];
