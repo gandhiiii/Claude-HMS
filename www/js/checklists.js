@@ -602,8 +602,8 @@
         var a = getAssignment(assignmentId);
         if (!a) return err('ERR_NOT_FOUND', 'Assignment not found.');
         if (!a.active) return err('ERR_INACTIVE', 'This assignment has been revoked.');
-        if (!(isAdmin(user) || (user && user.id === a.employeeId))) {
-            return err('ERR_PERMISSION', 'Only the assigned employee can fill this checklist.');
+        if (!(isAdmin(user) || isHodOf(user, a.department) || (user && String(user.id) === String(a.employeeId)))) {
+            return err('ERR_PERMISSION', 'Only the assigned employee or HOD can fill this checklist.');
         }
         var items = resolveAssignmentItems(a);
         if (items.length === 0) return err('ERR_VALIDATION', 'This assignment has no remaining points.');
@@ -628,7 +628,8 @@
             results: {}
         };
         entry.items.forEach(function (it) {
-            entry.results[it.itemId] = { status: 'pending', value: '', remarks: '' };
+            var k = it.itemId || it.id;
+            entry.results[k] = { status: 'pending', value: '', remarks: '' };
         });
         return ok({ entry: entry });
     }
@@ -639,8 +640,8 @@
         var a = getAssignment(entry.assignmentId);
         if (!a) return err('ERR_NOT_FOUND', 'Assignment not found.');
         if (!a.active) return err('ERR_INACTIVE', 'This assignment has been revoked.');
-        if (!(isAdmin(user) || (user && user.id === a.employeeId))) {
-            return err('ERR_PERMISSION', 'Only the assigned employee can submit this checklist.');
+        if (!(isAdmin(user) || isHodOf(user, a.department) || (user && String(user.id) === String(a.employeeId)))) {
+            return err('ERR_PERMISSION', 'Only the assigned employee or HOD can submit this checklist.');
         }
         if (hasAssignmentEntry(entry.assignmentId, entry.date)) {
             return err('ERR_DUPLICATE', 'This assigned checklist is already submitted for ' + entry.date + '.');

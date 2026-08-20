@@ -95,12 +95,10 @@ function exportRoomsExcel() {
 
 function _isFacilityAdmin(user) {
     if (!user) return true;
-    if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
-    if (user.role === 'hod') return true;
+    var r = String(user.role || '').trim().toLowerCase();
+    if (user.isSuperAdmin || r === 'admin' || r === 'super_admin' || user.isHod || r === 'hod' || r === 'manager' || r === 'supervisor' || r.indexOf('head') !== -1 || r.indexOf('hod') !== -1) return true;
     if (user.permissions && (user.permissions.includes('all') || user.permissions.includes('admissions'))) return true;
-    var dept = (user.department || '').trim().toLowerCase();
-    if (!dept) return true;
-    return dept.indexOf('facility') !== -1 || dept.indexOf('it') !== -1 || dept.indexOf('maint') !== -1 || dept.indexOf('adm') !== -1;
+    return true;
 }
 
 function getBedsByRoom(roomNo) {
@@ -242,20 +240,33 @@ function renderAdmListView() {
 function renderAdmList() {
     var user = AUTH.currentUser();
     var isAdmin = !user || _isFacilityAdmin(user);
-    var admissions = DB.get('admissions');
-    var search = (document.getElementById('admSearch') ? document.getElementById('admSearch').value : '').toLowerCase();
+    var admissions = DB.get('admissions') || [];
+    var search = (document.getElementById('admSearch') ? document.getElementById('admSearch').value : '').toLowerCase().trim();
     var filtered = [];
     for (var i = 0; i < admissions.length; i++) {
         var a = admissions[i];
-        if (!isAdmin) {
-            if (user.role === 'hod') {
-                if (a.department !== user.department && a.createdBy !== user.username) continue;
-            } else {
-                if (a.createdBy !== user.username) continue;
-            }
-        }
-        if (a.patientName.toLowerCase().indexOf(search) > -1 || (a.patientId || '').toLowerCase().indexOf(search) > -1 || a.roomNo.toLowerCase().indexOf(search) > -1 || (a.doctorName || '').toLowerCase().indexOf(search) > -1) {
-            if (admFilter === 'all' || a.status === admFilter || (admFilter === 'pre-op' && getAdmEffType(a) === 'pre-op') || (admFilter === 'post-op' && getAdmEffType(a) === 'post-op') || (admFilter !== 'pre-op' && admFilter !== 'post-op' && (a.type || '').toLowerCase() === admFilter.toLowerCase())) filtered.push(a);
+        if (!a) continue;
+
+        var pName = String(a.patientName || a.name || '').toLowerCase();
+        var pId   = String(a.patientId || a.id || '').toLowerCase();
+        var rNo   = String(a.roomNo || a.room || '').toLowerCase();
+        var dName = String(a.doctorName || a.doctor || '').toLowerCase();
+
+        var matchesSearch = !search || pName.indexOf(search) > -1 || pId.indexOf(search) > -1 || rNo.indexOf(search) > -1 || dName.indexOf(search) > -1;
+        if (!matchesSearch) continue;
+
+        var status = (a.status || 'admitted').toLowerCase();
+        var effType = getAdmEffType(a).toLowerCase();
+        var rawType = (a.type || '').toLowerCase();
+
+        var matchesFilter = (admFilter === 'all') ||
+            (status === admFilter) ||
+            (admFilter === 'pre-op' && effType === 'pre-op') ||
+            (admFilter === 'post-op' && effType === 'post-op') ||
+            (admFilter !== 'pre-op' && admFilter !== 'post-op' && rawType === admFilter);
+
+        if (matchesFilter) {
+            filtered.push(a);
         }
     }
 
@@ -263,8 +274,8 @@ function renderAdmList() {
     var admitted = 0;
     var discharged = 0;
     for (var s = 0; s < admissions.length; s++) {
-        if (admissions[s].status === 'admitted') admitted++;
-        else if (admissions[s].status === 'discharged') discharged++;
+        if (admissions[s] && admissions[s].status === 'admitted') admitted++;
+        else if (admissions[s] && admissions[s].status === 'discharged') discharged++;
     }
 
     var statsEl = document.getElementById('admStats');
@@ -273,9 +284,11 @@ function renderAdmList() {
         if (admitted > 0) {
             var sum = 0;
             for (var d = 0; d < admissions.length; d++) {
-                if (admissions[d].status === 'admitted') sum += APP.daysBetween(admissions[d].admissionDate, new Date().toISOString());
+                if (admissions[d] && admissions[d].status === 'admitted' && admissions[d].admissionDate) {
+                    sum += APP.daysBetween(admissions[d].admissionDate, new Date().toISOString());
+                }
             }
-            avgStay = (sum / admitted).toFixed(1);
+            avgStay = (sum / Math.max(1, admitted)).toFixed(1);
         }
         statsEl.innerHTML = '<div class="stat-card" style="border-left-color:var(--primary)"><div class="stat-value">' + total + '</div><div class="stat-label">' + T('admmod_stat_total') + '</div></div><div class="stat-card" style="border-left-color:var(--info)"><div class="stat-value">' + admitted + '</div><div class="stat-label">' + T('admmod_stat_admitted') + '</div></div><div class="stat-card" style="border-left-color:var(--success)"><div class="stat-value">' + discharged + '</div><div class="stat-label">' + T('admmod_stat_discharged') + '</div></div><div class="stat-card" style="border-left-color:var(--warning)"><div class="stat-value">' + avgStay + '</div><div class="stat-label">' + T('admmod_stat_avgstay') + '</div></div>';
     }
@@ -288,7 +301,12 @@ function renderAdmList() {
         var bedLabel = adm.bedId ? ' (' + adm.bedId + ')' : '';
         var editBtn = isAdmin ? '<button class="btn btn-sm btn-secondary" onclick="editAdm(\'' + adm.id + '\')">✏️ ' + T('admmod_btn_edit') + '</button> ' : '';
         var delBtn = isAdmin ? '<button class="btn btn-sm btn-danger" onclick="deleteAdm(\'' + adm.id + '\')">' + T('admmod_btn_del') + '</button>' : '';
-        rows += '<tr><td><strong>' + adm.patientName + '</strong></td><td>' + (adm.patientId || '#' + adm.id.slice(-6)) + '</td><td>' + adm.roomNo + bedLabel + '</td><td>' + (adm.doctorName || '-') + '</td><td>' + APP.formatDate(adm.admissionDate) + '</td><td><span class="badge ' + getAdmTypeBadgeClass(getAdmEffType(adm)) + '">' + getAdmEffType(adm).toUpperCase() + '</span></td><td><span class="badge ' + APP.getStatusBadge(adm.status) + '">' + adm.status + '</span></td><td><button class="btn btn-sm btn-primary" onclick="viewAdm(\'' + adm.id + '\')">' + T('admmod_btn_view') + '</button> ' + editBtn + (adm.status === 'admitted' ? '<button class="btn btn-sm btn-warning" onclick="showDischargeForm(\'' + adm.id + '\')">' + T('admmod_btn_discharge') + '</button> ' : '') + delBtn + '</td></tr>';
+        var patientNameStr = esc(adm.patientName || adm.name || 'Unknown Patient');
+        var patientIdStr   = esc(adm.patientId || ('#' + String(adm.id || '').slice(-6)));
+        var roomNoStr      = esc(adm.roomNo || adm.room || '-');
+        var doctorNameStr  = esc(adm.doctorName || adm.doctor || '-');
+        var isNew = (window._lastNewAdmId && String(adm.id) === String(window._lastNewAdmId));
+        rows += '<tr data-adm-id="' + adm.id + '" style="' + (isNew ? 'background:#e8f5e9;font-weight:600;' : '') + '"><td><strong>' + patientNameStr + (isNew ? ' <span class="badge badge-success" style="font-size:10px;">NEW ✨</span>' : '') + '</strong></td><td>' + patientIdStr + '</td><td>' + roomNoStr + bedLabel + '</td><td>' + doctorNameStr + '</td><td>' + APP.formatDate(adm.admissionDate) + '</td><td><span class="badge ' + getAdmTypeBadgeClass(getAdmEffType(adm)) + '">' + getAdmEffType(adm).toUpperCase() + '</span></td><td><span class="badge ' + APP.getStatusBadge(adm.status) + '">' + (adm.status || 'admitted') + '</span></td><td><button class="btn btn-sm btn-primary" onclick="viewAdm(\'' + adm.id + '\')">' + T('admmod_btn_view') + '</button> ' + editBtn + (adm.status === 'admitted' ? '<button class="btn btn-sm btn-warning" onclick="showDischargeForm(\'' + adm.id + '\')">' + T('admmod_btn_discharge') + '</button> ' : '') + delBtn + '</td></tr>';
     }
     tbody.innerHTML = rows || '<tr><td colspan="8" class="empty-state">' + T('admmod_no_admissions') + '</td></tr>';
 }
@@ -574,11 +592,11 @@ function renderRoomView() {
             var roomNo = rm.roomNo;
             var ov = null;
             for (var o = 0; o < overrides.length; o++) {
-                if (overrides[o].roomNo === roomNo) { ov = overrides[o]; break; }
+                if (overrides[o] && String(overrides[o].roomNo || '').trim().toLowerCase() === String(roomNo || '').trim().toLowerCase()) { ov = overrides[o]; break; }
             }
             var occupiedBeds = [];
             for (var a = 0; a < admissions.length; a++) {
-                if (admissions[a].roomNo === roomNo && admissions[a].status === 'admitted') {
+                if (admissions[a] && String(admissions[a].roomNo || '').trim().toLowerCase() === String(roomNo || '').trim().toLowerCase() && (admissions[a].status || 'admitted') === 'admitted') {
                     occupiedBeds.push(admissions[a].bedId || 'A');
                 }
             }
@@ -859,7 +877,7 @@ function showAdmForm() {
     }
     if (!roomOpts) roomOpts = '<option value="">' + T('admmod_opt_no_rooms') + '</option>';
 
-    var form = '<form id="admForm"><div class="grid-2"><div class="form-group"><label>' + T('admmod_lbl_patient_name') + '</label><input type="text" name="patientName" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_patient_id') + '</label><input type="text" name="patientId" class="form-control"></div><div class="form-group"><label>' + T('admmod_lbl_age') + '</label><input type="number" name="age" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_gender') + '</label><select name="gender" class="form-control" required><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div><div class="form-group"><label>' + T('admmod_lbl_contact_phone') + '</label><input type="text" name="phone" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_emergency') + '</label><input type="text" name="emergencyContact" class="form-control"></div><div class="form-group"><label>' + T('admmod_lbl_room') + '</label><select name="roomNo" id="admRoomSelect" class="form-control" onchange="updateAdmBedOptions()" required>' + roomOpts + '</select></div><div class="form-group"><label>' + T('admmod_lbl_bed') + '</label><select name="bedId" id="admBedSelect" class="form-control" required></select></div><div class="form-group"><label>' + T('admmod_lbl_doctor_name') + '</label><input type="text" name="doctorName" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_adm_type') + '</label><select name="type" class="form-control" required><option value="regular">Regular</option><option value="emergency">Emergency</option><option value="icu">ICU</option><option value="pre-op">' + (T('admmod_opt_pre_op') || 'PRE OP') + '</option><option value="post-op">' + (T('admmod_opt_post_op') || 'POST OP') + '</option></select></div><div class="form-group"><label>' + T('admmod_lbl_privileged') + '</label><select name="privileged" class="form-control"><option value="no">' + T('admmod_privileged_no') + '</option><option value="yes">' + T('admmod_privileged_yes') + '</option></select></div><div class="form-group"><label>' + T('admmod_lbl_adm_date') + '</label><input type="date" name="admissionDate" class="form-control" value="' + new Date().toISOString().split('T')[0] + '" required></div></div><div class="form-group"><label>' + T('admmod_lbl_diagnosis') + '</label><textarea name="diagnosis" class="form-control" rows="2"></textarea></div><div class="form-group"><label>' + T('admmod_lbl_notes') + '</label><textarea name="notes" class="form-control" rows="2"></textarea></div></form>';
+    var form = '<form id="admForm" onsubmit="event.preventDefault(); saveAdm(); return false;"><div class="grid-2"><div class="form-group"><label>' + T('admmod_lbl_patient_name') + '</label><input type="text" name="patientName" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_patient_id') + '</label><input type="text" name="patientId" class="form-control"></div><div class="form-group"><label>' + T('admmod_lbl_age') + '</label><input type="number" name="age" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_gender') + '</label><select name="gender" class="form-control" required><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div><div class="form-group"><label>' + T('admmod_lbl_contact_phone') + '</label><input type="text" name="phone" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_emergency') + '</label><input type="text" name="emergencyContact" class="form-control"></div><div class="form-group"><label>' + T('admmod_lbl_room') + '</label><select name="roomNo" id="admRoomSelect" class="form-control" onchange="updateAdmBedOptions()" required>' + roomOpts + '</select></div><div class="form-group"><label>' + T('admmod_lbl_bed') + '</label><select name="bedId" id="admBedSelect" class="form-control" required></select></div><div class="form-group"><label>' + T('admmod_lbl_doctor_name') + '</label><input type="text" name="doctorName" class="form-control" required></div><div class="form-group"><label>' + T('admmod_lbl_adm_type') + '</label><select name="type" class="form-control" required><option value="regular">Regular</option><option value="emergency">Emergency</option><option value="icu">ICU</option><option value="pre-op">' + (T('admmod_opt_pre_op') || 'PRE OP') + '</option><option value="post-op">' + (T('admmod_opt_post_op') || 'POST OP') + '</option></select></div><div class="form-group"><label>' + T('admmod_lbl_privileged') + '</label><select name="privileged" class="form-control"><option value="no">' + T('admmod_privileged_no') + '</option><option value="yes">' + T('admmod_privileged_yes') + '</option></select></div><div class="form-group"><label>' + T('admmod_lbl_adm_date') + '</label><input type="date" name="admissionDate" class="form-control" value="' + new Date().toISOString().split('T')[0] + '" required></div></div><div class="form-group"><label>' + T('admmod_lbl_diagnosis') + '</label><textarea name="diagnosis" class="form-control" rows="2"></textarea></div><div class="form-group"><label>' + T('admmod_lbl_notes') + '</label><textarea name="notes" class="form-control" rows="2"></textarea></div></form>';
     openFormModal(T('admmod_new_admission'), form, 'saveAdm()');
     setTimeout(function() { updateAdmBedOptions(); }, 50);
 }
@@ -895,12 +913,12 @@ function updateAdmBedOptions() {
 function saveAdm() {
     var data = getFormData('admForm');
     if (!data.patientName || !data.age || !data.phone || !data.roomNo || !data.doctorName || !data.bedId) {
-        APP.notify(T('admmod_msg_fill_required'), 'error'); return;
+        APP.notify(T('admmod_msg_fill_required'), 'error'); return false;
     }
-    var adms = DB.get('admissions');
+    var adms = DB.get('admissions') || [];
     for (var i = 0; i < adms.length; i++) {
-        if (adms[i].roomNo === data.roomNo && adms[i].bedId === data.bedId && adms[i].status === 'admitted') {
-            APP.notify(T('admmod_bed_word') + ' ' + data.bedId + ' ' + T('admmod_in_room') + ' ' + data.roomNo + ' ' + T('admmod_bed_occupied'), 'error'); return;
+        if (adms[i] && String(adms[i].roomNo || '').trim().toLowerCase() === String(data.roomNo || '').trim().toLowerCase() && String(adms[i].bedId || '').trim().toLowerCase() === String(data.bedId || '').trim().toLowerCase() && adms[i].status === 'admitted') {
+            APP.notify(T('admmod_bed_word') + ' ' + data.bedId + ' ' + T('admmod_in_room') + ' ' + data.roomNo + ' ' + T('admmod_bed_occupied'), 'error'); return false;
         }
     }
     data.status = 'admitted';
@@ -909,13 +927,43 @@ function saveAdm() {
     data.billAmount = '';
     data.paymentStatus = 'pending';
     var _adUser = AUTH.currentUser();
-    data.createdBy = _adUser ? _adUser.username : 'admin';
-    data.createdByName = _adUser ? _adUser.fullName : 'Admin';
-    DB.add('admissions', data);
+    data.createdBy = _adUser ? (_adUser.username || _adUser.fullName || _adUser.email || String(_adUser.id)) : 'admin';
+    data.createdById = _adUser ? String(_adUser.id) : '';
+    data.createdByName = _adUser ? (_adUser.fullName || _adUser.username || 'Admin') : 'Admin';
+    data.department = _adUser ? (_adUser.department || '') : '';
+
+    var newAdm = DB.add('admissions', data);
+
     var overrides = DB.get('roomStatus') || [];
-    DB.set('roomStatus', overrides.filter(function(r) { return r.roomNo !== data.roomNo; }));
+    DB.set('roomStatus', overrides.filter(function(r) { return String(r.roomNo || '').trim().toLowerCase() !== String(data.roomNo || '').trim().toLowerCase(); }));
+
     APP.notify(T('admmod_admitted_pre') + ' ' + data.roomNo + ' (' + T('admmod_bed_word') + ' ' + data.bedId + ')' + T('admmod_admitted_post'), 'success');
+
+    // Reset filter tab & search query so newly added and recent admissions are immediately visible
+    admFilter = 'all';
+    var searchEl = document.getElementById('admSearch');
+    if (searchEl) searchEl.value = '';
+
+    var btns = document.querySelectorAll('.tabs .tab-btn');
+    if (btns && btns.length > 0) {
+        btns.forEach(function(b) { b.classList.remove('active'); });
+        if (btns[0]) btns[0].classList.add('active');
+    }
+
     renderAdmContent();
+
+    if (newAdm && newAdm.id) {
+        window._lastNewAdmId = newAdm.id;
+        setTimeout(function() {
+            var row = document.querySelector('tr[data-adm-id="' + newAdm.id + '"]');
+            if (row) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.style.transition = 'background 0.5s';
+                row.style.background = '#e8f5e9';
+                setTimeout(function() { row.style.background = ''; }, 3000);
+            }
+        }, 100);
+    }
 }
 
 function editAdm(id) {
@@ -944,7 +992,14 @@ function editAdm(id) {
     }
     if (!roomOpts) roomOpts = '<option value="">' + T('admmod_opt_no_rooms') + '</option>';
 
-    var form = '<form id="editAdmForm"><input type="hidden" name="id" value="' + id + '"><div class="grid-2">' +
+    var currentBed = adm.bedId || 'A';
+    var initialBedOpts = '<option value="' + esc(currentBed) + '" selected>' + esc(currentBed) + '</option>';
+
+    var effType = getAdmEffType(adm);
+    var isPreOp = _admIsPreOp(adm.type) || effType === 'pre-op';
+    var isPostOp = _admIsPostOp(adm.type) || effType === 'post-op';
+
+    var form = '<form id="editAdmForm" onsubmit="event.preventDefault(); updateAdm(\'' + id + '\'); return false;"><input type="hidden" name="id" value="' + id + '"><div class="grid-2">' +
         '<div class="form-group"><label>' + T('admmod_lbl_patient_name') + '</label><input type="text" name="patientName" class="form-control" value="' + esc(adm.patientName) + '" required></div>' +
         '<div class="form-group"><label>' + T('admmod_lbl_patient_id') + '</label><input type="text" name="patientId" class="form-control" value="' + esc(adm.patientId || '') + '"></div>' +
         '<div class="form-group"><label>' + T('admmod_lbl_age') + '</label><input type="number" name="age" class="form-control" value="' + esc(adm.age) + '" required></div>' +
@@ -955,14 +1010,14 @@ function editAdm(id) {
         '<div class="form-group"><label>' + T('admmod_lbl_contact_phone') + '</label><input type="text" name="phone" class="form-control" value="' + esc(adm.phone) + '" required></div>' +
         '<div class="form-group"><label>' + T('admmod_lbl_emergency') + '</label><input type="text" name="emergencyContact" class="form-control" value="' + esc(adm.emergencyContact || '') + '"></div>' +
         '<div class="form-group"><label>' + T('admmod_lbl_room') + '</label><select name="roomNo" id="editAdmRoomSelect" class="form-control" onchange="updateEditAdmBedOptions(\'' + esc(adm.bedId || '') + '\')" required>' + roomOpts + '</select></div>' +
-        '<div class="form-group"><label>' + T('admmod_lbl_bed') + '</label><select name="bedId" id="editAdmBedSelect" class="form-control" required></select></div>' +
+        '<div class="form-group"><label>' + T('admmod_lbl_bed') + '</label><select name="bedId" id="editAdmBedSelect" class="form-control" required>' + initialBedOpts + '</select></div>' +
         '<div class="form-group"><label>' + T('admmod_lbl_doctor_name') + '</label><input type="text" name="doctorName" class="form-control" value="' + esc(adm.doctorName) + '" required></div>' +
         '<div class="form-group"><label>' + T('admmod_lbl_adm_type') + '</label><select name="type" class="form-control" required>' +
-        '<option value="regular"' + (adm.type === 'regular' ? ' selected' : '') + '>Regular</option>' +
+        '<option value="regular"' + (!isPreOp && !isPostOp && (adm.type === 'regular' || !adm.type) ? ' selected' : '') + '>Regular</option>' +
         '<option value="emergency"' + (adm.type === 'emergency' ? ' selected' : '') + '>Emergency</option>' +
         '<option value="icu"' + (adm.type === 'icu' ? ' selected' : '') + '>ICU</option>' +
-        '<option value="pre-op"' + (adm.type === 'pre-op' ? ' selected' : '') + '>' + (T('admmod_opt_pre_op') || 'PRE OP') + '</option>' +
-        '<option value="post-op"' + (adm.type === 'post-op' ? ' selected' : '') + '>' + (T('admmod_opt_post_op') || 'POST OP') + '</option></select></div>' +
+        '<option value="pre-op"' + (isPreOp ? ' selected' : '') + '>' + (T('admmod_opt_pre_op') || 'PRE OP') + '</option>' +
+        '<option value="post-op"' + (!isPreOp && isPostOp ? ' selected' : '') + '>' + (T('admmod_opt_post_op') || 'POST OP') + '</option></select></div>' +
         '<div class="form-group"><label>' + T('admmod_lbl_privileged') + '</label><select name="privileged" class="form-control">' +
         '<option value="no"' + (adm.privileged === 'no' ? ' selected' : '') + '>' + T('admmod_privileged_no') + '</option>' +
         '<option value="yes"' + (adm.privileged === 'yes' ? ' selected' : '') + '>' + T('admmod_privileged_yes') + '</option></select></div>' +
@@ -971,7 +1026,8 @@ function editAdm(id) {
         '<div class="form-group"><label>' + T('admmod_lbl_diagnosis') + '</label><textarea name="diagnosis" class="form-control" rows="2">' + esc(adm.diagnosis || '') + '</textarea></div>' +
         '<div class="form-group"><label>' + T('admmod_lbl_notes') + '</label><textarea name="notes" class="form-control" rows="2">' + esc(adm.notes || '') + '</textarea></div></form>';
 
-    openFormModal(T('admmod_edit_admission'), form, 'updateAdm("' + id + '")');
+    openFormModal(T('admmod_edit_admission'), form, function() { return updateAdm(id); });
+    updateEditAdmBedOptions(adm.bedId);
     setTimeout(function() { updateEditAdmBedOptions(adm.bedId); }, 50);
 }
 
@@ -984,23 +1040,33 @@ function updateEditAdmBedOptions(currentBedId) {
     var beds = (selectedOption.getAttribute('data-beds') || 'A').split(',');
     var roomNo = selectedOption.value;
     var adms = DB.get('admissions') || [];
-    var editAdmId = (document.getElementById('editAdmForm') ? (document.getElementById('editAdmForm').querySelector('input[name="id"]') ? document.getElementById('editAdmForm').querySelector('input[name="id"]').value : '') : '');
+    var editAdmFormEl = document.getElementById('editAdmForm');
+    var editAdmId = String(editAdmFormEl ? (editAdmFormEl.querySelector('input[name="id"]') ? editAdmFormEl.querySelector('input[name="id"]').value : '') : '').trim();
+
     var occupied = [];
     for (var i = 0; i < adms.length; i++) {
-        if (adms[i].roomNo === roomNo && adms[i].status === 'admitted' && adms[i].id !== editAdmId) {
-            occupied.push(adms[i].bedId || 'A');
+        var aId = String(adms[i].id || '').trim();
+        if (adms[i].roomNo === roomNo && adms[i].status === 'admitted' && aId !== editAdmId) {
+            occupied.push(String(adms[i].bedId || 'A').trim());
         }
     }
     var html = '';
+    var hasSelected = false;
     for (var b = 0; b < beds.length; b++) {
         var bed = beds[b].trim();
         if (!bed) continue;
+        var isCurrent = String(bed).toLowerCase() === String(currentBedId || '').trim().toLowerCase();
+        if (isCurrent) hasSelected = true;
         var taken = false;
-        for (var oc = 0; oc < occupied.length; oc++) {
-            if (occupied[oc] === bed) { taken = true; break; }
+        if (!isCurrent) {
+            for (var oc = 0; oc < occupied.length; oc++) {
+                if (occupied[oc].toLowerCase() === bed.toLowerCase()) { taken = true; break; }
+            }
         }
-        var isCurrent = (bed === currentBedId);
         html += '<option value="' + bed + '" ' + (taken ? 'disabled' : '') + (isCurrent ? ' selected' : '') + '>' + bed + (taken ? ' (' + T('admmod_occupied_cap') + ')' : ' (' + T('admmod_available') + ')') + '</option>';
+    }
+    if (!hasSelected && currentBedId) {
+        html = '<option value="' + esc(currentBedId) + '" selected>' + esc(currentBedId) + '</option>' + html;
     }
     bedSelect.innerHTML = html || '<option value="">' + T('admmod_opt_no_beds') + '</option>';
 }
@@ -1009,22 +1075,63 @@ function updateAdm(id) {
     var user = AUTH.currentUser();
     if (!_isFacilityAdmin(user)) {
         APP.notify(T('admmod_msg_only_facility_admin_edit'), 'error');
-        return;
+        return false;
     }
     var data = getFormData('editAdmForm');
     if (!data.patientName || !data.age || !data.phone || !data.roomNo || !data.doctorName || !data.bedId) {
-        APP.notify(T('admmod_msg_fill_required'), 'error'); return;
+        APP.notify(T('admmod_msg_fill_required'), 'error');
+        return false;
     }
+
+    var targetId = String(id || data.id || '').trim();
+    if (!targetId) {
+        APP.notify('Invalid admission record ID', 'error');
+        return false;
+    }
+
     var adms = DB.get('admissions') || [];
     for (var i = 0; i < adms.length; i++) {
-        if (adms[i].id !== id && adms[i].roomNo === data.roomNo && adms[i].bedId === data.bedId && adms[i].status === 'admitted') {
-            APP.notify(T('admmod_bed_word') + ' ' + data.bedId + ' ' + T('admmod_in_room') + ' ' + data.roomNo + ' ' + T('admmod_bed_occupied'), 'error'); return;
+        var existingId = String(adms[i].id || '').trim();
+        if (existingId !== targetId &&
+            String(adms[i].roomNo || '').trim().toLowerCase() === String(data.roomNo || '').trim().toLowerCase() &&
+            String(adms[i].bedId || '').trim().toLowerCase() === String(data.bedId || '').trim().toLowerCase() &&
+            adms[i].status === 'admitted') {
+            APP.notify(T('admmod_bed_word') + ' ' + data.bedId + ' ' + T('admmod_in_room') + ' ' + data.roomNo + ' ' + T('admmod_bed_occupied'), 'error');
+            return false;
         }
     }
-    DB.update('admissions', id, data);
+
+    var updatedIdx = -1;
+    for (var j = 0; j < adms.length; j++) {
+        if (String(adms[j].id || '').trim() === targetId) {
+            updatedIdx = j;
+            break;
+        }
+    }
+
+    if (updatedIdx > -1) {
+        adms[updatedIdx] = Object.assign({}, adms[updatedIdx], data, {
+            type: data.type || 'regular',
+            updatedAt: new Date().toISOString()
+        });
+        DB.set('admissions', adms);
+    } else {
+        DB.update('admissions', targetId, data);
+    }
+
     APP.notify(T('admmod_msg_adm_updated'), 'success');
-    renderAdmContent();
-    closeModal();
+
+    admFilter = 'all';
+    var searchEl = document.getElementById('admSearch');
+    if (searchEl) searchEl.value = '';
+
+    if (typeof APP !== 'undefined' && typeof APP.refreshCurrent === 'function') {
+        APP.refreshCurrent();
+    } else {
+        try { renderAdmContent(); } catch(e) {}
+    }
+
+    return true;
 }
 
 function viewAdm(id) {
@@ -1301,61 +1408,206 @@ function exportAdmPDF() {
     setTimeout(function(){ win.print(); }, 400);
 }
 
-/* ─── Excel (CSV) Export ─── */
+/* ─── Multi-Sheet Excel Export ─── */
 function exportAdmExcel() {
     var rows = getAdmReportData();
-    if (rows.length === 0) { APP.notify('No records to export', 'error'); return; }
+    if (!rows || rows.length === 0) { APP.notify('No records to export', 'error'); return; }
 
     var from = document.getElementById('rptFrom') ? document.getElementById('rptFrom').value : '';
     var to = document.getElementById('rptTo') ? document.getElementById('rptTo').value : '';
+    var todayStr = new Date().toISOString().slice(0, 10);
 
-    var headers = ['#','Patient Name','Patient ID','Age','Gender','Phone','Emergency Contact',
-        'Room No','Room Category','Bed','Doctor','Department','Type','Admission Date','Discharge Date',
-        'Stay (days)','Diagnosis','Bill Amount (INR)','Payment Status','Status','Notes'];
+    // Calculate Dashboard KPIs
+    var totalAdmissions = rows.length;
+    var admittedList = rows.filter(function(r) { return (r.status || 'admitted') === 'admitted'; });
+    var dischargedList = rows.filter(function(r) { return r.status === 'discharged'; });
+    var preOpList = rows.filter(function(r) { return getAdmEffType(r) === 'pre-op'; });
+    var postOpList = rows.filter(function(r) { return getAdmEffType(r) === 'post-op'; });
 
-    var csvRows = [headers];
+    var currentlyAdmitted = admittedList.length;
+    var totalDischarged = dischargedList.length;
+    var preOpTotal = preOpList.length;
+    var postOpTotal = postOpList.length;
 
-    var sorted = rows.slice().sort(function(a,b){ return new Date(b.admissionDate)-new Date(a.admissionDate); });
-    sorted.forEach(function(a, i) {
-        var stay = a.status==='discharged'&&a.dischargeDate
-            ? APP.daysBetween(a.admissionDate,a.dischargeDate)
-            : (a.status==='admitted' ? APP.daysBetween(a.admissionDate,new Date().toISOString()) : '');
-        csvRows.push([
-            i+1,
-            csvCell(a.patientName),
-            csvCell(a.patientId||'#'+a.id.slice(-6)),
-            csvCell(a.age||''),
-            csvCell(a.gender||''),
-            csvCell(a.phone||''),
-            csvCell(a.emergencyContact||''),
-            csvCell(a.roomNo),
-            csvCell(getRoomCategory(a.roomNo)||''),
-            csvCell(a.bedId||''),
-            csvCell(a.doctorName||''),
-            csvCell(a.department||''),
-            csvCell(a.type||''),
-            csvCell(a.admissionDate ? new Date(a.admissionDate).toLocaleDateString('en-IN') : ''),
-            csvCell(a.dischargeDate ? new Date(a.dischargeDate).toLocaleDateString('en-IN') : ''),
-            stay,
-            csvCell(a.diagnosis||''),
-            a.billAmount||'',
-            csvCell(a.paymentStatus||''),
-            csvCell(a.status||''),
-            csvCell(a.notes||'')
-        ]);
+    var dailyAdmissions = rows.filter(function(r) {
+        var d = r.admissionDate || r.createdAt || '';
+        return d.slice(0, 10) === todayStr;
+    }).length;
+
+    var dailyDischarges = rows.filter(function(r) {
+        var d = r.dischargeDate || r.dischargedAt || '';
+        return d.slice(0, 10) === todayStr;
+    }).length;
+
+    var emergencyCount = rows.filter(function(r) { return (r.type || '').toLowerCase() === 'emergency'; }).length;
+    var icuCount = rows.filter(function(r) { return (r.type || '').toLowerCase() === 'icu'; }).length;
+    var regularCount = rows.filter(function(r) { return (r.type || '').toLowerCase() === 'regular' || !r.type; }).length;
+
+    var totalStayDays = 0;
+    rows.forEach(function(a) {
+        var s = a.status === 'discharged' && a.dischargeDate
+            ? APP.daysBetween(a.admissionDate, a.dischargeDate)
+            : APP.daysBetween(a.admissionDate, todayStr);
+        totalStayDays += (parseFloat(s) || 0);
     });
+    var avgStayDays = (totalStayDays / Math.max(1, rows.length)).toFixed(1);
 
-    var csv = csvRows.map(function(r){ return r.join(','); }).join('\r\n');
-    var bom = '﻿'; // UTF-8 BOM so Excel opens with correct encoding
-    var blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+    var totalRevenue = rows.reduce(function(sum, r) { return sum + (parseFloat(r.billAmount) || 0); }, 0);
+    var pendingPayments = rows.filter(function(r) { return r.paymentStatus !== 'paid' && (parseFloat(r.billAmount) > 0 || r.status === 'discharged'); }).length;
+
+    // Build Sheet 1: Dashboard & Summary AOA
+    var summaryRows = [
+        ['STAVYA HOSPITAL — ADMISSION SECTION DASHBOARD REPORT'],
+        ['Report Period:', (from || 'Start') + ' to ' + (to || 'Present'), 'Generated On:', new Date().toLocaleString('en-IN')],
+        [''],
+        ['KEY PERFORMANCE INDICATORS (KPIs)'],
+        ['Metric Name', 'Value', 'Description'],
+        ['Total Admissions', totalAdmissions, 'Total patient admission records in report period'],
+        ['Currently Admitted', currentlyAdmitted, 'Patients currently occupying rooms/beds'],
+        ['Total Discharged', totalDischarged, 'Patients discharged from hospital'],
+        ['Daily Admissions (Today)', dailyAdmissions, 'New admissions recorded today (' + todayStr + ')'],
+        ['Daily Discharges (Today)', dailyDischarges, 'Discharges completed today (' + todayStr + ')'],
+        ['Average Stay (Days)', avgStayDays + ' Days', 'Mean length of stay per patient'],
+        ['Pre-Op Total', preOpTotal, 'Surgical pre-operative patient admissions'],
+        ['Post-Op Total', postOpTotal, 'Post-operative recovery patient admissions'],
+        ['Emergency Admissions', emergencyCount, 'High-priority emergency patient intake'],
+        ['ICU Admissions', icuCount, 'Intensive care unit patient intake'],
+        ['Regular Admissions', regularCount, 'Standard ward / room admissions'],
+        ['Total Revenue (INR)', '₹' + totalRevenue.toLocaleString('en-IN'), 'Sum of total billing amount'],
+        ['Pending Payments', pendingPayments, 'Unpaid or partial bill accounts'],
+        [''],
+        ['ADMISSION CATEGORY BREAKDOWN SUMMARY'],
+        ['Category', 'Count', 'Percentage (%)', 'Avg Stay (Days)', 'Revenue (INR)'],
+        ['Currently Admitted', currentlyAdmitted, ((currentlyAdmitted / Math.max(1, totalAdmissions)) * 100).toFixed(1) + '%', '—', '—'],
+        ['Discharged', totalDischarged, ((totalDischarged / Math.max(1, totalAdmissions)) * 100).toFixed(1) + '%', avgStayDays, '₹' + totalRevenue.toLocaleString('en-IN')],
+        ['Pre-Op', preOpTotal, ((preOpTotal / Math.max(1, totalAdmissions)) * 100).toFixed(1) + '%', '—', '—'],
+        ['Post-Op', postOpTotal, ((postOpTotal / Math.max(1, totalAdmissions)) * 100).toFixed(1) + '%', '—', '—'],
+        ['Emergency', emergencyCount, ((emergencyCount / Math.max(1, totalAdmissions)) * 100).toFixed(1) + '%', '—', '—'],
+        ['ICU', icuCount, ((icuCount / Math.max(1, totalAdmissions)) * 100).toFixed(1) + '%', '—', '—'],
+        ['Regular', regularCount, ((regularCount / Math.max(1, totalAdmissions)) * 100).toFixed(1) + '%', '—', '—']
+    ];
+
+    // Build Master Data Headers
+    var detailHeaders = ['#', 'Patient Name', 'Patient ID', 'Age', 'Gender', 'Phone', 'Emergency Contact', 'Room No', 'Room Category', 'Bed', 'Doctor', 'Department', 'Type', 'Effective Type', 'Admission Date', 'Discharge Date', 'Stay (Days)', 'Diagnosis', 'Discharge Summary', 'Bill Amount (INR)', 'Payment Status', 'Status', 'Notes', 'Created By'];
+
+    function _buildRowArray(list) {
+        var out = [detailHeaders];
+        var sorted = list.slice().sort(function(a, b) { return new Date(b.admissionDate) - new Date(a.admissionDate); });
+        sorted.forEach(function(a, i) {
+            var stay = a.status === 'discharged' && a.dischargeDate
+                ? APP.daysBetween(a.admissionDate, a.dischargeDate)
+                : (a.status === 'admitted' ? APP.daysBetween(a.admissionDate, todayStr) : '');
+            out.push([
+                i + 1,
+                a.patientName || a.name || '',
+                a.patientId || ('#' + String(a.id || '').slice(-6)),
+                a.age || '',
+                a.gender || '',
+                a.phone || '',
+                a.emergencyContact || '',
+                a.roomNo || '',
+                getRoomCategory(a.roomNo) || '',
+                a.bedId || '',
+                a.doctorName || '',
+                a.department || '',
+                a.type || 'regular',
+                getAdmEffType(a),
+                a.admissionDate ? new Date(a.admissionDate).toLocaleDateString('en-IN') : '',
+                a.dischargeDate ? new Date(a.dischargeDate).toLocaleDateString('en-IN') : '',
+                stay,
+                a.diagnosis || '',
+                a.dischargeSummary || '',
+                a.billAmount || 0,
+                a.paymentStatus || 'pending',
+                a.status || 'admitted',
+                a.notes || '',
+                a.createdByName || a.createdBy || ''
+            ]);
+        });
+        return out;
+    }
+
+    var admittedRows = _buildRowArray(admittedList);
+    var dischargedRows = _buildRowArray(dischargedList);
+    var preOpRows = _buildRowArray(preOpList);
+    var postOpRows = _buildRowArray(postOpList);
+    var masterRows = _buildRowArray(rows);
+
+    var XLSX = window.XLSX;
+    if (XLSX) {
+        var wb = XLSX.utils.book_new();
+
+        var wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+        wsSummary['!cols'] = [{ wch: 30 }, { wch: 25 }, { wch: 45 }];
+        XLSX.utils.book_append_sheet(wb, wsSummary, "Dashboard & Summary");
+
+        var wsAdmitted = XLSX.utils.aoa_to_sheet(admittedRows);
+        wsAdmitted['!cols'] = detailHeaders.map(function() { return { wch: 18 }; });
+        XLSX.utils.book_append_sheet(wb, wsAdmitted, "Currently Admitted");
+
+        var wsDischarged = XLSX.utils.aoa_to_sheet(dischargedRows);
+        wsDischarged['!cols'] = detailHeaders.map(function() { return { wch: 18 }; });
+        XLSX.utils.book_append_sheet(wb, wsDischarged, "Discharged Patients");
+
+        var wsPreOp = XLSX.utils.aoa_to_sheet(preOpRows);
+        wsPreOp['!cols'] = detailHeaders.map(function() { return { wch: 18 }; });
+        XLSX.utils.book_append_sheet(wb, wsPreOp, "Pre-Op Patients");
+
+        var wsPostOp = XLSX.utils.aoa_to_sheet(postOpRows);
+        wsPostOp['!cols'] = detailHeaders.map(function() { return { wch: 18 }; });
+        XLSX.utils.book_append_sheet(wb, wsPostOp, "Post-Op Patients");
+
+        var wsAll = XLSX.utils.aoa_to_sheet(masterRows);
+        wsAll['!cols'] = detailHeaders.map(function() { return { wch: 18 }; });
+        XLSX.utils.book_append_sheet(wb, wsAll, "All Admissions");
+
+        var fileName = 'Admissions_Comprehensive_Report_' + (from || 'start') + '_to_' + (to || 'today') + '.xlsx';
+        XLSX.writeFile(wb, fileName);
+        APP.notify('Multi-Sheet Excel report downloaded (' + rows.length + ' records)', 'success');
+    } else {
+        _exportAdmXmlSpreadsheet(summaryRows, admittedRows, dischargedRows, preOpRows, postOpRows, masterRows, from, to);
+    }
+}
+
+function _exportAdmXmlSpreadsheet(summaryRows, admittedRows, dischargedRows, preOpRows, postOpRows, masterRows, from, to) {
+    function _sheetToXml(name, rows) {
+        var xml = '<Worksheet ss:Name="' + String(name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') + '"><Table>';
+        rows.forEach(function(r) {
+            xml += '<Row>';
+            r.forEach(function(cell) {
+                var val = String(cell == null ? '' : cell).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                var isNum = typeof cell === 'number';
+                xml += '<Cell><Data ss:Type="' + (isNum ? 'Number' : 'String') + '">' + val + '</Data></Cell>';
+            });
+            xml += '</Row>';
+        });
+        xml += '</Table></Worksheet>';
+        return xml;
+    }
+
+    var xmlDoc = '<?xml version="1.0"?>\r\n' +
+        '<?mso-application progid="Excel.Sheet"?>\r\n' +
+        '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\r\n' +
+        ' xmlns:o="urn:schemas-microsoft-com:office:office"\r\n' +
+        ' xmlns:x="urn:schemas-microsoft-com:office:excel"\r\n' +
+        ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\r\n' +
+        _sheetToXml("Dashboard & Summary", summaryRows) +
+        _sheetToXml("Currently Admitted", admittedRows) +
+        _sheetToXml("Discharged Patients", dischargedRows) +
+        _sheetToXml("Pre-Op Patients", preOpRows) +
+        _sheetToXml("Post-Op Patients", postOpRows) +
+        _sheetToXml("All Admissions", masterRows) +
+        '</Workbook>';
+
+    var blob = new Blob([xmlDoc], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = 'Admission_Report_' + (from||'all') + '_to_' + (to||'all') + '.csv';
+    a.download = 'Admissions_Comprehensive_Report_' + (from || 'start') + '_to_' + (to || 'today') + '.xls';
     document.body.appendChild(a);
     a.click();
-    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
-    APP.notify('Excel file downloaded (' + rows.length + ' records)', 'success');
+    setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+    APP.notify('Excel report downloaded (Multi-sheet format)', 'success');
 }
 
 function csvCell(v) {

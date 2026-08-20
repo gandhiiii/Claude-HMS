@@ -334,17 +334,29 @@ var WS_NOTIFY = (function () {
                         var val = payload.new && payload.new.payload;
                         if (!val || !val.timestamp) return;
 
-                        // Ignore pop messages from before current session or from self
                         if (val.timestamp < sessionStartTime - 3000) return;
                         var user = _getUser();
-                        var myId = user ? (user.id || user.username) : null;
-                        if (myId && val.senderId === myId) return;
+                        var myId = user ? String(user.id || user.username) : null;
+                        if (myId && String(val.senderId) === myId) return;
 
-                        // Push pop notification (deduplication prevents double pops)
                         _push(val.title, val.body, val.notifType || val.type || 'info', true, val.key);
                     })
-                .subscribe(function (status) {});
-            console.log('[WS_NOTIFY] Supabase Realtime Database live_pops listener active ✓');
+                .on('broadcast', { event: 'live_pop' }, function (envelope) {
+                    var val = envelope && envelope.payload;
+                    if (!val || !val.timestamp) return;
+
+                    if (val.timestamp < sessionStartTime - 3000) return;
+                    var user = _getUser();
+                    var myId = user ? String(user.id || user.username) : null;
+                    if (myId && String(val.senderId) === myId) return;
+
+                    _push(val.title, val.body, val.notifType || val.type || 'info', true, val.key);
+                })
+                .subscribe(function (status) {
+                    if (status === 'SUBSCRIBED') {
+                        console.log('[WS_NOTIFY] Supabase Realtime Broadcast & Postgres listener active ✓');
+                    }
+                });
         } catch (e) {
             console.warn('[WS_NOTIFY] Supabase listener notice:', e.message);
         }
@@ -352,19 +364,61 @@ var WS_NOTIFY = (function () {
 
     function _broadcastSupabase(title, body, type, key) {
         if (!window.SB_DB) return;
+        var user = _getUser();
+        var myId = user ? String(user.id || user.username) : 'anon';
+        var payload = {
+            title: title,
+            body: body,
+            notifType: type || 'info',
+            key: key || null,
+            senderId: myId,
+            timestamp: Date.now()
+        };
+
+        // 1. Supabase Realtime Broadcast (Works instantly on active devices)
+        try {
+            if (_sbChannel) {
+                _sbChannel.send({
+                    type: 'broadcast',
+                    event: 'live_pop',
+                    payload: payload
+                });
+            }
+        } catch (e) {}
+
+        // 2. Supabase Postgres Table Insert
+        try {
+            window.SB_DB.from('hms_live_pops').insert({ payload: payload }).then(function (res) {
+                if (res && res.error) console.warn('[WS_NOTIFY] live_pops insert notice:', res.error.message);
+            }).catch(function() {});
+        } catch (e) {}
+
+        // 3. Web Push Relay (Delivers background OS push notifications when app/browser is closed)
+        _sendRelayPush(title, body, type, key);
+    }
+
+    function _sendRelayPush(title, body, type, key) {
+        if (!window.HMS_PUSH_CONFIG || !window.HMS_PUSH_CONFIG.relayUrl) return;
         try {
             var user = _getUser();
-            window.SB_DB.from('hms_live_pops').insert({
-                payload: {
-                    title:     title,
-                    body:      body,
+            var senderId = user ? String(user.id || user.username) : null;
+            fetch(window.HMS_PUSH_CONFIG.relayUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: title,
+                    body: body,
                     notifType: type || 'info',
-                    key:       key || null,
-                    senderId:  user ? (user.id || user.username) : 'anon',
+                    key: key || null,
+                    senderId: senderId,
                     timestamp: Date.now()
-                }
+                })
+            }).then(function (r) {
+                return r.json();
             }).then(function (res) {
-                if (res && res.error) console.warn('[WS_NOTIFY] live_pops insert error:', res.error.message);
+                console.log('[WS_NOTIFY] Background Push Relay dispatched ✓');
+            }).catch(function (e) {
+                console.warn('[WS_NOTIFY] Push Relay notice:', e.message);
             });
         } catch (e) {}
     }

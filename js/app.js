@@ -344,6 +344,11 @@ const Router = {
             APP.notify('All data uploaded to database ✓', 'success');
         }, 2000);
     },
+    refreshCurrent() {
+        if (this.currentModule) {
+            this.navigate(this.currentModule);
+        }
+    },
     logout() {
         if (confirm('Are you sure you want to logout?')) {
             AUTH.logout();
@@ -374,21 +379,47 @@ function openFormModal(title, formHtml, onSave, large) {
         <div id="modalFormBody">${formHtml}</div>
         <div class="modal-footer">
             <button class="btn btn-danger" onclick="this.closest('.modal').remove()">Cancel</button>
-            <button class="btn btn-primary" id="modalSaveBtn" onclick="__modalSave(this,'${onSave}')">Save</button>
+            <button class="btn btn-primary" id="modalSaveBtn">Save</button>
         </div>
     `, large);
+    const saveBtn = m.querySelector('#modalSaveBtn');
+    if (saveBtn) {
+        saveBtn.onclick = function() {
+            __modalSave(this, onSave);
+        };
+    }
     return m;
 }
 
 function __modalSave(btn, fnCall) {
-    if (btn.disabled) return;
+    if (!btn || btn.disabled) return;
     btn.disabled = true;
     btn.style.opacity = '0.6';
-    const result = eval(fnCall);
-    if (result instanceof Promise) {
-        result.then(r => { if (r !== false) btn.closest('.modal').remove(); });
-    } else if (result !== false) {
-        btn.closest('.modal').remove();
+    try {
+        const result = typeof fnCall === 'function' ? fnCall() : eval(fnCall);
+        if (result instanceof Promise) {
+            result.then(r => {
+                if (r === false) {
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                } else {
+                    const m = btn.closest('.modal');
+                    if (m) m.remove();
+                }
+            }).catch(err => {
+                console.error('[__modalSave] Promise error:', err);
+                if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+            });
+        } else if (result === false) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        } else {
+            const m = btn.closest('.modal');
+            if (m) m.remove();
+        }
+    } catch (err) {
+        console.error('[__modalSave] Execution error:', err);
+        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
     }
 }
 

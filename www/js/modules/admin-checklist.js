@@ -30,7 +30,7 @@ function switchChecklistTab(tab, btn) {
 function renderAdmTasks() {
     const user = AUTH.currentUser();
     const all = DB.get('adminChecklist') || [];
-    const items = all.filter(i => i.createdBy === user.fullName);
+    const items = all.filter(i => !user || i.createdBy === user.fullName || i.createdBy === user.username || i.createdBy === user.id || (user.role === 'admin' || user.isSuperAdmin));
     const content = document.getElementById('admContent');
     if (!content) return;
     content.innerHTML = `
@@ -254,14 +254,15 @@ function removeAuditItem(btn) {
 
 function saveAudit() {
     const form = document.getElementById('auditForm');
+    if (!form) return false;
     const id = form.querySelector('[name="id"]')?.value;
-    const title = form.querySelector('[name="title"]')?.value;
+    const title = form.querySelector('[name="title"]')?.value?.trim();
     const assignedTo = form.querySelector('[name="assignedTo"]')?.value;
     const area = form.querySelector('[name="area"]')?.value;
     const deadline = form.querySelector('[name="deadline"]')?.value;
     const status = form.querySelector('[name="status"]')?.value || 'planned';
     const notes = form.querySelector('[name="notes"]')?.value;
-    if (!title) { APP.notify(T('achkmod_msg_title_required'), 'error'); return; }
+    if (!title) { APP.notify(T('achkmod_msg_title_required'), 'error'); return false; }
     const items = [];
     const rows = form.querySelectorAll('.cl-item-row');
     rows.forEach((row, i) => {
@@ -270,7 +271,7 @@ function saveAudit() {
         const n = row.querySelector('[name^="ai_notes_"]')?.value?.trim() || '';
         if (task) items.push({ task, expected, notes: n, status: 'pending' });
     });
-    if (items.length === 0) { APP.notify(T('achkmod_msg_add_audit_item'), 'error'); return; }
+    if (items.length === 0) { APP.notify(T('achkmod_msg_add_audit_item'), 'error'); return false; }
     if (id) {
         const existing = DB.getById('adminAudits', id);
         const statusMap = {};
@@ -281,10 +282,11 @@ function saveAudit() {
         DB.update('adminAudits', id, { title, assignedTo, area, deadline, notes, items, status });
         APP.notify(T('achkmod_msg_audit_updated'), 'success');
     } else {
-        DB.add('adminAudits', { title, assignedTo: assignedTo || '', area: area || '', deadline: deadline || '', notes: notes || '', items, status, createdBy: AUTH.currentUser().fullName });
+        DB.add('adminAudits', { title, assignedTo: assignedTo || '', area: area || '', deadline: deadline || '', notes: notes || '', items, status, createdBy: AUTH.currentUser()?.fullName || '' });
         APP.notify(T('achkmod_msg_audit_created'), 'success');
     }
     renderAdmAudits();
+    return true;
 }
 
 function editAudit(id) {

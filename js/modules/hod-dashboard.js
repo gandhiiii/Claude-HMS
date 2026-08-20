@@ -513,14 +513,68 @@ function _hodOverview(el) {
    ADMISSIONS TAB
 ═══════════════════════════════════════════════ */
 function _hodAdmissions(el) {
-    var cleaning = _hodData.cleaning;
+    var cleaning = _hodData.cleaning || [];
+    var allAdm = DB.get('admissions') || [];
+    var admitted = allAdm.filter(function(a) { return (a.status || 'admitted') === 'admitted'; });
+    var discharged = allAdm.filter(function(a) { return a.status === 'discharged'; });
+
     var html = '<div style="margin-bottom:16px;">'
-        + '<div style="font-weight:700;font-size:16px;margin-bottom:4px;">🏥 Admissions & Discharges</div>'
-        + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">Manage patient admissions and discharges from the main Admissions module.</div>'
-        + '<button class="btn btn-primary" style="margin-right:8px;" onclick="Router.navigate(\'admissions\')">Open Admissions Module →</button>'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+        + '<div><div style="font-weight:700;font-size:18px;">🏥 Hospital Admissions & Patient Records (' + allAdm.length + ' Total)</div>'
+        + '<div style="font-size:13px;color:var(--gray);">Live real-time patient admissions, room assignments, and discharge queue.</div></div>'
+        + '<button class="btn btn-primary" onclick="Router.navigate(\'admissions\')">Open Full Admissions Module →</button>'
         + '</div>'
 
-        + '<div style="border-top:1px solid var(--border);padding-top:16px;">'
+        // KPI Summary Cards
+        + '<div class="grid-4" style="gap:10px;margin-bottom:16px;">'
+        + '<div style="background:#e3f2fd;border:1px solid #90caf9;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#1565c0;font-weight:600;">TOTAL ADMISSIONS</div><div style="font-size:22px;font-weight:700;color:#0d47a1;">' + allAdm.length + '</div></div>'
+        + '<div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#2e7d32;font-weight:600;">CURRENTLY ADMITTED</div><div style="font-size:22px;font-weight:700;color:#1b5e20;">' + admitted.length + '</div></div>'
+        + '<div style="background:#fff3e0;border:1px solid #ffe0b2;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#e65100;font-weight:600;">TOTAL DISCHARGED</div><div style="font-size:22px;font-weight:700;color:#bf360c;">' + discharged.length + '</div></div>'
+        + '<div style="background:#f3e5f5;border:1px solid #ce93d8;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#7b1fa2;font-weight:600;">ROOMS TO CLEAN</div><div style="font-size:22px;font-weight:700;color:#4a148c;">' + cleaning.length + '</div></div>'
+        + '</div>'
+
+        // Recent Admissions Table Widget
+        + '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
+        + '<div style="font-weight:700;font-size:15px;">📌 Recent Hospital Patient Admissions</div>'
+        + '<span style="font-size:12px;color:var(--gray);">Showing latest entries</span>'
+        + '</div>'
+        + '<div class="table-responsive"><table class="table" style="font-size:12px;margin:0;"><thead><tr>'
+        + '<th>#</th><th>Patient Name</th><th>ID</th><th>Age/Gender</th><th>Room/Bed</th><th>Doctor</th><th>Type</th><th>Admitted Date</th><th>Status</th><th>Action</th>'
+        + '</tr></thead><tbody>';
+
+    if (allAdm.length === 0) {
+        html += '<tr><td colspan="10" style="text-align:center;color:var(--gray);padding:20px;">No patient admissions found.</td></tr>';
+    } else {
+        var sorted = allAdm.slice().sort(function(a, b) {
+            return new Date(b.admissionDate || b.createdAt || 0) - new Date(a.admissionDate || a.createdAt || 0);
+        });
+        sorted.slice(0, 10).forEach(function(a, i) {
+            var bedLabel = a.bedId ? ' (' + a.bedId + ')' : '';
+            var typeBadge = (a.type === 'emergency') ? 'badge-danger' : (a.type === 'icu') ? 'badge-warning' : 'badge-info';
+            var stBadge = (a.status === 'admitted') ? 'badge-success' : 'badge-secondary';
+            var admDate = a.admissionDate ? new Date(a.admissionDate).toLocaleDateString('en-IN') : (a.createdAt ? new Date(a.createdAt).toLocaleDateString('en-IN') : '—');
+            var pName = a.patientName || a.name || 'Unknown Patient';
+            var pId = a.patientId || ('#' + String(a.id || '').slice(-6));
+
+            html += '<tr>'
+                + '<td>' + (i + 1) + '</td>'
+                + '<td><strong>' + _esc(pName) + '</strong></td>'
+                + '<td>' + _esc(pId) + '</td>'
+                + '<td>' + _esc(a.age || '—') + ' / ' + _esc(a.gender || '—') + '</td>'
+                + '<td><strong>' + _esc(a.roomNo || '—') + _esc(bedLabel) + '</strong></td>'
+                + '<td>' + _esc(a.doctorName || '—') + '</td>'
+                + '<td><span class="badge ' + typeBadge + '" style="font-size:10px;">' + _esc(a.type || 'regular').toUpperCase() + '</span></td>'
+                + '<td>' + admDate + '</td>'
+                + '<td><span class="badge ' + stBadge + '" style="font-size:10px;">' + _esc(a.status || 'admitted').toUpperCase() + '</span></td>'
+                + '<td><button class="btn btn-sm btn-primary" onclick="Router.navigate(\'admissions\')">View / Edit →</button></td>'
+                + '</tr>';
+        });
+    }
+    html += '</tbody></table></div></div>';
+
+    // Room Cleaning Queue Widget
+    html += '<div style="border-top:1px solid var(--border);padding-top:16px;">'
         + '<div style="font-weight:700;font-size:15px;margin-bottom:12px;">🧹 Room Cleaning Queue (' + cleaning.length + ')</div>';
 
     if (cleaning.length === 0) {

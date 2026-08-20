@@ -79,17 +79,19 @@ const ROOM_ITEM_KEYS = {
 };
 
 function renderRoomList() {
-    const checklists = DB.get('roomchecklists');
+    const checklists = DB.get('roomchecklists') || [];
     const search = (document.getElementById('roomSearch')?.value || '').toLowerCase();
-    let filtered = checklists.filter(r =>
-        r.roomNo.toLowerCase().includes(search) ||
-        r.checkedBy.toLowerCase().includes(search)
+    let filtered = (Array.isArray(checklists) ? checklists : []).filter(r =>
+        r && (
+            String(r.roomNo || '').toLowerCase().includes(search) ||
+            String(r.checkedBy || '').toLowerCase().includes(search)
+        )
     );
     if (roomFilter !== 'all') {
         if (roomFilter === 'completed') {
-            filtered = filtered.filter(r => r.status === 'completed');
+            filtered = filtered.filter(r => r && r.status === 'completed');
         } else {
-            filtered = filtered.filter(r => r.type === roomFilter);
+            filtered = filtered.filter(r => r && r.type === roomFilter);
         }
     }
 
@@ -103,42 +105,53 @@ function renderRoomList() {
         const pct = totalItems > 0 ? Math.round((okItems / totalItems) * 100) : 0;
 
         return `<tr>
-            <td><strong>${r.roomNo}</strong></td>
+            <td><strong>${r.roomNo || 'N/A'}</strong></td>
             <td><span class="badge ${r.type === 'pre-admission' ? 'badge-info' : 'badge-warning'}">${r.type === 'pre-admission' ? T('rcmod_tab_pre_admission') : T('rcmod_tab_post_discharge')}</span></td>
-            <td>${r.checkedBy}</td>
+            <td>${r.checkedBy || 'System'}</td>
             <td>${APP.formatDate(r.createdAt)}</td>
-            <td>${okItems}/${totalItems}</td>
+            <td>${okItems}/${totalItems} (${pct}%)</td>
             <td>${issues.length > 0 ? `<span style="color:var(--danger)">${issues.length} ${T('rcmod_issues_word')}</span>` : '<span style="color:var(--secondary)">' + T('rcmod_none') + '</span>'}</td>
-            <td><span class="badge ${r.status === 'completed' ? 'badge-success' : 'badge-warning'}">${r.status}</span></td>
+            <td><span class="badge ${r.status === 'completed' ? 'badge-success' : 'badge-warning'}">${r.status || 'completed'}</span></td>
             <td>
                 <button class="btn btn-sm btn-primary" onclick="viewRoomChecklist('${r.id}')">${T('rcmod_btn_view')}</button>
+                <button class="btn btn-sm btn-warning" onclick="editRoomChecklist('${r.id}')">${T('btn_edit') || 'Edit'}</button>
                 <button class="btn btn-sm btn-danger" onclick="deleteRoomChecklist('${r.id}')">${T('rcmod_btn_delete')}</button>
             </td>
         </tr>`;
     }).join('') || '<tr><td colspan="8" class="empty-state">' + T('rcmod_empty_state') + '</td></tr>';
 }
 
-function showRoomForm(type) {
+function showRoomForm(type, existingItem) {
+    const user = AUTH.currentUser();
+    const defaultChecker = existingItem ? (existingItem.checkedBy || '') : (user ? (user.fullName || user.username) : '');
     const items = ROOM_ITEMS[type] || [];
     const itemKeys = ROOM_ITEM_KEYS[type] || [];
-    let itemsHtml = items.map((item, idx) => `
-        <label class="permission-item" style="background:var(--white);border:1px solid var(--light-gray);">
-            <input type="checkbox" name="checkItem" value="${item}" checked>
-            <span>${T(itemKeys[idx])}</span>
-        </label>
-    `).join('');
+    const existingItemsMap = existingItem ? (existingItem.items || {}) : null;
+
+    let itemsHtml = items.map((item, idx) => {
+        const isChecked = existingItemsMap ? (existingItemsMap[item] !== false) : true;
+        return `
+            <label class="permission-item" style="background:var(--white);border:1px solid var(--light-gray);">
+                <input type="checkbox" name="checkItem" value="${item}" ${isChecked ? 'checked' : ''}>
+                <span>${T(itemKeys[idx])}</span>
+            </label>
+        `;
+    }).join('');
+
+    const editId = existingItem ? existingItem.id : '';
 
     const form = `
         <form id="roomForm">
             <input type="hidden" name="type" value="${type}">
+            <input type="hidden" name="editId" value="${editId}">
             <div class="grid-2">
                 <div class="form-group">
                     <label>${T('rcmod_room_ward_label')}</label>
-                    <input type="text" name="roomNo" class="form-control" placeholder="${T('rcmod_room_placeholder')}" required>
+                    <input type="text" name="roomNo" class="form-control" value="${existingItem ? (existingItem.roomNo || '') : ''}" placeholder="${T('rcmod_room_placeholder')}" required>
                 </div>
                 <div class="form-group">
                     <label>${T('rcmod_checked_by_label')}</label>
-                    <input type="text" name="checkedBy" class="form-control" required>
+                    <input type="text" name="checkedBy" class="form-control" value="${defaultChecker}" required>
                 </div>
             </div>
             <div class="form-group">
@@ -147,33 +160,54 @@ function showRoomForm(type) {
             </div>
             <div class="form-group">
                 <label>${T('rcmod_remarks_label')}</label>
-                <textarea name="remarks" class="form-control" rows="2"></textarea>
+                <textarea name="remarks" class="form-control" rows="2">${existingItem ? (existingItem.remarks || '') : ''}</textarea>
             </div>
         </form>
     `;
-    openFormModal((type === 'pre-admission' ? T('rcmod_tab_pre_admission') : T('rcmod_tab_post_discharge')) + T('rcmod_room_checklist_suffix'), form, `saveRoomChecklist()`, true);
+    const titlePrefix = existingItem ? 'Edit ' : '';
+    openFormModal(titlePrefix + (type === 'pre-admission' ? T('rcmod_tab_pre_admission') : T('rcmod_tab_post_discharge')) + T('rcmod_room_checklist_suffix'), form, `saveRoomChecklist()`, true);
+}
+
+function editRoomChecklist(id) {
+    const item = DB.getById('roomchecklists', id);
+    if (!item) return;
+    showRoomForm(item.type || 'pre-admission', item);
 }
 
 function saveRoomChecklist() {
     const form = document.getElementById('roomForm');
+    if (!form) return false;
+    const editId = form.querySelector('[name="editId"]')?.value || '';
     const roomNo = form.querySelector('[name="roomNo"]')?.value;
     const checkedBy = form.querySelector('[name="checkedBy"]')?.value;
     const type = form.querySelector('[name="type"]')?.value;
     const remarks = form.querySelector('[name="remarks"]')?.value || '';
 
-    if (!roomNo || !checkedBy) { APP.notify(T('rcmod_room_checker_required'), 'error'); return; }
+    if (!roomNo || !checkedBy) { APP.notify(T('rcmod_room_checker_required'), 'error'); return false; }
 
     const items = {};
     form.querySelectorAll('[name="checkItem"]').forEach(cb => {
         items[cb.value] = cb.checked;
     });
 
-    DB.add('roomchecklists', {
-        roomNo, checkedBy, type, items, remarks,
-        status: 'completed'
-    });
-    APP.notify(T('rcmod_checklist_completed'), 'success');
+    if (editId) {
+        DB.update('roomchecklists', editId, {
+            roomNo, checkedBy, type, items, remarks,
+            status: 'completed'
+        });
+        APP.notify('Room checklist updated ✓', 'success');
+    } else {
+        DB.add('roomchecklists', {
+            roomNo, checkedBy, type, items, remarks,
+            status: 'completed'
+        });
+        APP.notify(T('rcmod_checklist_completed'), 'success');
+    }
     renderRoomList();
+    if (typeof SYNC !== 'undefined' && typeof SYNC.pushAll === 'function') {
+        SYNC.pushAll();
+    }
+    return true;
 }
 
 function viewRoomChecklist(id) {
@@ -203,7 +237,7 @@ function viewRoomChecklist(id) {
         <div class="grid-2">
             <div><strong>${T('rcmod_checked_by_colon')}</strong> ${r.checkedBy}</div>
             <div><strong>${T('rcmod_date_colon')}</strong> ${APP.formatDateTime(r.createdAt)}</div>
-            <div><strong>${T('rcmod_status_colon')}</strong> <span class="badge badge-success">${r.status.toUpperCase()}</span></div>
+            <div><strong>${T('rcmod_status_colon')}</strong> <span class="badge badge-success">${(r.status || 'completed').toUpperCase()}</span></div>
             <div><strong>${T('rcmod_overall_colon')}</strong> ${okItems.length}/${Object.keys(items).length}${T('rcmod_items_passed_suffix')}</div>
         </div>
         ${itemsHtml}
@@ -215,5 +249,8 @@ function deleteRoomChecklist(id) {
     confirmAction(T('rcmod_delete_confirm'), () => {
         DB.delete('roomchecklists', id);
         renderRoomList();
+        if (typeof SYNC !== 'undefined' && typeof SYNC.pushAll === 'function') {
+            SYNC.pushAll();
+        }
     });
 }

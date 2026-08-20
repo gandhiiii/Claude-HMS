@@ -380,7 +380,7 @@ function renderDashAdmTasks() {
     const user = AUTH.currentUser();
     if (!user) return;
     const all = DB.get('adminChecklist') || [];
-    const items = all.filter(i => i.createdBy === user.fullName && !i.done);
+    const items = all.filter(i => (!i.done) && (!user || i.createdBy === user.fullName || i.createdBy === user.username || i.createdBy === user.id || (user.role === 'admin' || user.isSuperAdmin)));
     const list = document.getElementById('dashAdmTaskList');
     if (!list) return;
     if (items.length === 0) {

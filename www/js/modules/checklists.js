@@ -159,10 +159,10 @@ function showClForm(cl) {
     let users = DB.get('users').filter(u => !u.isSuperAdmin);
     const floors = DB.get('floorItems');
     const existingItems = cl?.items || [];
-    const isEdit = !!cl;
+    const isEdit = !!(cl && cl.id);
     if (user.role === 'hod') {
         users = users.filter(u => u.department === user.department && u.role !== 'admin');
-        if (cl) users = users.concat(DB.get('users').filter(u => u.fullName === cl.assignedTo));
+        if (cl && cl.assignedTo) users = users.concat(DB.get('users').filter(u => u.fullName === cl.assignedTo));
     }
     const depts = DB.get('departments');
     const form = `
@@ -191,7 +191,7 @@ function showClForm(cl) {
                 </div>
                 <div class="form-group">
                     <label>${T('chkmod_label_floor_area')}</label>
-                    <select name="floor" class="form-control" onchange="loadFloorItems(this)" ${isEdit ? 'disabled' : ''}>
+                    <select name="floor" class="form-control" onchange="loadFloorItems(this)">
                         <option value="">${T('chkmod_opt_select_floor')}</option>
                         ${floors.map(f => '<option value="' + f.floor + '" ' + (cl?.floor === f.floor ? 'selected' : '') + '>' + f.floor + ' (' + f.items.length + T('chkmod_items_suffix') + '</option>').join('')}
                     </select>
@@ -258,7 +258,8 @@ function loadFloorItems(select) {
     if (!floor) return;
     const container = document.getElementById('clItemsContainer');
     if (!container) return;
-    container.innerHTML = floor.items.map((item, i) => renderClItemRow(i, item.name, item.unit)).join('');
+    const currentCount = container.querySelectorAll('.cl-item-row').length;
+    container.insertAdjacentHTML('beforeend', floor.items.map((item, i) => renderClItemRow(currentCount + i, item.name, item.unit)).join(''));
 }
 
 function addClItem() {
@@ -297,17 +298,19 @@ function toggleClWeekDate(sel) {
 function saveCl() {
     const user = AUTH.currentUser();
     const form = document.getElementById('clForm');
+    if (!form) return false;
     const id = form.querySelector('[name="id"]')?.value;
-    const title = form.querySelector('[name="title"]')?.value;
+    const title = form.querySelector('[name="title"]')?.value?.trim();
     const assignedTo = form.querySelector('[name="assignedTo"]')?.value;
-    const floor = form.querySelector('[name="floor"]')?.value;
+    const floorSelect = form.querySelector('[name="floor"]');
+    const floor = floorSelect ? floorSelect.value : '';
     const deadline = form.querySelector('[name="deadline"]')?.value;
     const status = form.querySelector('[name="status"]')?.value || 'active';
     const description = form.querySelector('[name="description"]')?.value;
-    const department = form.querySelector('[name="department"]')?.value || user.department || '';
+    const department = form.querySelector('[name="department"]')?.value || user?.department || '';
     const frequency  = form.querySelector('[name="frequency"]')?.value  || 'daily';
     const weekDate   = form.querySelector('[name="weekDate"]')?.value  || '';
-    if (!title || !assignedTo) { APP.notify(T('chkmod_msg_title_assignment_required'), 'error'); return; }
+    if (!title || !assignedTo) { APP.notify(T('chkmod_msg_title_assignment_required'), 'error'); return false; }
     const items = [];
     const rows = form.querySelectorAll('.cl-item-row');
     rows.forEach((row, i) => {
@@ -315,20 +318,36 @@ function saveCl() {
         const unit = row.querySelector('[name^="cl_unit_"]')?.value || '';
         if (task) items.push({ task, unit, status: 'pending' });
     });
-    if (items.length === 0) { APP.notify(T('chkmod_msg_add_one_item'), 'error'); return; }
+    if (items.length === 0) { APP.notify(T('chkmod_msg_add_one_item'), 'error'); return false; }
     if (id) {
         const existing = DB.getById('checklists', id);
-        const statusMap = {};
-        (existing?.items || []).forEach(item => { statusMap[item.task] = item.status; });
-        items.forEach(item => {
-            if (statusMap[item.task] !== undefined) item.status = statusMap[item.task];
+        const itemMap = {};
+        (existing?.items || []).forEach(item => {
+            if (item.task) itemMap[item.task] = item;
         });
-        DB.update('checklists', id, { title, assignedTo, floor, deadline, description, items, status, department, frequency, weekDate });
+        items.forEach(item => {
+            const prev = itemMap[item.task];
+            if (prev) {
+                if (prev.status) item.status = prev.status;
+                if (prev.value !== undefined) item.value = prev.value;
+                if (prev.remarks !== undefined) item.remarks = prev.remarks;
+                if (prev.updatedAt) item.updatedAt = prev.updatedAt;
+                if (prev.updatedBy) item.updatedBy = prev.updatedBy;
+            }
+        });
+        const finalFloor = floor || existing?.floor || '';
+        const res = DB.update('checklists', id, { title, assignedTo, floor: finalFloor, deadline, description, items, status, department, frequency, weekDate });
+        if (!res) {
+            DB.add('checklists', {
+                title, assignedTo, floor: finalFloor || '', deadline: deadline || '', description: description || '',
+                department, items, status: 'active', assignedBy: user?.fullName || '', frequency, weekDate
+            });
+        }
         APP.notify(T('chkmod_msg_updated'), 'success');
     } else {
         DB.add('checklists', {
             title, assignedTo, floor: floor || '', deadline: deadline || '', description: description || '',
-            department, items, status: 'active', assignedBy: user.fullName, frequency, weekDate
+            department, items, status: 'active', assignedBy: user?.fullName || '', frequency, weekDate
         });
         APP.notify(T('chkmod_msg_created'), 'success');
     }
@@ -340,6 +359,7 @@ function saveCl() {
     } else {
         renderClList();
     }
+    return true;
 }
 
 function editCl(id) {
@@ -378,6 +398,7 @@ function updateClItemRemarks(id, idx, value) {
     if (!cl || !cl.items[idx]) return;
     cl.items[idx].remarks = value;
     cl.items[idx].updatedAt = new Date().toISOString();
+    DB.update('checklists', id, { items: cl.items });
 }
 
 function submitClProblem(clId, idx) {

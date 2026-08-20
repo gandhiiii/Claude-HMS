@@ -838,7 +838,7 @@ function _renderEmpChecklists(checklists) {
         return;
     }
 
-    var today = new Date().toISOString().slice(0, 10);
+    var today = (typeof CHECKLISTS !== 'undefined' && CHECKLISTS.operDate) ? CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
     var html = '';
 
     /* ─── Render CHECKLISTS API assignments ─── */
@@ -852,7 +852,6 @@ function _renderEmpChecklists(checklists) {
             });
             html += '</select></div>';
         }
-
         html += '<div style="margin-bottom:14px;">'
             + '<div style="font-weight:700;font-size:14px;margin-bottom:8px;">📋 ' + T('empd2_dept_assignments') + '</div>';
 
@@ -878,10 +877,17 @@ function _renderEmpChecklists(checklists) {
             var afIc = empFreqIcon[af] || '🔄';
 
             if (!window._empClAsgnState) window._empClAsgnState = {};
+            var draftKey = 'hms_draft_asgn_' + a.id;
             if (!window._empClAsgnState[a.id]) {
-                var st = {};
-                items.forEach(function(it) { st[it.itemId] = { status: 'pending', value: '', remarks: '' }; });
-                window._empClAsgnState[a.id] = st;
+                var savedDraft = null;
+                try { savedDraft = JSON.parse(localStorage.getItem(draftKey)); } catch(e) {}
+                if (savedDraft && typeof savedDraft === 'object') {
+                    window._empClAsgnState[a.id] = savedDraft;
+                } else {
+                    var st = {};
+                    items.forEach(function(it) { st[it.itemId] = { status: 'pending', value: '', remarks: '' }; });
+                    window._empClAsgnState[a.id] = st;
+                }
             }
 
             html += '<div class="card" style="margin-bottom:10px;' + (submitted ? 'opacity:0.6;' : '') + '">'
@@ -905,9 +911,9 @@ function _renderEmpChecklists(checklists) {
                 html += '<div class="empClItem" data-status="' + sel + '" data-item-id="' + it.itemId + '" data-key="' + a.id + '" style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;background:' + sbg + ';font-size:13px;flex-wrap:wrap;">'
                     + '<span style="display:inline-block;min-width:70px;text-align:center;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;color:white;background:' + sc + ';flex-shrink:0;">' + (sel !== 'pending' ? sel.toUpperCase() : 'PENDING') + '</span>'
                     + '<span style="flex:1;min-width:120px;">' + it.label + '</span>'
-                    + (it.unit ? '<input type="number" step="any" value="' + val + '" ' + (submitted ? 'disabled' : '') + ' onchange="window._empClAsgnState[\'' + a.id + '\'][\'' + it.itemId + '\'].value=this.value" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;text-align:right;" placeholder="0">' : '')
+                    + (it.unit ? '<input type="number" step="any" value="' + val + '" ' + (submitted ? 'disabled' : '') + ' onchange="window._empClAsgnState[\'' + a.id + '\'][\'' + it.itemId + '\'].value=this.value;try{localStorage.setItem(\'' + draftKey + '\',JSON.stringify(window._empClAsgnState[\'' + a.id + '\']))}catch(e){}" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;text-align:right;" placeholder="0">' : '')
                     + (it.unit ? '<span style="font-size:11px;font-weight:600;color:var(--gray);background:var(--card);padding:2px 7px;border-radius:4px;border:1px solid var(--border);flex-shrink:0;">' + it.unit + '</span>' : '')
-                    + '<select ' + (submitted ? 'disabled' : '') + ' onchange="window._empClAsgnState[\'' + a.id + '\'][\'' + it.itemId + '\'].status=this.value;_renderEmpChecklists(window._empChecklists||[])" style="width:auto;padding:3px 4px;border:1px solid var(--border);border-radius:4px;font-size:12px;flex-shrink:0;">' + opts + '</select>'
+                    + '<select ' + (submitted ? 'disabled' : '') + ' onchange="window._empClAsgnState[\'' + a.id + '\'][\'' + it.itemId + '\'].status=this.value;try{localStorage.setItem(\'' + draftKey + '\',JSON.stringify(window._empClAsgnState[\'' + a.id + '\']))}catch(e){};_renderEmpChecklists(window._empChecklists||[])" style="width:auto;padding:3px 4px;border:1px solid var(--border);border-radius:4px;font-size:12px;flex-shrink:0;">' + opts + '</select>'
                     + '</div>';
             });
 
@@ -927,6 +933,8 @@ function _renderEmpChecklists(checklists) {
         var freqBg   = { daily:'#e3f2fd', weekly:'#f3e5f5', monthly:'#e8f5e9' };
         var freqClr  = { daily:'#1565c0', weekly:'#6a1b9a', monthly:'#2e7d32' };
         var freqIcon = { daily:'🔄', weekly:'📅', monthly:'🗓️' };
+        var empStatusColors = { ok: '#28a745', fault: '#dc3545', na: '#6c757d', problem: '#fd7e14', pending: '#e9ecef' };
+        var empStatusBgs  = { ok: '#f0faf0', fault: '#fff5f5', na: '#f5f5f5', problem: '#fff8f0', pending: 'var(--bg)' };
         filtered.forEach(function(cl) {
             var freq  = cl.frequency || 'daily';
             var total = cl.items ? cl.items.length : 0;
@@ -963,8 +971,28 @@ function _renderEmpChecklists(checklists) {
                 + '<div style="flex:1;height:8px;background:var(--light-gray);border-radius:4px;"><div style="height:100%;width:' + pct + '%;background:' + (pct === 100 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)') + ';border-radius:4px;transition:width .3s;"></div></div>'
                 + '<span style="font-size:12px;color:var(--gray);min-width:55px;">' + done + '/' + total + ' ' + T('empd2_done_word') + '</span>'
                 + '</div>'
-                + (cl.deadline ? '<div style="font-size:11px;color:' + (isDue ? 'var(--warning)' : 'var(--gray)') + ';">' + T('empd2_cl_deadline') + APP.formatDate(cl.deadline) + '</div>' : '')
-                + '</div>';
+                + (cl.deadline ? '<div style="font-size:11px;color:' + (isDue ? 'var(--warning)' : 'var(--gray)') + ';">' + T('empd2_cl_deadline') + APP.formatDate(cl.deadline) + '</div>' : '');
+
+            if (cl.items && cl.items.length > 0) {
+                html += '<div style="max-height:220px;overflow-y:auto;margin-top:6px;padding:4px;border-top:1px solid var(--border);">';
+                cl.items.forEach(function(item, idx) {
+                    var sel = item.status || 'pending';
+                    var val = item.value !== undefined ? item.value : '';
+                    var sc = empStatusColors[sel] || '#e9ecef';
+                    var sbg = empStatusBgs[sel] || 'var(--bg)';
+                    var opts = ['ok','fault','problem','na'].map(function(s) { return '<option value="' + s + '" ' + (sel === s ? 'selected' : '') + '>' + s.toUpperCase() + '</option>'; }).join('');
+                    html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;margin-bottom:4px;border-radius:4px;background:' + sbg + ';font-size:12px;flex-wrap:wrap;">'
+                        + '<span style="display:inline-block;min-width:60px;text-align:center;padding:2px 4px;border-radius:3px;font-size:10px;font-weight:600;color:white;background:' + sc + ';flex-shrink:0;">' + (sel !== 'pending' ? sel.toUpperCase() : 'PENDING') + '</span>'
+                        + '<span style="flex:1;min-width:110px;">' + item.task + '</span>'
+                        + (item.unit ? '<input type="number" step="any" value="' + val + '" ' + (submitted ? 'disabled' : '') + ' onchange="updateClItemValue(\'' + cl.id + '\',' + idx + ',this.value)" style="width:75px;padding:2px 4px;border:1px solid var(--border);border-radius:4px;font-size:11px;text-align:right;" placeholder="0">' : '')
+                        + (item.unit ? '<span style="font-size:10px;font-weight:600;color:var(--gray);background:var(--card);padding:2px 5px;border-radius:3px;border:1px solid var(--border);flex-shrink:0;">' + item.unit + '</span>' : '')
+                        + '<select ' + (submitted ? 'disabled' : '') + ' onchange="updateClItemStatus(\'' + cl.id + '\',' + idx + ',this.value)" style="width:auto;padding:2px 4px;border:1px solid var(--border);border-radius:4px;font-size:11px;flex-shrink:0;">' + opts + '</select>'
+                        + '</div>';
+                });
+                html += '</div>';
+            }
+
+            html += '</div>';
         });
     }
 
@@ -979,7 +1007,7 @@ function _renderEmpChecklists(checklists) {
             var div = document.createElement('div');
             div.className = 'empClProblemDesc';
             div.style.cssText = 'width:100%;margin-top:6px;padding:8px;background:#fff3e0;border:1px solid #ffcc02;border-radius:6px;';
-            div.innerHTML = '<div style="font-size:11px;font-weight:600;color:#e65100;margin-bottom:4px;">\u26a0\ufe0f Problem Description</div>'
+            div.innerHTML = '<div style="font-size:11px;font-weight:600;color:#e65100;margin-bottom:4px;">⚠️ Problem Description</div>'
                 + '<textarea rows="2" placeholder="Describe the problem in detail..." style="width:100%;padding:8px;border:1px solid #ffb300;border-radius:4px;font-size:13px;resize:vertical;background:#fff;color:#333;">'
                 + ((window._empClAsgnState[key] && window._empClAsgnState[key][itemId] && window._empClAsgnState[key][itemId].remarks) || '')
                 + '</textarea>';
@@ -987,6 +1015,7 @@ function _renderEmpChecklists(checklists) {
             ta.oninput = function() {
                 if (window._empClAsgnState[key] && window._empClAsgnState[key][itemId]) {
                     window._empClAsgnState[key][itemId].remarks = this.value;
+                    try { localStorage.setItem('hms_draft_asgn_' + key, JSON.stringify(window._empClAsgnState[key])); } catch(e) {}
                 }
             };
             el2.appendChild(div);
@@ -999,14 +1028,38 @@ function _renderEmpChecklists(checklists) {
 function empSubmitDeptAsgn(assignmentId) {
     if (!window.CHECKLISTS) return;
     var user = AUTH.currentUser();
-    var today = new Date().toISOString().slice(0, 10);
+    var today = (typeof CHECKLISTS !== 'undefined' && CHECKLISTS.operDate) ? CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
+    var asgn = CHECKLISTS.getAssignment(assignmentId);
+    var items = asgn ? CHECKLISTS.resolveAssignmentItems(asgn) : [];
+    var draftKey = 'hms_draft_asgn_' + assignmentId;
+    var state = (window._empClAsgnState && window._empClAsgnState[assignmentId]) || {};
+    if (!Object.keys(state).length) {
+        try { state = JSON.parse(localStorage.getItem(draftKey)) || {}; } catch(e) {}
+    }
+
+    var pendingCount = 0;
+    items.forEach(function(it) {
+        var key = it.itemId || it.id;
+        var s = state[key] || state[it.itemId] || state[it.id] || {};
+        if (!s.status || s.status === 'pending') pendingCount++;
+    });
+
+    if (items.length > 0 && pendingCount === items.length) {
+        APP.notify('Please fill out the checklist items before submitting.', 'error');
+        return;
+    }
+    if (pendingCount > 0) {
+        if (!confirm('You have ' + pendingCount + ' item(s) still pending. Do you want to submit anyway?')) {
+            return;
+        }
+    }
+
     var startResult = CHECKLISTS.startAssignmentEntry(user, assignmentId, today);
     if (!startResult.success) { APP.notify(startResult.message, 'error'); return; }
     var entry = startResult.entry;
-    var state = (window._empClAsgnState && window._empClAsgnState[assignmentId]) || {};
     entry.items.forEach(function(it) {
-        if (entry.results[it.itemId] !== undefined) {
-            var s = state[it.itemId] || {};
+        var s = state[it.itemId] || state[it.id] || {};
+        if (entry.results[it.itemId]) {
             entry.results[it.itemId].status = s.status || 'pending';
             entry.results[it.itemId].value = s.value || '';
             entry.results[it.itemId].remarks = s.remarks || '';

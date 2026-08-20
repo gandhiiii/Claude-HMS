@@ -34,6 +34,10 @@
             empd2_handover_required: 'Shift and at least one note (summary or pending) are required.',
             empd2_handover_saved: 'Handover submitted — Facility HOD notified',
             empd2_handover_notif_title: 'New Shift Handover',
+            empd2_handover_delete: 'Delete',
+            empd2_handover_deleted: 'Handover deleted',
+            empd2_handover_no_perm: 'Only Facility HOD or admin can add or delete handovers',
+            empd2_handover_confirm_delete: 'Delete this handover? This cannot be undone.',
 
             /* ── KPI strip ── */
             empd2_kpi_due_today: 'Due Today',
@@ -241,6 +245,10 @@
             empd2_handover_required: 'शिफ्ट और कम से कम एक नोट (सारांश या लंबित) आवश्यक है।',
             empd2_handover_saved: 'हैंडओवर जमा — फैसिलिटी HOD को सूचित किया गया',
             empd2_handover_notif_title: 'नया शिफ्ट हैंडओवर',
+            empd2_handover_delete: 'हटाएं',
+            empd2_handover_deleted: 'हैंडओवर हटाया गया',
+            empd2_handover_no_perm: 'केवल फैसिलिटी HOD या एडमिन हैंडओवर जोड़ या हटा सकते हैं',
+            empd2_handover_confirm_delete: 'इस हैंडओवर को हटाएं? इसे वापस नहीं किया जा सकता।',
 
             /* ── KPI strip ── */
             empd2_kpi_due_today: 'आज देय',
@@ -448,6 +456,10 @@
             empd2_handover_required: 'શિફ્ટ અને ઓછામાં ઓછી એક નોંધ (સારાંશ અથવા બાકી) જરૂરી છે.',
             empd2_handover_saved: 'હેન્ડઓવર સબમિટ — ફેસિલિટી HOD ને જાણ કરાઈ',
             empd2_handover_notif_title: 'નવું શિફ્ટ હેન્ડઓવર',
+            empd2_handover_delete: 'કાઢી નાખો',
+            empd2_handover_deleted: 'હેન્ડઓવર કાઢી નાખવામાં આવ્યું',
+            empd2_handover_no_perm: 'માત્ર ફેસિલિટી HOD અથવા એડમિન હેન્ડઓવર ઉમેરી અથવા કાઢી શકે છે',
+            empd2_handover_confirm_delete: 'આ હેન્ડઓવર કાઢી નાખો? આ પાછું નથી આવતું.',
 
             /* ── KPI strip ── */
             empd2_kpi_due_today: 'આજે બાકી',

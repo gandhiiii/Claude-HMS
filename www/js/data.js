@@ -1,11 +1,31 @@
 const DB = {
     _channel: typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('hms_sync') : null,
     _listeners: [],
+    _channelInited: false,
+
+    initChannel() {
+        if (this._channel && !this._channelInited) {
+            this._channelInited = true;
+            var self = this;
+            this._channel.onmessage = function(e) {
+                if (e && e.data && e.data.event) {
+                    self._listeners.filter(l => l.event === e.data.event).forEach(l => l.fn(e.data.data));
+                    try {
+                        if (typeof APP !== 'undefined' && typeof APP.refreshCurrent === 'function') {
+                            APP.refreshCurrent();
+                        }
+                    } catch(err) {}
+                }
+            };
+        }
+    },
 
     on(event, fn) {
+        this.initChannel();
         this._listeners.push({ event, fn });
     },
     _emit(event, data) {
+        this.initChannel();
         this._listeners.filter(l => l.event === event).forEach(l => l.fn(data));
         if (this._channel) {
             try { this._channel.postMessage({ event, data, timestamp: Date.now() }); } catch(e) {}
@@ -27,6 +47,7 @@ const DB = {
         var json = JSON.stringify(data);
         try { localStorage.setItem('hms_' + key, json); } catch (e) { console.warn('localStorage set error:', e); }
         try { sessionStorage.setItem('hms_' + key, json); } catch (e) { console.warn('sessionStorage set error:', e); }
+        this._emit('change', { store: key, action: 'set' });
     },
     add(key, item) {
         this._autoSnapBeforeChange(key, 'add');
@@ -41,7 +62,8 @@ const DB = {
     update(key, id, updates) {
         this._autoSnapBeforeChange(key, 'update');
         const items = this.get(key);
-        const idx = items.findIndex(i => i.id === id);
+        const target = String(id);
+        const idx = items.findIndex(i => i && String(i.id) === target);
         if (idx > -1) {
             items[idx] = { ...items[idx], ...updates, updatedAt: new Date().toISOString() };
             this.set(key, items);
@@ -53,7 +75,8 @@ const DB = {
     delete(key, id) {
         this._autoSnapBeforeChange(key, 'delete');
         this.markDeleted(key, id);
-        const items = this.get(key).filter(i => i.id !== id);
+        const target = String(id);
+        const items = this.get(key).filter(i => !i || String(i.id) !== target);
         this.set(key, items);
         this._emit('change', { store: key, action: 'delete', id });
     },
@@ -79,7 +102,9 @@ const DB = {
         return !!delMap[id];
     },
     getById(key, id) {
-        return this.get(key).find(i => i.id === id) || null;
+        if (id === undefined || id === null) return null;
+        const target = String(id);
+        return this.get(key).find(i => i && String(i.id) === target) || null;
     },
 
     /* ── All keys synced to the cloud / exported in backups ── */
@@ -94,7 +119,7 @@ const DB = {
         'hodLinenInv', 'hodHousekeepingInv',
         'employeeTodos',
         'complaints', 'roomchecklists', 'admissions', 'rooms', 'roomStatus',
-        'lostfound', 'adminChecklist', 'checklists',
+        'lostfound', 'adminChecklist', 'adminAudits', 'checklists',
         'material_requests', 'suggestions', 'reports',
         'roomCleaningTasks', 'floorItems', 'handovers',
         'budgets', 'budget_expenses', 'quarterly_priorities',
@@ -104,6 +129,7 @@ const DB = {
         'securityDeployment',
         'patientShiftings',
         'hospital_settings',
+        'hospitalUnits', 'hospitalFloors', 'checklistTemplates', 'checklistEntries', 'checklistAssignments',
         '_deleted_ids'
     ],
 
@@ -309,8 +335,99 @@ const DB = {
         var raw = localStorage.getItem('hms_backup_1');
         if (!raw) return { success: false, error: 'No backup found' };
         return this.importAll(raw, false);
+    },
+
+    /* Auto-recover lost data across all keys from local backups if local storage was overwritten */
+    recoverAllFromBackups() {
+        try {
+            var bkIndex = this.getBackupIndex ? this.getBackupIndex() : [];
+            // Older backups first, so newer backups overwrite older ones
+            var sortedSlots = bkIndex.slice().sort(function(a,b){ return new Date(a.ts) - new Date(b.ts); });
+            var slotNames = sortedSlots.map(function(s){ return 'hms_bk_' + s.n; });
+            ['hms_backup_3', 'hms_backup_2', 'hms_backup_1'].forEach(function(s){
+                if (slotNames.indexOf(s) === -1) slotNames.unshift(s);
+            });
+
+            var recoveredCount = 0;
+            var deletedMap = this.getDeletedIds ? this.getDeletedIds() : {};
+
+            function _getItemId(item) {
+                if (!item || typeof item !== 'object') return null;
+                if (item.id) return String(item.id);
+                if (item.date && (item.assignmentId || item.templateId || item.unitId || item.roomNo || item.title)) {
+                    return item.date + '_' + (item.assignmentId || item.templateId || item.unitId || item.roomNo || item.title);
+                }
+                if (item.createdAt || item.submittedAt || item.timestamp) {
+                    return String(item.createdAt || item.submittedAt || item.timestamp);
+                }
+                return JSON.stringify(item);
+            }
+
+            slotNames.forEach(function(slotKey) {
+                var raw = localStorage.getItem(slotKey);
+                if (!raw) return;
+                try {
+                    var snap = JSON.parse(raw);
+                    var data = snap.data || snap;
+                    if (!data || typeof data !== 'object') return;
+
+                    Object.keys(data).forEach(function(key) {
+                        if (DB._ALL_KEYS.indexOf(key) === -1 || key === '_deleted_ids') return;
+                        var backupData = data[key];
+                        if (!backupData) return;
+
+                        var currentRaw = localStorage.getItem('hms_' + key);
+                        var currentData = currentRaw ? JSON.parse(currentRaw) : null;
+
+                        if (Array.isArray(backupData)) {
+                            if (!Array.isArray(currentData)) {
+                                localStorage.setItem('hms_' + key, JSON.stringify(backupData));
+                                recoveredCount++;
+                            } else {
+                                var curMap = {};
+                                currentData.forEach(function(i){
+                                    var id = _getItemId(i);
+                                    if (id) curMap[id] = true;
+                                });
+                                var added = false;
+                                backupData.forEach(function(bItem) {
+                                    if (bItem) {
+                                        var bId = _getItemId(bItem);
+                                        if (bId && !curMap[bId] && !(bItem.id && deletedMap[bItem.id])) {
+                                            currentData.push(bItem);
+                                            curMap[bId] = true;
+                                            added = true;
+                                        }
+                                    }
+                                });
+                                if (added) {
+                                    localStorage.setItem('hms_' + key, JSON.stringify(currentData));
+                                    recoveredCount++;
+                                }
+                            }
+                        } else if (typeof backupData === 'object' && backupData !== null) {
+                            var mergedObj = Object.assign({}, backupData, currentData || {});
+                            var jsonMerged = JSON.stringify(mergedObj);
+                            if (currentRaw !== jsonMerged) {
+                                localStorage.setItem('hms_' + key, jsonMerged);
+                                recoveredCount++;
+                            }
+                        }
+                    });
+                } catch(e) {}
+            });
+
+            if (recoveredCount > 0 && typeof SYNC !== 'undefined' && typeof SYNC.pushAll === 'function') {
+                setTimeout(function() { SYNC.pushAll(); }, 500);
+            }
+            return recoveredCount;
+        } catch(e) {
+            return 0;
+        }
     }
 };
+
+try { DB.recoverAllFromBackups(); } catch(e) {}
 
 const AUTH = {
     _sid() {
@@ -859,6 +976,7 @@ const APP = {
                 var _sgClean = _sg.filter(function(_s) { return _s && typeof _s === 'object' && typeof _s.title === 'string'; });
                 if (_sgClean.length !== _sg.length) DB.set('suggestions', _sgClean);
             } catch (_e) {}
+            try { DB.recoverAllFromBackups(); } catch(_e) {}
             APP_SYNC.init();
         } catch (e) {
             console.warn('APP.init error:', e);
@@ -953,6 +1071,16 @@ const APP = {
             const floors = DB.get('floorItems');
             if (!Array.isArray(floors) || floors.length === 0) {
                 DB.set('floorItems', FLOOR_ITEMS);
+            } else {
+                let updated = false;
+                FLOOR_ITEMS.forEach(function(defaultFloor) {
+                    var existing = floors.find(function(f) { return f.floor === defaultFloor.floor; });
+                    if (!existing) {
+                        floors.push(defaultFloor);
+                        updated = true;
+                    }
+                });
+                if (updated) DB.set('floorItems', floors);
             }
             if (!Array.isArray(DB.get('hodLockers')) || DB.get('hodLockers').length === 0) {
                 DB.recoverHodLockers();

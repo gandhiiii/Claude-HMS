@@ -104,7 +104,7 @@ function dchkShowTemplateForm(existing) {
             <input type="hidden" name="id" value="${existing ? existing.id : ''}">
             <div class="form-group">
                 <label>${T('dchk_dept_label')} *</label>
-                <select name="department" class="form-control" onchange="dchkDeptChanged(this)" ${isEdit ? 'disabled' : ''}>
+                <select name="department" class="form-control" onchange="dchkDeptChanged(this)">
                     <option value="">${T('dchk_select_dept')}</option>
                     ${depts.map(d => {
                         const val = d.name || d;
@@ -114,7 +114,7 @@ function dchkShowTemplateForm(existing) {
             </div>
             <div class="form-group" id="dchkFloorGroup">
                 <label>${T('dchk_floor_label')}</label>
-                <select name="floorId" class="form-control" ${isEdit ? 'disabled' : ''}>
+                <select name="floorId" class="form-control">
                     <option value="">${T('dchk_select_floor')}</option>
                     ${floors.map(f => '<option value="' + f.id + '" ' + (existing && existing.floorId === f.id ? 'selected' : '') + '>' + f.name + '</option>').join('')}
                 </select>
@@ -129,7 +129,6 @@ function dchkShowTemplateForm(existing) {
                     ${freqOpts.map(f => '<option value="' + f + '" ' + ((existing && existing.frequency === f) ? 'selected' : '') + '>' + freqLabels[f] + '</option>').join('')}
                 </select>
             </div>
-            ${!isEdit ? `
             <div class="form-group" style="margin-top:12px;">
                 <label>${T('dchk_upload_file')}</label>
                 <div style="display:flex;gap:8px;align-items:center;">
@@ -147,13 +146,16 @@ function dchkShowTemplateForm(existing) {
                 <div id="dchkPointList" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px;margin-top:4px;">
                     <div style="color:var(--gray);font-size:13px;">${T('dchk_no_points')}</div>
                 </div>
-            </div>` : ''}
+            </div>
         </form>
     `;
     openFormModal(isEdit ? T('dchk_edit_template') : T('dchk_new_template'), form, 'dchkSaveTemplate()', true);
     setTimeout(function() {
         const sel = document.querySelector('#dchkTemplateForm [name="department"]');
         if (sel) dchkDeptChanged(sel);
+        if (existing && existing.items && existing.items.length > 0) {
+            dchkSetPoints(existing.items);
+        }
     }, 50);
 }
 
@@ -226,29 +228,53 @@ function dchkCollectPoints() {
 }
 
 function dchkSaveTemplate() {
-    if (!window.CHECKLISTS) { APP.notify('Checklist system not loaded', 'error'); return; }
+    if (!window.CHECKLISTS) { APP.notify('Checklist system not loaded', 'error'); return false; }
     const user = AUTH.currentUser();
     const form = document.getElementById('dchkTemplateForm');
+    if (!form) return false;
     const id = form.querySelector('[name="id"]')?.value;
     const department = form.querySelector('[name="department"]')?.value;
-    const title = form.querySelector('[name="title"]')?.value;
+    const title = form.querySelector('[name="title"]')?.value?.trim();
     const floorId = form.querySelector('[name="floorId"]')?.value;
     const frequency = form.querySelector('[name="frequency"]')?.value || 'daily';
-    if (!department || !title) { APP.notify('Department and title required', 'error'); return; }
+    if (!department || !title) { APP.notify('Department and title required', 'error'); return false; }
+
+    const points = dchkCollectPoints();
+    if (points.length === 0) { APP.notify('Add at least one point', 'error'); return false; }
 
     if (id) {
+        const templates = DB.get('checklistTemplates') || [];
+        const tpl = templates.find(function(t) { return t.id === id; });
+        if (tpl) {
+            tpl.department = department;
+            tpl.title = title.includes('(') ? title : (title + ' (' + frequency + ')');
+            tpl.frequency = frequency;
+            if (floorId) {
+                tpl.floorId = floorId;
+                const floor = window.CHECKLISTS ? CHECKLISTS.getFloor(floorId) : null;
+                if (floor) tpl.floorName = floor.name;
+            }
+            tpl.items = points.map(function(p, i) {
+                var existingItem = (tpl.items || [])[i];
+                return {
+                    id: existingItem ? existingItem.id : ('ci_' + Date.now() + '_' + i),
+                    label: p.label || p,
+                    type: existingItem ? existingItem.type : 'fixed',
+                    unit: p.unit || ''
+                };
+            });
+            tpl.updatedAt = new Date().toISOString();
+            DB.set('checklistTemplates', templates);
+        }
         APP.notify(T('dchk_template_saved'), 'success');
         closeModal();
         dchkRenderTemplates();
-        return;
+        return true;
     }
-
-    const points = dchkCollectPoints();
-    if (points.length === 0) { APP.notify('Add at least one point', 'error'); return; }
 
     const needsFloor = window.CHECKLISTS && CHECKLISTS.requiresFloor(department);
     const result = CHECKLISTS.createTemplate(user, department, title + ' (' + frequency + ')', needsFloor ? (floorId || undefined) : undefined);
-    if (!result.success) { APP.notify(result.message, 'error'); return; }
+    if (!result.success) { APP.notify(result.message, 'error'); return false; }
     const tpl = result.template;
     points.forEach(function(p) {
         var itemResult = CHECKLISTS.addItem(user, tpl.id, { label: p.label || p, type: 'fixed' });
@@ -270,6 +296,7 @@ function dchkSaveTemplate() {
     APP.notify(T('dchk_template_saved'), 'success');
     closeModal();
     dchkRenderTemplates();
+    return true;
 }
 
 function dchkShowItems(templateId) {
@@ -464,7 +491,7 @@ function dchkRenderFill() {
         return;
     }
     const myAssignments = CHECKLISTS.myAssignments(user);
-    const dateStr = window.CHECKLISTS.operDate ? window.CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
+    const dateStr = (typeof CHECKLISTS !== 'undefined' && CHECKLISTS.operDate) ? CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
 
     if (myAssignments.length === 0) {
         content.innerHTML = '<div class="empty-state">' + T('dchk_no_assignments') + '</div>';
@@ -519,11 +546,18 @@ function dchkRenderFill() {
         const items = CHECKLISTS.resolveAssignmentItems(a);
         const alreadySubmitted = CHECKLISTS.hasAssignmentEntry(a.id, dateStr);
         const key = a.id;
+        const draftKey = 'hms_dchk_draft_' + key;
         if (!dchkFillState[key]) {
-            dchkFillState[key] = {};
-            items.forEach(function(it) {
-                dchkFillState[key][it.itemId] = { status: 'pending', value: '', remarks: '' };
-            });
+            var savedDraft = null;
+            try { savedDraft = JSON.parse(localStorage.getItem(draftKey)); } catch(e) {}
+            if (savedDraft && typeof savedDraft === 'object') {
+                dchkFillState[key] = savedDraft;
+            } else {
+                dchkFillState[key] = {};
+                items.forEach(function(it) {
+                    dchkFillState[key][it.itemId] = { status: 'pending', value: '', remarks: '' };
+                });
+            }
         }
 
         // Get frequency from template
@@ -560,9 +594,9 @@ function dchkRenderFill() {
                         return '<div class="dchk-item" data-status="' + sel + '" data-item-id="' + it.itemId + '" data-key="' + key + '" style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;background:' + sbg + ';font-size:13px;flex-wrap:wrap;">' +
                             '<span style="display:inline-block;min-width:70px;text-align:center;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;color:white;background:' + sc + ';flex-shrink:0;">' + (sel !== 'pending' ? sel.toUpperCase() : 'PENDING') + '</span>' +
                             '<span style="flex:1;min-width:120px;">' + it.label + '</span>' +
-                            (it.unit ? '<input type="number" step="any" value="' + val + '" ' + (alreadySubmitted ? 'disabled' : '') + ' onchange="dchkFillState[\'' + key + '\'][\'' + it.itemId + '\'].value=this.value" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;text-align:right;" placeholder="0">' : '') +
+                            (it.unit ? '<input type="number" step="any" value="' + val + '" ' + (alreadySubmitted ? 'disabled' : '') + ' onchange="dchkFillState[\'' + key + '\'][\'' + it.itemId + '\'].value=this.value;try{localStorage.setItem(\'' + draftKey + '\',JSON.stringify(dchkFillState[\'' + key + '\']))}catch(e){}" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;text-align:right;" placeholder="0">' : '') +
                             (it.unit ? '<span style="font-size:11px;font-weight:600;color:var(--gray);background:var(--card);padding:2px 7px;border-radius:4px;border:1px solid var(--border);flex-shrink:0;">' + it.unit + '</span>' : '') +
-                            '<select ' + (alreadySubmitted ? 'disabled' : '') + ' onchange="dchkFillState[\'' + key + '\'][\'' + it.itemId + '\'].status=this.value;dchkRenderFill()" style="width:auto;padding:3px 4px;border:1px solid var(--border);border-radius:4px;font-size:12px;flex-shrink:0;">' + opts + '</select>' +
+                            '<select ' + (alreadySubmitted ? 'disabled' : '') + ' onchange="dchkFillState[\'' + key + '\'][\'' + it.itemId + '\'].status=this.value;try{localStorage.setItem(\'' + draftKey + '\',JSON.stringify(dchkFillState[\'' + key + '\']))}catch(e){};dchkRenderFill()" style="width:auto;padding:3px 4px;border:1px solid var(--border);border-radius:4px;font-size:12px;flex-shrink:0;">' + opts + '</select>' +
                             '</div>';
                     }).join('')}
                 </div>
@@ -585,7 +619,7 @@ function dchkRenderFill() {
             var div = document.createElement('div');
             div.className = 'dchk-problem-desc';
             div.style.cssText = 'width:100%;margin-top:6px;padding:8px;background:#fff3e0;border:1px solid #ffcc02;border-radius:6px;';
-            div.innerHTML = '<div style="font-size:11px;font-weight:600;color:#e65100;margin-bottom:4px;">\u26a0\ufe0f Problem Description</div>'
+            div.innerHTML = '<div style="font-size:11px;font-weight:600;color:#e65100;margin-bottom:4px;">⚠️ Problem Description</div>'
                 + '<textarea rows="2" placeholder="Describe the problem in detail..." style="width:100%;padding:8px;border:1px solid #ffb300;border-radius:4px;font-size:13px;resize:vertical;background:#fff;color:#333;">'
                 + ((dchkFillState[key] && dchkFillState[key][itemId] && dchkFillState[key][itemId].remarks) || '')
                 + '</textarea>';
@@ -593,6 +627,7 @@ function dchkRenderFill() {
             ta.oninput = function() {
                 if (dchkFillState[key] && dchkFillState[key][itemId]) {
                     dchkFillState[key][itemId].remarks = this.value;
+                    try { localStorage.setItem('hms_dchk_draft_' + key, JSON.stringify(dchkFillState[key])); } catch(e) {}
                 }
             };
             el.appendChild(div);
@@ -605,23 +640,49 @@ function dchkRenderFill() {
 function dchkSubmitFill(assignmentId) {
     if (!window.CHECKLISTS) return;
     const user = AUTH.currentUser();
-    const dateStr = window.CHECKLISTS.operDate ? window.CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
+    const dateStr = (typeof CHECKLISTS !== 'undefined' && CHECKLISTS.operDate) ? CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
+    const draftKey = 'hms_dchk_draft_' + assignmentId;
+    let state = dchkFillState[assignmentId] || {};
+    if (!Object.keys(state).length) {
+        try { state = JSON.parse(localStorage.getItem(draftKey)) || {}; } catch(e) {}
+    }
+
+    const items = CHECKLISTS.resolveAssignmentItems(assignmentId);
+    let pendingCount = 0;
+    items.forEach(function(it) {
+        const key = it.itemId || it.id;
+        const s = state[key] || state[it.itemId] || state[it.id] || {};
+        if (!s.status || s.status === 'pending') pendingCount++;
+    });
+
+    if (items.length > 0 && pendingCount === items.length) {
+        APP.notify('Please fill out the checklist items before submitting.', 'error');
+        return;
+    }
+    if (pendingCount > 0) {
+        if (!confirm('You have ' + pendingCount + ' item(s) still pending. Do you want to submit anyway?')) {
+            return;
+        }
+    }
 
     const startResult = CHECKLISTS.startAssignmentEntry(user, assignmentId, dateStr);
     if (!startResult.success) { APP.notify(startResult.message, 'error'); return; }
     const entry = startResult.entry;
-    const state = dchkFillState[assignmentId] || {};
     entry.items.forEach(function(it) {
-        if (entry.results[it.itemId] !== undefined) {
-            var s = state[it.itemId] || {};
-            entry.results[it.itemId].status = s.status || 'pending';
-            entry.results[it.itemId].value = s.value || '';
-            entry.results[it.itemId].remarks = s.remarks || '';
+        var key = it.itemId || it.id;
+        var resKey = entry.results[key] !== undefined ? key : (entry.results[it.itemId] !== undefined ? it.itemId : it.id);
+        if (entry.results[resKey] !== undefined) {
+            var s = state[key] || state[it.itemId] || state[it.id] || {};
+            entry.results[resKey].status = s.status || 'pending';
+            entry.results[resKey].value = s.value !== undefined ? s.value : '';
+            entry.results[resKey].remarks = s.remarks || '';
         }
     });
     const submitResult = CHECKLISTS.submitAssignmentEntry(user, entry);
     if (!submitResult.success) { APP.notify(submitResult.message, 'error'); return; }
+    try { localStorage.removeItem(draftKey); } catch(e) {}
     APP.notify(T('dchk_assigned_ok'), 'success');
+    delete dchkFillState[assignmentId];
     dchkRenderFill();
 }
 
@@ -636,7 +697,7 @@ function dchkRenderOversight() {
         return;
     }
     const depts = DB.get('departments') || [];
-    const dateStr = window.CHECKLISTS.operDate ? window.CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
+    const dateStr = (typeof CHECKLISTS !== 'undefined' && CHECKLISTS.operDate) ? CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
     const selectedDept = document.getElementById('dchkOversightDept')?.value || '';
 
     content.innerHTML = `

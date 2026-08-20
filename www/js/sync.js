@@ -7,11 +7,11 @@ var SYNC = (function () {
     var SHARED_KEYS = [
         'users', 'departments', 'featureRights',
         'inventory', 'inventory_receipts', 'inventory_movements', 'scraps', 'scrapConfig',
-        'gatesecurity', 'doctorVisits', 'patientVisits', 'phase2Tasks',
+        'gatesecurity', 'doctorVisits', 'patientVisits', 'patients', 'phase2', 'phase2Tasks',
         'projects', 'ambulance', 'ambulance_trips',
         'problems', 'tasks', 'complaints',
         'roomchecklists', 'admissions', 'rooms', 'roomStatus',
-        'lostfound', 'adminChecklist', 'checklists',
+        'lostfound', 'adminChecklist', 'adminAudits', 'checklists',
         'material_requests', 'suggestions', 'reports',
         'roomCleaningTasks', 'floorItems', 'resetTokens', 'handovers',
         'hodTasks', 'hodRequests', 'hodPurchases',
@@ -22,7 +22,10 @@ var SYNC = (function () {
         'budgets', 'budget_expenses',
         'quarterly_priorities', 'pwResetRequests',
         'material_returns', 'sk_reports',
-        'security_incidents', 'staffDeployment', 'securityDeployment', 'patientShiftings', '_deleted_ids'
+        'security_incidents', 'staffDeployment', 'securityDeployment', 'patientShiftings',
+        'hospital_settings', 'hospitalUnits', 'hospitalFloors', 'floors',
+        'checklistTemplates', 'checklistEntries', 'checklistAssignments',
+        'dept_meetings', '_deleted_ids'
     ];
 
     var _pushing    = {};  // key -> true while a Supabase write is in-flight
@@ -61,10 +64,21 @@ var SYNC = (function () {
         }
     }
 
+    function _getItemTs(item) {
+        if (!item || typeof item !== 'object') return 0;
+        var t = item.updatedAt || item.createdAt || item.timestamp || item.ts || item.date || item.updated_at || item.created_at || 0;
+        if (typeof t === 'number') return t;
+        if (typeof t === 'string') {
+            var d = Date.parse(t);
+            if (!isNaN(d)) return d;
+        }
+        return 0;
+    }
+
     /* ── Merge remote data into local storage, preserving locally-created items ──
-       For object arrays (items have an .id): remote wins for shared ids,
-       but local-only items are kept and scheduled to be pushed back.
-       For anything else: remote wins outright.                                  */
+       For object arrays (items have an .id): newer timestamp wins, and local-only
+       items are kept and scheduled to be pushed back.
+       For anything else: local keys take precedence over remote keys.             */
     function _mergeIntoLocal(key, remoteData) {
         try {
             var localRaw = localStorage.getItem('hms_' + key);
@@ -106,27 +120,64 @@ var SYNC = (function () {
                 var cleanRemote = remoteData.filter(function(i) {
                     return !(i && i.id && deletedMap[i.id]);
                 });
+                var cleanLocal = localData.filter(function(i) {
+                    return !(i && i.id && deletedMap[i.id]);
+                });
                 var isObjArr = cleanRemote.some(function (i) { return i && typeof i === 'object' && i.id; }) ||
-                               localData.some(function (i)  { return i && typeof i === 'object' && i.id; });
+                               cleanLocal.some(function (i)  { return i && typeof i === 'object' && i.id; });
                 if (isObjArr) {
-                    var remoteIds = {};
-                    cleanRemote.forEach(function (i) { if (i && i.id) remoteIds[i.id] = true; });
+                    var remoteMap = {};
+                    cleanRemote.forEach(function (i) { if (i && i.id) remoteMap[i.id] = i; });
+                    var localMap = {};
+                    cleanLocal.forEach(function (i) { if (i && i.id) localMap[i.id] = i; });
+
+                    var allIds = {};
+                    Object.keys(remoteMap).forEach(function(id){ allIds[id] = true; });
+                    Object.keys(localMap).forEach(function(id){ allIds[id] = true; });
+
+                    merged = [];
+                    Object.keys(allIds).forEach(function(id) {
+                        if (deletedMap[id]) return;
+                        var rItem = remoteMap[id];
+                        var lItem = localMap[id];
+                        if (rItem && lItem) {
+                            var rTs = _getItemTs(rItem);
+                            var lTs = _getItemTs(lItem);
+                            if (lTs > rTs) {
+                                merged.push(lItem);
+                                hasLocalOnly = true; // Local is newer — schedule push
+                            } else {
+                                merged.push(rItem);
+                            }
+                        } else if (lItem) {
+                            merged.push(lItem);
+                            hasLocalOnly = true;
+                        } else if (rItem) {
+                            merged.push(rItem);
+                        }
+                    });
+                } else {
                     merged = cleanRemote.slice();
-                    localData.forEach(function (item) {
-                        if (item && item.id && !remoteIds[item.id] && !deletedMap[item.id]) {
+                    cleanLocal.forEach(function(item) {
+                        var k = typeof item === 'object' ? JSON.stringify(item) : String(item);
+                        var existsInRemote = cleanRemote.some(function(ri) {
+                            return (typeof ri === 'object' ? JSON.stringify(ri) : String(ri)) === k;
+                        });
+                        if (!existsInRemote) {
                             merged.push(item);
                             hasLocalOnly = true;
                         }
                     });
-                } else {
-                    merged = cleanRemote;
                 }
             } else if (Array.isArray(remoteData)) {
                 merged = remoteData.filter(function(i) {
                     return !(i && i.id && deletedMap[i.id]);
                 });
             } else if (remoteData && typeof remoteData === 'object' && localData && typeof localData === 'object') {
-                merged = Object.assign({}, localData, remoteData);
+                merged = Object.assign({}, remoteData, localData);
+                Object.keys(localData).forEach(function(k) {
+                    if (!remoteData.hasOwnProperty(k)) hasLocalOnly = true;
+                });
             }
 
             var json = JSON.stringify(merged);
@@ -267,7 +318,11 @@ var SYNC = (function () {
                     })
                 .subscribe(function (status) {
                     if (status === 'SUBSCRIBED') {
-                        try { if (typeof APP_SYNC !== 'undefined') APP_SYNC._updateStatus(); } catch (e) {}
+                        sbPullAll(function () {
+                            _recordSyncTs();
+                            try { if (typeof APP_SYNC !== 'undefined') APP_SYNC._updateStatus(); } catch (e) {}
+                            try { if (typeof APP !== 'undefined') APP.refreshCurrent(); } catch (e) {}
+                        });
                     }
                 });
         } catch (e) {
@@ -297,6 +352,8 @@ var SYNC = (function () {
 
     return {
         _refreshTimer: null,
+        _pollInterval: null,
+        _listenersAttached: false,
         _lastSyncTs: (function(){ try { return localStorage.getItem('hms_last_cloud_sync'); } catch(e){ return null; } })(),
 
         init: function () {
@@ -315,6 +372,36 @@ var SYNC = (function () {
                 });
             } else {
                 try { if (typeof APP_SYNC !== 'undefined') APP_SYNC._updateStatus(); } catch (e) {}
+            }
+
+            // Periodic catch-up polling every 30 seconds to guarantee multi-device updates even if WS drops
+            if (!this._pollInterval) {
+                this._pollInterval = setInterval(function () {
+                    if (window.SB_DB && document.visibilityState === 'visible') {
+                        sbPullAll(function () { _recordSyncTs(); });
+                    }
+                }, 30000);
+            }
+
+            // Window Focus & Online re-sync listeners
+            if (!this._listenersAttached) {
+                this._listenersAttached = true;
+                window.addEventListener('focus', function () {
+                    if (window.SB_DB) {
+                        sbPullAll(function () {
+                            _recordSyncTs();
+                            try { if (typeof APP !== 'undefined') APP.refreshCurrent(); } catch (e) {}
+                        });
+                    }
+                });
+                window.addEventListener('online', function () {
+                    if (window.SB_DB) {
+                        sbPullAll(function () {
+                            _recordSyncTs();
+                            try { if (typeof APP !== 'undefined') APP.refreshCurrent(); } catch (e) {}
+                        });
+                    }
+                });
             }
 
             // Also wire up same-browser BroadcastChannel sync
