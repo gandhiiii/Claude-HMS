@@ -934,6 +934,7 @@ function updateAdmBedOptions() {
         }
     }
     var html = '';
+    var autoSelected = false;
     for (var b = 0; b < beds.length; b++) {
         var bed = beds[b].trim();
         if (!bed) continue;
@@ -941,7 +942,9 @@ function updateAdmBedOptions() {
         for (var oc = 0; oc < occupied.length; oc++) {
             if (occupied[oc] === bed) { taken = true; break; }
         }
-        html += '<option value="' + bed + '" ' + (taken ? 'disabled' : '') + '>' + bed + (taken ? ' (' + T('admmod_occupied_cap') + ')' : ' (' + T('admmod_available') + ')') + '</option>';
+        var isSel = (!taken && !autoSelected) ? ' selected' : '';
+        if (isSel) autoSelected = true;
+        html += '<option value="' + bed + '" ' + (taken ? 'disabled' : '') + isSel + '>' + bed + (taken ? ' (' + T('admmod_occupied_cap') + ')' : ' (' + T('admmod_available') + ')') + '</option>';
     }
     bedSelect.innerHTML = html || '<option value="">' + T('admmod_opt_no_beds') + '</option>';
 }
