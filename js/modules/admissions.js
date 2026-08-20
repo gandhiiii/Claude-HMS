@@ -39,7 +39,18 @@ function getAdmTypeBadgeClass(type) {
 }
 
 function getRooms() {
-    return DB.get('rooms');
+    var rooms = DB.get('rooms') || [];
+    if (!rooms || rooms.length === 0) {
+        rooms = [
+            { id: 'room_101', roomNo: '101', floor: 1, category: 'Deluxe Special', beds: ['A', 'B'] },
+            { id: 'room_102', roomNo: '102', floor: 1, category: 'Semi Special', beds: ['A', 'B'] },
+            { id: 'room_103', roomNo: '103', floor: 1, category: 'Twin', beds: ['A', 'B'] },
+            { id: 'room_201', roomNo: '201', floor: 2, category: 'Super Deluxe', beds: ['A'] },
+            { id: 'room_ICU1', roomNo: 'ICU-1', floor: 2, category: 'Super Deluxe', beds: ['A', 'B', 'C'] }
+        ];
+        DB.set('rooms', rooms);
+    }
+    return rooms;
 }
 
 function getRoomCategory(roomNo) {
@@ -936,14 +947,22 @@ function updateAdmBedOptions() {
 }
 
 function saveAdm() {
+    var formEl = document.getElementById('admForm');
+    if (formEl && typeof formEl.reportValidity === 'function') {
+        if (!formEl.reportValidity()) {
+            return false;
+        }
+    }
     var data = getFormData('admForm');
     if (!data.patientName || !data.age || !data.phone || !data.roomNo || !data.doctorName || !data.bedId) {
-        APP.notify(T('admmod_msg_fill_required'), 'error'); return false;
+        APP.notify(T('admmod_msg_fill_required') || 'Please fill out all required fields.', 'error');
+        return false;
     }
     var adms = DB.get('admissions') || [];
     for (var i = 0; i < adms.length; i++) {
         if (adms[i] && String(adms[i].roomNo || '').trim().toLowerCase() === String(data.roomNo || '').trim().toLowerCase() && String(adms[i].bedId || '').trim().toLowerCase() === String(data.bedId || '').trim().toLowerCase() && adms[i].status === 'admitted') {
-            APP.notify(T('admmod_bed_word') + ' ' + data.bedId + ' ' + T('admmod_in_room') + ' ' + data.roomNo + ' ' + T('admmod_bed_occupied'), 'error'); return false;
+            APP.notify(T('admmod_bed_word') + ' ' + data.bedId + ' ' + T('admmod_in_room') + ' ' + data.roomNo + ' ' + T('admmod_bed_occupied'), 'error');
+            return false;
         }
     }
     data.status = 'admitted';
@@ -962,7 +981,7 @@ function saveAdm() {
     var overrides = DB.get('roomStatus') || [];
     DB.set('roomStatus', overrides.filter(function(r) { return String(r.roomNo || '').trim().toLowerCase() !== String(data.roomNo || '').trim().toLowerCase(); }));
 
-    APP.notify(T('admmod_admitted_pre') + ' ' + data.roomNo + ' (' + T('admmod_bed_word') + ' ' + data.bedId + ')' + T('admmod_admitted_post'), 'success');
+    APP.notify((T('admmod_admitted_pre') || 'Patient admitted to room') + ' ' + data.roomNo + ' (' + (T('admmod_bed_word') || 'Bed') + ' ' + data.bedId + ')', 'success');
 
     // Reset filter tab & search query so newly added and recent admissions are immediately visible
     admFilter = 'all';
@@ -977,6 +996,13 @@ function saveAdm() {
 
     renderAdmContent();
 
+    if (typeof SYNC !== 'undefined' && typeof SYNC.pushAll === 'function') {
+        SYNC.pushAll();
+    }
+
+    var modal = document.querySelector('.modal.active') || document.querySelector('.modal');
+    if (modal) modal.remove();
+
     if (newAdm && newAdm.id) {
         window._lastNewAdmId = newAdm.id;
         setTimeout(function() {
@@ -989,6 +1015,7 @@ function saveAdm() {
             }
         }, 100);
     }
+    return true;
 }
 
 function editAdm(id) {
@@ -1102,6 +1129,12 @@ function updateAdm(id) {
         APP.notify(T('admmod_msg_only_facility_admin_edit'), 'error');
         return false;
     }
+    var formEl = document.getElementById('editAdmForm');
+    if (formEl && typeof formEl.reportValidity === 'function') {
+        if (!formEl.reportValidity()) {
+            return false;
+        }
+    }
     var data = getFormData('editAdmForm');
     if (!data.patientName || !data.age || !data.phone || !data.roomNo || !data.doctorName || !data.bedId) {
         APP.notify(T('admmod_msg_fill_required'), 'error');
@@ -1155,6 +1188,13 @@ function updateAdm(id) {
     } else {
         try { renderAdmContent(); } catch(e) {}
     }
+
+    if (typeof SYNC !== 'undefined' && typeof SYNC.pushAll === 'function') {
+        SYNC.pushAll();
+    }
+
+    var modal = document.querySelector('.modal.active') || document.querySelector('.modal');
+    if (modal) modal.remove();
 
     return true;
 }
