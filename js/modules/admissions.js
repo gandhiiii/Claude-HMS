@@ -167,9 +167,16 @@ function getRoomDetails(roomNo) {
 
 function renderAdmissions(container) {
     container.innerHTML = `
-        <div class="flex-between mb-4" id="admTopBar">
-            <div class="search-box" id="admSearchBox">
-                <input type="text" class="form-control" id="admSearch" placeholder="${T('admmod_search_ph')}" oninput="renderAdmList()">
+        <div class="flex-between mb-4 flex-wrap" id="admTopBar" style="gap:12px;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <div class="search-box" id="admSearchBox">
+                    <input type="text" class="form-control" id="admSearch" placeholder="${T('admmod_search_ph')}" oninput="renderAdmList()">
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;" id="admDateBox">
+                    <label style="font-size:12px;font-weight:600;">📅 Date:</label>
+                    <input type="date" id="admDateFilter" class="form-control" style="width:auto;padding:4px 8px;font-size:13px;" onchange="renderAdmList()">
+                    <button class="btn btn-sm btn-secondary" onclick="document.getElementById('admDateFilter').value='';renderAdmList();">Reset</button>
+                </div>
             </div>
             <button class="btn btn-primary" onclick="showAdmForm()">+ ${T('admmod_new_admission')}</button>
         </div>
@@ -195,28 +202,33 @@ function renderAdmissions(container) {
 function renderAdmContent() {
     var topBar = document.getElementById('admTopBar');
     var searchBox = document.getElementById('admSearchBox');
+    var dateBox = document.getElementById('admDateBox');
     var stats = document.getElementById('admStats');
     var content = document.getElementById('admContent');
     if (!content) return;
     if (admFilter === 'rooms') {
         if (topBar) topBar.style.justifyContent = 'flex-end';
         if (searchBox) searchBox.style.display = 'none';
+        if (dateBox) dateBox.style.display = 'none';
         if (stats) stats.style.display = 'none';
         content.innerHTML = '<div id="roomViewContainer"></div><div style="margin-top:12px;text-align:right;"><button class="btn btn-sm btn-secondary" onclick="showRoomManagement()">⚙️ ' + T('admmod_manage_rooms') + '</button></div>';
         renderRoomView();
     } else if (admFilter === 'cleaning') {
         if (topBar) topBar.style.justifyContent = 'flex-end';
         if (searchBox) searchBox.style.display = 'none';
+        if (dateBox) dateBox.style.display = 'none';
         if (stats) stats.style.display = 'none';
         renderCleaningAdmin(content);
     } else if (admFilter === 'report') {
         if (topBar) topBar.style.justifyContent = 'flex-end';
         if (searchBox) searchBox.style.display = 'none';
+        if (dateBox) dateBox.style.display = 'none';
         if (stats) stats.style.display = 'none';
         renderAdmReport(content);
     } else {
         if (topBar) topBar.style.justifyContent = '';
         if (searchBox) searchBox.style.display = '';
+        if (dateBox) dateBox.style.display = '';
         if (stats) stats.style.display = '';
         content.innerHTML = renderAdmListView();
         renderAdmList();
@@ -242,6 +254,8 @@ function renderAdmList() {
     var isAdmin = !user || _isFacilityAdmin(user);
     var admissions = DB.get('admissions') || [];
     var search = (document.getElementById('admSearch') ? document.getElementById('admSearch').value : '').toLowerCase().trim();
+    var selectedDate = (document.getElementById('admDateFilter') ? document.getElementById('admDateFilter').value : '').trim();
+
     var filtered = [];
     for (var i = 0; i < admissions.length; i++) {
         var a = admissions[i];
@@ -251,9 +265,20 @@ function renderAdmList() {
         var pId   = String(a.patientId || a.id || '').toLowerCase();
         var rNo   = String(a.roomNo || a.room || '').toLowerCase();
         var dName = String(a.doctorName || a.doctor || '').toLowerCase();
+        var admDateStr = a.admissionDate ? String(a.admissionDate).slice(0, 10) : '';
+        var formattedAdmDate = a.admissionDate ? APP.formatDate(a.admissionDate).toLowerCase() : '';
 
-        var matchesSearch = !search || pName.indexOf(search) > -1 || pId.indexOf(search) > -1 || rNo.indexOf(search) > -1 || dName.indexOf(search) > -1;
-        if (!matchesSearch) continue;
+        var matchesDateFilter = !selectedDate || admDateStr === selectedDate;
+
+        var matchesSearch = !search ||
+            pName.indexOf(search) > -1 ||
+            pId.indexOf(search) > -1 ||
+            rNo.indexOf(search) > -1 ||
+            dName.indexOf(search) > -1 ||
+            admDateStr.indexOf(search) > -1 ||
+            formattedAdmDate.indexOf(search) > -1;
+
+        if (!matchesSearch || !matchesDateFilter) continue;
 
         var status = (a.status || 'admitted').toLowerCase();
         var effType = getAdmEffType(a).toLowerCase();
