@@ -1158,79 +1158,114 @@ function updateEditAdmBedOptions(currentBedId) {
 }
 
 function updateAdm(id) {
-    var user = AUTH.currentUser();
-    if (!_isFacilityAdmin(user)) {
-        APP.notify(T('admmod_msg_only_facility_admin_edit'), 'error');
-        return false;
-    }
-    var formEl = document.getElementById('editAdmForm');
-    if (formEl && typeof formEl.reportValidity === 'function') {
-        if (!formEl.reportValidity()) {
+    if (updateAdm._isSaving) return false;
+    updateAdm._isSaving = true;
+
+    try {
+        var user = AUTH.currentUser();
+        if (!_isFacilityAdmin(user)) {
+            APP.notify(T('admmod_msg_only_facility_admin_edit') || 'Only facility admin can edit admissions.', 'error');
+            updateAdm._isSaving = false;
             return false;
         }
-    }
-    var data = getFormData('editAdmForm');
-    if (!data.patientName || !data.age || !data.phone || !data.roomNo || !data.doctorName || !data.bedId) {
-        APP.notify(T('admmod_msg_fill_required'), 'error');
-        return false;
-    }
+        var formEl = document.getElementById('editAdmForm');
+        if (formEl && typeof formEl.reportValidity === 'function') {
+            if (!formEl.reportValidity()) {
+                updateAdm._isSaving = false;
+                return false;
+            }
+        }
+        var data = getFormData('editAdmForm');
+        var name = (data.patientName || '').trim();
+        var age = (data.age || '').trim();
+        var phone = (data.phone || '').trim();
+        var roomNo = (data.roomNo || '').trim();
+        var doctorName = (data.doctorName || '').trim();
+        var bedId = (data.bedId || '').trim();
 
-    var targetId = String(id || data.id || '').trim();
-    if (!targetId) {
-        APP.notify('Invalid admission record ID', 'error');
-        return false;
-    }
-
-    var adms = DB.get('admissions') || [];
-    for (var i = 0; i < adms.length; i++) {
-        var existingId = String(adms[i].id || '').trim();
-        if (existingId !== targetId &&
-            String(adms[i].roomNo || '').trim().toLowerCase() === String(data.roomNo || '').trim().toLowerCase() &&
-            String(adms[i].bedId || '').trim().toLowerCase() === String(data.bedId || '').trim().toLowerCase() &&
-            adms[i].status === 'admitted') {
-            APP.notify(T('admmod_bed_word') + ' ' + data.bedId + ' ' + T('admmod_in_room') + ' ' + data.roomNo + ' ' + T('admmod_bed_occupied'), 'error');
+        if (!name || !age || !phone || !roomNo || !doctorName || !bedId) {
+            APP.notify(T('admmod_msg_fill_required') || 'Please fill in all required fields.', 'error');
+            updateAdm._isSaving = false;
             return false;
         }
-    }
 
-    var updatedIdx = -1;
-    for (var j = 0; j < adms.length; j++) {
-        if (String(adms[j].id || '').trim() === targetId) {
-            updatedIdx = j;
-            break;
+        var targetId = String(id || data.id || '').trim();
+        if (!targetId) {
+            APP.notify('Invalid admission record ID', 'error');
+            updateAdm._isSaving = false;
+            return false;
         }
+
+        var adms = DB.get('admissions') || [];
+        for (var i = 0; i < adms.length; i++) {
+            var existingId = String(adms[i].id || '').trim();
+            if (existingId !== targetId &&
+                String(adms[i].roomNo || '').trim().toLowerCase() === roomNo.toLowerCase() &&
+                String(adms[i].bedId || '').trim().toLowerCase() === bedId.toLowerCase() &&
+                (adms[i].status || 'admitted') === 'admitted') {
+                APP.notify((T('admmod_bed_word') || 'Bed') + ' ' + bedId + ' ' + (T('admmod_in_room') || 'in room') + ' ' + roomNo + ' ' + (T('admmod_bed_occupied') || 'is already occupied.'), 'error');
+                updateAdm._isSaving = false;
+                return false;
+            }
+        }
+
+        var updatedIdx = -1;
+        for (var j = 0; j < adms.length; j++) {
+            if (String(adms[j].id || '').trim() === targetId) {
+                updatedIdx = j;
+                break;
+            }
+        }
+
+        if (updatedIdx > -1) {
+            adms[updatedIdx] = Object.assign({}, adms[updatedIdx], data, {
+                patientName: name,
+                age: age,
+                phone: phone,
+                roomNo: roomNo,
+                bedId: bedId,
+                doctorName: doctorName,
+                type: data.type || 'regular',
+                admissionDate: data.admissionDate ? new Date(data.admissionDate).toISOString() : adms[updatedIdx].admissionDate,
+                updatedAt: new Date().toISOString()
+            });
+            DB.set('admissions', adms);
+        } else {
+            DB.update('admissions', targetId, Object.assign({}, data, {
+                patientName: name,
+                age: age,
+                phone: phone,
+                roomNo: roomNo,
+                bedId: bedId,
+                doctorName: doctorName,
+                updatedAt: new Date().toISOString()
+            }));
+        }
+
+        APP.notify(T('admmod_msg_adm_updated') || 'Admission updated successfully ✓', 'success');
+
+        admFilter = 'all';
+        var searchEl = document.getElementById('admSearch');
+        if (searchEl) searchEl.value = '';
+
+        renderAdmContent();
+        renderAdmList();
+
+        if (typeof SYNC !== 'undefined' && typeof SYNC.pushAll === 'function') {
+            try { SYNC.pushAll(); } catch(e) {}
+        }
+
+        var modal = document.querySelector('.modal.active') || document.querySelector('.modal');
+        if (modal) modal.remove();
+
+        updateAdm._isSaving = false;
+        return true;
+    } catch (err) {
+        console.error('[updateAdm] Error:', err);
+        alert('Error updating admission: ' + err.message);
+        updateAdm._isSaving = false;
+        return false;
     }
-
-    if (updatedIdx > -1) {
-        adms[updatedIdx] = Object.assign({}, adms[updatedIdx], data, {
-            type: data.type || 'regular',
-            updatedAt: new Date().toISOString()
-        });
-        DB.set('admissions', adms);
-    } else {
-        DB.update('admissions', targetId, data);
-    }
-
-    APP.notify(T('admmod_msg_adm_updated'), 'success');
-
-    admFilter = 'all';
-    var searchEl = document.getElementById('admSearch');
-    if (searchEl) searchEl.value = '';
-
-    if (typeof APP !== 'undefined' && typeof APP.refreshCurrent === 'function') {
-        APP.refreshCurrent();
-    } else {
-        try { renderAdmContent(); } catch(e) {}
-    }
-
-    if (typeof SYNC !== 'undefined' && typeof SYNC.pushAll === 'function') {
-        SYNC.pushAll();
-    }
-
-    var modal = document.querySelector('.modal.active') || document.querySelector('.modal');
-    if (modal) modal.remove();
-
-    return true;
 }
 
 function viewAdm(id) {
