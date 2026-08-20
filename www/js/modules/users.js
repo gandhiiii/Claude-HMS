@@ -152,7 +152,7 @@ function _teamMemberRow(u, icon, bg, color) {
 function adminAddToTeam(dept) {
     // Pre-fill showUserForm with the dept locked
     var depts = DB.get('departments') || [];
-    var roles = ['employee', 'hod', 'storekeeper', 'ambulance_employee'];
+    var roles = ['employee', 'hod', 'storekeeper', 'ambulance_employee', 'doctor', 'BILLING_CLERK', 'RECEPTIONIST', 'BILLING_MANAGER', 'CHIEF_ACCOUNTANT', 'CFO', 'MD', 'EXECUTIVE', 'CHAIRMAN', 'VICE_CHAIRMAN', 'DIRECTOR'];
     // Load department's inherited features
     var deptObj = depts.find(function(d) { return d.name === dept; });
     var deptFeatures = deptObj && Array.isArray(deptObj.features) ? deptObj.features : [];
@@ -254,7 +254,7 @@ function renderUsersList() {
 
 function showUserForm(user) {
     const depts = DB.get('departments').filter(d => d.active !== false);
-    const roles = ['admin', 'hod', 'storekeeper', 'employee', 'ambulance_employee'];
+    const roles = ['admin', 'hod', 'storekeeper', 'employee', 'ambulance_employee', 'doctor', 'BILLING_CLERK', 'RECEPTIONIST', 'BILLING_MANAGER', 'CHIEF_ACCOUNTANT', 'CFO', 'MD', 'EXECUTIVE', 'CHAIRMAN', 'VICE_CHAIRMAN', 'DIRECTOR'];
     const isEdit = !!user;
 
     const userDept = user?.department || '';

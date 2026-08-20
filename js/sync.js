@@ -13,6 +13,7 @@ var SYNC = (function () {
         'roomchecklists', 'admissions', 'rooms', 'roomStatus',
         'lostfound', 'adminChecklist', 'adminAudits', 'checklists',
         'material_requests', 'suggestions', 'reports',
+        'discountRequests',
         'roomCleaningTasks', 'floorItems', 'resetTokens', 'handovers',
         'hodTasks', 'hodRequests', 'hodPurchases',
         'hodTodos', 'hodUniforms', 'hodLockers',

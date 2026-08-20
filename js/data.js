@@ -569,6 +569,16 @@ const AUTH = {
             }
             return false;
         }
+        // Discount approvals: accounts/finance/billing department staff, doctors,
+        // MD/Vice Chairman/Chairman/Director and other approvers are auto-granted.
+        if (permission === 'discounts') {
+            if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
+            var _discRoles = ['BILLING_CLERK','RECEPTIONIST','BILLING_MANAGER','CHIEF_ACCOUNTANT','CFO','MD','DIRECTOR','EXECUTIVE','CHAIRMAN','VICE_CHAIRMAN','doctor'];
+            if (_discRoles.indexOf(user.role) !== -1) return true;
+            var _discDept = (user.department || '').trim().toLowerCase();
+            if (_discDept.indexOf('account') !== -1 || _discDept.indexOf('finance') !== -1 || _discDept.indexOf('billing') !== -1) return true;
+            return user.permissions && user.permissions.includes('discounts');
+        }
         if (user.isSuperAdmin || (user.permissions && user.permissions.includes('all'))) return true;
         // Role-based auto-grants (no manual permission config needed)
         if (permission === 'hod-dashboard' && user.role === 'hod') return true;
@@ -1123,7 +1133,9 @@ const APP = {
         return 'red';
     },
     getRoleBadge(role) {
-        const colors = { admin: 'badge-danger', hod: 'badge-warning', storekeeper: 'badge-info', employee: 'badge-success', ambulance_employee: 'badge-info' };
+        const colors = { admin: 'badge-danger', hod: 'badge-warning', storekeeper: 'badge-info', employee: 'badge-success', ambulance_employee: 'badge-info',
+            BILLING_CLERK: 'badge-info', RECEPTIONIST: 'badge-info', BILLING_MANAGER: 'badge-warning', CHIEF_ACCOUNTANT: 'badge-warning', CFO: 'badge-success',
+            MD: 'badge-danger', DIRECTOR: 'badge-danger', EXECUTIVE: 'badge-danger', CHAIRMAN: 'badge-danger', VICE_CHAIRMAN: 'badge-danger', doctor: 'badge-success' };
         return colors[role] || 'badge-info';
     },
     loadScript(url) {

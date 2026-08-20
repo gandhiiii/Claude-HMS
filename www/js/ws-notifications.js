@@ -13,7 +13,7 @@ var WS_NOTIFY = (function () {
         'material_requests', 'hodRequests', 'suggestions',
         'ambulance', 'admissions', 'lostfound',
         'hodEquipmentServices', 'hodEquipmentBackdowns',
-        'handovers'
+        'handovers', 'discountRequests'
     ];
 
     /* ── State ── */
@@ -134,6 +134,18 @@ var WS_NOTIFY = (function () {
         if (key === 'lostfound')        return true;
         if (key === 'hodEquipmentServices')  return ['IT', 'Facility', 'Maintenance'].some(function(x){ return x.toLowerCase() === (user.department||'').trim().toLowerCase(); });
         if (key === 'hodEquipmentBackdowns') return ['IT', 'Facility', 'Maintenance'].some(function(x){ return x.toLowerCase() === (user.department||'').trim().toLowerCase(); });
+        if (key === 'discountRequests') {
+            var _dRole = String(user.role || '').toUpperCase();
+            var _dExec = ['MD', 'DIRECTOR', 'EXECUTIVE', 'CHAIRMAN', 'VICE_CHAIRMAN'];
+            if (item.currentApproverRole === _dRole) return true;
+            if (item.currentApproverRole === 'EXECUTIVE' && _dExec.indexOf(_dRole) !== -1) return true;
+            if (item.requestedBy === user.username) return true;
+            var _chain = item.approvalChain || [];
+            for (var _i = 0; _i < _chain.length; _i++) {
+                if (_chain[_i].actorUsername === user.username) return true;
+            }
+            return false;
+        }
         if (key === 'handovers') return (user.role === 'hod' || user.role === 'super_admin' || user.role === 'admin') &&
             ['IT','Facility','Maintenance'].some(function(x){ return x.toLowerCase() === (user.department||'').trim().toLowerCase(); });
         return false;
@@ -152,6 +164,7 @@ var WS_NOTIFY = (function () {
             lostfound:         { icon: '🔍', title: 'Lost & Found',        body: item.itemName || item.description || 'Item reported' },
             hodEquipmentServices:  { icon: '🔧', title: 'Equipment Service',  body: (item.assetName||'Equipment') + ' — ' + (item.serviceType||'service') + ' record added' },
             hodEquipmentBackdowns: { icon: '📉', title: 'Breakdown Alert',    body: (item.assetName||'Equipment') + ' — ' + (item.reason||'Breakdown reported') },
+            discountRequests:    { icon: '🏷️', title: 'Discount Request',     body: (item.patientName||'Patient') + ' — ' + (item.requestCode||'new discount request') },
             handovers:             { icon: '🔄', title: 'Shift Handover',     body: (item.employeeName||'Employee') + ' handed over ' + (item.shift||'') + ' shift' + (item.summary ? ': ' + item.summary : '') }
         };
         var m = map[key] || { icon: '🔔', title: 'Update', body: 'New data received' };
