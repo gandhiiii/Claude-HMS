@@ -597,10 +597,10 @@ const AUTH = {
         if (permission === 'dashboard') return user.isSuperAdmin || user.role === 'admin';
         if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
 
-        // 1. Explicit user permissions assigned by Admin
-        if (user.permissions && Array.isArray(user.permissions)) {
+        // 1. Explicit user permissions assigned by Admin take precedence for specific employees
+        if (user.permissions && Array.isArray(user.permissions) && user.permissions.length > 0) {
             if (user.permissions.includes('all')) return true;
-            if (user.permissions.includes(permission)) return true;
+            return user.permissions.includes(permission);
         }
 
         // 2. Department feature rights assigned by Admin
@@ -612,17 +612,15 @@ const AUTH = {
             }
         }
 
-        // 3. Role-based defaults when permissions array is set by Admin
-        if (user.permissions && Array.isArray(user.permissions) && user.permissions.length > 0) {
-            return user.permissions.includes(permission);
-        }
-
         // Role and Department-Based Auto-Grants (when NO explicit user permission override is set)
         var dNorm = (user.department || '').trim().toLowerCase();
-        var isFacilityDept = ['facility', 'maintenance', 'housekeeping', 'security', 'engineering'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+        var isFacilityDept = ['facility', 'facilities', 'maintenance', 'housekeeping', 'house keeping', 'hk', 'security', 'engineering', 'civil', 'electrical', 'plumbing', 'sanitation', 'utility', 'cleaning', 'cleaner', 'cleaners', 'sweeper', 'housekeeper', 'housekeepers'].some(function(x){ return dNorm.indexOf(x) !== -1; });
         var isNursingDept  = ['nursing', 'icu', 'ward', 'ot', 'casualty', 'emergency', 'clinical'].some(function(x){ return dNorm.indexOf(x) !== -1; });
         var isStoreDept    = ['store', 'stores', 'inventory', 'warehouse'].some(function(x){ return dNorm.indexOf(x) !== -1; });
-        var isItDept       = ['it', 'computer', 'computers', 'biomedical', 'software'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+        var isItDept       = ['it', 'i.t.', 'information technology', 'computer', 'computers', 'biomedical', 'software'].some(function(x){
+            if (x === 'it') return /\bit\b/i.test(dNorm);
+            return dNorm.indexOf(x) !== -1;
+        });
 
         if (permission === 'hod-dashboard' && user.role === 'hod') return true;
         if (permission === 'employee-dashboard' && !(user.isSuperAdmin || user.role === 'admin')) return true;
@@ -630,7 +628,7 @@ const AUTH = {
 
         // Facility / Maintenance / Housekeeping auto-grants
         if (isFacilityDept) {
-            if (['checklists','departmental-checklist','cleaning','room-checklist','staff-deployment','security-deployment','problems','material-requests','scrap','handover'].indexOf(permission) !== -1) return true;
+            if (['checklists','departmental-checklist','cleaning','room-checklist','staff-deployment','security-deployment','problems','material-requests','scrap','handover','equipbackdown','work','reports'].indexOf(permission) !== -1) return true;
         }
 
         // Nursing / Clinical auto-grants

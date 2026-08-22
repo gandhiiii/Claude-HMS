@@ -396,34 +396,51 @@ var PatientShifting = (function () {
     }
 
     /* ── Employee dashboard tab ── */
+    var _tabState = { from: '', to: '' };
+
     function renderTab(el) {
         var user = AUTH.currentUser();
         if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
         _mode = 'tab';
         var today = _dateStr();
+        if (!_tabState.from && !_tabState.to) {
+            _tabState.from = today;
+            _tabState.to = today;
+        }
 
         var html = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
-            + '<div style="font-weight:700;font-size:16px;">🚑 Patient Shifting — ' + today + '</div>'
-            + '<div style="display:flex;gap:6px;">'
+            + '<div style="font-weight:700;font-size:16px;">🚑 Patient Shifting</div>'
+            + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
             + '<button class="btn btn-sm btn-primary" onclick="PatientShifting.toggleAdd()">➕ Add Entry</button>'
-            + '<button class="btn btn-sm btn-success" onclick="PatientShifting.exportToday()">📊 Excel</button>'
+            + '<button class="btn btn-sm btn-success" onclick="PatientShifting.exportTab()">📊 Export Excel</button>'
             + '</div></div>'
+
+            // Date & Filter controls for employee tab
+            + '<div class="card" style="padding:12px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:end;background:var(--light-gray);">'
+            + '<div class="form-group" style="margin:0;"><label style="font-size:11px;font-weight:600;">From Date</label>'
+            + '<input type="date" id="psTabFrom" class="form-control" value="' + (_tabState.from || '') + '" style="padding:5px 8px;font-size:12px;"></div>'
+            + '<div class="form-group" style="margin:0;"><label style="font-size:11px;font-weight:600;">To Date</label>'
+            + '<input type="date" id="psTabTo" class="form-control" value="' + (_tabState.to || '') + '" style="padding:5px 8px;font-size:12px;"></div>'
+            + '<button class="btn btn-sm btn-primary" style="font-size:12px;" onclick="PatientShifting.applyTabFilter()">🔍 Filter</button>'
+            + '<button class="btn btn-sm btn-outline" style="font-size:12px;" onclick="PatientShifting.setTabRange(\'today\')">Today</button>'
+            + '<button class="btn btn-sm btn-outline" style="font-size:12px;" onclick="PatientShifting.setTabRange(\'week\')">This Week</button>'
+            + '<button class="btn btn-sm btn-outline" style="font-size:12px;" onclick="PatientShifting.setTabRange(\'month\')">This Month</button>'
+            + '<button class="btn btn-sm btn-outline" style="font-size:12px;" onclick="PatientShifting.setTabRange(\'all\')">All Time</button>'
+            + '</div>'
+
             + '<div id="psAddWrap" style="display:none;margin-bottom:14px;">' + _addFormHtml() + '</div>'
             + _reportSectionHtml()
             + '<div id="psTabBody"></div>';
 
         el.innerHTML = html;
-        renderTabResults(today);
+        renderTabResults();
     }
 
-    function renderTabResults(today) {
+    function renderTabResults() {
         var user = AUTH.currentUser();
         var body = document.getElementById('psTabBody');
         if (!body) return;
-        var rows = _filter(today, today);
-        if (!_isManager(user)) {
-            rows = rows.filter(function (e) { return e.createdBy === (user ? user.username : ''); });
-        }
+        var rows = _filter(_tabState.from, _tabState.to);
         body.innerHTML = _summaryCards(rows) + _entriesTable(rows, user);
     }
 
@@ -515,6 +532,31 @@ var PatientShifting = (function () {
         },
         exportToday: function () {
             _export(_dateStr(), _dateStr());
+        },
+        exportTab: function () {
+            _export(_tabState.from, _tabState.to);
+        },
+        applyTabFilter: function () {
+            _tabState.from = (document.getElementById('psTabFrom') || {}).value || '';
+            _tabState.to = (document.getElementById('psTabTo') || {}).value || '';
+            renderTabResults();
+        },
+        setTabRange: function (range) {
+            var today = _dateStr();
+            if (range === 'today') {
+                _tabState.from = today; _tabState.to = today;
+            } else if (range === 'week') {
+                var r = _periodRange('weekly');
+                _tabState.from = r.from; _tabState.to = r.to;
+            } else if (range === 'month') {
+                var r2 = _periodRange('monthly');
+                _tabState.from = r2.from; _tabState.to = r2.to;
+            } else if (range === 'all') {
+                _tabState.from = ''; _tabState.to = '';
+            }
+            var f = document.getElementById('psTabFrom'); if (f) f.value = _tabState.from;
+            var t = document.getElementById('psTabTo'); if (t) t.value = _tabState.to;
+            renderTabResults();
         },
         exportPeriod: function (period) {
             var r = _periodRange(period);

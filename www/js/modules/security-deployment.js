@@ -440,40 +440,63 @@ var SecurityDeployment = (function () {
     }
 
     /* ── Employee dashboard tab ── */
+    var _tabState = { from: '', to: '', type: 'all' };
+
     function renderTab(el) {
         var user = AUTH.currentUser();
         if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
         _mode = 'tab';
         var today = _dateStr();
+        if (!_tabState.from && !_tabState.to) {
+            _tabState.from = today;
+            _tabState.to = today;
+        }
 
         var html = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
-            + '<div style="font-weight:700;font-size:16px;">🛡️ Security Deployment — ' + today + '</div>'
-            + '<div style="display:flex;gap:6px;">'
+            + '<div style="font-weight:700;font-size:16px;">🛡️ Security Deployment</div>'
+            + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
             + '<button class="btn btn-sm btn-primary" onclick="SecurityDeployment.toggleAdd()">➕ Add Entry</button>'
-            + '<button class="btn btn-sm btn-success" onclick="SecurityDeployment.exportToday()">📊 Excel</button>'
+            + '<button class="btn btn-sm btn-success" onclick="SecurityDeployment.exportTab()">📊 Export Excel</button>'
             + '</div></div>'
+
+            // Date & Filter controls for employee tab
+            + '<div class="card" style="padding:12px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:end;background:var(--light-gray);">'
+            + '<div class="form-group" style="margin:0;"><label style="font-size:11px;font-weight:600;">From Date</label>'
+            + '<input type="date" id="sedTabFrom" class="form-control" value="' + (_tabState.from || '') + '" style="padding:5px 8px;font-size:12px;"></div>'
+            + '<div class="form-group" style="margin:0;"><label style="font-size:11px;font-weight:600;">To Date</label>'
+            + '<input type="date" id="sedTabTo" class="form-control" value="' + (_tabState.to || '') + '" style="padding:5px 8px;font-size:12px;"></div>'
+            + '<div class="form-group" style="margin:0;"><label style="font-size:11px;font-weight:600;">Type</label>'
+            + '<select id="sedTabType" class="form-control" style="padding:5px 8px;font-size:12px;">'
+            + '<option value="all"' + (_tabState.type === 'all' ? ' selected' : '') + '>All Staff</option>'
+            + '<option value="guard"' + (_tabState.type === 'guard' ? ' selected' : '') + '>Guard</option>'
+            + '<option value="supervisor"' + (_tabState.type === 'supervisor' ? ' selected' : '') + '>Supervisor</option>'
+            + '</select></div>'
+            + '<button class="btn btn-sm btn-primary" style="font-size:12px;" onclick="SecurityDeployment.applyTabFilter()">🔍 Filter</button>'
+            + '<button class="btn btn-sm btn-outline" style="font-size:12px;" onclick="SecurityDeployment.setTabRange(\'today\')">Today</button>'
+            + '<button class="btn btn-sm btn-outline" style="font-size:12px;" onclick="SecurityDeployment.setTabRange(\'week\')">This Week</button>'
+            + '<button class="btn btn-sm btn-outline" style="font-size:12px;" onclick="SecurityDeployment.setTabRange(\'month\')">This Month</button>'
+            + '<button class="btn btn-sm btn-outline" style="font-size:12px;" onclick="SecurityDeployment.setTabRange(\'all\')">All Time</button>'
+            + '</div>'
+
             + '<div id="sedAddWrap" style="display:none;margin-bottom:14px;">' + _addFormHtml() + '</div>'
             + _reportSectionHtml()
             + '<div id="sedTabBody"></div>';
 
         el.innerHTML = html;
-        renderTabResults(today);
+        renderTabResults();
     }
 
-    function renderTabResults(today) {
+    function renderTabResults() {
         var user = AUTH.currentUser();
         var body = document.getElementById('sedTabBody');
         if (!body) return;
-        var rows = _filter(today, today, 'all');
-        if (!_isManager(user)) {
-            rows = rows.filter(function (e) { return e.createdBy === (user ? user.username : ''); });
-        }
+        var rows = _filter(_tabState.from, _tabState.to, _tabState.type || 'all');
         var sm = _summary(rows);
         var guards = rows.filter(function (e) { return e.staffType !== 'supervisor'; });
         var supervisors = rows.filter(function (e) { return e.staffType === 'supervisor'; });
         body.innerHTML = _summaryCards(sm)
-            + _entriesTable(guards, '🛡️ Security Guards', '#37474f', user)
-            + _entriesTable(supervisors, '👮 Security Supervisors', '#1565c0', user);
+            + _entriesTable(guards, '🛡️ Security Guards (' + guards.length + ')', '#37474f', user)
+            + _entriesTable(supervisors, '👮 Security Supervisors (' + supervisors.length + ')', '#1565c0', user);
     }
 
     return {
@@ -569,6 +592,33 @@ var SecurityDeployment = (function () {
         },
         exportToday: function () {
             _export(_dateStr(), _dateStr(), 'all');
+        },
+        exportTab: function () {
+            _export(_tabState.from, _tabState.to, _tabState.type || 'all');
+        },
+        applyTabFilter: function () {
+            _tabState.from = (document.getElementById('sedTabFrom') || {}).value || '';
+            _tabState.to = (document.getElementById('sedTabTo') || {}).value || '';
+            _tabState.type = (document.getElementById('sedTabType') || {}).value || 'all';
+            renderTabResults();
+        },
+        setTabRange: function (range) {
+            var now = new Date();
+            var today = _dateStr();
+            if (range === 'today') {
+                _tabState.from = today; _tabState.to = today;
+            } else if (range === 'week') {
+                var r = _periodRange('weekly');
+                _tabState.from = r.from; _tabState.to = r.to;
+            } else if (range === 'month') {
+                var r2 = _periodRange('monthly');
+                _tabState.from = r2.from; _tabState.to = r2.to;
+            } else if (range === 'all') {
+                _tabState.from = ''; _tabState.to = '';
+            }
+            var f = document.getElementById('sedTabFrom'); if (f) f.value = _tabState.from;
+            var t = document.getElementById('sedTabTo'); if (t) t.value = _tabState.to;
+            renderTabResults();
         },
         exportPeriod: function (period) {
             var r = _periodRange(period);

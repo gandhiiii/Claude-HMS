@@ -388,40 +388,63 @@ var StaffDeployment = (function () {
     }
 
     /* ── Employee dashboard tab ── */
+    var _tabState = { from: '', to: '', type: 'all' };
+
     function renderTab(el) {
         var user = AUTH.currentUser();
         if (!user) { el.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
         _mode = 'tab';
         var today = _dateStr();
+        if (!_tabState.from && !_tabState.to) {
+            _tabState.from = today;
+            _tabState.to = today;
+        }
 
         var html = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">'
-            + '<div style="font-weight:700;font-size:16px;">🧹 Staff Deployment — ' + today + '</div>'
-            + '<div style="display:flex;gap:6px;">'
+            + '<div style="font-weight:700;font-size:16px;">🧹 Staff Deployment</div>'
+            + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
             + '<button class="btn btn-sm btn-primary" onclick="StaffDeployment.toggleAdd()">➕ Add Entry</button>'
-            + '<button class="btn btn-sm btn-success" onclick="StaffDeployment.exportToday()">📊 Excel</button>'
+            + '<button class="btn btn-sm btn-success" onclick="StaffDeployment.exportTab()">📊 Export Excel</button>'
             + '</div></div>'
+
+            // Date & Filter controls for employee tab
+            + '<div class="card" style="padding:12px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:end;background:var(--light-gray);">'
+            + '<div class="form-group" style="margin:0;"><label style="font-size:11px;font-weight:600;">From Date</label>'
+            + '<input type="date" id="sdpTabFrom" class="form-control" value="' + (_tabState.from || '') + '" style="padding:5px 8px;font-size:12px;"></div>'
+            + '<div class="form-group" style="margin:0;"><label style="font-size:11px;font-weight:600;">To Date</label>'
+            + '<input type="date" id="sdpTabTo" class="form-control" value="' + (_tabState.to || '') + '" style="padding:5px 8px;font-size:12px;"></div>'
+            + '<div class="form-group" style="margin:0;"><label style="font-size:11px;font-weight:600;">Type</label>'
+            + '<select id="sdpTabType" class="form-control" style="padding:5px 8px;font-size:12px;">'
+            + '<option value="all"' + (_tabState.type === 'all' ? ' selected' : '') + '>All Staff</option>'
+            + '<option value="housekeeping"' + (_tabState.type === 'housekeeping' ? ' selected' : '') + '>Housekeeping</option>'
+            + '<option value="pca"' + (_tabState.type === 'pca' ? ' selected' : '') + '>PCA</option>'
+            + '</select></div>'
+            + '<button class="btn btn-sm btn-primary" style="font-size:12px;" onclick="StaffDeployment.applyTabFilter()">🔍 Filter</button>'
+            + '<button class="btn btn-sm btn-outline" style="font-size:12px;" onclick="StaffDeployment.setTabRange(\'today\')">Today</button>'
+            + '<button class="btn btn-sm btn-outline" style="font-size:12px;" onclick="StaffDeployment.setTabRange(\'week\')">This Week</button>'
+            + '<button class="btn btn-sm btn-outline" style="font-size:12px;" onclick="StaffDeployment.setTabRange(\'month\')">This Month</button>'
+            + '<button class="btn btn-sm btn-outline" style="font-size:12px;" onclick="StaffDeployment.setTabRange(\'all\')">All Time</button>'
+            + '</div>'
+
             + '<div id="sdpAddWrap" style="display:none;margin-bottom:14px;">' + _addFormHtml() + '</div>'
             + _reportSectionHtml()
             + '<div id="sdpTabBody"></div>';
 
         el.innerHTML = html;
-        renderTabResults(today);
+        renderTabResults();
     }
 
-    function renderTabResults(today) {
+    function renderTabResults() {
         var user = AUTH.currentUser();
         var body = document.getElementById('sdpTabBody');
         if (!body) return;
-        var rows = _filter(today, today, 'all');
-        if (!(user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'hod'))) {
-            rows = rows.filter(function (e) { return e.createdBy === (user ? user.username : ''); });
-        }
+        var rows = _filter(_tabState.from, _tabState.to, _tabState.type || 'all');
         var sm = _summary(rows);
         var hk = rows.filter(function (e) { return e.staffType !== 'pca'; });
         var pca = rows.filter(function (e) { return e.staffType === 'pca'; });
         body.innerHTML = _summaryCards(sm)
-            + _entriesTable(hk, '🧹 Housekeeping', '#2e7d32', user)
-            + _entriesTable(pca, '🤝 PCA (Patient Care Assistant)', '#1565c0', user);
+            + _entriesTable(hk, '🧹 Housekeeping (' + hk.length + ')', '#2e7d32', user)
+            + _entriesTable(pca, '🤝 PCA (Patient Care Assistant) (' + pca.length + ')', '#1565c0', user);
     }
 
     return {
@@ -493,6 +516,33 @@ var StaffDeployment = (function () {
         },
         exportToday: function () {
             _export(_dateStr(), _dateStr(), 'all');
+        },
+        exportTab: function () {
+            _export(_tabState.from, _tabState.to, _tabState.type || 'all');
+        },
+        applyTabFilter: function () {
+            _tabState.from = (document.getElementById('sdpTabFrom') || {}).value || '';
+            _tabState.to = (document.getElementById('sdpTabTo') || {}).value || '';
+            _tabState.type = (document.getElementById('sdpTabType') || {}).value || 'all';
+            renderTabResults();
+        },
+        setTabRange: function (range) {
+            var now = new Date();
+            var today = _dateStr();
+            if (range === 'today') {
+                _tabState.from = today; _tabState.to = today;
+            } else if (range === 'week') {
+                var r = _periodRange('weekly');
+                _tabState.from = r.from; _tabState.to = r.to;
+            } else if (range === 'month') {
+                var r2 = _periodRange('monthly');
+                _tabState.from = r2.from; _tabState.to = r2.to;
+            } else if (range === 'all') {
+                _tabState.from = ''; _tabState.to = '';
+            }
+            var f = document.getElementById('sdpTabFrom'); if (f) f.value = _tabState.from;
+            var t = document.getElementById('sdpTabTo'); if (t) t.value = _tabState.to;
+            renderTabResults();
         },
         exportPeriod: function (period) {
             var r = _periodRange(period);

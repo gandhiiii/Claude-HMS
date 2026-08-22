@@ -141,10 +141,17 @@ const Router = {
         // Non-admin staff must not access admin-only modules directly
         var _adminOnly = ['dashboard', 'reports', 'data-history', 'budget', 'quarterly-priorities', 'feature-rights', 'hospital-settings'];
         if (_adminOnly.indexOf(module) !== -1 && !isAdmin) {
-            if (u.role === 'hod') { module = 'hod-dashboard'; }
+            var requestedModule = module;
+            if (u.role === 'hod') {
+                module = 'hod-dashboard';
+                if (requestedModule === 'reports') window._hodTargetTab = 'hodreports';
+            }
             else if (u.role === 'storekeeper') { module = 'storekeeper-dashboard'; }
             else if (u.role === 'ambulance_employee') { module = 'ambulance'; }
-            else { module = 'employee-dashboard'; }
+            else {
+                module = 'employee-dashboard';
+                if (requestedModule === 'reports') window._targetEmpTab = 'reports';
+            }
         }
 
         // Cleanup ambulance tracking when leaving that module
