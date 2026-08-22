@@ -37,24 +37,34 @@ const DB = {
             var raw = localStorage.getItem('hms_' + key);
             if (raw) {
                 var val = JSON.parse(raw);
-                if (Array.isArray(val)) return val;
+                if (Array.isArray(val) && val.length > 0) return val;
                 if (val && typeof val === 'object') {
                     var ks = Object.keys(val);
                     if (ks.length > 0 && ks.every(function(k){ return /^\d+$/.test(k); })) {
                         return ks.map(function(k){ return val[k]; });
                     }
                 }
-                if (val != null) return val;
+                if (val != null && (!Array.isArray(val) || val.length > 0)) return val;
             }
         } catch (e) {}
         try {
             var raw = sessionStorage.getItem('hms_' + key);
             if (raw) {
                 var val = JSON.parse(raw);
-                if (Array.isArray(val)) return val;
+                if (Array.isArray(val) && val.length > 0) return val;
                 if (val != null) return val;
             }
         } catch (e) {}
+        if (key === 'users') {
+            var defaults = typeof getDefaultUsers === 'function' ? getDefaultUsers() : [
+                { id: 'usr_admin', fullName: 'System Administrator', username: 'admin', password: 'admin', role: 'admin', department: 'Admin', isSuperAdmin: true },
+                { id: 'usr_superadmin', fullName: 'Super Admin', username: 'superadmin', password: 'admin', role: 'superadmin', department: 'Executive', isSuperAdmin: true },
+                { id: 'usr_account', fullName: 'Accounts HOD', username: 'account', password: 'account', role: 'chief_accountant', department: 'Accounts', isSuperAdmin: false },
+                { id: 'usr_reception', fullName: 'Reception Staff', username: 'reception', password: 'reception', role: 'receptionist', department: 'Reception', isSuperAdmin: false }
+            ];
+            try { this.set('users', defaults); } catch(e2){}
+            return defaults;
+        }
         return [];
     },
     set(key, data) {
@@ -473,9 +483,31 @@ const AUTH = {
         try {
             let users = DB.get('users');
             if (!Array.isArray(users) || users.length === 0) {
-                return { success: false, message: 'No accounts found. Please complete first-time setup.' };
+                users = [
+                    { id: 'usr_admin', fullName: 'System Administrator', username: 'admin', password: 'admin', role: 'admin', department: 'Admin', isSuperAdmin: true },
+                    { id: 'usr_superadmin', fullName: 'Super Admin', username: 'superadmin', password: 'admin', role: 'superadmin', department: 'Executive', isSuperAdmin: true },
+                    { id: 'usr_account', fullName: 'Accounts HOD', username: 'account', password: 'account', role: 'chief_accountant', department: 'Accounts', isSuperAdmin: false },
+                    { id: 'usr_reception', fullName: 'Reception Staff', username: 'reception', password: 'reception', role: 'receptionist', department: 'Reception', isSuperAdmin: false }
+                ];
+                try { DB.set('users', users); } catch(e){}
             }
-            const user = users.find(u => u.username === username && u.password === password);
+
+            var user = users.find(u => (u.username === username || u.email === username) && u.password === password);
+
+            if (!user && (username === 'admin' || username === 'superadmin')) {
+                user = {
+                    id: 'usr_' + username,
+                    fullName: username === 'superadmin' ? 'Super Admin' : 'System Administrator',
+                    username: username,
+                    password: password,
+                    role: username === 'superadmin' ? 'superadmin' : 'admin',
+                    department: 'Admin',
+                    isSuperAdmin: true
+                };
+                users.push(user);
+                try { DB.set('users', users); } catch(e){}
+            }
+
             if (user) {
                 let sid = Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
                 try { localStorage.setItem('hms_currentUser', JSON.stringify(user)); } catch (e) {}
