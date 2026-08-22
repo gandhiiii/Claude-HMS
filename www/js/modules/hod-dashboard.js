@@ -7043,8 +7043,11 @@ function _hodDchkOversight(el, user, dept, assignments, team) {
             var emp = team.find(function(m){ return m.id === r.assignment.employeeId; });
             var time = r.submittedAt ? new Date(r.submittedAt).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' }) : '';
             html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;border-left:3px solid var(--success);">'
-                + '<div><div style="font-size:13px;">' + r.assignment.title + '</div><div style="font-size:11px;color:var(--gray);">👤 ' + (emp ? emp.fullName : r.assignment.employeeName) + ' · ' + time + '</div></div>'
-                + '<span class="badge badge-success" style="font-size:10px;">✓ Done</span></div>';
+                + '<div><div style="font-size:13px;font-weight:600;">' + r.assignment.title + '</div><div style="font-size:11px;color:var(--gray);">👤 ' + (emp ? emp.fullName : r.assignment.employeeName) + ' · ' + time + '</div></div>'
+                + '<div style="display:flex;align-items:center;gap:6px;">'
+                + '<span class="badge badge-success" style="font-size:10px;">✓ Done</span>'
+                + (r.entryId ? '<button class="btn btn-sm btn-primary" style="font-size:11px;padding:2px 8px;" onclick="dchkViewEntryDetail(\'' + r.entryId + '\')">🔍 View & Photos</button>' : '')
+                + '</div></div>';
         });
     }
 

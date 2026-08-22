@@ -557,7 +557,7 @@ function dchkRenderFill() {
             } else {
                 dchkFillState[key] = {};
                 items.forEach(function(it) {
-                    dchkFillState[key][it.itemId] = { status: 'pending', value: '', remarks: '' };
+                    dchkFillState[key][it.itemId] = { status: 'pending', value: '', remarks: '', photos: [] };
                 });
             }
         }
@@ -583,22 +583,37 @@ function dchkRenderFill() {
                     <h3>${a.title} ${assignmentFloor ? '<span style="font-size:12px;color:var(--gray);font-weight:400;">📍 ' + assignmentFloor + '</span>' : ''} <span style="background:' + afBg + ';color:' + afCl + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;margin-left:4px;">' + afIc + ' ' + (af.charAt(0).toUpperCase() + af.slice(1)) + '</span> <span style="font-size:12px;color:var(--gray);font-weight:400;">(${T('dchk_date_label')}: ${dateStr})</span></h3>
                     ${alreadySubmitted ? '<span class="badge badge-success">' + T('dchk_already_submitted') + '</span>' : ''}
                 </div>
-                <div style="max-height:300px;overflow-y:auto;">
+                <div style="max-height:400px;overflow-y:auto;">
                     ${items.length === 0 ? '<div class="empty-state">' + T('dchk_no_points') + '</div>' :
                     items.map(function(it) {
-                        var st = dchkFillState[key][it.itemId] || { status: 'pending', value: '', remarks: '' };
+                        var st = dchkFillState[key][it.itemId] || { status: 'pending', value: '', remarks: '', photos: [] };
                         var sel = st.status || 'pending';
                         var val = st.value || '';
                         var rem = st.remarks || '';
+                        var photos = st.photos || [];
                         var sc = dchkStatusColors[sel] || '#e9ecef';
                         var sbg = dchkStatusBgs[sel] || 'var(--bg)';
                         var opts = DCHK_STATUSES.map(function(s) { return '<option value="' + s + '" ' + (sel === s ? 'selected' : '') + '>' + s.toUpperCase() + '</option>'; }).join('');
-                        return '<div class="dchk-item" data-status="' + sel + '" data-item-id="' + it.itemId + '" data-key="' + key + '" style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;background:' + sbg + ';font-size:13px;flex-wrap:wrap;">' +
+                        
+                        var photoSection = '<div style="width:100%;margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' +
+                            '<input type="file" accept="image/*" capture="environment" id="dchk_photo_input_' + key + '_' + it.itemId + '" style="display:none;" onchange="dchkHandlePhotoUpload(\'' + key + '\',\'' + it.itemId + '\',this)">' +
+                            (!alreadySubmitted ? '<button type="button" class="btn btn-sm" style="background:#f0f4ff;color:#2563eb;border:1px solid #bfdbfe;padding:2px 8px;font-size:12px;border-radius:4px;" onclick="document.getElementById(\'dchk_photo_input_' + key + '_' + it.itemId + '\').click()">📷 ' + (photos.length > 0 ? ('Add Photo (' + photos.length + ')') : 'Capture Photo') + '</button>' : '') +
+                            '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' +
+                            photos.map(function(p, pIdx) {
+                                return '<div style="position:relative;display:inline-block;">' +
+                                    '<img src="' + p.url + '" onclick="openImageModal(\'' + p.url.replace(/'/g, "\\'") + '\', \'' + (it.label || '').replace(/'/g, "\\'") + '\')" style="width:40px;height:40px;object-fit:cover;border-radius:4px;cursor:pointer;border:1px solid var(--border);" title="Click to expand">' +
+                                    (!alreadySubmitted ? '<button type="button" onclick="dchkRemovePhoto(\'' + key + '\',\'' + it.itemId + '\',' + pIdx + ')" style="position:absolute;top:-4px;right:-4px;background:var(--danger);color:#fff;border:none;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>' : '') +
+                                    '</div>';
+                            }).join('') +
+                            '</div></div>';
+
+                        return '<div class="dchk-item" data-status="' + sel + '" data-item-id="' + it.itemId + '" data-key="' + key + '" style="display:flex;align-items:center;gap:6px;padding:8px;border-radius:6px;background:' + sbg + ';font-size:13px;flex-wrap:wrap;margin-bottom:6px;border:1px solid var(--border);">' +
                             '<span style="display:inline-block;min-width:70px;text-align:center;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600;color:white;background:' + sc + ';flex-shrink:0;">' + (sel !== 'pending' ? sel.toUpperCase() : 'PENDING') + '</span>' +
                             '<span style="flex:1;min-width:120px;">' + it.label + '</span>' +
                             (it.unit ? '<input type="number" step="any" value="' + val + '" ' + (alreadySubmitted ? 'disabled' : '') + ' onchange="dchkFillState[\'' + key + '\'][\'' + it.itemId + '\'].value=this.value;try{localStorage.setItem(\'' + draftKey + '\',JSON.stringify(dchkFillState[\'' + key + '\']))}catch(e){}" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px;text-align:right;" placeholder="0">' : '') +
                             (it.unit ? '<span style="font-size:11px;font-weight:600;color:var(--gray);background:var(--card);padding:2px 7px;border-radius:4px;border:1px solid var(--border);flex-shrink:0;">' + it.unit + '</span>' : '') +
                             '<select ' + (alreadySubmitted ? 'disabled' : '') + ' onchange="dchkFillState[\'' + key + '\'][\'' + it.itemId + '\'].status=this.value;try{localStorage.setItem(\'' + draftKey + '\',JSON.stringify(dchkFillState[\'' + key + '\']))}catch(e){};dchkRenderFill()" style="width:auto;padding:3px 4px;border:1px solid var(--border);border-radius:4px;font-size:12px;flex-shrink:0;">' + opts + '</select>' +
+                            photoSection +
                             '</div>';
                     }).join('')}
                 </div>
@@ -636,6 +651,37 @@ function dchkRenderFill() {
         });
     } catch(e) {
         if (content) content.insertAdjacentHTML('afterbegin', '<div style="background:#ffebee;color:#c62828;padding:4px;font-size:11px;">Error rendering: ' + e.message + '</div>');
+    }
+}
+
+async function dchkHandlePhotoUpload(key, itemId, input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    if (typeof APP !== 'undefined') APP.notify('Compressing & uploading photo...', 'info');
+    try {
+        var photoObj = await window.uploadChecklistPhoto(file, { subfolder: 'checklists/' + key });
+        if (!dchkFillState[key]) dchkFillState[key] = {};
+        if (!dchkFillState[key][itemId]) dchkFillState[key][itemId] = { status: 'pending', value: '', remarks: '', photos: [] };
+        if (!dchkFillState[key][itemId].photos) dchkFillState[key][itemId].photos = [];
+        dchkFillState[key][itemId].photos.push(photoObj);
+
+        var draftKey = 'hms_dchk_draft_' + key;
+        try { localStorage.setItem(draftKey, JSON.stringify(dchkFillState[key])); } catch(e) {}
+
+        if (typeof APP !== 'undefined') APP.notify('Photo attached ✓', 'success');
+        dchkRenderFill();
+    } catch (err) {
+        console.error('[HMS Photo] Upload error:', err);
+        if (typeof APP !== 'undefined') APP.notify('Failed to attach photo: ' + err.message, 'error');
+    }
+}
+
+function dchkRemovePhoto(key, itemId, photoIdx) {
+    if (dchkFillState[key] && dchkFillState[key][itemId] && dchkFillState[key][itemId].photos) {
+        dchkFillState[key][itemId].photos.splice(photoIdx, 1);
+        var draftKey = 'hms_dchk_draft_' + key;
+        try { localStorage.setItem(draftKey, JSON.stringify(dchkFillState[key])); } catch(e) {}
+        dchkRenderFill();
     }
 }
 
@@ -678,6 +724,7 @@ function dchkSubmitFill(assignmentId) {
             entry.results[resKey].status = s.status || 'pending';
             entry.results[resKey].value = s.value !== undefined ? s.value : '';
             entry.results[resKey].remarks = s.remarks || '';
+            entry.results[resKey].photos = Array.isArray(s.photos) ? s.photos : [];
         }
     });
     const submitResult = CHECKLISTS.submitAssignmentEntry(user, entry);
@@ -878,8 +925,9 @@ function dchkViewEntryDetail(id) {
                         <tr>
                             <th>Checklist Item</th>
                             <th>Status</th>
-                            <th>Value / Value Specified</th>
+                            <th>Value / Reading</th>
                             <th>Remarks</th>
+                            <th>Photos</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -888,12 +936,20 @@ function dchkViewEntryDetail(id) {
                             const res = results[key] || results[it.itemId] || results[it.id] || {};
                             const st = res.status || 'pending';
                             const badgeCls = st === 'ok' ? 'badge-success' : (st === 'fault' ? 'badge-danger' : (st === 'report' ? 'badge-warning' : 'badge-secondary'));
+                            const resPhotos = res.photos || [];
                             return `
                                 <tr>
                                     <td><strong>${it.label || it.name || key}</strong> ${it.unit ? '<span style="font-size:11px;color:var(--gray);">[' + it.unit + ']</span>' : ''}</td>
                                     <td><span class="badge ${badgeCls}">${st.toUpperCase()}</span></td>
                                     <td>${res.value !== undefined && res.value !== '' ? res.value + (it.unit ? ' ' + it.unit : '') : '-'}</td>
                                     <td>${res.remarks || '-'}</td>
+                                    <td>
+                                        ${resPhotos.length === 0 ? '<span style="color:var(--gray);font-size:12px;">No photo</span>' : `
+                                            <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
+                                                ${resPhotos.map(p => `<img src="${p.url}" onclick="openImageModal('${p.url.replace(/'/g, "\\'")}', '${(it.label || '').replace(/'/g, "\\'")}')" style="width:42px;height:42px;object-fit:cover;border-radius:4px;cursor:pointer;border:1px solid var(--border);" title="Click to view full photo">`).join('')}
+                                            </div>
+                                        `}
+                                    </td>
                                 </tr>
                             `;
                         }).join('')}

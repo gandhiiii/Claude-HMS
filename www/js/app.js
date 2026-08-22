@@ -538,3 +538,40 @@ function deptDropdown(name, selected) {
         depts.map(d => '<option value="' + d.name + '" ' + (selected === d.name ? 'selected' : '') + '>' + d.name + '</option>').join('') +
         '</select>';
 }
+
+/**
+ * Universal Image Lightbox Modal
+ * Opens a full-resolution modal preview for uploaded photos.
+ */
+function openImageModal(src, title) {
+    if (!src) return;
+    title = title || 'Checklist Photograph';
+    var modalId = 'hmsImageLightboxModal';
+    var existing = document.getElementById(modalId);
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = modalId;
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;backdrop-filter:blur(4px);';
+
+    overlay.innerHTML = `
+        <div style="position:relative;max-width:90vw;max-height:85vh;display:flex;flex-direction:column;align-items:center;">
+            <div style="width:100%;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;color:#fff;">
+                <span style="font-size:14px;font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,0.5);">${title}</span>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <a href="${src}" download="checklist-photo.jpg" target="_blank" class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:#fff;border:none;padding:4px 10px;border-radius:4px;text-decoration:none;font-size:12px;">⬇️ Download</a>
+                    <button type="button" onclick="document.getElementById('${modalId}').remove()" style="background:rgba(255,255,255,0.25);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer;line-height:1;">✕</button>
+                </div>
+            </div>
+            <img src="${src}" alt="${title}" style="max-width:100%;max-height:78vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.1);">
+        </div>
+    `;
+
+    overlay.onclick = function (e) {
+        if (e.target === overlay) overlay.remove();
+    };
+
+    document.body.appendChild(overlay);
+}
+window.openImageModal = openImageModal;
+

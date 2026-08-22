@@ -1025,6 +1025,38 @@ function _renderEmpChecklists(checklists) {
     }
 }
 
+async function empHandlePhotoUpload(asgnId, itemId, input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    if (typeof APP !== 'undefined') APP.notify('Compressing & uploading photo...', 'info');
+    try {
+        var photoObj = await window.uploadChecklistPhoto(file, { subfolder: 'checklists/' + asgnId });
+        if (!window._empClAsgnState) window._empClAsgnState = {};
+        if (!window._empClAsgnState[asgnId]) window._empClAsgnState[asgnId] = {};
+        if (!window._empClAsgnState[asgnId][itemId]) window._empClAsgnState[asgnId][itemId] = { status: 'pending', value: '', remarks: '', photos: [] };
+        if (!window._empClAsgnState[asgnId][itemId].photos) window._empClAsgnState[asgnId][itemId].photos = [];
+        window._empClAsgnState[asgnId][itemId].photos.push(photoObj);
+
+        var draftKey = 'hms_draft_asgn_' + asgnId;
+        try { localStorage.setItem(draftKey, JSON.stringify(window._empClAsgnState[asgnId])); } catch(e) {}
+
+        if (typeof APP !== 'undefined') APP.notify('Photo attached ✓', 'success');
+        _renderEmpChecklists(window._empChecklists || []);
+    } catch (err) {
+        console.error('[HMS Photo] Upload error:', err);
+        if (typeof APP !== 'undefined') APP.notify('Failed to attach photo: ' + err.message, 'error');
+    }
+}
+
+function empRemovePhoto(asgnId, itemId, photoIdx) {
+    if (window._empClAsgnState && window._empClAsgnState[asgnId] && window._empClAsgnState[asgnId][itemId] && window._empClAsgnState[asgnId][itemId].photos) {
+        window._empClAsgnState[asgnId][itemId].photos.splice(photoIdx, 1);
+        var draftKey = 'hms_draft_asgn_' + asgnId;
+        try { localStorage.setItem(draftKey, JSON.stringify(window._empClAsgnState[asgnId])); } catch(e) {}
+        _renderEmpChecklists(window._empChecklists || []);
+    }
+}
+
 function empSubmitDeptAsgn(assignmentId) {
     if (!window.CHECKLISTS) return;
     var user = AUTH.currentUser();

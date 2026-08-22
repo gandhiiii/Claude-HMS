@@ -51,11 +51,11 @@
 
         // --- per‑department get / set ---
         get: function (deptKey) {
-            var raw = localStorage.getItem(this.dbKey(deptKey));
+            var raw = localStorage.getItem(this._db(deptKey));
             return raw ? JSON.parse(raw) : [];
         },
         set: function (deptKey, arr) {
-            localStorage.setItem(this.dbKey(deptKey), JSON.stringify(arr));
+            localStorage.setItem(this._db(deptKey), JSON.stringify(arr));
             this._emit(deptKey, "set", arr);
         },
 
@@ -289,33 +289,85 @@
         if (!container) return;
 
         if (!list.length) {
-            container.innerHTML = "<p>No discount requests for " + _.deptName(deptKey) + ".</p>";
+            container.innerHTML = "<p style='color:var(--gray);font-size:14px;padding:16px;text-align:center;'>No discount requests for " + _.deptName(deptKey) + ".</p>";
             return;
         }
 
-        var html = "<ul>";
+        var html = "<div class='table-responsive'><table><thead><tr>"
+            + "<th>Code</th><th>Patient</th><th>Amount</th><th>Discount</th><th>Payable</th><th>Requested By</th><th>Status</th>"
+            + "</tr></thead><tbody>";
         for (var i = 0; i < list.length; i++) {
             var r = list[i];
-            var statusBadge = "pending"; // simplified – you can map status → badge later
-            html += "<li>",
-                "   <strong>" + (r.requestCode || "—") + "</strong> – " + (r.patientName || "—"),
-                "   <span style='font-size:0.8em;color:gray;'>by " + (r.requestedByName || "") + "</span>",
-                "   <span style='margin-left:12px;'>Status: " + statusBadge + "</span>",
-                "</li>";
+            var statusBadge = "<span class='badge badge-warning'>" + (r.status || "PENDING") + "</span>";
+            html += "<tr>"
+                + "<td><strong>" + (r.requestCode || "—") + "</strong></td>"
+                + "<td>" + (r.patientName || "—") + "</td>"
+                + "<td>₹" + (r.totalBillAmount || 0) + "</td>"
+                + "<td>₹" + (r.calculatedDiscountAmount || 0) + " (" + (r.requestedDiscountVal || 0) + (r.requestedDiscountType === 'PERCENTAGE' ? '%' : '₹') + ")</td>"
+                + "<td>₹" + (r.finalPayableAmount || 0) + "</td>"
+                + "<td>" + (r.requestedByName || r.requestedBy || "—") + "</td>"
+                + "<td>" + statusBadge + "</td>"
+                + "</tr>";
         }
-        html += "</ul>";
+        html += "</tbody></table></div>";
         container.innerHTML = html;
+    };
+
+    // Main module renderer called by Router.navigate('discounts')
+    global.renderDiscounts = function (container) {
+        if (!container) return;
+        container.innerHTML = 
+            '<div class="card">'
+            + '<div class="flex-between mb-4">'
+            + '  <div>'
+            + '    <h2 style="margin:0;font-size:20px;font-weight:700;">🏷️ Discount Permission System</h2>'
+            + '    <p style="font-size:13px;color:var(--gray);margin:4px 0 0 0;">Manage and approve department discount requests across Admission, Accounting, Radiology, and Reception</p>'
+            + '  </div>'
+            + '  <div style="display:flex;gap:8px;">'
+            + '    <button class="btn btn-primary btn-sm" onclick="showReceptionDiscountForm()">+ New Request</button>'
+            + '  </div>'
+            + '</div>'
+            + '<div class="tab-container" style="display:flex;gap:8px;border-bottom:1px solid var(--border-color);margin-bottom:16px;">'
+            + '  <button class="tab-btn active" onclick="switchDiscountTab(\'admission\', this)">Admission</button>'
+            + '  <button class="tab-btn" onclick="switchDiscountTab(\'account\', this)">Accounting</button>'
+            + '  <button class="tab-btn" onclick="switchDiscountTab(\'radiology\', this)">Radiology</button>'
+            + '  <button class="tab-btn" onclick="switchDiscountTab(\'reception\', this)">Reception</button>'
+            + '</div>'
+            + '<div id="discountList_admission"></div>'
+            + '<div id="discountList_account" style="display:none;"></div>'
+            + '<div id="discountList_radiology" style="display:none;"></div>'
+            + '<div id="discountList_reception" style="display:none;"></div>'
+            + '</div>';
+
+        global.switchDiscountTab = function(deptKey, btnEl) {
+            ['admission', 'account', 'radiology', 'reception'].forEach(function(dk) {
+                var el = document.getElementById('discountList_' + dk);
+                if (el) el.style.display = (dk === deptKey) ? 'block' : 'none';
+            });
+            if (btnEl && btnEl.parentElement) {
+                var btns = btnEl.parentElement.querySelectorAll('.tab-btn');
+                btns.forEach(function(b) { b.classList.remove('active'); });
+                btnEl.classList.add('active');
+            }
+            global.renderDiscountList(deptKey);
+        };
+
+        global.renderDiscountList('admission');
+        global.renderDiscountList('account');
+        global.renderDiscountList('radiology');
+        global.renderDiscountList('reception');
     };
 
     // -------------------------------------------------------------
     // 7.  Initialisation – run once when the page loads
     // -------------------------------------------------------------
-    // (a) Make sure the global `user` object exists – your auth code should set it.
-    // (b) Render the four department lists immediately so the UI is populated.
-    for (var dk in DEPARTMENTS) {
-        // initial render (will show empty state until requests are created)
-        global.renderDiscountList(dk);
-    }
+    try {
+        for (var dk in DEPARTMENTS) {
+            if (document.getElementById("discountList_" + dk)) {
+                global.renderDiscountList(dk);
+            }
+        }
+    } catch(e) {}
 
     // (c) Expose a couple of tiny helpers for the console / dev tools
     global.DISCOUNT_MODULE = {

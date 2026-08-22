@@ -385,7 +385,7 @@
             results: {}
         };
         entry.items.forEach(function (it) {
-            entry.results[it.id] = { checked: false, remarks: '' };
+            entry.results[it.id] = { checked: false, remarks: '', photos: [] };
         });
         return ok({ entry: entry });
     }
@@ -398,6 +398,7 @@
         var r = entry.results[itemId];
         if (patch.checked !== undefined) r.checked = !!patch.checked;
         if (patch.remarks !== undefined) r.remarks = String(patch.remarks);
+        if (patch.photos !== undefined) r.photos = Array.isArray(patch.photos) ? patch.photos : [];
         return ok({ entry: entry });
     }
 
@@ -629,7 +630,7 @@
         };
         entry.items.forEach(function (it) {
             var k = it.itemId || it.id;
-            entry.results[k] = { status: 'pending', value: '', remarks: '' };
+            entry.results[k] = { status: 'pending', value: '', remarks: '', photos: [] };
         });
         return ok({ entry: entry });
     }
