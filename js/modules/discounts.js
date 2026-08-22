@@ -169,6 +169,8 @@
         // 2️⃣ Compute discount figures
         var calc = _.calcDiscount(formData.discountType, formData.discountValue, formData.totalBillAmount);
 
+        var routing = resolveApprovalRouting(calc.disc, formData.isBypass);
+
         // 3️⃣ Build the request object
         var now = new Date().toISOString();
         var request = {
@@ -199,23 +201,25 @@
             requestedBy: global.user ? global.user.username : "anonymous",
             requestedByName: global.user ? (global.user.fullName || global.user.name || "") : "",
             requestedByRole: global.user ? global.user.role : "",
-            requiredAuthorityRole: ALLOWED_CREATION_ROLES[0], // will be resolved by the role‑check above
-            currentApproverRole: ALLOWED_CREATION_ROLES[0],
-            status: "PENDING_BMGR",           // first‑step status
-            isDirectExecutiveGrant: false,
-            approverComments: "",
-            approvedBy: "",
-            approvalTimestamp: null,
+            requiredAuthorityRole: routing.requiredRole,
+            currentApproverRole: routing.requiredRole,
+            status: routing.status,
+            isDirectExecutiveGrant: !!formData.isBypass,
+            approverComments: formData.isBypass ? "Approved via Executive Direct Grant" : "",
+            approvedBy: formData.isBypass ? (global.user ? (global.user.fullName || global.user.username) : "Executive Admin") : "",
+            approvalTimestamp: formData.isBypass ? now : null,
             createdAt: now,
             approvalChain: [
                 {
                     step: 1,
-                    title: "Discount Asked at Billing Desk",
+                    title: formData.isBypass ? "Direct Executive Grant Approval (Bypassed)" : "Discount Asked at Billing Desk",
                     actor: (global.user ? global.user.fullName + " (" + global.user.role + ")" : "Anonymous"),
                     actorUsername: global.user ? global.user.username : "anonymous",
                     role: global.user ? global.user.role : "",
-                    action: "SUBMITTED",
-                    comments: "Discount of " + (calc.pct).toFixed(1) + "% (" + global.currency(calc.disc) + ") requested during billing payment.",
+                    action: formData.isBypass ? "APPROVED_BYPASS" : "SUBMITTED",
+                    comments: formData.isBypass 
+                        ? "Bypassed Approval Matrix — Direct Waiver Granted: ₹" + calc.disc.toLocaleString('en-IN')
+                        : "Discount of " + (calc.pct).toFixed(1) + "% (₹" + calc.disc.toLocaleString('en-IN') + ") routed to " + routing.requiredRoleLabel,
                     timestamp: now
                 }
             ]
@@ -236,6 +240,129 @@
         global.renderDiscountList(key);
 
         return request;
+    };
+
+    // -------------------------------------------------------------
+    // Approval Procedure Matrix Configurator (Admin Only to Edit)
+    // -------------------------------------------------------------
+    function getApprovalMatrix() {
+        var matrix = DB.get('approvalMatrix');
+        if (!matrix || typeof matrix !== 'object' || !matrix.tier1Limit) {
+            matrix = {
+                tier1Limit: 25000,
+                tier2Limit: 200000,
+                tier1Role: 'BILLING_MANAGER',
+                tier1Label: 'Finance Manager',
+                tier2Role: 'CFO',
+                tier2Label: 'CFO',
+                tier3Role: 'MD',
+                tier3Label: 'Director'
+            };
+            DB.set('approvalMatrix', matrix);
+        }
+        return matrix;
+    }
+
+    global.editApprovalMatrixPrompt = function() {
+        var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
+        var isAdmin = !user || user.isSuperAdmin || ['admin', 'superadmin', 'md', 'director', 'chairman', 'executive'].indexOf(String(user.role || '').toLowerCase()) !== -1;
+        if (!isAdmin) {
+            if (global.APP && global.APP.notify) global.APP.notify('Only System Administrators can modify the Approval Procedure Matrix amounts.', 'error');
+            else alert('Only System Administrators can modify the Approval Procedure Matrix amounts.');
+            return;
+        }
+
+        var matrix = getApprovalMatrix();
+        var t1 = prompt('Enter Tier 1 Max Amount (Up to Finance Manager, current: ₹' + matrix.tier1Limit + '):', matrix.tier1Limit);
+        if (t1 === null) return;
+        var t1Num = Number(t1);
+        if (isNaN(t1Num) || t1Num <= 0) { alert('Invalid Tier 1 amount'); return; }
+
+        var t2 = prompt('Enter Tier 2 Max Amount (Above Tier 1 up to CFO, current: ₹' + matrix.tier2Limit + '):', matrix.tier2Limit);
+        if (t2 === null) return;
+        var t2Num = Number(t2);
+        if (isNaN(t2Num) || t2Num <= t1Num) { alert('Tier 2 amount must be greater than Tier 1 amount'); return; }
+
+        matrix.tier1Limit = t1Num;
+        matrix.tier2Limit = t2Num;
+        DB.set('approvalMatrix', matrix);
+        if (global.APP && global.APP.notify) global.APP.notify('Approval Matrix amounts updated successfully!', 'success');
+        if (typeof global.renderDiscounts === 'function') {
+            var container = document.getElementById('pageContent') || document.querySelector('.page-content');
+            if (container) global.renderDiscounts(container);
+        }
+    };
+
+    function resolveApprovalRouting(discountAmount, isBypass) {
+        var matrix = getApprovalMatrix();
+        var disc = Number(discountAmount) || 0;
+
+        if (isBypass) {
+            return {
+                requiredRole: 'ADMIN_BYPASS',
+                requiredRoleLabel: 'Direct Executive Grant (Bypassed)',
+                status: 'APPROVED',
+                statusLabel: 'APPROVED (Direct Grant)'
+            };
+        }
+
+        if (disc <= matrix.tier1Limit) {
+            return {
+                requiredRole: matrix.tier1Role,
+                requiredRoleLabel: matrix.tier1Label,
+                status: 'PENDING_BMGR',
+                statusLabel: 'PENDING (Finance Manager)'
+            };
+        } else if (disc <= matrix.tier2Limit) {
+            return {
+                requiredRole: matrix.tier2Role,
+                requiredRoleLabel: matrix.tier2Label,
+                status: 'PENDING_CFO',
+                statusLabel: 'PENDING (CFO)'
+            };
+        } else {
+            return {
+                requiredRole: matrix.tier3Role,
+                requiredRoleLabel: matrix.tier3Label,
+                status: 'PENDING_MD',
+                statusLabel: 'PENDING (Director)'
+            };
+        }
+    }
+
+    global.bypassApproveDiscountRequest = function(deptKey, reqId) {
+        var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
+        var isAdmin = !user || user.isSuperAdmin || ['admin', 'superadmin', 'md', 'director', 'chairman', 'executive', 'cfo'].indexOf(String(user.role || '').toLowerCase()) !== -1;
+        if (!isAdmin) {
+            if (global.APP && global.APP.notify) global.APP.notify('Only Admin or Executive Board can bypass approval matrix.', 'error');
+            else alert('Only Admin or Executive Board can bypass approval matrix.');
+            return;
+        }
+
+        if (!confirm('Are you sure you want to BYPASS approval matrix and approve this discount request immediately?')) return;
+
+        var list = DB.get(deptKey) || [];
+        var req = list.find(function(r){ return r.id === reqId; });
+        if (req) {
+            var now = new Date().toISOString();
+            req.status = 'APPROVED';
+            req.isDirectExecutiveGrant = true;
+            req.approvedBy = user ? (user.fullName || user.username) : 'System Admin';
+            req.approvalTimestamp = now;
+            req.approverComments = 'Approved via Direct Executive Bypass';
+            if (!req.approvalChain) req.approvalChain = [];
+            req.approvalChain.push({
+                step: req.approvalChain.length + 1,
+                title: 'Executive Bypass Approval',
+                actor: user ? (user.fullName || user.username) : 'System Admin',
+                action: 'APPROVED_BYPASS',
+                comments: 'Direct Approval Grant (Bypassed Matrix)',
+                timestamp: now
+            });
+            DB.set(deptKey, list);
+            if (global.APP && global.APP.notify) global.APP.notify('Request ' + req.requestCode + ' approved via Executive Bypass!', 'success');
+            global.renderDiscountList(deptKey);
+        }
     };
 
     // -------------------------------------------------------------
@@ -507,6 +634,13 @@
             '  <label style="font-weight:600;margin-bottom:4px;display:block;">Detailed Reason for Concession *</label>',
             '  <textarea name="detailedReason" class="form-control" rows="3" placeholder="Enter reason for discount request..." required></textarea>',
             '</div>',
+            '<div class="form-group mb-3" style="background:#fff3e0;border:1px solid #ffe0b2;padding:10px 12px;border-radius:8px;">',
+            '  <label style="display:flex;align-items:center;gap:8px;font-weight:700;color:#e65100;cursor:pointer;margin:0;font-size:13px;">',
+            '    <input type="checkbox" name="isBypass" style="width:16px;height:16px;accent-color:#e65100;">',
+            '    <span>⚡ Bypass Approval Matrix (Direct Executive Grant)</span>',
+            '  </label>',
+            '  <small style="display:block;color:#bf360c;margin-top:2px;font-size:11px;">Directly approves the request immediately without routing delays (Admin & Executive privilege).</small>',
+            '</div>',
             '</form>'
         ].join("");
 
@@ -525,6 +659,7 @@
         var discType    = (form.querySelector('[name="discountType"]').value || 'PERCENTAGE');
         var discVal     = (form.querySelector('[name="discountValue"]').value || '').trim();
         var reason      = (form.querySelector('[name="detailedReason"]').value || '').trim();
+        var isBypass    = form.querySelector('[name="isBypass"]') ? form.querySelector('[name="isBypass"]').checked : false;
 
         if (!patientId || !patientName || !totalBill || !discVal || !reason) {
             if (global.APP && global.APP.notify) global.APP.notify('Please fill out all required fields.', 'error');
@@ -540,7 +675,8 @@
             totalBillAmount: Number(totalBill),
             discountType: discType,
             discountValue: Number(discVal),
-            detailedReason: reason
+            detailedReason: reason,
+            isBypass: isBypass
         };
 
         global.createDiscount("reception", formData);
@@ -560,12 +696,28 @@
             return;
         }
 
+        var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
+        var isAdmin = !user || user.isSuperAdmin || ['admin', 'superadmin', 'md', 'director', 'chairman', 'executive', 'cfo'].indexOf(String(user.role || '').toLowerCase()) !== -1;
+
         var html = "<div class='table-responsive'><table class='table' style='width:100%;font-size:13px;border-collapse:collapse;'><thead><tr style='background:var(--light-gray);'>"
-            + "<th style='padding:10px;'>Code</th><th style='padding:10px;'>Patient ID</th><th style='padding:10px;'>Patient Name</th><th style='padding:10px;'>Service</th><th style='padding:10px;'>Doctor Name</th><th style='padding:10px;'>Total Bill</th><th style='padding:10px;'>Discount</th><th style='padding:10px;'>Payable</th><th style='padding:10px;'>Requested By</th><th style='padding:10px;text-align:center;'>Status</th>"
+            + "<th style='padding:10px;'>Code</th><th style='padding:10px;'>Patient ID</th><th style='padding:10px;'>Patient Name</th><th style='padding:10px;'>Service</th><th style='padding:10px;'>Doctor Name</th><th style='padding:10px;'>Total Bill</th><th style='padding:10px;'>Discount</th><th style='padding:10px;'>Payable</th><th style='padding:10px;'>Requested By</th><th style='padding:10px;text-align:center;'>Status</th><th style='padding:10px;text-align:center;'>Actions</th>"
             + "</tr></thead><tbody>";
         for (var i = 0; i < list.length; i++) {
             var r = list[i];
-            var statusBadge = "<span class='badge badge-warning'>" + (r.status || "PENDING") + "</span>";
+            var isApproved = r.status === 'APPROVED';
+            var statusBadge = isApproved 
+                ? "<span class='badge badge-success' style='background:#2e7d32;color:#fff;'>APPROVED" + (r.isDirectExecutiveGrant ? " (Grant)" : "") + "</span>" 
+                : "<span class='badge badge-warning'>" + (r.status || "PENDING") + "</span>";
+
+            var actionBtns = "";
+            if (!isApproved && isAdmin) {
+                actionBtns = "<button type='button' class='btn btn-sm btn-outline' style='font-size:11px;padding:3px 8px;color:#e65100;border-color:#ffe0b2;' onclick='bypassApproveDiscountRequest(\"" + deptKey + "\", \"" + r.id + "\")'>⚡ Bypass & Approve</button>";
+            } else if (isApproved) {
+                actionBtns = "<span style='color:var(--success);font-weight:bold;font-size:11px;'>✓ Approved</span>";
+            } else {
+                actionBtns = "<span style='color:var(--gray);font-size:11px;'>In Routing</span>";
+            }
+
             html += "<tr style='border-bottom:1px solid var(--border);'>"
                 + "<td style='padding:10px;'><strong>" + (r.requestCode || "—") + "</strong></td>"
                 + "<td style='padding:10px;'><span class='badge badge-info' style='font-size:11px;'>" + (r.patientId || "—") + "</span></td>"
@@ -577,6 +729,7 @@
                 + "<td style='padding:10px;font-weight:700;color:var(--success);'>₹" + (r.finalPayableAmount || 0).toLocaleString('en-IN') + "</td>"
                 + "<td style='padding:10px;color:var(--gray);'>" + (r.requestedByName || r.requestedBy || "—") + "</td>"
                 + "<td style='padding:10px;text-align:center;'>" + statusBadge + "</td>"
+                + "<td style='padding:10px;text-align:center;'>" + actionBtns + "</td>"
                 + "</tr>";
         }
         html += "</tbody></table></div>";
@@ -588,6 +741,8 @@
         if (!container) return;
         var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
         var canAddDoc = canManageDoctors(user);
+        var matrix = getApprovalMatrix();
+        var isAdmin = !user || user.isSuperAdmin || ['admin', 'superadmin', 'md', 'director', 'chairman', 'executive'].indexOf(String(user.role || '').toLowerCase()) !== -1;
 
         container.innerHTML = 
             '<div class="card">'
@@ -602,6 +757,32 @@
             + '    <button class="btn btn-primary btn-sm" onclick="showReceptionDiscountForm()">+ New Request</button>'
             + '  </div>'
             + '</div>'
+
+            // Approval Procedure Matrix Card
+            + '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">'
+            + '  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'
+            + '    <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">⚖️ Approval Procedure - All Department <small style="font-weight:normal;color:var(--gray);">(Amount-Based Routing & Matrix)</small></div>'
+            + (isAdmin ? '    <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;" onclick="editApprovalMatrixPrompt()">✏️ Change Amounts (Admin Only)</button>' : '')
+            + '  </div>'
+            + '  <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:8px;font-size:12px;">'
+            + '    <div style="background:var(--white,#fff);border:1px solid var(--border);padding:8px 12px;border-radius:8px;">'
+            + '      <span style="color:var(--gray);display:block;font-size:11px;font-weight:600;">Tier 1 Approval</span>'
+            + '      <strong style="color:var(--primary);font-size:13px;">Up to ₹' + (matrix.tier1Limit || 25000).toLocaleString('en-IN') + '/-</strong>'
+            + '      <span style="display:block;color:var(--dark);font-size:11px;">Trf to Finance Manager</span>'
+            + '    </div>'
+            + '    <div style="background:var(--white,#fff);border:1px solid var(--border);padding:8px 12px;border-radius:8px;">'
+            + '      <span style="color:var(--gray);display:block;font-size:11px;font-weight:600;">Tier 2 Approval</span>'
+            + '      <strong style="color:#ed6c02;font-size:13px;">Above ₹' + (matrix.tier1Limit || 25000).toLocaleString('en-IN') + '/- - ₹' + (matrix.tier2Limit || 200000).toLocaleString('en-IN') + '/-</strong>'
+            + '      <span style="display:block;color:var(--dark);font-size:11px;">Trf to CFO</span>'
+            + '    </div>'
+            + '    <div style="background:var(--white,#fff);border:1px solid var(--border);padding:8px 12px;border-radius:8px;">'
+            + '      <span style="color:var(--gray);display:block;font-size:11px;font-weight:600;">Tier 3 Approval</span>'
+            + '      <strong style="color:#d32f2f;font-size:13px;">Above ₹' + (matrix.tier2Limit || 200000).toLocaleString('en-IN') + '/-</strong>'
+            + '      <span style="display:block;color:var(--dark);font-size:11px;">Trf to Director</span>'
+            + '    </div>'
+            + '  </div>'
+            + '</div>'
+
             + (canAddDoc ? 
                 '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">'
                 + '  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
