@@ -665,6 +665,128 @@ function renderEmpOverview(el) {
             + ' &nbsp;<button class="btn btn-sm btn-danger" onclick="empTabSwitch(\'work\')">' + T('empd2_btn_view_all') + '</button></div>';
     }
 
+    // Role-based Accounts Department Work Summary & Activity Stream
+    var deptNorm = (d.dept || d.user.department || '').trim().toLowerCase();
+    var isAccountGrp = ['account', 'accounts', 'finance', 'billing', 'accounts & finance', 'billing & accounts'].some(function(x){ return deptNorm.indexOf(x) !== -1; });
+
+    if (isAccountGrp) {
+        var uName = d.user.username || '';
+        var fName = d.user.fullName || uName;
+
+        // Query user's own purchases & expenses
+        var myPurchases = (DB.get('hodPurchases') || []).filter(function(p) {
+            return p && (p.username === uName || p.createdBy === uName || p.requestedBy === uName || p.employeeName === fName || p.submittedBy === uName);
+        });
+        var totalPurchaseSum = myPurchases.reduce(function(sum, p) { return sum + (parseFloat(p.amount || p.totalAmount || p.price || 0) || 0); }, 0);
+
+        // Query user's own discount requests
+        var myDiscounts = (DB.get('discountRequests') || []).filter(function(r) {
+            return r && (r.requestedBy === uName || r.createdBy === uName || r.endorsedBy === uName || r.username === uName || r.patientName);
+        });
+
+        var myClDone = d.myChecklists.filter(function(c) { return c.status === 'completed'; });
+        var myTasksDone = d.myTasks.filter(function(t) { return t.status === 'completed'; });
+        var myReports = (DB.get('reports') || []).filter(function(r) { return r && (r.submittedBy === uName || r.createdBy === uName || r.username === uName); });
+
+        html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:18px;">'
+            + '<div style="font-weight:700;font-size:16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">'
+            + '<span>💳 Accounts & Finance - My Work Dashboard</span>'
+            + '<span class="badge badge-info" style="font-size:12px;">' + (d.user.role || 'Accounts Staff').toUpperCase() + '</span>'
+            + '</div>'
+            + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px;">'
+            + '<div style="background:var(--primary-light,#e0e7ff);padding:12px;border-radius:10px;text-align:center;">'
+            + '<div style="font-size:11px;color:var(--gray);font-weight:600;">MY LOGGED EXPENSES</div>'
+            + '<div style="font-size:20px;font-weight:800;color:var(--primary);margin-top:2px;">₹' + totalPurchaseSum.toLocaleString('en-IN') + '</div>'
+            + '<div style="font-size:11px;color:var(--gray);">' + myPurchases.length + ' purchase entry(ies)</div>'
+            + '</div>'
+            + '<div style="background:#fff3e0;padding:12px;border-radius:10px;text-align:center;">'
+            + '<div style="font-size:11px;color:var(--gray);font-weight:600;">DISCOUNT REQUESTS</div>'
+            + '<div style="font-size:20px;font-weight:800;color:#e65100;margin-top:2px;">' + myDiscounts.length + '</div>'
+            + '<div style="font-size:11px;color:var(--gray);">' + myDiscounts.filter(function(r){return r.status==='approved';}).length + ' approved</div>'
+            + '</div>'
+            + '<div style="background:#e8f5e9;padding:12px;border-radius:10px;text-align:center;">'
+            + '<div style="font-size:11px;color:var(--gray);font-weight:600;">AUDIT CHECKLISTS</div>'
+            + '<div style="font-size:20px;font-weight:800;color:var(--success);margin-top:2px;">' + myClDone.length + '</div>'
+            + '<div style="font-size:11px;color:var(--gray);">' + d.myChecklists.length + ' total assigned</div>'
+            + '</div>'
+            + '<div style="background:#f3e5f5;padding:12px;border-radius:10px;text-align:center;">'
+            + '<div style="font-size:11px;color:var(--gray);font-weight:600;">TASKS & REPORTS</div>'
+            + '<div style="font-size:20px;font-weight:800;color:#6a1b9a;margin-top:2px;">' + (myTasksDone.length + myReports.length) + '</div>'
+            + '<div style="font-size:11px;color:var(--gray);">' + tasksPending.length + ' pending task(s)</div>'
+            + '</div>'
+            + '</div>';
+
+        // Work feed log
+        var myWorkFeed = [];
+        myPurchases.forEach(function(p) {
+            myWorkFeed.push({
+                type: '💰 Purchase/Expense',
+                title: p.title || p.itemName || p.item || 'Purchase Expense',
+                amount: p.amount ? '₹' + parseFloat(p.amount).toLocaleString('en-IN') : '',
+                date: p.createdAt || p.date || '',
+                status: p.status || 'completed'
+            });
+        });
+        myDiscounts.forEach(function(r) {
+            myWorkFeed.push({
+                type: '🏷️ Discount Request',
+                title: (r.patientName ? r.patientName + ' - ' : '') + (r.reason || 'Discount Request'),
+                amount: r.amount ? '₹' + parseFloat(r.amount).toLocaleString('en-IN') : (r.discountPct ? r.discountPct + '%' : ''),
+                date: r.createdAt || r.date || '',
+                status: r.status || 'pending'
+            });
+        });
+        d.myChecklists.forEach(function(c) {
+            myWorkFeed.push({
+                type: '📑 Audit Checklist',
+                title: c.title || 'Account Audit Checklist',
+                amount: c.status === 'completed' ? '100% OK' : 'In Progress',
+                date: c.createdAt || c.updatedAt || '',
+                status: c.status || 'active'
+            });
+        });
+        myReports.forEach(function(rp) {
+            myWorkFeed.push({
+                type: '📈 Work Report',
+                title: rp.title || rp.reportTitle || 'Account Work Submission',
+                amount: '',
+                date: rp.createdAt || rp.date || '',
+                status: rp.status || 'submitted'
+            });
+        });
+
+        myWorkFeed.sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); });
+
+        html += '<div style="font-weight:700;font-size:14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
+            + '<span>📝 Work Done By Me (' + myWorkFeed.length + ' items)</span>'
+            + '<button class="btn btn-sm btn-primary" onclick="empTabSwitch(\'purchases\')">+ Record Purchase / Expense</button>'
+            + '</div>';
+
+        if (myWorkFeed.length === 0) {
+            html += '<div style="text-align:center;padding:20px;color:var(--gray);background:var(--light-gray);border-radius:8px;margin-bottom:14px;">'
+                + '<div>📋 No activity entries recorded yet for your account.</div>'
+                + '<div style="font-size:12px;margin-top:4px;">Use the tabs above to record purchases, submit reports, or complete audit checklists.</div>'
+                + '</div>';
+        } else {
+            html += '<div class="table-responsive mb-3" style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:14px;"><table class="table" style="width:100%;font-size:13px;border-collapse:collapse;">'
+                + '<thead><tr style="background:var(--light-gray);text-align:left;position:sticky;top:0;">'
+                + '<th style="padding:8px 10px;">Type</th><th style="padding:8px 10px;">Description / Title</th><th style="padding:8px 10px;">Value</th><th style="padding:8px 10px;">Date</th><th style="padding:8px 10px;text-align:center;">Status</th>'
+                + '</tr></thead><tbody>';
+            myWorkFeed.slice(0, 10).forEach(function(item) {
+                var stBadge = item.status === 'approved' || item.status === 'completed' ? 'badge-success' : item.status === 'pending' ? 'badge-warning' : 'badge-info';
+                html += '<tr style="border-bottom:1px solid var(--border);">'
+                    + '<td style="padding:8px 10px;font-weight:600;">' + item.type + '</td>'
+                    + '<td style="padding:8px 10px;">' + item.title + '</td>'
+                    + '<td style="padding:8px 10px;font-weight:700;color:var(--primary);">' + (item.amount || '-') + '</td>'
+                    + '<td style="padding:8px 10px;color:var(--gray);">' + (item.date ? APP.formatDate(item.date) : '-') + '</td>'
+                    + '<td style="padding:8px 10px;text-align:center;"><span class="badge ' + stBadge + '">' + item.status + '</span></td>'
+                    + '</tr>';
+            });
+            html += '</tbody></table></div>';
+        }
+        html += '</div>';
+    }
+
     // Today's focus
     html += '<div style="margin-bottom:18px;">'
         + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">🎯 ' + T('empd2_todays_focus') + '</div>';
