@@ -288,8 +288,7 @@ function renderEmployeeDashboard(container, initialTab) {
     var isDoctorGrp    = ['doctor', 'doctors', 'medical', 'consultant', 'physician', 'surgeon'].some(function(x){ return dNorm.indexOf(x) !== -1; });
     var isPharmacyGrp  = ['pharmacy', 'chemist', 'drug store'].some(function(x){ return dNorm.indexOf(x) !== -1; });
     var isStoreGrp     = ['store', 'stores', 'inventory', 'warehouse'].some(function(x){ return dNorm.indexOf(x) !== -1; });
-    var isItGrp        = ['it', 'computer', 'computers', 'biomedical', 'software'].some(function(x){ return dNorm.indexOf(x) !== -1; });
-    var isFacilityGrp  = ['facility', 'facilities', 'maintenance', 'housekeeping', 'security', 'engineering'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+    var isFacilityGrp  = ['facility', 'facilities', 'maintenance', 'housekeeping', 'house keeping', 'hk', 'security', 'engineering', 'civil', 'electrical', 'plumbing', 'sanitation', 'utility', 'cleaning', 'cleaner', 'cleaners', 'sweeper', 'housekeeper', 'housekeepers'].some(function(x){ return dNorm.indexOf(x) !== -1; });
     var isItGrp        = ['it', 'i.t.', 'information technology', 'computer', 'computers', 'biomedical', 'software'].some(function(x){
         if (x === 'it') return /\bit\b/i.test(dNorm);
         return dNorm.indexOf(x) !== -1;
@@ -444,6 +443,9 @@ function renderEmployeeDashboard(container, initialTab) {
     // 2. Admin Feature Control: Filter tabs so ONLY options allowed by Admin are displayed
     tabs = tabs.filter(function(t) {
         if (t.id === 'overview' || t.id === 'performance' || t.id === 'qgoals') return true;
+        if (isFacilityGrp && ['staffdeploy','securitydeploy','cleaning','scrap','handover','equipbackdown','checklists','work','reports'].indexOf(t.id) !== -1) {
+            return true;
+        }
         var permKey = t.id === 'matrequests' ? 'material-requests'
             : t.id === 'lostfound' ? 'lost-found'
             : t.id === 'staffdeploy' ? 'staff-deployment'

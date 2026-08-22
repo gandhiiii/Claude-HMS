@@ -614,7 +614,7 @@ const AUTH = {
 
         // Role and Department-Based Auto-Grants (when NO explicit user permission override is set)
         var dNorm = (user.department || '').trim().toLowerCase();
-        var isFacilityDept = ['facility', 'facilities', 'maintenance', 'housekeeping', 'security', 'engineering'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+        var isFacilityDept = ['facility', 'facilities', 'maintenance', 'housekeeping', 'house keeping', 'hk', 'security', 'engineering', 'civil', 'electrical', 'plumbing', 'sanitation', 'utility', 'cleaning', 'cleaner', 'cleaners', 'sweeper', 'housekeeper', 'housekeepers'].some(function(x){ return dNorm.indexOf(x) !== -1; });
         var isNursingDept  = ['nursing', 'icu', 'ward', 'ot', 'casualty', 'emergency', 'clinical'].some(function(x){ return dNorm.indexOf(x) !== -1; });
         var isStoreDept    = ['store', 'stores', 'inventory', 'warehouse'].some(function(x){ return dNorm.indexOf(x) !== -1; });
         var isItDept       = ['it', 'i.t.', 'information technology', 'computer', 'computers', 'biomedical', 'software'].some(function(x){
@@ -628,7 +628,7 @@ const AUTH = {
 
         // Facility / Maintenance / Housekeeping auto-grants
         if (isFacilityDept) {
-            if (['checklists','departmental-checklist','cleaning','room-checklist','staff-deployment','security-deployment','problems','material-requests','scrap','handover'].indexOf(permission) !== -1) return true;
+            if (['checklists','departmental-checklist','cleaning','room-checklist','staff-deployment','security-deployment','problems','material-requests','scrap','handover','equipbackdown','work','reports'].indexOf(permission) !== -1) return true;
         }
 
         // Nursing / Clinical auto-grants
