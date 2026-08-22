@@ -951,39 +951,29 @@
             + '  </div>'
             + '</div>'
 
-            // Approval Procedure Matrix Card
+            // Approval Procedure Matrix Card (Fixed View-Only Procedure)
             + '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">'
             + '  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'
             + '    <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">⚖️ Approval Procedure - All Department <small style="font-weight:normal;color:var(--gray);">(Amount-Based Routing & Matrix)</small></div>'
-            + (isAdmin ? '    <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;" onclick="editApprovalMatrixPrompt()">✏️ Change Amounts (Admin Only)</button>' : '')
             + '  </div>'
             + '  <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:8px;font-size:12px;">'
             + '    <div style="background:var(--white,#fff);border:1px solid var(--border);padding:8px 12px;border-radius:8px;">'
             + '      <span style="color:var(--gray);display:block;font-size:11px;font-weight:600;">Tier 1 Approval</span>'
-            + '      <strong style="color:var(--primary);font-size:13px;">Up to ₹' + (matrix.tier1Limit || 25000).toLocaleString('en-IN') + '/-</strong>'
+            + '      <strong style="color:var(--primary);font-size:13px;">Up to ₹25,000/-</strong>'
             + '      <span style="display:block;color:var(--dark);font-size:11px;">Trf to Finance Manager</span>'
             + '    </div>'
             + '    <div style="background:var(--white,#fff);border:1px solid var(--border);padding:8px 12px;border-radius:8px;">'
             + '      <span style="color:var(--gray);display:block;font-size:11px;font-weight:600;">Tier 2 Approval</span>'
-            + '      <strong style="color:#ed6c02;font-size:13px;">Above ₹' + (matrix.tier1Limit || 25000).toLocaleString('en-IN') + '/- - ₹' + (matrix.tier2Limit || 200000).toLocaleString('en-IN') + '/-</strong>'
+            + '      <strong style="color:#ed6c02;font-size:13px;">Above ₹25,000/- - ₹2,00,000/-</strong>'
             + '      <span style="display:block;color:var(--dark);font-size:11px;">Trf to CFO</span>'
             + '    </div>'
             + '    <div style="background:var(--white,#fff);border:1px solid var(--border);padding:8px 12px;border-radius:8px;">'
             + '      <span style="color:var(--gray);display:block;font-size:11px;font-weight:600;">Tier 3 Approval</span>'
-            + '      <strong style="color:#d32f2f;font-size:13px;">Above ₹' + (matrix.tier2Limit || 200000).toLocaleString('en-IN') + '/-</strong>'
+            + '      <strong style="color:#d32f2f;font-size:13px;">Above ₹2,00,000/-</strong>'
             + '      <span style="display:block;color:var(--dark);font-size:11px;">Trf to Director</span>'
             + '    </div>'
             + '  </div>'
             + '</div>'
-
-            + (isAdmin ? 
-                '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">'
-                + '  <div style="margin-bottom:8px;">'
-                + '    <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">⚡ Admin User Permissions Directory <small style="font-weight:normal;color:var(--gray);">(Admin Only — Configure Doctor, Service, and Bypass Rights per User)</small></div>'
-                + '  </div>'
-                + '  <div id="userBypassDirectoryBadges"></div>'
-                + '</div>'
-              : '')
             + (canAddSvc ? 
                 '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">'
                 + '  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
@@ -1021,7 +1011,6 @@
             + '<div id="discountList_reception" style="display:none;"></div>'
             + '</div>';
 
-        if (isAdmin) renderUserPermissionBadges();
         if (canAddSvc) renderServiceBadges();
         if (canAddDoc) renderDoctorBadges();
 
