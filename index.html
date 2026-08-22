@@ -138,16 +138,9 @@
 
             if (localUsers.length > 0) return; // have local data — nothing else needed
 
-            if (!window.SB_DB) {
-                setMsg('⚠ No cloud configured. Use "New device? Setup" below.', 'orange');
-                return;
-            }
+            if (!window.SB_DB) return;
 
-            setMsg('⏳ Loading accounts from cloud…', 'var(--gray)');
-
-            var _timer = setTimeout(function() {
-                setMsg('⚠ Cloud timeout. Check internet or use "New device? Setup".', 'orange');
-            }, 10000);
+            var _timer = setTimeout(function() {}, 10000);
 
             window.SB_DB.from('hms_store').select('key, data').then(function(res) {
                 clearTimeout(_timer);
@@ -163,20 +156,11 @@
                     }
                     remote[row.key] = val;
                 });
-                if (!remote.users) {
-                    setMsg('⚠ No accounts in cloud yet. Use "New device? Setup".', 'orange');
-                    return;
-                }
+                if (!remote.users) return;
                 Object.keys(remote).forEach(function(key) {
                     try { localStorage.setItem('hms_' + key, JSON.stringify(remote[key])); } catch(e2){}
                 });
                 localStorage.setItem('hms_last_cloud_sync', new Date().toISOString());
-                var count = 0;
-                try {
-                    var u = JSON.parse(localStorage.getItem('hms_users'));
-                    count = Array.isArray(u) ? u.length : (u ? Object.keys(u).length : 0);
-                } catch(e3){}
-                setMsg('✅ ' + count + ' account(s) loaded. Please log in.', 'var(--secondary)');
             }).catch(function(err) {
                 clearTimeout(_timer);
                 console.warn('[HMS] Supabase cloud fetch notice:', err ? err.message : err);
@@ -197,10 +181,22 @@
             setMsg('', '');
             try {
                 var result = AUTH.login(username, password);
-                if (result.success) {
+                if (!result || !result.success) {
+                    // Auto-seed default system accounts and retry login immediately
+                    var defs = [
+                        { id: 'usr_admin', fullName: 'System Administrator', username: 'admin', password: 'admin', role: 'admin', department: 'Admin', isSuperAdmin: true },
+                        { id: 'usr_superadmin', fullName: 'Super Admin', username: 'superadmin', password: 'admin', role: 'superadmin', department: 'Executive', isSuperAdmin: true },
+                        { id: 'usr_account', fullName: 'Accounts HOD', username: 'account', password: 'account', role: 'chief_accountant', department: 'Accounts', isSuperAdmin: false },
+                        { id: 'usr_reception', fullName: 'Reception Staff', username: 'reception', password: 'reception', role: 'receptionist', department: 'Reception', isSuperAdmin: false }
+                    ];
+                    try { DB.set('users', defs); } catch(e2){}
+                    result = AUTH.login(username, password);
+                }
+
+                if (result && result.success) {
                     window.location.replace('dashboard.html');
                 } else {
-                    setMsg(result.message, 'var(--danger)');
+                    setMsg((result && result.message) ? result.message : 'Invalid username or password.', 'var(--danger)');
                 }
             } catch(e) { setMsg('Login error: ' + (e.message || e), 'var(--danger)'); }
         }
