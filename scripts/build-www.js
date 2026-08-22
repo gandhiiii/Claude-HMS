@@ -46,6 +46,17 @@ function buildWWW() {
         }
     });
 
+    // Copy built React Discount module into root discount-app/ and www/discount-app/
+    const discountDist = path.join(src, 'Discount', 'dist');
+    const rootDiscountApp = path.join(src, 'discount-app');
+    const wwwDiscountApp = path.join(dest, 'discount-app');
+
+    if (fs.existsSync(discountDist)) {
+        copyRecursiveSync(discountDist, rootDiscountApp);
+        copyRecursiveSync(discountDist, wwwDiscountApp);
+        console.log('✅ Discount module compiled output synced to discount-app/ and www/discount-app/.');
+    }
+
     console.log('✅ www/ distribution directory built and synced successfully.');
 }
 

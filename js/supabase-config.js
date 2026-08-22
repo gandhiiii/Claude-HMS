@@ -145,3 +145,131 @@ window.urlBase64ToUint8Array = function (base64String) {
         window.WS_SERVER_URL = 'ws://localhost:8765';
     }
 })();
+
+// ═══════════════════════════════════════════════════════════════════
+// Checklist Photo Upload & Image Compression Helper
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Compresses an image File object using HTML Canvas.
+ * @param {File} file - Source image file
+ * @param {number} maxDim - Maximum width or height in pixels (default: 1200)
+ * @param {number} quality - JPEG compression quality 0.0 - 1.0 (default: 0.8)
+ * @returns {Promise<Blob>} JPEG Blob
+ */
+window.compressImageFile = function (file, maxDim, quality) {
+    maxDim = maxDim || 1200;
+    quality = quality || 0.8;
+    return new Promise(function (resolve, reject) {
+        if (!file || !file.type || !file.type.startsWith('image/')) {
+            return reject(new Error('Invalid image file'));
+        }
+        var reader = new FileReader();
+        reader.onerror = function (err) { reject(err); };
+        reader.onload = function (e) {
+            var img = new Image();
+            img.onerror = function (err) { reject(err); };
+            img.onload = function () {
+                var width = img.width;
+                var height = img.height;
+                if (width > maxDim || height > maxDim) {
+                    if (width > height) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    } else {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+                }
+                var canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                var ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob(function (blob) {
+                    if (blob) resolve(blob);
+                    else reject(new Error('Canvas image compression failed'));
+                }, 'image/jpeg', quality);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+};
+
+/**
+ * Reads a Blob/File as a Base64 Data URL.
+ */
+window.blobToDataURL = function (blob) {
+    return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = function (e) { resolve(e.target.result); };
+        reader.readAsDataURL(blob);
+    });
+};
+
+/**
+ * Compresses and uploads a photo to Supabase Storage ('checklist-photos' bucket).
+ * Falls back to Base64 Data URL if Supabase is unconfigured, offline, or bucket upload fails.
+ * @param {File} file - Selected or captured photo file
+ * @param {Object} [options] - { subfolder: string, filename: string }
+ * @returns {Promise<{ url: string, name: string, uploadedAt: string, storage: 'supabase'|'local' }>}
+ */
+window.uploadChecklistPhoto = async function (file, options) {
+    options = options || {};
+    var subfolder = options.subfolder || 'checklists';
+    var originalName = file.name || ('photo_' + Date.now() + '.jpg');
+    
+    // Step 1: Compress image client-side to max 1200px JPEG
+    var compressedBlob;
+    try {
+        compressedBlob = await window.compressImageFile(file, 1200, 0.8);
+    } catch (e) {
+        console.warn('[HMS Photo] Compression failed, using raw file:', e.message);
+        compressedBlob = file;
+    }
+
+    // Step 2: Try uploading to Supabase Storage if configured
+    if (window.SB_CONFIGURED && window.SUPABASE && window.SUPABASE.storage) {
+        try {
+            var bucketName = 'checklist-photos';
+            var fileExt = 'jpg';
+            var fileName = (options.filename || ('img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7))) + '.' + fileExt;
+            var filePath = subfolder + '/' + fileName;
+
+            var uploadRes = await window.SUPABASE.storage
+                .from(bucketName)
+                .upload(filePath, compressedBlob, {
+                    contentType: 'image/jpeg',
+                    upsert: true
+                });
+
+            if (!uploadRes.error && uploadRes.data) {
+                var publicRes = window.SUPABASE.storage.from(bucketName).getPublicUrl(filePath);
+                var publicUrl = publicRes && publicRes.data && publicRes.data.publicUrl ? publicRes.data.publicUrl : null;
+                if (publicUrl) {
+                    return {
+                        url: publicUrl,
+                        name: originalName,
+                        uploadedAt: new Date().toISOString(),
+                        storage: 'supabase'
+                    };
+                }
+            } else {
+                console.warn('[HMS Photo] Supabase storage upload notice:', uploadRes.error ? uploadRes.error.message : 'No data');
+            }
+        } catch (err) {
+            console.warn('[HMS Photo] Supabase upload failed, falling back to base64:', err.message);
+        }
+    }
+
+    // Fallback: Base64 Data URL stored locally
+    var dataUrl = await window.blobToDataURL(compressedBlob);
+    return {
+        url: dataUrl,
+        name: originalName,
+        uploadedAt: new Date().toISOString(),
+        storage: 'local'
+    };
+};

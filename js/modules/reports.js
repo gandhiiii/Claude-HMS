@@ -959,6 +959,46 @@ function _rChecklists(el) {
     });
     var bdK = Object.keys(byDept);
 
+    // Extract all uploaded photos from submitted checklist entries
+    var entries = DB.get('checklistEntries') || [];
+    var allPhotos = [];
+    entries.forEach(function(entry) {
+        var items = entry.items || [];
+        var results = entry.results || {};
+        items.forEach(function(it) {
+            var key = it.itemId || it.id;
+            var res = results[key] || results[it.itemId] || results[it.id] || {};
+            var photos = res.photos || [];
+            photos.forEach(function(p) {
+                allPhotos.push({
+                    url: p.url,
+                    itemLabel: it.label || it.name || 'Checklist Point',
+                    dept: entry.department || 'General',
+                    date: entry.date || '',
+                    user: entry.filledByName || 'Staff',
+                    title: entry.assignmentTitle || entry.templateTitle || 'Checklist'
+                });
+            });
+        });
+    });
+
+    var photoGalleryHtml = '<div class="card" style="margin-top:16px;padding:16px;">' +
+        '<div class="flex-between mb-3">' +
+        '<h3>📷 Checklist Photograph Audit Gallery (' + allPhotos.length + ' Photos)</h3>' +
+        '</div>' +
+        (allPhotos.length === 0 ? '<div class="empty-state">No photographs have been captured in submitted checklists yet.</div>' :
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:12px;">' +
+        allPhotos.slice().reverse().map(function(p) {
+            return '<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;">' +
+                '<img src="' + p.url + '" onclick="openImageModal(\'' + p.url.replace(/'/g, "\\'") + '\', \'' + p.itemLabel.replace(/'/g, "\\'") + '\')" style="width:100%;height:130px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid var(--border);" title="Click to view full photo">' +
+                '<div style="font-size:12px;font-weight:700;line-height:1.3;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + p.itemLabel + '</div>' +
+                '<div style="font-size:11px;color:var(--gray);">' + p.dept + ' · 👤 ' + p.user + '</div>' +
+                '<div style="font-size:10px;color:var(--gray);">📅 ' + p.date + '</div>' +
+                '</div>';
+        }).join('') +
+        '</div>') +
+        '</div>';
+
     el.innerHTML =
         '<div class="grid-4 mb-4">'
         + _rKpi(cl.length, 'Total Checklists', '#1a73e8', '📋', '')
@@ -972,7 +1012,8 @@ function _rChecklists(el) {
         + '</div>'
         + '<div style="margin-bottom:16px;">'
         + _rChartCard('Completed vs Pending by Department', 'rcl_drate', 260)
-        + '</div>';
+        + '</div>'
+        + photoGalleryHtml;
 
     setTimeout(function() {
         _rMakeChart('rcl_status', {
