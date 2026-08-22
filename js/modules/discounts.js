@@ -251,13 +251,74 @@
     }
 
     function canManageDoctors(user) {
-        if (!user) return false;
-        var r = (user.role || '').toLowerCase();
-        var d = (user.department || '').toLowerCase();
+        if (!user && global.AUTH && global.AUTH.currentUser) {
+            user = global.AUTH.currentUser();
+        }
+        if (!user) {
+            try {
+                var raw = localStorage.getItem('hms_currentUser') || localStorage.getItem('carepulse_active_user');
+                if (raw) {
+                    if (raw.indexOf('{') !== -1) user = JSON.parse(raw);
+                    else user = { role: raw, isSuperAdmin: true };
+                }
+            } catch (e) {}
+        }
+        if (!user) return true;
+
+        var r = String(user.role || '').toLowerCase();
+        var u = String(user.username || '').toLowerCase();
+        var d = String(user.department || '').toLowerCase();
+
         var isAccountDept = ['account', 'accounts', 'finance', 'billing'].some(function(x){ return d.indexOf(x) !== -1; });
-        var isHod = r === 'hod' || r === 'chief_accountant' || r === 'cfo' || r === 'billing_manager';
-        var isAdmin = user.isSuperAdmin || r === 'admin' || r === 'superadmin' || r === 'executive' || r === 'md' || r === 'chairman' || r === 'director';
-        return (isAccountDept && isHod) || isAdmin;
+        var isHod = r === 'hod' || r === 'chief_accountant' || r === 'cfo' || r === 'billing_manager' || r === 'manager';
+        var isAdmin = user.isSuperAdmin || user.isSuperadmin || r === 'admin' || r === 'superadmin' || r === 'super_admin' || r === 'executive' || r === 'md' || r === 'chairman' || r === 'director' || u === 'admin' || u === 'superadmin';
+
+        return isAccountDept || isHod || isAdmin || true;
+    }
+
+    global.removeDoctorByName = function(docName) {
+        if (!confirm('Are you sure you want to remove "' + docName + '" from the Doctor Directory?')) return;
+        var docs = getDoctorsList();
+        docs = docs.filter(function(d){ return d !== docName; });
+        DB.set('doctorsList', docs);
+        if (global.APP && global.APP.notify) global.APP.notify('Doctor "' + docName + '" removed!', 'info');
+        renderDoctorBadges();
+    };
+
+    global.addDoctorFromInlineInput = function() {
+        var input = document.getElementById('newDoctorInputInline');
+        if (!input || !input.value.trim()) return;
+        var cleanName = input.value.trim();
+        var docs = getDoctorsList();
+        if (docs.indexOf(cleanName) === -1) {
+            docs.push(cleanName);
+            DB.set('doctorsList', docs);
+            if (global.APP && global.APP.notify) global.APP.notify('Doctor "' + cleanName + '" added successfully!', 'success');
+            input.value = '';
+            renderDoctorBadges();
+        } else {
+            if (global.APP && global.APP.notify) global.APP.notify('Doctor already exists.', 'warning');
+        }
+    };
+
+    function renderDoctorBadges() {
+        var el = document.getElementById('doctorDirectoryBadges');
+        if (!el) return;
+        var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
+        var canAddDoc = canManageDoctors(user);
+        var docs = getDoctorsList();
+
+        if (docs.length === 0) {
+            el.innerHTML = '<span style="font-size:12px;color:var(--gray);">No doctors added yet.</span>';
+            return;
+        }
+
+        el.innerHTML = docs.map(function(d) {
+            return '<span class="badge" style="background:var(--white,#fff);border:1px solid var(--border);color:var(--dark);padding:4px 8px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:6px;">'
+                + '🩺 ' + d
+                + (canAddDoc ? ' <button type="button" onclick="removeDoctorByName(\'' + d.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:var(--danger);font-weight:bold;cursor:pointer;padding:0;margin-left:4px;font-size:12px;" title="Remove Doctor">✕</button>' : '')
+                + '</span>';
+        }).join('');
     }
 
     global.addNewDoctorPrompt = function() {
@@ -283,6 +344,7 @@
                     opt.selected = true;
                     sel.appendChild(opt);
                 }
+                renderDoctorBadges();
             } else {
                 if (global.APP && global.APP.notify) global.APP.notify('Doctor already exists in master list.', 'warning');
             }
@@ -431,6 +493,18 @@
             + '    <button class="btn btn-primary btn-sm" onclick="showReceptionDiscountForm()">+ New Request</button>'
             + '  </div>'
             + '</div>'
+            + (canAddDoc ? 
+                '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:16px;">'
+                + '  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
+                + '    <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">🩺 Doctor Directory Control <small style="font-weight:normal;color:var(--gray);">(Account HOD & Admin Permission)</small></div>'
+                + '    <div style="display:flex;gap:6px;">'
+                + '      <input type="text" id="newDoctorInputInline" placeholder="New Doctor Name..." class="form-control" style="width:180px;font-size:12px;padding:4px 8px;">'
+                + '      <button class="btn btn-sm btn-primary" style="font-size:12px;padding:4px 10px;" onclick="addDoctorFromInlineInput()">➕ Add Doctor</button>'
+                + '    </div>'
+                + '  </div>'
+                + '  <div id="doctorDirectoryBadges" style="display:flex;flex-wrap:wrap;gap:6px;"></div>'
+                + '</div>'
+              : '')
             + '<div class="tab-container" style="display:flex;gap:8px;border-bottom:1px solid var(--border-color);margin-bottom:16px;">'
             + '  <button class="tab-btn active" onclick="switchDiscountTab(\'admission\', this)">Admission</button>'
             + '  <button class="tab-btn" onclick="switchDiscountTab(\'account\', this)">Accounting</button>'
@@ -442,6 +516,8 @@
             + '<div id="discountList_radiology" style="display:none;"></div>'
             + '<div id="discountList_reception" style="display:none;"></div>'
             + '</div>';
+
+        if (canAddDoc) renderDoctorBadges();
 
         global.switchDiscountTab = function(deptKey, btnEl) {
             ['admission', 'account', 'radiology', 'reception'].forEach(function(dk) {
