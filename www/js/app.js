@@ -7,13 +7,17 @@ const Router = {
         this.renderSidebar();
 
         // Restore last visited module or use role default
-        const defaultModule = user.role === 'ambulance_employee' ? 'ambulance'
-            : user.role === 'employee' ? 'employee-dashboard'
+        const isAdmin = user.isSuperAdmin || user.role === 'admin';
+        const defaultModule = isAdmin ? 'dashboard'
             : user.role === 'hod' ? 'hod-dashboard'
             : user.role === 'storekeeper' ? 'storekeeper-dashboard'
-            : 'dashboard';
+            : user.role === 'ambulance_employee' ? 'ambulance'
+            : 'employee-dashboard';
         const saved = localStorage.getItem('hms_lastModule');
-        const startModule = saved || defaultModule;
+        let startModule = saved || defaultModule;
+        if (!isAdmin && startModule === 'dashboard') {
+            startModule = defaultModule;
+        }
         this.navigate(startModule);
 
         // Mobile: overlay click closes sidebar
@@ -67,7 +71,7 @@ const Router = {
         if (!nav) return;
         const _t = typeof T === 'function' ? T : function(k){ return k; };
         const items = [
-            { id: 'dashboard', label: _t('nav_dashboard'), icon: '📊', permission: 'dashboard' },
+            { id: 'dashboard', label: _t('nav_dashboard'), icon: '📊', permission: 'dashboard', adminOnly: true },
             { id: 'users', label: _t('nav_users'), icon: '👥', permission: 'users' },
             { id: 'departments', label: _t('nav_departments'), icon: '🏢', permission: 'departments' },
             { id: 'feature-rights', label: _t('nav_feature_rights'), icon: '🔐', permission: 'departments' },
@@ -118,18 +122,28 @@ const Router = {
     navigate(module) {
         var u = AUTH.currentUser();
         if (!u) { window.location.href = 'index.html'; return; }
+        var isAdmin = u.isSuperAdmin || u.role === 'admin';
+
         if (module === 'purchases') {
             window._hodTargetTab = 'purchases';
             module = 'hod-dashboard';
         }
-        if (module === 'dashboard' && u && u.role === 'employee') module = 'employee-dashboard';
-        if (module === 'dashboard' && u && u.role === 'hod') module = 'hod-dashboard';
-        if (module === 'dashboard' && u && u.role === 'storekeeper') module = 'storekeeper-dashboard';
-        // HOD and employees must not access admin-only modules directly
-        var _adminOnly = ['reports', 'data-history', 'budget', 'quarterly-priorities', 'feature-rights'];
-        if (_adminOnly.indexOf(module) !== -1 && u.role !== 'admin' && !u.isSuperAdmin) {
+
+        // Strict role-based dashboard guard:
+        // Admin dashboard ('dashboard') is strictly restricted to Admin & SuperAdmin
+        if (module === 'dashboard' && !isAdmin) {
+            if (u.role === 'hod') module = 'hod-dashboard';
+            else if (u.role === 'storekeeper') module = 'storekeeper-dashboard';
+            else if (u.role === 'ambulance_employee') module = 'ambulance';
+            else module = 'employee-dashboard';
+        }
+
+        // Non-admin staff must not access admin-only modules directly
+        var _adminOnly = ['dashboard', 'reports', 'data-history', 'budget', 'quarterly-priorities', 'feature-rights', 'hospital-settings'];
+        if (_adminOnly.indexOf(module) !== -1 && !isAdmin) {
             if (u.role === 'hod') { module = 'hod-dashboard'; }
             else if (u.role === 'storekeeper') { module = 'storekeeper-dashboard'; }
+            else if (u.role === 'ambulance_employee') { module = 'ambulance'; }
             else { module = 'employee-dashboard'; }
         }
 

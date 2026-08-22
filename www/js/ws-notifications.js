@@ -45,11 +45,15 @@ var WS_NOTIFY = (function () {
             if (window.WS_SERVER_URL && window.WS_SERVER_URL.startsWith('ws')) {
                 return window.WS_SERVER_URL;
             }
+            // On HTTPS origins (such as GitHub Pages), unencrypted ws:// connections are blocked
+            // by browser Mixed Content Security. Return null to rely on Supabase Realtime WSS.
+            if (window.location && window.location.protocol === 'https:') {
+                return null;
+            }
             var host = (window.location && window.location.hostname && window.location.hostname !== '' && window.location.hostname !== 'file:')
                 ? window.location.hostname
                 : 'localhost';
-            var proto = (window.location && window.location.protocol === 'https:') ? 'wss:' : 'ws:';
-            return proto + '//' + host + ':8765';
+            return 'ws://' + host + ':8765';
         } catch (e) {
             return 'ws://localhost:8765';
         }
@@ -333,8 +337,21 @@ var WS_NOTIFY = (function () {
     /* ────────────────────────────────────────────────────────────
        Supabase (PostgreSQL Realtime) Notification Fan-Out & Listener
     ──────────────────────────────────────────────────────────── */
+    var _sbRetryTimer = null;
     function _initSupabaseListener() {
-        if (!window.SB_DB || _sbInited) return;
+        if (!window.SB_DB) {
+            if (!_sbRetryTimer) {
+                _sbRetryTimer = setInterval(function() {
+                    if (window.SB_DB && !_sbInited) {
+                        clearInterval(_sbRetryTimer);
+                        _sbRetryTimer = null;
+                        _initSupabaseListener();
+                    }
+                }, 1500);
+            }
+            return;
+        }
+        if (_sbInited) return;
         _sbInited = true;
 
         try {
@@ -367,7 +384,7 @@ var WS_NOTIFY = (function () {
                 })
                 .subscribe(function (status) {
                     if (status === 'SUBSCRIBED') {
-                        console.log('[WS_NOTIFY] Supabase Realtime Broadcast & Postgres listener active ✓');
+                        console.log('[WS_NOTIFY] Supabase Realtime WSS active ✓');
                     }
                 });
         } catch (e) {
@@ -661,7 +678,7 @@ var WS_NOTIFY = (function () {
             data: { url: 'dashboard.html', key: key || null }
         };
 
-        // Option A: Use Service Worker for OS-level background notifications (works after app is closed)
+        // Option A: Use Service Worker for OS-level background notifications
         if (_swReg && _swReg.showNotification) {
             try {
                 _swReg.showNotification(title, options);
@@ -669,12 +686,10 @@ var WS_NOTIFY = (function () {
             } catch (e) {}
         }
 
-        // Option B: Standard Notification API (when tab is backgrounded)
-        if (!document.hasFocus()) {
-            try {
-                new Notification(title, options);
-            } catch (e) {}
-        }
+        // Option B: Standard Notification API
+        try {
+            new Notification(title, options);
+        } catch (e) {}
     }
 
     /* ────────────────────────────────────────────────────────────
@@ -829,7 +844,10 @@ var WS_NOTIFY = (function () {
     ──────────────────────────────────────────────────────────── */
     function _connectWS() {
         _wsUrl = _resolveWsUrl();
-        if (!_wsUrl) return;
+        if (!_wsUrl) {
+            console.log('[WS_NOTIFY] HTTPS/Cloud environment detected — using Supabase Realtime WSS as primary carrier ✓');
+            return;
+        }
 
         try {
             console.log('[WS_NOTIFY] Connecting WS →', _wsUrl);
@@ -871,7 +889,7 @@ var WS_NOTIFY = (function () {
 
             _ws.onerror = function (e) {
                 _wsConnected = false;
-                console.warn('[WS_NOTIFY] WebSocket connection error');
+                console.warn('[WS_NOTIFY] WebSocket connection notice');
             };
 
         } catch (e) {

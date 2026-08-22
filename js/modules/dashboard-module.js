@@ -60,21 +60,21 @@ function renderDashboard(container) {
     const user = AUTH.currentUser();
     const isAdmin = user.role === 'admin' || user.isSuperAdmin;
 
-    const users = DB.get('users');
-    const departments = DB.get('departments');
-    const inventory = DB.get('inventory');
-    const admissions = DB.get('admissions');
-    const tasks = DB.get('tasks');
-    const complaints = DB.get('complaints');
-    const problems = DB.get('problems');
-    const projects = DB.get('projects');
-    const lost = DB.get('lostfound');
-    const gate = DB.get('gatesecurity');
-    const ambulance = DB.get('ambulance');
-    const checklists = DB.get('checklists');
+    const users = DB.get('users') || [];
+    const departments = DB.get('departments') || [];
+    const inventory = DB.get('inventory') || [];
+    const admissions = DB.get('admissions') || [];
+    const tasks = DB.get('tasks') || [];
+    const complaints = DB.get('complaints') || [];
+    const problems = DB.get('problems') || [];
+    const projects = DB.get('projects') || [];
+    const lost = DB.get('lostfound') || [];
+    const gate = DB.get('gatesecurity') || [];
+    const ambulance = DB.get('ambulance') || [];
+    const checklists = DB.get('checklists') || [];
     const adminTasks = DB.get('adminChecklist') || [];
     const p2Tasks = DB.get('phase2Tasks') || [];
-    const trips = DB.get('ambulance_trips');
+    const trips = DB.get('ambulance_trips') || [];
 
     const now = new Date();
     const thisMonth = now.getMonth();

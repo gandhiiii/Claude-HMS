@@ -35,11 +35,25 @@ const DB = {
     get(key) {
         try {
             var raw = localStorage.getItem('hms_' + key);
-            if (raw) return JSON.parse(raw);
+            if (raw) {
+                var val = JSON.parse(raw);
+                if (Array.isArray(val)) return val;
+                if (val && typeof val === 'object') {
+                    var ks = Object.keys(val);
+                    if (ks.length > 0 && ks.every(function(k){ return /^\d+$/.test(k); })) {
+                        return ks.map(function(k){ return val[k]; });
+                    }
+                }
+                if (val != null) return val;
+            }
         } catch (e) {}
         try {
             var raw = sessionStorage.getItem('hms_' + key);
-            if (raw) return JSON.parse(raw);
+            if (raw) {
+                var val = JSON.parse(raw);
+                if (Array.isArray(val)) return val;
+                if (val != null) return val;
+            }
         } catch (e) {}
         return [];
     },
@@ -579,10 +593,11 @@ const AUTH = {
             if (_discDept.indexOf('account') !== -1 || _discDept.indexOf('finance') !== -1 || _discDept.indexOf('billing') !== -1) return true;
             return user.permissions && user.permissions.includes('discounts');
         }
+        if (permission === 'dashboard') return user.isSuperAdmin || user.role === 'admin';
         if (user.isSuperAdmin || (user.permissions && user.permissions.includes('all'))) return true;
         // Role-based auto-grants (no manual permission config needed)
         if (permission === 'hod-dashboard' && user.role === 'hod') return true;
-        if (permission === 'employee-dashboard' && (user.role === 'employee' || user.role === 'hod')) return true;
+        if (permission === 'employee-dashboard' && !(user.isSuperAdmin || user.role === 'admin')) return true;
         if (permission === 'storekeeper-dashboard' && user.role === 'storekeeper') return true;
         // Storekeeper auto-gets inventory and material-requests access
         if (user.role === 'storekeeper' && ['inventory','material-requests','problems'].indexOf(permission) !== -1) return true;
