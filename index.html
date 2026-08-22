@@ -179,13 +179,17 @@
                 setMsg('✅ ' + count + ' account(s) loaded. Please log in.', 'var(--secondary)');
             }).catch(function(err) {
                 clearTimeout(_timer);
-                if (window.isSupabaseSchemaMissing && window.isSupabaseSchemaMissing(err)) {
-                    setMsg('⚠ ' + (window.SB_SETUP_HINT || 'Cloud database not set up yet.') + ' Or use "New device? Setup" to continue locally.', 'orange');
-                    return;
-                }
                 var msg = err && err.message ? err.message : 'unknown error';
-                setMsg('⚠ Cloud error: ' + msg + ' — use "New device? Setup".', 'orange');
-                console.error('[HMS] Supabase pull failed:', msg);
+                console.warn('[HMS] Supabase cloud fetch notice:', msg);
+                var hasLocalUsers = false;
+                try { hasLocalUsers = (DB.get('users') || []).length > 0; } catch(e){}
+                if (hasLocalUsers) {
+                    setMsg('', '');
+                } else if (window.isSupabaseSchemaMissing && window.isSupabaseSchemaMissing(err)) {
+                    setMsg('⚠ ' + (window.SB_SETUP_HINT || 'Cloud database not set up yet.') + ' Or use "New device? Setup" to continue locally.', 'orange');
+                } else {
+                    setMsg('⚠ Cloud notice: ' + msg + ' — use "New device? Setup" to initialize local accounts.', 'orange');
+                }
             });
         })();
 

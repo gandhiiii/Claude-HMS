@@ -14,7 +14,7 @@
 
 var SUPABASE_CONFIG = {
     url:           "https://hpjexrelsmdjkjgohele.supabase.co",
-    publishableKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVC"
+    publishableKey: "sb_publishable_LJTo5vD8aKXiW5rhBaUAtA_sZYWNa2K"
 };
 
 (function () {
