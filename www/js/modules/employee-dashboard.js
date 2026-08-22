@@ -404,6 +404,21 @@ function renderEmployeeDashboard(container) {
         ];
     }
 
+    // Admin Feature Control: Filter tabs so ONLY options given by Admin are displayed
+    if (user.permissions && Array.isArray(user.permissions) && user.permissions.length > 0) {
+        tabs = tabs.filter(function(t) {
+            if (t.id === 'overview' || t.id === 'work' || t.id === 'todo' || t.id === 'performance' || t.id === 'qgoals') return true;
+            var permKey = t.id === 'matrequests' ? 'material-requests'
+                : t.id === 'lostfound' ? 'lost-found'
+                : t.id === 'staffdeploy' ? 'staff-deployment'
+                : t.id === 'securitydeploy' ? 'security-deployment'
+                : t.id === 'patientshift' ? 'patient-shifting'
+                : t.id === 'equipbackdown' ? 'problems'
+                : t.id;
+            return AUTH.hasPermission(user, permKey);
+        });
+    }
+
     var html = ''
         // ── Profile header ──
         + '<div style="background:linear-gradient(135deg,var(--primary) 0%,#1a6bcc 100%);border-radius:14px;padding:20px 24px;color:#fff;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'

@@ -337,10 +337,12 @@ function showUserForm(user) {
 
 function renderPermissionCheckboxes(deptFeatures, userPerms, isEdit) {
     const allFeatures = [
-        'dashboard', 'users', 'departments', 'inventory', 'gate-security',
-        'projects', 'ambulance', 'problems', 'tasks', 'complaints',
-        'room-checklist', 'admissions', 'lost-found', 'checklists', 'admin-checklists',
-        'departmental-checklist', 'staff-deployment', 'security-deployment', 'patient-shifting'
+        'dashboard', 'users', 'departments', 'inventory', 'discounts', 'purchases',
+        'matrequests', 'scrap', 'gate-security', 'projects', 'ambulance', 'problems',
+        'tasks', 'complaints', 'suggestions', 'room-checklist', 'admissions',
+        'lost-found', 'checklists', 'admin-checklists', 'departmental-checklist',
+        'handover', 'cleaning', 'equipbackdown', 'reports', 'staff-deployment',
+        'security-deployment', 'patient-shifting'
     ];
 
     const inheritedSet = new Set(deptFeatures || []);

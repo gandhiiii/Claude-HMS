@@ -591,11 +591,33 @@ const AUTH = {
             if (_discRoles.indexOf(user.role) !== -1) return true;
             var _discDept = (user.department || '').trim().toLowerCase();
             if (_discDept.indexOf('account') !== -1 || _discDept.indexOf('finance') !== -1 || _discDept.indexOf('billing') !== -1) return true;
-            return user.permissions && user.permissions.includes('discounts');
+            if (user.permissions && user.permissions.includes('discounts')) return true;
         }
+
         if (permission === 'dashboard') return user.isSuperAdmin || user.role === 'admin';
-        if (user.isSuperAdmin || (user.permissions && user.permissions.includes('all'))) return true;
-        // Role-based auto-grants (no manual permission config needed)
+        if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
+
+        // 1. Explicit user permissions assigned by Admin
+        if (user.permissions && Array.isArray(user.permissions)) {
+            if (user.permissions.includes('all')) return true;
+            if (user.permissions.includes(permission)) return true;
+        }
+
+        // 2. Department feature rights assigned by Admin
+        if (user.department) {
+            var depts = DB.get('departments') || [];
+            var deptObj = depts.find(function(d){ return d.name === user.department; });
+            if (deptObj && Array.isArray(deptObj.features) && deptObj.features.length > 0) {
+                if (deptObj.features.includes(permission)) return true;
+            }
+        }
+
+        // 3. Role-based defaults when permissions array is set by Admin
+        if (user.permissions && Array.isArray(user.permissions) && user.permissions.length > 0) {
+            return user.permissions.includes(permission);
+        }
+
+        // Role-based auto-grants (when no restrictive permissions array is configured by Admin)
         if (permission === 'hod-dashboard' && user.role === 'hod') return true;
         if (permission === 'employee-dashboard' && !(user.isSuperAdmin || user.role === 'admin')) return true;
         if (permission === 'storekeeper-dashboard' && user.role === 'storekeeper') return true;
@@ -1090,7 +1112,9 @@ const APP = {
                     'projects','ambulance','problems','tasks','complaints',
                     'room-checklist','admissions','lost-found','checklists','admin-checklists',
                     'material-requests','suggestions','reports','employee-dashboard',
-                    'departmental-checklist','department-meetings'];
+                    'departmental-checklist','department-meetings','discounts','purchases',
+                    'scrap','handover','cleaning','equipbackdown','staff-deployment',
+                    'security-deployment','patient-shifting'];
                 DB.set('featureRights', defaultRights);
             }
             const floors = DB.get('floorItems');
