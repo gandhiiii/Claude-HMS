@@ -175,6 +175,7 @@
             id: "REQ-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4),
             department: deptName,
             requestCode: "DISC-" + Math.floor(1000 + Math.random() * 9000),
+            patientId: formData.patientId || ("UHID-" + Math.floor(10000 + Math.random() * 90000)),
             patientName: formData.patientName,
             patientAge: formData.patientAge || "N/A",
             patientGender: formData.patientGender || "N/A",
@@ -238,46 +239,143 @@
     };
 
     // -------------------------------------------------------------
+    // Doctor Master Helpers (Account HOD & Admin permission only)
+    // -------------------------------------------------------------
+    function getDoctorsList() {
+        var docs = DB.get('doctorsList');
+        if (!Array.isArray(docs) || docs.length === 0) {
+            docs = ['Dr. Michael Chang', 'Dr. Sarah Jenkins', 'Dr. Rajesh Sharma', 'Dr. Ananya Patel', 'Dr. Vikram Mehta', 'Dr. Suresh Kumar', 'Dr. Priya Nair'];
+            DB.set('doctorsList', docs);
+        }
+        return docs;
+    }
+
+    function canManageDoctors(user) {
+        if (!user) return false;
+        var r = (user.role || '').toLowerCase();
+        var d = (user.department || '').toLowerCase();
+        var isAccountDept = ['account', 'accounts', 'finance', 'billing'].some(function(x){ return d.indexOf(x) !== -1; });
+        var isHod = r === 'hod' || r === 'chief_accountant' || r === 'cfo' || r === 'billing_manager';
+        var isAdmin = user.isSuperAdmin || r === 'admin' || r === 'superadmin' || r === 'executive' || r === 'md' || r === 'chairman' || r === 'director';
+        return (isAccountDept && isHod) || isAdmin;
+    }
+
+    global.addNewDoctorPrompt = function() {
+        var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
+        if (!canManageDoctors(user)) {
+            if (global.APP && global.APP.notify) global.APP.notify('Only Accounts HOD and Admins are authorized to add new doctors.', 'error');
+            else alert('Only Accounts HOD and Admins are authorized to add new doctors.');
+            return;
+        }
+        var name = prompt('Enter new Doctor Name (e.g. Dr. Ramesh Gupta):');
+        if (name && name.trim()) {
+            var docs = getDoctorsList();
+            var cleanName = name.trim();
+            if (docs.indexOf(cleanName) === -1) {
+                docs.push(cleanName);
+                DB.set('doctorsList', docs);
+                if (global.APP && global.APP.notify) global.APP.notify('Doctor "' + cleanName + '" added to master list!', 'success');
+                var sel = document.querySelector('select[name="doctorName"]');
+                if (sel) {
+                    var opt = document.createElement('option');
+                    opt.value = cleanName;
+                    opt.textContent = cleanName;
+                    opt.selected = true;
+                    sel.appendChild(opt);
+                }
+            } else {
+                if (global.APP && global.APP.notify) global.APP.notify('Doctor already exists in master list.', 'warning');
+            }
+        }
+    };
+
+    // -------------------------------------------------------------
     // 5.  Reception module – for employees (uses createDiscount above)
     // -------------------------------------------------------------
     global.showReceptionDiscountForm = function () {
-        // Very simple form – in a real app you’d use a proper modal library.
-        var dept = DEPARTMENTS.reception;
+        var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
+        var docs = getDoctorsList();
+        var docOptions = docs.map(function(d){ return '<option value="' + d + '">' + d + '</option>'; }).join('');
+        var canAddDoc = canManageDoctors(user);
+
+        var autoPatientId = 'UHID-' + Math.floor(10000 + Math.random() * 90000);
+
         var html = [
             '<form id="receptionForm">',
-            '<div class="form-group">',
-            '  <label>Patient Name *</label>',
-            '  <input type="text" name="patientName" required>',
+            '<div class="form-group mb-3">',
+            '  <label style="font-weight:600;margin-bottom:4px;display:block;">Patient ID / UHID No. *</label>',
+            '  <input type="text" name="patientId" class="form-control" value="' + autoPatientId + '" required>',
             '</div>',
-            '<div class="form-group">',
-            '  <label>Total Bill <small>₹</small> *</label>',
-            '  <input type="number" name="totalBillAmount" step="0.01" required>',
+            '<div class="form-group mb-3">',
+            '  <label style="font-weight:600;margin-bottom:4px;display:block;">Patient Full Name *</label>',
+            '  <input type="text" name="patientName" class="form-control" placeholder="e.g. Ramesh Kumar" required>',
             '</div>',
-            '<div class="form-group">',
-            '  <label>Discount Type</label>',
-            '  <select name="discountType">',
-            '    <option value="PERCENTAGE">Percentage</option>',
-            '    <option value="FIXED">Fixed Amount</option>',
-            '</select>',
+            '<div class="form-group mb-3">',
+            '  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">',
+            '    <label style="font-weight:600;margin:0;">Attending Doctor Name *</label>',
+            (canAddDoc ? '    <button type="button" class="btn btn-sm btn-outline" style="font-size:11px;padding:2px 8px;" onclick="addNewDoctorPrompt()">➕ Add Doctor (Account HOD/Admin)</button>' : '<small style="color:var(--gray);font-size:11px;">Managed by Accounts HOD/Admin</small>'),
+            '  </div>',
+            '  <select name="doctorName" class="form-control" required>',
+            docOptions,
+            '  </select>',
             '</div>',
-            '<div class="form-group">',
-            '  <label>Discount Value *</label>',
-            '  <input type="number" name="discountValue" min="0" step="0.01" required>',
+            '<div class="grid-2 mb-3" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">',
+            '  <div class="form-group">',
+            '    <label style="font-weight:600;margin-bottom:4px;display:block;">Total Bill Amount <small>₹</small> *</label>',
+            '    <input type="number" name="totalBillAmount" class="form-control" step="0.01" placeholder="e.g. 15000" required>',
+            '  </div>',
+            '  <div class="form-group">',
+            '    <label style="font-weight:600;margin-bottom:4px;display:block;">Discount Type</label>',
+            '    <select name="discountType" class="form-control">',
+            '      <option value="PERCENTAGE">Percentage (%)</option>',
+            '      <option value="FIXED">Fixed Amount (₹)</option>',
+            '    </select>',
+            '  </div>',
             '</div>',
-            '<div class="form-group">',
-            '  <label>Detailed Reason *</label>',
-            '  <textarea name="detailedReason" rows="3" required></textarea>',
+            '<div class="form-group mb-3">',
+            '  <label style="font-weight:600;margin-bottom:4px;display:block;">Discount Value *</label>',
+            '  <input type="number" name="discountValue" class="form-control" min="0" step="0.01" placeholder="e.g. 15" required>',
             '</div>',
-            '</form>',
-            '<div style="margin-top:12px;">',
-            '  <button type="button" onclick="createDiscount(\"reception\", window.formData)" class="btn btn-primary">Submit Discount Request</button>',
-            '  <button type="button" onclick="document.getElementById(\'receptionForm\').reset()" class="btn btn-secondary">Reset</button>',
-            '</div>'
+            '<div class="form-group mb-3">',
+            '  <label style="font-weight:600;margin-bottom:4px;display:block;">Detailed Reason for Concession *</label>',
+            '  <textarea name="detailedReason" class="form-control" rows="3" placeholder="Enter reason for discount request..." required></textarea>',
+            '</div>',
+            '</form>'
         ].join("");
 
-        global.openFormModal("New Discount Request (Reception)", html, function () {
-            // form was submitted inside createDiscount – nothing extra needed here
-        });
+        global.openFormModal("🏷️ New Discount Request", html, "submitDiscountFormFromModal()", false);
+    };
+
+    global.submitDiscountFormFromModal = function() {
+        var form = document.getElementById('receptionForm');
+        if (!form) return;
+
+        var patientId   = (form.querySelector('[name="patientId"]').value || '').trim();
+        var patientName = (form.querySelector('[name="patientName"]').value || '').trim();
+        var doctorName  = (form.querySelector('[name="doctorName"]').value || '').trim();
+        var totalBill   = (form.querySelector('[name="totalBillAmount"]').value || '').trim();
+        var discType    = (form.querySelector('[name="discountType"]').value || 'PERCENTAGE');
+        var discVal     = (form.querySelector('[name="discountValue"]').value || '').trim();
+        var reason      = (form.querySelector('[name="detailedReason"]').value || '').trim();
+
+        if (!patientId || !patientName || !totalBill || !discVal || !reason) {
+            if (global.APP && global.APP.notify) global.APP.notify('Please fill out all required fields.', 'error');
+            else alert('Please fill out all required fields.');
+            return;
+        }
+
+        var formData = {
+            patientId: patientId,
+            patientName: patientName,
+            doctorName: doctorName,
+            totalBillAmount: Number(totalBill),
+            discountType: discType,
+            discountValue: Number(discVal),
+            detailedReason: reason
+        };
+
+        global.createDiscount("reception", formData);
+        global.closeFormModal();
     };
 
     // -------------------------------------------------------------
@@ -293,20 +391,22 @@
             return;
         }
 
-        var html = "<div class='table-responsive'><table><thead><tr>"
-            + "<th>Code</th><th>Patient</th><th>Amount</th><th>Discount</th><th>Payable</th><th>Requested By</th><th>Status</th>"
+        var html = "<div class='table-responsive'><table class='table' style='width:100%;font-size:13px;border-collapse:collapse;'><thead><tr style='background:var(--light-gray);'>"
+            + "<th style='padding:10px;'>Code</th><th style='padding:10px;'>Patient ID</th><th style='padding:10px;'>Patient Name</th><th style='padding:10px;'>Doctor Name</th><th style='padding:10px;'>Total Bill</th><th style='padding:10px;'>Discount</th><th style='padding:10px;'>Payable</th><th style='padding:10px;'>Requested By</th><th style='padding:10px;text-align:center;'>Status</th>"
             + "</tr></thead><tbody>";
         for (var i = 0; i < list.length; i++) {
             var r = list[i];
             var statusBadge = "<span class='badge badge-warning'>" + (r.status || "PENDING") + "</span>";
-            html += "<tr>"
-                + "<td><strong>" + (r.requestCode || "—") + "</strong></td>"
-                + "<td>" + (r.patientName || "—") + "</td>"
-                + "<td>₹" + (r.totalBillAmount || 0) + "</td>"
-                + "<td>₹" + (r.calculatedDiscountAmount || 0) + " (" + (r.requestedDiscountVal || 0) + (r.requestedDiscountType === 'PERCENTAGE' ? '%' : '₹') + ")</td>"
-                + "<td>₹" + (r.finalPayableAmount || 0) + "</td>"
-                + "<td>" + (r.requestedByName || r.requestedBy || "—") + "</td>"
-                + "<td>" + statusBadge + "</td>"
+            html += "<tr style='border-bottom:1px solid var(--border);'>"
+                + "<td style='padding:10px;'><strong>" + (r.requestCode || "—") + "</strong></td>"
+                + "<td style='padding:10px;'><span class='badge badge-info' style='font-size:11px;'>" + (r.patientId || "—") + "</span></td>"
+                + "<td style='padding:10px;font-weight:600;'>" + (r.patientName || "—") + "</td>"
+                + "<td style='padding:10px;'>" + (r.doctorName || "—") + "</td>"
+                + "<td style='padding:10px;font-weight:700;'>₹" + (r.totalBillAmount || 0).toLocaleString('en-IN') + "</td>"
+                + "<td style='padding:10px;color:var(--primary);font-weight:700;'>₹" + (r.calculatedDiscountAmount || 0).toLocaleString('en-IN') + " (" + (r.requestedDiscountVal || 0) + (r.requestedDiscountType === 'PERCENTAGE' ? '%' : '₹') + ")</td>"
+                + "<td style='padding:10px;font-weight:700;color:var(--success);'>₹" + (r.finalPayableAmount || 0).toLocaleString('en-IN') + "</td>"
+                + "<td style='padding:10px;color:var(--gray);'>" + (r.requestedByName || r.requestedBy || "—") + "</td>"
+                + "<td style='padding:10px;text-align:center;'>" + statusBadge + "</td>"
                 + "</tr>";
         }
         html += "</tbody></table></div>";
@@ -316,14 +416,18 @@
     // Main module renderer called by Router.navigate('discounts')
     global.renderDiscounts = function (container) {
         if (!container) return;
+        var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
+        var canAddDoc = canManageDoctors(user);
+
         container.innerHTML = 
             '<div class="card">'
-            + '<div class="flex-between mb-4">'
+            + '<div class="flex-between mb-4" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
             + '  <div>'
             + '    <h2 style="margin:0;font-size:20px;font-weight:700;">🏷️ Discount Permission System</h2>'
             + '    <p style="font-size:13px;color:var(--gray);margin:4px 0 0 0;">Manage and approve department discount requests across Admission, Accounting, Radiology, and Reception</p>'
             + '  </div>'
-            + '  <div style="display:flex;gap:8px;">'
+            + '  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+            + (canAddDoc ? '    <button class="btn btn-outline btn-sm" onclick="addNewDoctorPrompt()">➕ Add Doctor (HOD/Admin)</button>' : '')
             + '    <button class="btn btn-primary btn-sm" onclick="showReceptionDiscountForm()">+ New Request</button>'
             + '  </div>'
             + '</div>'

@@ -232,7 +232,24 @@ export const NewDiscountModal = ({ onClose }) => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Attending Doctor</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-300">Attending Doctor</label>
+                {['ADMIN', 'BILLING_MANAGER', 'CHIEF_ACCOUNTANT', 'CFO', 'MD', 'EXECUTIVE', 'DIRECTOR'].includes(activeUser?.role) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const docName = prompt('Enter new Doctor Name (Account HOD / Admin privilege):');
+                      if (docName && docName.trim()) {
+                        addDoctor(docName.trim());
+                        setFormData(prev => ({ ...prev, doctorName: docName.trim() }));
+                      }
+                    }}
+                    className="text-[10px] text-teal-400 hover:underline font-bold"
+                  >
+                    + Add Doctor
+                  </button>
+                )}
+              </div>
               <select
                 value={formData.doctorName}
                 onChange={e => setFormData({ ...formData, doctorName: e.target.value })}
