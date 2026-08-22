@@ -201,13 +201,16 @@ function _checkAndResetChecklists(checklists, user) {
 /* ══════════════════════════════════════════
    MAIN RENDER
 ══════════════════════════════════════════ */
-function renderEmployeeDashboard(container) {
+function renderEmployeeDashboard(container, initialTab) {
     var user = AUTH.currentUser();
     if (!user) { container.innerHTML = '<div class="empty-state">Not logged in</div>'; return; }
     var dept = user.department || '';
     var isAdmin = user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin';
     var u    = user.fullName || user.username;
     var q    = _getQuarter();
+
+    var activeTab = initialTab || window._targetEmpTab || _empTab || 'overview';
+    window._targetEmpTab = null;
 
     // Merge admin tasks + HOD-assigned tasks, tagging each with its source store
     var tasks = (DB.get('tasks') || []).map(function(t){ return Object.assign({}, t, {_store: 'tasks'}); })
@@ -286,8 +289,15 @@ function renderEmployeeDashboard(container) {
     var isPharmacyGrp  = ['pharmacy', 'chemist', 'drug store'].some(function(x){ return dNorm.indexOf(x) !== -1; });
     var isStoreGrp     = ['store', 'stores', 'inventory', 'warehouse'].some(function(x){ return dNorm.indexOf(x) !== -1; });
     var isItGrp        = ['it', 'computer', 'computers', 'biomedical', 'software'].some(function(x){ return dNorm.indexOf(x) !== -1; });
-    var isFacilityGrp  = ['facility', 'maintenance', 'housekeeping', 'security', 'engineering'].some(function(x){ return dNorm.indexOf(x) !== -1; });
-    var isHrGrp        = ['hr', 'personnel', 'admin', 'human resource'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+    var isFacilityGrp  = ['facility', 'facilities', 'maintenance', 'housekeeping', 'security', 'engineering'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+    var isItGrp        = ['it', 'i.t.', 'information technology', 'computer', 'computers', 'biomedical', 'software'].some(function(x){
+        if (x === 'it') return /\bit\b/i.test(dNorm);
+        return dNorm.indexOf(x) !== -1;
+    });
+    var isHrGrp        = ['hr', 'personnel', 'admin', 'human resource'].some(function(x){
+        if (x === 'hr') return /\bhr\b/i.test(dNorm);
+        return dNorm.indexOf(x) !== -1;
+    });
 
     var pendingDiscountsCount = (DB.get('discountRequests') || []).filter(function(r){ return r.status === 'pending'; }).length;
     var pendingReqsCount     = _empData.myRequests.filter(function(r){ return r.status === 'pending'; }).length;
@@ -360,16 +370,6 @@ function renderEmployeeDashboard(container) {
             { id: 'checklists',  label: '✅ Store Checklists' },
             { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length }
         ];
-    } else if (isItGrp) {
-        tabs = [
-            { id: 'overview',    label: '📊 IT Overview' },
-            { id: 'problems',    label: '🔧 Problem Tickets', badge: openProblemsCount, badgeClass: 'badge-danger' },
-            { id: 'equipbackdown', label: '📉 Hardware & Server Breakdowns' },
-            { id: 'handover',    label: '🔄 IT Shift Handover' },
-            { id: 'checklists',  label: '✅ System & Backup Checklists' },
-            { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
-            { id: 'todo',        label: T('empd2_tab_todo'), badge: todoPend, badgeClass: 'badge-warning' }
-        ];
     } else if (isFacilityGrp) {
         tabs = [
             { id: 'overview',    label: T('empd2_tab_overview') },
@@ -380,7 +380,19 @@ function renderEmployeeDashboard(container) {
             { id: 'handover',    label: '🔄 Shift Handover' },
             { id: 'equipbackdown', label: '📉 Equipment Breakdowns' },
             { id: 'checklists',  label: '✅ Maintenance Checklists' },
-            { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length }
+            { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
+            { id: 'reports',     label: T('empd2_tab_reports') }
+        ];
+    } else if (isItGrp) {
+        tabs = [
+            { id: 'overview',    label: '📊 IT Overview' },
+            { id: 'problems',    label: '🔧 Problem Tickets', badge: openProblemsCount, badgeClass: 'badge-danger' },
+            { id: 'equipbackdown', label: '📉 Hardware & Server Breakdowns' },
+            { id: 'handover',    label: '🔄 IT Shift Handover' },
+            { id: 'checklists',  label: '✅ System & Backup Checklists' },
+            { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
+            { id: 'todo',        label: T('empd2_tab_todo'), badge: todoPend, badgeClass: 'badge-warning' },
+            { id: 'reports',     label: T('empd2_tab_reports') }
         ];
     } else if (isHrGrp) {
         tabs = [
@@ -404,16 +416,46 @@ function renderEmployeeDashboard(container) {
         ];
     }
 
-    // Admin Feature Control: Filter tabs so ONLY options given by Admin are displayed
+    // Master list of configurable feature tabs
+    var extraFeatureTabs = [
+        { id: 'staffdeploy', perm: 'staff-deployment', label: '🧹 Staff Deployment' },
+        { id: 'securitydeploy', perm: 'security-deployment', label: '🛡️ Security Deployment' },
+        { id: 'cleaning', perm: 'cleaning', label: '🧹 Room & Floor Cleaning', badge: _empData.pendingCleaning.length, badgeClass: 'badge-danger' },
+        { id: 'scrap', perm: 'scrap', label: '🗑️ Waste & Scrap Disposal' },
+        { id: 'handover', perm: 'handover', label: '🔄 Shift Handover' },
+        { id: 'equipbackdown', perm: 'equipbackdown', label: '📉 Equipment Breakdowns' },
+        { id: 'checklists', perm: 'checklists', label: '✅ Maintenance Checklists' },
+        { id: 'matrequests', perm: 'material-requests', label: '📦 Material Requisitions', badge: pendingReqsCount },
+        { id: 'patientshift', perm: 'patient-shifting', label: '🚑 Patient Shifting' },
+        { id: 'work', perm: 'work', label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
+        { id: 'reports', perm: 'reports', label: T('empd2_tab_reports') }
+    ];
+
+    // 1. Include feature tabs explicitly granted to this user by Admin
+    extraFeatureTabs.forEach(function(ft) {
+        if (AUTH.hasPermission(user, ft.perm) || (user.permissions && user.permissions.includes(ft.perm))) {
+            var exists = tabs.some(function(t){ return t.id === ft.id; });
+            if (!exists) {
+                tabs.push({ id: ft.id, label: ft.label, badge: ft.badge, badgeClass: ft.badgeClass });
+            }
+        }
+    });
+
+    // 2. Admin Feature Control: Filter tabs so ONLY options allowed by Admin are displayed
     tabs = tabs.filter(function(t) {
-        if (t.id === 'overview' || t.id === 'work' || t.id === 'todo' || t.id === 'performance' || t.id === 'qgoals') return true;
+        if (t.id === 'overview' || t.id === 'performance' || t.id === 'qgoals') return true;
         var permKey = t.id === 'matrequests' ? 'material-requests'
             : t.id === 'lostfound' ? 'lost-found'
             : t.id === 'staffdeploy' ? 'staff-deployment'
             : t.id === 'securitydeploy' ? 'security-deployment'
             : t.id === 'patientshift' ? 'patient-shifting'
-            : t.id === 'equipbackdown' ? 'problems'
+            : t.id === 'equipbackdown' ? 'equipbackdown'
             : t.id === 'cleaning' ? 'cleaning'
+            : t.id === 'scrap' ? 'scrap'
+            : t.id === 'handover' ? 'handover'
+            : t.id === 'checklists' ? 'checklists'
+            : t.id === 'work' ? 'work'
+            : t.id === 'reports' ? 'reports'
             : t.id;
         return AUTH.hasPermission(user, permKey);
     });
@@ -476,7 +518,7 @@ function renderEmployeeDashboard(container) {
         + '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:0 4px;display:flex;overflow-x:auto;gap:2px;border-bottom:none;">'
         + tabs.map(function(t) {
             var label = t.label + (t.badge > 0 ? ' <span class="badge ' + (t.badgeClass || 'badge-primary') + '" style="font-size:10px;margin-left:2px;">' + t.badge + '</span>' : '');
-            return '<button class="emp-tab-btn' + (t.id === 'overview' ? ' active' : '') + '" data-tab="' + t.id + '" onclick="empTabSwitch(\'' + t.id + '\',this)">' + label + '</button>';
+            return '<button class="emp-tab-btn' + (t.id === activeTab ? ' active' : '') + '" data-tab="' + t.id + '" onclick="empTabSwitch(\'' + t.id + '\',this)">' + label + '</button>';
         }).join('')
         + '</div>'
 
@@ -486,8 +528,8 @@ function renderEmployeeDashboard(container) {
 
     container.innerHTML = html;
 
-    _empTab = 'overview';
-    _renderEmpTab('overview');
+    _empTab = activeTab;
+    _renderEmpTab(activeTab);
 
     // Start background browser-notification check (30-min interval, once per session)
     if (typeof HMS_REM !== 'undefined') HMS_REM.scheduleCheck(user);
@@ -1718,7 +1760,6 @@ function renderEmpCleaningSection(el) {
     var tasks = DB.get('roomCleaningTasks') || [];
     var pending = tasks.filter(function(t){ return t.status !== 'done'; });
     var done    = tasks.filter(function(t){ return t.status === 'done'; });
-    var myDone  = done.filter(function(t){ return t.completedBy === (user ? user.fullName : ''); });
 
     var html = '';
     if (pending.length > 0) {
@@ -1760,12 +1801,26 @@ function renderEmpCleaningSection(el) {
         html += '</div>';
     }
 
-    if (myDone.length > 0) {
-        html += '<div style="font-weight:600;font-size:14px;color:var(--gray);margin-bottom:8px;">' + T('empd2_clean_by_you') + '</div>'
-            + '<div class="table-responsive"><table><thead><tr><th>' + T('empd2_clean_room') + '</th><th>' + T('empd2_clean_th_patient') + '</th><th>' + T('empd2_clean_th_completed') + '</th></tr></thead><tbody>';
-        myDone.slice().reverse().slice(0,10).forEach(function(t) {
-            html += '<tr><td><strong>' + t.roomNo + '</strong></td><td>' + t.patientName + '</td>'
-                + '<td>' + (t.completedAt ? APP.formatDateTime(t.completedAt) : '—') + '</td></tr>';
+    if (done.length > 0) {
+        var sortedDone = done.slice().sort(function(a, b) {
+            return new Date(b.completedAt || b.createdAt || 0) - new Date(a.completedAt || a.createdAt || 0);
+        });
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;margin-bottom:8px;">'
+            + '<div style="font-weight:600;font-size:14px;color:var(--text);">📋 Completed Cleaning History (' + done.length + ')</div>'
+            + '</div>'
+            + '<div class="table-responsive"><table><thead><tr>'
+            + '<th>' + T('empd2_clean_room') + '</th>'
+            + '<th>' + T('empd2_clean_th_patient') + '</th>'
+            + '<th>Cleaned By</th>'
+            + '<th>' + T('empd2_clean_th_completed') + '</th>'
+            + '</tr></thead><tbody>';
+        sortedDone.forEach(function(t) {
+            html += '<tr>'
+                + '<td><strong>' + (t.roomNo || '-') + '</strong>' + (t.floor ? ' <span style="font-size:11px;color:var(--gray);">(' + t.floor + ')</span>' : '') + '</td>'
+                + '<td>' + (t.patientName || '-') + '</td>'
+                + '<td>' + (t.completedBy || t.assignedTo || 'Staff') + '</td>'
+                + '<td>' + (t.completedAt ? APP.formatDateTime(t.completedAt) : '—') + '</td>'
+                + '</tr>';
         });
         html += '</tbody></table></div>';
     }

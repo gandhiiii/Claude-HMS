@@ -339,7 +339,7 @@ function renderPermissionCheckboxes(deptFeatures, userPerms, isEdit) {
     const allFeatures = [
         'dashboard', 'users', 'departments', 'inventory', 'discounts', 'purchases',
         'matrequests', 'scrap', 'gate-security', 'projects', 'ambulance', 'problems',
-        'tasks', 'complaints', 'suggestions', 'room-checklist', 'admissions',
+        'tasks', 'work', 'complaints', 'suggestions', 'room-checklist', 'admissions',
         'lost-found', 'checklists', 'admin-checklists', 'departmental-checklist',
         'handover', 'cleaning', 'equipbackdown', 'reports', 'staff-deployment',
         'security-deployment', 'patient-shifting'
@@ -351,11 +351,10 @@ function renderPermissionCheckboxes(deptFeatures, userPerms, isEdit) {
     return allFeatures.map(f => {
         const fromDept = inheritedSet.has(f);
         const checkedByUser = userSet.has(f);
-        const checked = fromDept || checkedByUser;
-        // Inherited features are disabled (read-only) only when EDITING an existing user
-        var disabledAttr = fromDept && isEdit ? 'disabled' : '';
-        return `<label class="permission-item" style="${fromDept ? 'background:#e8f0fe;border:1px solid #c2d7f8;' + (isEdit ? 'opacity:0.85;' : '') : 'background:var(--bg);'}">
-            <input type="checkbox" name="permissions" value="${f}" ${checked ? 'checked' : ''} ${disabledAttr}>
+        // If user permissions explicitly set (isEdit and userPerms is array), honor userSet; otherwise default to fromDept || checkedByUser
+        const checked = (isEdit && Array.isArray(userPerms) && userPerms.length > 0) ? userSet.has(f) : (fromDept || checkedByUser);
+        return `<label class="permission-item" style="${fromDept ? 'background:#e8f0fe;border:1px solid #c2d7f8;' : 'background:var(--bg);'}">
+            <input type="checkbox" name="permissions" value="${f}" ${checked ? 'checked' : ''}>
             <span>${f.replace('-', ' ')}</span>
             ${fromDept ? '<span style="font-size:10px;color:var(--primary);margin-left:auto;">' + T('usrmod_badge_dept_tag') + '</span>' : ''}
         </label>`;
@@ -369,14 +368,19 @@ function onDeptChange(select) {
         deptFeatures = JSON.parse(selectedOption?.getAttribute('data-features') || '[]');
     } catch(e) { deptFeatures = []; }
 
+    const form = select.closest('form');
+    const isEdit = !!form.querySelector('[name="id"]')?.value;
     const grid = document.getElementById('permissionsGrid');
     if (!grid) return;
-
-    const form = document.getElementById('userForm');
-    const isEdit = !!(form?.querySelector('[name="id"]')?.value);
     const currentPerms = Array.from(form.querySelectorAll('[name="permissions"]:checked')).map(cb => cb.value);
-
     grid.innerHTML = renderPermissionCheckboxes(deptFeatures, currentPerms, isEdit);
+}
+
+function selectAllPermissions(check) {
+    const grid = document.getElementById('permissionsGrid');
+    if (!grid) return;
+    const allCbs = grid.querySelectorAll('[name="permissions"]');
+    allCbs.forEach(cb => { cb.checked = check; });
 }
 
 function onRoleChange(select) {

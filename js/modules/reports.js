@@ -50,7 +50,7 @@ function renderReports(container) {
             + '<div style="font-size:48px;margin-bottom:12px;">🔒</div>'
             + '<h3 style="margin-bottom:8px;">Admin Access Only</h3>'
             + '<p style="color:var(--gray);font-size:14px;">Reports & Analytics is restricted to administrators.<br>Please use your dashboard for department reports.</p>'
-            + '<button class="btn btn-primary" style="margin-top:16px;" onclick="Router.navigate(\'' + (user && user.role === 'hod' ? 'hod-dashboard' : 'employee-dashboard') + '\')">← Back to My Dashboard</button>'
+            + '<button class="btn btn-primary" style="margin-top:16px;" onclick="window._targetEmpTab=\'reports\';window._hodTargetTab=\'hodreports\';Router.navigate(\'' + (user && user.role === 'hod' ? 'hod-dashboard' : 'employee-dashboard') + '\')">← Back to My Reports Dashboard</button>'
             + '</div>';
         return;
     }
