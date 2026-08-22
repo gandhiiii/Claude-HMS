@@ -471,18 +471,40 @@
         return docs;
     }
 
+    function getLoggedInUser() {
+        var u = null;
+        if (global.AUTH && typeof global.AUTH.currentUser === 'function') {
+            u = global.AUTH.currentUser();
+        }
+        if (!u && global.user) u = global.user;
+        if (!u) {
+            try {
+                var raw = localStorage.getItem('hms_currentUser');
+                if (raw) u = JSON.parse(raw);
+            } catch(e) {}
+        }
+        if (!u) {
+            try {
+                var rawAct = localStorage.getItem('carepulse_active_user');
+                if (rawAct) {
+                    var users = DB.get('users') || [];
+                    u = users.find(function(usr){ return usr.id === rawAct || usr.username === rawAct; });
+                }
+            } catch(e) {}
+        }
+        return u;
+    }
+
     function isSystemAdmin(user) {
         if (!user) return false;
+        if (user.isSuperAdmin === true) return true;
         var role = String(user.role || '').toLowerCase();
         var uname = String(user.username || '').toLowerCase();
-        return user.isSuperAdmin || uname === 'admin' || uname === 'superadmin' || role === 'admin' || role === 'superadmin';
+        return uname === 'admin' || uname === 'superadmin' || role === 'admin' || role === 'superadmin';
     }
 
     function canManageDoctors(user) {
-        if (!user) return false;
-        var role = String(user.role || '').toLowerCase();
-        var uname = String(user.username || '').toLowerCase();
-        return user.isSuperAdmin || uname === 'admin' || uname === 'superadmin' || role === 'admin' || role === 'superadmin' || role === 'cfo' || role === 'chief_accountant' || role === 'account';
+        return isSystemAdmin(user);
     }
 
     global.removeDoctorByName = function(docName) {
@@ -875,7 +897,7 @@
     // Main module renderer called by Router.navigate('discounts')
     global.renderDiscounts = function (container) {
         if (!container) return;
-        var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
+        var user = getLoggedInUser();
         var canAddDoc = canManageDoctors(user);
         var matrix = getApprovalMatrix();
         var isAdmin = isSystemAdmin(user);
