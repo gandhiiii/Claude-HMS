@@ -263,34 +263,128 @@
         return matrix;
     }
 
-    global.editApprovalMatrixPrompt = function() {
-        var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
-        var isAdmin = !user || user.isSuperAdmin || ['admin', 'superadmin', 'md', 'director', 'chairman', 'executive'].indexOf(String(user.role || '').toLowerCase()) !== -1;
-        if (!isAdmin) {
-            if (global.APP && global.APP.notify) global.APP.notify('Only System Administrators can modify the Approval Procedure Matrix amounts.', 'error');
-            else alert('Only System Administrators can modify the Approval Procedure Matrix amounts.');
+    global.openApprovalMatrixEditModal = function(focusTier) {
+        var user = getLoggedInUser();
+        if (!isSystemAdmin(user)) {
+            if (global.APP && global.APP.notify) global.APP.notify('Only System Administrators can configure the Approval Procedure Matrix.', 'error');
+            else alert('Only System Administrators can configure the Approval Procedure Matrix.');
             return;
         }
 
         var matrix = getApprovalMatrix();
-        var t1 = prompt('Enter Tier 1 Max Amount (Up to Finance Manager, current: ₹' + matrix.tier1Limit + '):', matrix.tier1Limit);
-        if (t1 === null) return;
-        var t1Num = Number(t1);
-        if (isNaN(t1Num) || t1Num <= 0) { alert('Invalid Tier 1 amount'); return; }
+        var existingModal = document.getElementById('approvalMatrixEditModal');
+        if (existingModal) existingModal.remove();
 
-        var t2 = prompt('Enter Tier 2 Max Amount (Above Tier 1 up to CFO, current: ₹' + matrix.tier2Limit + '):', matrix.tier2Limit);
-        if (t2 === null) return;
-        var t2Num = Number(t2);
-        if (isNaN(t2Num) || t2Num <= t1Num) { alert('Tier 2 amount must be greater than Tier 1 amount'); return; }
+        var modal = document.createElement('div');
+        modal.id = 'approvalMatrixEditModal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(15,23,42,0.75);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+        
+        modal.innerHTML = 
+            '<div style="background:#fff;border-radius:16px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);width:100%;max-width:540px;overflow:hidden;border:1px solid #e2e8f0;animation:fadeIn 0.2s ease-out;">'
+            + '  <div style="background:linear-gradient(135deg, #0f172a, #1e293b);padding:16px 20px;color:#fff;display:flex;justify-content:space-between;align-items:center;">'
+            + '    <div>'
+            + '      <h3 style="margin:0;font-size:16px;font-weight:700;">⚖️ Edit Approval Matrix & Role Routing</h3>'
+            + '      <p style="margin:2px 0 0 0;font-size:12px;color:#94a3b8;">Set amounts & assigned roles for 3 Approval Tiers</p>'
+            + '    </div>'
+            + '    <button onclick="document.getElementById(\'approvalMatrixEditModal\').remove()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;line-height:1;">✕</button>'
+            + '  </div>'
+            + '  <div style="padding:20px;max-height:75vh;overflow-y:auto;display:flex;flex-direction:column;gap:16px;">'
 
-        matrix.tier1Limit = t1Num;
-        matrix.tier2Limit = t2Num;
+            // Tier 1 Section
+            + '    <div style="background:#f8fafc;border:2px solid ' + (focusTier === 'tier1' ? '#3b82f6' : '#e2e8f0') + ';padding:14px;border-radius:12px;">'
+            + '      <div style="font-weight:700;font-size:13px;color:#1e40af;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">'
+            + '        <span>1️⃣ Tier 1 Approval (First Level)</span>'
+            + '        <span style="font-size:11px;background:#dbeafe;color:#1e40af;padding:2px 6px;border-radius:4px;">Up to Tier 1 Limit</span>'
+            + '      </div>'
+            + '      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
+            + '        <div>'
+            + '          <label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Max Amount Limit (₹):</label>'
+            + '          <input type="number" id="mat_t1Limit" value="' + (matrix.tier1Limit || 25000) + '" class="form-control" style="font-size:12px;padding:6px 10px;font-weight:700;">'
+            + '        </div>'
+            + '        <div>'
+            + '          <label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Assigned Role Title:</label>'
+            + '          <input type="text" id="mat_t1Label" value="' + (matrix.tier1Label || 'Finance Manager') + '" class="form-control" style="font-size:12px;padding:6px 10px;">'
+            + '        </div>'
+            + '      </div>'
+            + '    </div>'
+
+            // Tier 2 Section
+            + '    <div style="background:#f8fafc;border:2px solid ' + (focusTier === 'tier2' ? '#f59e0b' : '#e2e8f0') + ';padding:14px;border-radius:12px;">'
+            + '      <div style="font-weight:700;font-size:13px;color:#b45309;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">'
+            + '        <span>2️⃣ Tier 2 Approval (Mid Level)</span>'
+            + '        <span style="font-size:11px;background:#fef3c7;color:#b45309;padding:2px 6px;border-radius:4px;">Tier 1 Max to Tier 2 Max</span>'
+            + '      </div>'
+            + '      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
+            + '        <div>'
+            + '          <label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Max Amount Limit (₹):</label>'
+            + '          <input type="number" id="mat_t2Limit" value="' + (matrix.tier2Limit || 200000) + '" class="form-control" style="font-size:12px;padding:6px 10px;font-weight:700;">'
+            + '        </div>'
+            + '        <div>'
+            + '          <label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Assigned Role Title:</label>'
+            + '          <input type="text" id="mat_t2Label" value="' + (matrix.tier2Label || 'CFO') + '" class="form-control" style="font-size:12px;padding:6px 10px;">'
+            + '        </div>'
+            + '      </div>'
+            + '    </div>'
+
+            // Tier 3 Section
+            + '    <div style="background:#f8fafc;border:2px solid ' + (focusTier === 'tier3' ? '#ef4444' : '#e2e8f0') + ';padding:14px;border-radius:12px;">'
+            + '      <div style="font-weight:700;font-size:13px;color:#b91c1c;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;">'
+            + '        <span>3️⃣ Tier 3 Approval (Highest Level)</span>'
+            + '        <span style="font-size:11px;background:#fee2e2;color:#b91c1c;padding:2px 6px;border-radius:4px;">Above Tier 2 Max</span>'
+            + '      </div>'
+            + '      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
+            + '        <div>'
+            + '          <label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Min Threshold (₹):</label>'
+            + '          <input type="text" value="Above Tier 2 Max" disabled class="form-control" style="font-size:12px;padding:6px 10px;background:#f1f5f9;color:#94a3b8;">'
+            + '        </div>'
+            + '        <div>'
+            + '          <label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:4px;">Assigned Role Title:</label>'
+            + '          <input type="text" id="mat_t3Label" value="' + (matrix.tier3Label || 'Director') + '" class="form-control" style="font-size:12px;padding:6px 10px;">'
+            + '        </div>'
+            + '      </div>'
+            + '    </div>'
+
+            + '  </div>'
+            + '  <div style="background:#f8fafc;padding:12px 20px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:10px;">'
+            + '    <button type="button" class="btn btn-outline" style="font-size:12px;padding:6px 14px;" onclick="document.getElementById(\'approvalMatrixEditModal\').remove()">Cancel</button>'
+            + '    <button type="button" class="btn btn-primary" style="font-size:12px;padding:6px 16px;font-weight:700;" onclick="saveApprovalMatrixModal()">💾 Save & Apply Matrix</button>'
+            + '  </div>'
+            + '</div>';
+
+        document.body.appendChild(modal);
+    };
+
+    global.saveApprovalMatrixModal = function() {
+        var t1 = Number(document.getElementById('mat_t1Limit').value);
+        var t2 = Number(document.getElementById('mat_t2Limit').value);
+        var t1Label = document.getElementById('mat_t1Label').value.trim() || 'Finance Manager';
+        var t2Label = document.getElementById('mat_t2Label').value.trim() || 'CFO';
+        var t3Label = document.getElementById('mat_t3Label').value.trim() || 'Director';
+
+        if (isNaN(t1) || t1 <= 0) { alert('Please enter a valid Tier 1 Max Amount limit (> 0).'); return; }
+        if (isNaN(t2) || t2 <= t1) { alert('Tier 2 Max Amount limit must be greater than Tier 1 Max Amount (₹' + t1 + ').'); return; }
+
+        var matrix = getApprovalMatrix();
+        matrix.tier1Limit = t1;
+        matrix.tier2Limit = t2;
+        matrix.tier1Label = t1Label;
+        matrix.tier2Label = t2Label;
+        matrix.tier3Label = t3Label;
+
         DB.set('approvalMatrix', matrix);
-        if (global.APP && global.APP.notify) global.APP.notify('Approval Matrix amounts updated successfully!', 'success');
-        if (typeof global.renderDiscounts === 'function') {
-            var container = document.getElementById('pageContent') || document.querySelector('.page-content');
-            if (container) global.renderDiscounts(container);
-        }
+
+        if (global.APP && global.APP.notify) global.APP.notify('Approval Matrix amounts and role routing updated successfully!', 'success');
+        else alert('Approval Matrix amounts and role routing updated successfully!');
+
+        var el = document.getElementById('approvalMatrixEditModal');
+        if (el) el.remove();
+
+        var container = document.getElementById('pageContent') || document.querySelector('.page-content');
+        if (container && typeof global.renderDiscounts === 'function') global.renderDiscounts(container);
+    };
+
+    global.editApprovalMatrixPrompt = function() {
+        global.openApprovalMatrixEditModal('tier1');
     };
 
     function resolveApprovalRouting(discountAmount, isBypass) {
@@ -951,26 +1045,36 @@
             + '  </div>'
             + '</div>'
 
-            // Approval Procedure Matrix Card (Fixed View-Only Procedure)
+            // Approval Procedure Matrix Card (Interactive Edit for Admin)
             + '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">'
             + '  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">'
             + '    <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">⚖️ Approval Procedure - All Department <small style="font-weight:normal;color:var(--gray);">(Amount-Based Routing & Matrix)</small></div>'
+            + (isAdmin ? '    <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;font-weight:700;" onclick="openApprovalMatrixEditModal(\'tier1\')">✏️ Edit Matrix & Roles (Admin Only)</button>' : '')
             + '  </div>'
             + '  <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:8px;font-size:12px;">'
-            + '    <div style="background:var(--white,#fff);border:1px solid var(--border);padding:8px 12px;border-radius:8px;">'
-            + '      <span style="color:var(--gray);display:block;font-size:11px;font-weight:600;">Tier 1 Approval</span>'
-            + '      <strong style="color:var(--primary);font-size:13px;">Up to ₹25,000/-</strong>'
-            + '      <span style="display:block;color:var(--dark);font-size:11px;">Trf to Finance Manager</span>'
+            + '    <div ' + (isAdmin ? 'onclick="openApprovalMatrixEditModal(\'tier1\')" title="Click to edit Tier 1 Amount & Role" style="background:var(--white,#fff);border:1.5px dashed var(--primary);padding:10px 12px;border-radius:8px;cursor:pointer;transition:all 0.2s;" class="hover-card"' : 'style="background:var(--white,#fff);border:1px solid var(--border);padding:10px 12px;border-radius:8px;"') + '>'
+            + '      <div style="display:flex;justify-content:space-between;align-items:center;">'
+            + '        <span style="color:var(--gray);font-size:11px;font-weight:600;">Tier 1 Approval</span>'
+            + (isAdmin ? '        <small style="color:var(--primary);font-size:10px;font-weight:bold;">✏️ Edit</small>' : '')
+            + '      </div>'
+            + '      <strong style="color:var(--primary);font-size:13px;display:block;margin-top:2px;">Up to ₹' + (matrix.tier1Limit || 25000).toLocaleString('en-IN') + '/-</strong>'
+            + '      <span style="display:block;color:var(--dark);font-size:11px;font-weight:600;margin-top:2px;">Trf to ' + (matrix.tier1Label || 'Finance Manager') + '</span>'
             + '    </div>'
-            + '    <div style="background:var(--white,#fff);border:1px solid var(--border);padding:8px 12px;border-radius:8px;">'
-            + '      <span style="color:var(--gray);display:block;font-size:11px;font-weight:600;">Tier 2 Approval</span>'
-            + '      <strong style="color:#ed6c02;font-size:13px;">Above ₹25,000/- - ₹2,00,000/-</strong>'
-            + '      <span style="display:block;color:var(--dark);font-size:11px;">Trf to CFO</span>'
+            + '    <div ' + (isAdmin ? 'onclick="openApprovalMatrixEditModal(\'tier2\')" title="Click to edit Tier 2 Amount & Role" style="background:var(--white,#fff);border:1.5px dashed #ed6c02;padding:10px 12px;border-radius:8px;cursor:pointer;transition:all 0.2s;" class="hover-card"' : 'style="background:var(--white,#fff);border:1px solid var(--border);padding:10px 12px;border-radius:8px;"') + '>'
+            + '      <div style="display:flex;justify-content:space-between;align-items:center;">'
+            + '        <span style="color:var(--gray);font-size:11px;font-weight:600;">Tier 2 Approval</span>'
+            + (isAdmin ? '        <small style="color:#ed6c02;font-size:10px;font-weight:bold;">✏️ Edit</small>' : '')
+            + '      </div>'
+            + '      <strong style="color:#ed6c02;font-size:13px;display:block;margin-top:2px;">Above ₹' + (matrix.tier1Limit || 25000).toLocaleString('en-IN') + '/- - ₹' + (matrix.tier2Limit || 200000).toLocaleString('en-IN') + '/-</strong>'
+            + '      <span style="display:block;color:var(--dark);font-size:11px;font-weight:600;margin-top:2px;">Trf to ' + (matrix.tier2Label || 'CFO') + '</span>'
             + '    </div>'
-            + '    <div style="background:var(--white,#fff);border:1px solid var(--border);padding:8px 12px;border-radius:8px;">'
-            + '      <span style="color:var(--gray);display:block;font-size:11px;font-weight:600;">Tier 3 Approval</span>'
-            + '      <strong style="color:#d32f2f;font-size:13px;">Above ₹2,00,000/-</strong>'
-            + '      <span style="display:block;color:var(--dark);font-size:11px;">Trf to Director</span>'
+            + '    <div ' + (isAdmin ? 'onclick="openApprovalMatrixEditModal(\'tier3\')" title="Click to edit Tier 3 Role" style="background:var(--white,#fff);border:1.5px dashed #d32f2f;padding:10px 12px;border-radius:8px;cursor:pointer;transition:all 0.2s;" class="hover-card"' : 'style="background:var(--white,#fff);border:1px solid var(--border);padding:10px 12px;border-radius:8px;"') + '>'
+            + '      <div style="display:flex;justify-content:space-between;align-items:center;">'
+            + '        <span style="color:var(--gray);font-size:11px;font-weight:600;">Tier 3 Approval</span>'
+            + (isAdmin ? '        <small style="color:#d32f2f;font-size:10px;font-weight:bold;">✏️ Edit</small>' : '')
+            + '      </div>'
+            + '      <strong style="color:#d32f2f;font-size:13px;display:block;margin-top:2px;">Above ₹' + (matrix.tier2Limit || 200000).toLocaleString('en-IN') + '/-</strong>'
+            + '      <span style="display:block;color:var(--dark);font-size:11px;font-weight:600;margin-top:2px;">Trf to ' + (matrix.tier3Label || 'Director') + '</span>'
             + '    </div>'
             + '  </div>'
             + '</div>'
