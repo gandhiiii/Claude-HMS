@@ -625,8 +625,14 @@ const AUTH = {
         if (user.role === 'storekeeper' && ['inventory','material-requests','problems'].indexOf(permission) !== -1) return true;
         // HOD auto-gets admissions, checklists, material-requests so they can manage their dept
         if (user.role === 'hod' && ['admissions','checklists','departmental-checklist','material-requests','problems','tasks','department-meetings','staff-deployment','security-deployment','patient-shifting'].indexOf(permission) !== -1) return true;
-        // HOD and employees can file indoor incidents (complaints)
-        if (permission === 'complaints' && (user.role === 'hod' || user.role === 'employee')) return true;
+        // Room cleaning & room checklists: auto-granted only to Nursing, Facility, Maintenance, Housekeeping
+        if (permission === 'cleaning' || permission === 'room-checklist') {
+            if (user.permissions && user.permissions.indexOf(permission) !== -1) return true;
+            var dCleanNorm = (user.department || '').trim().toLowerCase();
+            var isCleanDept = ['facility', 'maintenance', 'housekeeping', 'nursing', 'icu', 'ward', 'ot', 'clinical'].some(function(x){ return dCleanNorm.indexOf(x) !== -1; });
+            return isCleanDept;
+        }
+
         // Employees auto-get access to checklists, deployments, and shifting
         if (user.role === 'employee' && ['checklists','departmental-checklist','staff-deployment','security-deployment','patient-shifting'].indexOf(permission) !== -1) return true;
         return user.permissions && user.permissions.includes(permission);

@@ -405,19 +405,20 @@ function renderEmployeeDashboard(container) {
     }
 
     // Admin Feature Control: Filter tabs so ONLY options given by Admin are displayed
-    if (user.permissions && Array.isArray(user.permissions) && user.permissions.length > 0) {
-        tabs = tabs.filter(function(t) {
-            if (t.id === 'overview' || t.id === 'work' || t.id === 'todo' || t.id === 'performance' || t.id === 'qgoals') return true;
-            var permKey = t.id === 'matrequests' ? 'material-requests'
-                : t.id === 'lostfound' ? 'lost-found'
-                : t.id === 'staffdeploy' ? 'staff-deployment'
-                : t.id === 'securitydeploy' ? 'security-deployment'
-                : t.id === 'patientshift' ? 'patient-shifting'
-                : t.id === 'equipbackdown' ? 'problems'
-                : t.id;
-            return AUTH.hasPermission(user, permKey);
-        });
-    }
+    tabs = tabs.filter(function(t) {
+        if (t.id === 'overview' || t.id === 'work' || t.id === 'todo' || t.id === 'performance' || t.id === 'qgoals') return true;
+        var permKey = t.id === 'matrequests' ? 'material-requests'
+            : t.id === 'lostfound' ? 'lost-found'
+            : t.id === 'staffdeploy' ? 'staff-deployment'
+            : t.id === 'securitydeploy' ? 'security-deployment'
+            : t.id === 'patientshift' ? 'patient-shifting'
+            : t.id === 'equipbackdown' ? 'problems'
+            : t.id === 'cleaning' ? 'cleaning'
+            : t.id;
+        return AUTH.hasPermission(user, permKey);
+    });
+
+    var canSeeCleaning = (isNursingGrp || isFacilityGrp) || AUTH.hasPermission(user, 'cleaning') || AUTH.hasPermission(user, 'room-checklist');
 
     var html = ''
         // ── Profile header ──
@@ -464,8 +465,8 @@ function renderEmployeeDashboard(container) {
         + '</div>'
         + '</div>'
 
-        // ── Cleaning alert (hidden for IT) ──
-        + (dept !== 'IT' && _empData.pendingCleaning.length > 0
+        // ── Cleaning alert (only shown to staff with explicit cleaning rights or Nursing/Facility department) ──
+        + (canSeeCleaning && _empData.pendingCleaning.length > 0
             ? '<div style="background:#fff3e0;border:2px solid var(--warning);border-radius:10px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="empTabSwitch(\'cleaning\',this)">'
               + '<span style="font-size:24px;">🧹</span><div style="flex:1;"><div style="font-weight:700;color:#e65100;">' + _empData.pendingCleaning.length + ' ' + T('empd2_rooms_cleaning') + '</div>'
               + '<div style="font-size:12px;color:var(--gray);">' + T('empd2_tap_view') + '</div></div><span style="color:#e65100;">›</span></div>'
