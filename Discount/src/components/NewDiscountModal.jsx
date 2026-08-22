@@ -395,8 +395,8 @@ export const NewDiscountModal = ({ onClose }) => {
               <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
                 Discount Matrix Preset Tiers:
               </label>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {[10, 25, 50, 100].map((pct) => (
+              <div className="grid grid-cols-4 md:grid-cols-8 gap-1.5">
+                {[5, 10, 15, 20, 25, 30, 50, 100].map((pct) => (
                   <button
                     key={pct}
                     type="button"
@@ -407,16 +407,13 @@ export const NewDiscountModal = ({ onClose }) => {
                         requestedDiscountVal: pct
                       });
                     }}
-                    className={`py-1.5 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                    className={`py-1.5 px-2 rounded-xl border text-xs font-bold transition-all flex flex-col items-center justify-center ${
                       Number(formData.requestedDiscountVal) === pct && formData.requestedDiscountType === 'PERCENTAGE'
                         ? 'bg-teal-500 text-slate-950 border-teal-400 shadow-lg shadow-teal-500/20 scale-[1.02]'
                         : 'bg-slate-950 text-teal-300 border-slate-800 hover:border-teal-500/50 hover:bg-slate-900'
                     }`}
                   >
                     <span>{pct}%</span>
-                    <span className="text-[9px] opacity-75 font-normal">
-                      {pct === 10 ? '(Routine)' : pct === 25 ? '(Staff/Doc)' : pct === 50 ? '(Hardship)' : '(100% BPL)'}
-                    </span>
                   </button>
                 ))}
               </div>

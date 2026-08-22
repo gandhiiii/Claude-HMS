@@ -566,6 +566,37 @@
         }
     };
 
+    global.setDiscountPresetPct = function(pct) {
+        var form = document.getElementById('receptionForm');
+        if (!form) return;
+        var typeSel = form.querySelector('[name="discountType"]');
+        var valInput = form.querySelector('[name="discountValue"]');
+        if (typeSel) typeSel.value = 'PERCENTAGE';
+        if (valInput) valInput.value = pct;
+        global.updateDiscountLiveCalc();
+    };
+
+    global.updateDiscountLiveCalc = function() {
+        var form = document.getElementById('receptionForm');
+        if (!form) return;
+        var totalBill = Number(form.querySelector('[name="totalBillAmount"]').value) || 0;
+        var discType = form.querySelector('[name="discountType"]').value || 'PERCENTAGE';
+        var discVal = Number(form.querySelector('[name="discountValue"]').value) || 0;
+
+        var discAmt = 0;
+        if (discType === 'FIXED') {
+            discAmt = Math.min(discVal, totalBill);
+        } else {
+            discAmt = Number((totalBill * discVal / 100).toFixed(2));
+        }
+        var payable = Math.max(0, Number((totalBill - discAmt).toFixed(2)));
+
+        var discEl = document.getElementById('liveCalcDiscountAmt');
+        var payableEl = document.getElementById('liveCalcPayableAmt');
+        if (discEl) discEl.textContent = '₹' + discAmt.toLocaleString('en-IN');
+        if (payableEl) payableEl.textContent = '₹' + payable.toLocaleString('en-IN');
+    };
+
     // -------------------------------------------------------------
     // 5.  Reception module – for employees (uses createDiscount above)
     // -------------------------------------------------------------
@@ -616,19 +647,42 @@
             '<div class="grid-2 mb-3" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">',
             '  <div class="form-group">',
             '    <label style="font-weight:600;margin-bottom:4px;display:block;">Total Bill Amount <small>₹</small> *</label>',
-            '    <input type="number" name="totalBillAmount" class="form-control" step="0.01" placeholder="e.g. 15000" required>',
+            '    <input type="number" name="totalBillAmount" class="form-control" step="0.01" placeholder="e.g. 15000" oninput="updateDiscountLiveCalc()" required>',
             '  </div>',
             '  <div class="form-group">',
             '    <label style="font-weight:600;margin-bottom:4px;display:block;">Discount Type</label>',
-            '    <select name="discountType" class="form-control">',
+            '    <select name="discountType" class="form-control" onchange="updateDiscountLiveCalc()">',
             '      <option value="PERCENTAGE">Percentage (%)</option>',
             '      <option value="FIXED">Fixed Amount (₹)</option>',
             '    </select>',
             '  </div>',
             '</div>',
             '<div class="form-group mb-3">',
+            '  <label style="font-weight:600;margin-bottom:4px;display:block;">Discount Percentage Quick Select Range</label>',
+            '  <div style="display:flex;gap:6px;flex-wrap:wrap;">',
+            '    <button type="button" class="btn btn-sm btn-outline" style="font-size:12px;padding:4px 10px;font-weight:bold;color:var(--primary);" onclick="setDiscountPresetPct(5)">5%</button>',
+            '    <button type="button" class="btn btn-sm btn-outline" style="font-size:12px;padding:4px 10px;font-weight:bold;color:var(--primary);" onclick="setDiscountPresetPct(10)">10%</button>',
+            '    <button type="button" class="btn btn-sm btn-outline" style="font-size:12px;padding:4px 10px;font-weight:bold;color:var(--primary);" onclick="setDiscountPresetPct(15)">15%</button>',
+            '    <button type="button" class="btn btn-sm btn-outline" style="font-size:12px;padding:4px 10px;font-weight:bold;color:var(--primary);" onclick="setDiscountPresetPct(20)">20%</button>',
+            '    <button type="button" class="btn btn-sm btn-outline" style="font-size:12px;padding:4px 10px;font-weight:bold;color:var(--primary);" onclick="setDiscountPresetPct(25)">25%</button>',
+            '    <button type="button" class="btn btn-sm btn-outline" style="font-size:12px;padding:4px 10px;font-weight:bold;color:var(--primary);" onclick="setDiscountPresetPct(30)">30%</button>',
+            '    <button type="button" class="btn btn-sm btn-outline" style="font-size:12px;padding:4px 10px;font-weight:bold;color:var(--primary);" onclick="setDiscountPresetPct(50)">50%</button>',
+            '    <button type="button" class="btn btn-sm btn-outline" style="font-size:12px;padding:4px 10px;font-weight:bold;color:var(--primary);" onclick="setDiscountPresetPct(100)">100%</button>',
+            '  </div>',
+            '</div>',
+            '<div class="form-group mb-3">',
             '  <label style="font-weight:600;margin-bottom:4px;display:block;">Discount Value *</label>',
-            '  <input type="number" name="discountValue" class="form-control" min="0" step="0.01" placeholder="e.g. 15" required>',
+            '  <input type="number" name="discountValue" class="form-control" min="0" step="0.01" placeholder="e.g. 15" oninput="updateDiscountLiveCalc()" required>',
+            '</div>',
+            '<div style="background:#e8f5e9;border:1px solid #c8e6c9;padding:10px 14px;border-radius:8px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:center;">',
+            '  <div>',
+            '    <span style="font-size:11px;color:#2e7d32;font-weight:600;display:block;">Discount Waiver Amount</span>',
+            '    <strong id="liveCalcDiscountAmt" style="font-size:16px;color:#2e7d32;">₹0</strong>',
+            '  </div>',
+            '  <div>',
+            '    <span style="font-size:11px;color:#1b5e20;font-weight:700;display:block;">Net Amount Payable After Discount</span>',
+            '    <strong id="liveCalcPayableAmt" style="font-size:16px;color:#1b5e20;">₹0</strong>',
+            '  </div>',
             '</div>',
             '<div class="form-group mb-3">',
             '  <label style="font-weight:600;margin-bottom:4px;display:block;">Detailed Reason for Concession *</label>',
