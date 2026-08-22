@@ -41,14 +41,14 @@ var SUPABASE_CONFIG = {
         } catch (e) {}
 
         // Priority 2: In-app saved config (from Data History setup form or downloaded file)
-        if (SUPABASE_CONFIG.url.startsWith('REPLACE_')) {
-            try {
-                var _saved = JSON.parse(localStorage.getItem('hms_supabase_cfg') || 'null');
-                if (_saved && _saved.url && !_saved.url.startsWith('REPLACE_')) {
-                    SUPABASE_CONFIG = _saved;
-                }
-            } catch (e) {}
-        }
+        try {
+            var _saved = JSON.parse(localStorage.getItem('hms_supabase_cfg') || 'null');
+            if (_saved && (_saved.publishableKey === "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVC" || (_saved.publishableKey && _saved.publishableKey.length < 40))) {
+                localStorage.removeItem('hms_supabase_cfg');
+            } else if (SUPABASE_CONFIG.url.startsWith('REPLACE_') && _saved && _saved.url && !_saved.url.startsWith('REPLACE_')) {
+                SUPABASE_CONFIG = _saved;
+            }
+        } catch (e) {}
 
         // If the URL is still a placeholder, run local-only
         if (SUPABASE_CONFIG.url.startsWith('REPLACE_')) {
