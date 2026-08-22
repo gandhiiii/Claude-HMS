@@ -617,24 +617,42 @@ const AUTH = {
             return user.permissions.includes(permission);
         }
 
-        // Role-based auto-grants (when no restrictive permissions array is configured by Admin)
+        // Role and Department-Based Auto-Grants (when NO explicit user permission override is set)
+        var dNorm = (user.department || '').trim().toLowerCase();
+        var isFacilityDept = ['facility', 'maintenance', 'housekeeping', 'security', 'engineering'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+        var isNursingDept  = ['nursing', 'icu', 'ward', 'ot', 'casualty', 'emergency', 'clinical'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+        var isStoreDept    = ['store', 'stores', 'inventory', 'warehouse'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+        var isItDept       = ['it', 'computer', 'computers', 'biomedical', 'software'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+
         if (permission === 'hod-dashboard' && user.role === 'hod') return true;
         if (permission === 'employee-dashboard' && !(user.isSuperAdmin || user.role === 'admin')) return true;
         if (permission === 'storekeeper-dashboard' && user.role === 'storekeeper') return true;
-        // Storekeeper auto-gets inventory and material-requests access
-        if (user.role === 'storekeeper' && ['inventory','material-requests','problems'].indexOf(permission) !== -1) return true;
-        // HOD auto-gets admissions, checklists, material-requests so they can manage their dept
-        if (user.role === 'hod' && ['admissions','checklists','departmental-checklist','material-requests','problems','tasks','department-meetings','staff-deployment','security-deployment','patient-shifting'].indexOf(permission) !== -1) return true;
-        // Room cleaning & room checklists: auto-granted only to Nursing, Facility, Maintenance, Housekeeping
-        if (permission === 'cleaning' || permission === 'room-checklist') {
-            if (user.permissions && user.permissions.indexOf(permission) !== -1) return true;
-            var dCleanNorm = (user.department || '').trim().toLowerCase();
-            var isCleanDept = ['facility', 'maintenance', 'housekeeping', 'nursing', 'icu', 'ward', 'ot', 'clinical'].some(function(x){ return dCleanNorm.indexOf(x) !== -1; });
-            return isCleanDept;
+
+        // Facility / Maintenance / Housekeeping auto-grants
+        if (isFacilityDept) {
+            if (['checklists','departmental-checklist','cleaning','room-checklist','staff-deployment','security-deployment','problems','material-requests','scrap','handover'].indexOf(permission) !== -1) return true;
         }
 
-        // Employees auto-get access to checklists, deployments, and shifting
-        if (user.role === 'employee' && ['checklists','departmental-checklist','staff-deployment','security-deployment','patient-shifting'].indexOf(permission) !== -1) return true;
+        // Nursing / Clinical auto-grants
+        if (isNursingDept) {
+            if (['checklists','departmental-checklist','cleaning','room-checklist','admissions','patient-shifting','handover','material-requests','problems'].indexOf(permission) !== -1) return true;
+        }
+
+        // Storekeeper / Store auto-grants
+        if (isStoreDept || user.role === 'storekeeper') {
+            if (['inventory','material-requests','scrap','checklists','problems'].indexOf(permission) !== -1) return true;
+        }
+
+        // IT auto-grants
+        if (isItDept) {
+            if (['problems','checklists','handover'].indexOf(permission) !== -1) return true;
+        }
+
+        // HOD auto-gets management access for their department
+        if (user.role === 'hod') {
+            if (['tasks','department-meetings','departmental-checklist','checklists','material-requests','problems'].indexOf(permission) !== -1) return true;
+        }
+
         return user.permissions && user.permissions.includes(permission);
     },
     canAccess(permission) {

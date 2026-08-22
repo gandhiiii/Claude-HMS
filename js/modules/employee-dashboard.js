@@ -435,9 +435,9 @@ function renderEmployeeDashboard(container) {
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px;">'
         + _kpiCard('📅', T('empd2_kpi_due_today'),  todayTasks.length, '#fff3e0', '#e65100', 'work')
         + _kpiCard('📆', T('empd2_kpi_due_week'),   weekTasks.length,  '#e3f2fd', 'var(--primary)', 'work')
-        + _kpiCard('✅', T('empd2_kpi_checklist'),  clPct + '%',       '#e8f5e9', 'var(--secondary)', 'checklists')
-        + _kpiCard('🔧', T('empd2_kpi_issues'),     openProbs.length,  '#fce4ec', 'var(--danger)', 'reports')
-        + _kpiCard('📋', T('empd2_kpi_projects'),   _empData.myProjects.length, '#f3e5f5', '#7b1fa2', 'work')
+        + (AUTH.hasPermission(user, 'checklists') ? _kpiCard('✅', T('empd2_kpi_checklist'), clPct + '%', '#e8f5e9', 'var(--secondary)', 'checklists') : '')
+        + (AUTH.hasPermission(user, 'problems') ? _kpiCard('🔧', T('empd2_kpi_issues'), openProbs.length, '#fce4ec', 'var(--danger)', 'reports') : '')
+        + (AUTH.hasPermission(user, 'projects') || _empData.myProjects.length > 0 ? _kpiCard('📋', T('empd2_kpi_projects'), _empData.myProjects.length, '#f3e5f5', '#7b1fa2', 'work') : '')
         + _kpiCard('📝', T('empd2_kpi_todo'), todoPend, '#fff8e1', '#f57f17', 'todo')
         + '</div>'
 
@@ -668,7 +668,7 @@ function renderEmpOverview(el) {
             html += '</div>';
         }
 
-        if (recentCl.length > 0) {
+        if (recentCl.length > 0 && AUTH.hasPermission(d.user, 'checklists')) {
             html += '<div style="font-size:12px;font-weight:600;color:var(--gray);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.5px;">' + T('empd2_open_checklists') + '</div>';
             recentCl.slice(0, 3).forEach(function(cl) {
                 var total = cl.items ? cl.items.length : 0;
