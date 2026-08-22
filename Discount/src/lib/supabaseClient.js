@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Default mock values if environment variables are missing
-const defaultUrl = 'https://mock-hospital-supabase.supabase.co';
-const defaultAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock_key';
+// Default Supabase values
+const defaultUrl = 'https://hpjexrelsmdjkjgohele.supabase.co';
+const defaultAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVC';
 
 let supabaseClient = null;
 
