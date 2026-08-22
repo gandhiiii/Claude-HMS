@@ -19,8 +19,8 @@ import {
 export const NewDiscountModal = ({ onClose }) => {
   const { createDiscountRequest, createDirectExecutiveGrant, getRequiredAuthorityForDiscount, activeUser, users, departments, services, doctors, getDepartmentForService } = useApp();
 
-  const isExecutive = ['CHAIRMAN', 'VICE_CHAIRMAN', 'MD'].includes(activeUser?.role);
-  const [isDirectGrantMode, setIsDirectGrantMode] = useState(isExecutive);
+  const canUserBypass = activeUser?.role === 'ADMIN' || activeUser?.role === 'SUPERADMIN' || activeUser?.username === 'admin' || !!activeUser?.canBypassApproval;
+  const [isDirectGrantMode, setIsDirectGrantMode] = useState(canUserBypass);
 
   const defaultService = (services && services[0]) || 'Consultation Fees';
   const defaultDept = getDepartmentForService ? getDepartmentForService(defaultService) : (departments[0] || 'OPD');

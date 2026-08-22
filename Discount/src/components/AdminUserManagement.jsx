@@ -587,6 +587,29 @@ export const AdminUserManagement = () => {
                 </div>
               </div>
 
+              {/* Bypass Matrix Privilege Strip */}
+              <div className="mt-3 p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Matrix Bypass Privilege:</span>
+                  <span className={`text-[11px] font-extrabold ${user.role === 'ADMIN' || user.canBypassApproval ? 'text-amber-400' : 'text-slate-500'}`}>
+                    {user.role === 'ADMIN' || user.canBypassApproval ? '⚡ Granted (Bypass Active)' : '🔒 Standard Routing'}
+                  </span>
+                </div>
+                {user.role !== 'ADMIN' && (
+                  <button
+                    type="button"
+                    onClick={() => updateUser(user.id, { canBypassApproval: !user.canBypassApproval })}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold border transition-all ${
+                      user.canBypassApproval
+                        ? 'bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20'
+                        : 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
+                    }`}
+                  >
+                    {user.canBypassApproval ? '🚫 Revoke Bypass' : '⚡ Grant Bypass'}
+                  </button>
+                )}
+              </div>
+
               {/* Contact Info for Notifications */}
               <div className="mt-3 space-y-1.5 text-xs text-slate-400">
                 <div className="flex items-center gap-2">

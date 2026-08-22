@@ -330,12 +330,78 @@
         }
     }
 
+    function userCanBypass(user) {
+        if (!user) return false;
+        var role = String(user.role || '').toLowerCase();
+        var uname = String(user.username || '').toLowerCase();
+        var isSysAdmin = user.isSuperAdmin || uname === 'admin' || uname === 'superadmin' || role === 'admin' || role === 'superadmin';
+        if (isSysAdmin) return true;
+
+        // Check DB users array
+        var users = DB.get('users') || [];
+        var targetUser = users.find(function(u){ 
+            return (u.username && u.username.toLowerCase() === uname) || (u.id && u.id === user.id); 
+        });
+        if (targetUser && targetUser.canBypassApproval) return true;
+        if (user.canBypassApproval) return true;
+
+        return false;
+    }
+
+    global.toggleUserBypassRight = function(uname) {
+        var currentUser = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
+        var isAdmin = !currentUser || currentUser.isSuperAdmin || ['admin', 'superadmin'].indexOf(String(currentUser.role || '').toLowerCase()) !== -1 || String(currentUser.username || '').toLowerCase() === 'admin';
+        if (!isAdmin) {
+            if (global.APP && global.APP.notify) global.APP.notify('Only System Administrator can grant or revoke Bypass Approval permissions.', 'error');
+            else alert('Only System Administrator can grant or revoke Bypass Approval permissions.');
+            return;
+        }
+
+        var users = DB.get('users') || [];
+        var target = users.find(function(u){ return (u.username && u.username.toLowerCase() === uname.toLowerCase()) || u.id === uname; });
+        if (target) {
+            target.canBypassApproval = !target.canBypassApproval;
+            DB.set('users', users);
+            var statusText = target.canBypassApproval ? 'GRANTED' : 'REVOKED';
+            if (global.APP && global.APP.notify) global.APP.notify('Bypass Approval privilege ' + statusText + ' for user "' + (target.fullName || target.username) + '".', 'success');
+            renderUserBypassBadges();
+        }
+    };
+
+    function renderUserBypassBadges() {
+        var el = document.getElementById('userBypassDirectoryBadges');
+        if (!el) return;
+        var users = DB.get('users') || [];
+        if (!users.length) {
+            el.innerHTML = '<span style="font-size:12px;color:var(--gray);">No users registered in system.</span>';
+            return;
+        }
+
+        el.innerHTML = users.map(function(u) {
+            var uname = u.username || u.id;
+            var name = u.fullName || u.name || uname;
+            var isSysAdmin = u.isSuperAdmin || String(u.role || '').toLowerCase() === 'admin' || String(u.username || '').toLowerCase() === 'admin';
+            var hasBypass = isSysAdmin || !!u.canBypassApproval;
+
+            return '<div style="background:var(--white,#fff);border:1px solid var(--border);padding:8px 12px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;">'
+                + '<div>'
+                + '  <strong style="font-size:13px;display:block;color:var(--dark);">' + name + ' <small style="color:var(--gray);">(' + (u.role || 'USER') + ')</small></strong>'
+                + '  <span style="font-size:11px;color:' + (hasBypass ? '#2e7d32' : 'var(--gray)') + ';font-weight:600;">' + (hasBypass ? '⚡ Bypass Privilege Active' : '🔒 Standard Approval Matrix Routing') + '</span>'
+                + '</div>'
+                + (isSysAdmin 
+                    ? '<span style="font-size:11px;background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:4px;font-weight:bold;">Admin (Always Active)</span>'
+                    : '<button type="button" class="btn btn-sm ' + (hasBypass ? 'btn-outline-danger' : 'btn-outline-primary') + '" style="font-size:11px;padding:3px 8px;" onclick="toggleUserBypassRight(\'' + uname.replace(/'/g, "\\'") + '\')">'
+                        + (hasBypass ? '🚫 Revoke Bypass' : '⚡ Grant Bypass Right')
+                        + '</button>')
+                + '</div>';
+        }).join('');
+    }
+
     global.bypassApproveDiscountRequest = function(deptKey, reqId) {
         var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
-        var isAdmin = !user || user.isSuperAdmin || ['admin', 'superadmin', 'md', 'director', 'chairman', 'executive', 'cfo'].indexOf(String(user.role || '').toLowerCase()) !== -1;
-        if (!isAdmin) {
-            if (global.APP && global.APP.notify) global.APP.notify('Only Admin or Executive Board can bypass approval matrix.', 'error');
-            else alert('Only Admin or Executive Board can bypass approval matrix.');
+        if (!userCanBypass(user)) {
+            if (global.APP && global.APP.notify) global.APP.notify('You are not authorized to bypass approval matrix. Only Admin or users granted Bypass Privilege can perform direct executive approvals.', 'error');
+            else alert('You are not authorized to bypass approval matrix. Only Admin or users granted Bypass Privilege can perform direct executive approvals.');
             return;
         }
 
@@ -688,13 +754,19 @@
             '  <label style="font-weight:600;margin-bottom:4px;display:block;">Detailed Reason for Concession *</label>',
             '  <textarea name="detailedReason" class="form-control" rows="3" placeholder="Enter reason for discount request..." required></textarea>',
             '</div>',
-            '<div class="form-group mb-3" style="background:#fff3e0;border:1px solid #ffe0b2;padding:10px 12px;border-radius:8px;">',
-            '  <label style="display:flex;align-items:center;gap:8px;font-weight:700;color:#e65100;cursor:pointer;margin:0;font-size:13px;">',
-            '    <input type="checkbox" name="isBypass" style="width:16px;height:16px;accent-color:#e65100;">',
-            '    <span>⚡ Bypass Approval Matrix (Direct Executive Grant)</span>',
-            '  </label>',
-            '  <small style="display:block;color:#bf360c;margin-top:2px;font-size:11px;">Directly approves the request immediately without routing delays (Admin & Executive privilege).</small>',
-            '</div>',
+            (userCanBypass(user) ? 
+              '<div class="form-group mb-3" style="background:#fff3e0;border:1px solid #ffe0b2;padding:10px 12px;border-radius:8px;">'
+              + '  <label style="display:flex;align-items:center;gap:8px;font-weight:700;color:#e65100;cursor:pointer;margin:0;font-size:13px;">'
+              + '    <input type="checkbox" name="isBypass" style="width:16px;height:16px;accent-color:#e65100;">'
+              + '    <span>⚡ Bypass Approval Matrix (Direct Executive Grant)</span>'
+              + '  </label>'
+              + '  <small style="display:block;color:#bf360c;margin-top:2px;font-size:11px;">Directly approves request immediately (Admin-granted privilege for user: ' + (user ? (user.fullName || user.username) : 'Admin') + ').</small>'
+              + '</div>'
+             :
+              '<div class="form-group mb-3" style="background:#f5f5f5;border:1px solid #e0e0e0;padding:8px 12px;border-radius:8px;">'
+              + '  <small style="color:var(--gray);font-size:11px;">🔒 Standard Approval Procedure Matrix applies. (Bypass Approval permission is managed by Admin per user).</small>'
+              + '</div>'
+            ),
             '</form>'
         ].join("");
 
@@ -837,6 +909,14 @@
             + '  </div>'
             + '</div>'
 
+            + (isAdmin ? 
+                '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">'
+                + '  <div style="margin-bottom:8px;">'
+                + '    <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">⚡ User Bypass Rights Directory <small style="font-weight:normal;color:var(--gray);">(Admin Only — Grant or Revoke Executive Bypass Privilege per User)</small></div>'
+                + '  </div>'
+                + '  <div id="userBypassDirectoryBadges"></div>'
+                + '</div>'
+              : '')
             + (canAddDoc ? 
                 '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">'
                 + '  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
@@ -872,6 +952,7 @@
             + '<div id="discountList_reception" style="display:none;"></div>'
             + '</div>';
 
+        if (isAdmin) renderUserBypassBadges();
         if (canAddDoc) {
             renderServiceBadges();
             renderDoctorBadges();
