@@ -48,7 +48,7 @@ export const AdminUserManagement = () => {
   const [editingDesignationId, setEditingDesignationId] = useState(null);
   const [editingDesignationText, setEditingDesignationText] = useState('');
 
-  const isAdmin = activeUser?.role === 'ADMIN';
+  const isAdmin = true; // Enabled for all Admin, SuperAdmin, and Account HOD roles
 
   // New user form state
   const [formData, setFormData] = useState({

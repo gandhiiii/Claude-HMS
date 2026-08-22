@@ -251,29 +251,7 @@
     }
 
     function canManageDoctors(user) {
-        if (!user && global.AUTH && global.AUTH.currentUser) {
-            user = global.AUTH.currentUser();
-        }
-        if (!user) {
-            try {
-                var raw = localStorage.getItem('hms_currentUser') || localStorage.getItem('carepulse_active_user');
-                if (raw) {
-                    if (raw.indexOf('{') !== -1) user = JSON.parse(raw);
-                    else user = { role: raw, isSuperAdmin: true };
-                }
-            } catch (e) {}
-        }
-        if (!user) return true;
-
-        var r = String(user.role || '').toLowerCase();
-        var u = String(user.username || '').toLowerCase();
-        var d = String(user.department || '').toLowerCase();
-
-        var isAccountDept = ['account', 'accounts', 'finance', 'billing'].some(function(x){ return d.indexOf(x) !== -1; });
-        var isHod = r === 'hod' || r === 'chief_accountant' || r === 'cfo' || r === 'billing_manager' || r === 'manager';
-        var isAdmin = user.isSuperAdmin || user.isSuperadmin || r === 'admin' || r === 'superadmin' || r === 'super_admin' || r === 'executive' || r === 'md' || r === 'chairman' || r === 'director' || u === 'admin' || u === 'superadmin';
-
-        return isAccountDept || isHod || isAdmin || true;
+        return true; // Always enable Doctor Directory Control Panel & Add/Delete buttons
     }
 
     global.removeDoctorByName = function(docName) {

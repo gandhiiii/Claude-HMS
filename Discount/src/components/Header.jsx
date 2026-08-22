@@ -60,38 +60,31 @@ export const Header = ({
           </div>
         </div>
 
-        {/* Center Tabs: Only show Admin User Control to ADMIN role */}
-        {activeUser?.role === 'ADMIN' ? (
-          <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800">
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`px-4 py-1.5 rounded-lg text-xs transition-all duration-200 ${
-                activeTab === 'dashboard'
-                  ? 'bg-gradient-to-r from-sky-400 to-teal-300 text-slate-950 font-black shadow-md'
-                  : 'text-slate-400 hover:text-slate-200 font-semibold'
-              }`}
-            >
-              OPD Dashboard & Waivers
-            </button>
+        {/* Center Tabs: Show to Admin, SuperAdmin, HOD & Account roles */}
+        <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`px-4 py-1.5 rounded-lg text-xs transition-all duration-200 ${
+              activeTab === 'dashboard'
+                ? 'bg-gradient-to-r from-sky-400 to-teal-300 text-slate-950 font-black shadow-md'
+                : 'text-slate-400 hover:text-slate-200 font-semibold'
+            }`}
+          >
+            OPD Dashboard & Waivers
+          </button>
 
-            <button
-              onClick={() => setActiveTab('admin')}
-              className={`px-4 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all duration-200 ${
-                activeTab === 'admin'
-                  ? 'bg-gradient-to-r from-sky-400 to-teal-300 text-slate-950 font-black shadow-md'
-                  : 'text-slate-400 hover:text-slate-200 font-semibold'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>User Directory & Roles</span>
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-xs font-bold text-sky-300 bg-slate-900 px-3.5 py-1.5 rounded-xl border border-sky-500/30">
-            <span className="h-2 w-2 rounded-full bg-sky-400"></span>
-            <span>Stavya Spine Authorization Hub ({roleMeta.label})</span>
-          </div>
-        )}
+          <button
+            onClick={() => setActiveTab('admin')}
+            className={`px-4 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all duration-200 ${
+              activeTab === 'admin'
+                ? 'bg-gradient-to-r from-sky-400 to-teal-300 text-slate-950 font-black shadow-md'
+                : 'text-slate-400 hover:text-slate-200 font-semibold'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>User Directory & Doctor Control</span>
+          </button>
+        </div>
 
         {/* Right Actions & Active Role Switcher */}
         <div className="flex items-center gap-2.5 flex-wrap justify-end">
