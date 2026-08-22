@@ -4,6 +4,7 @@ import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { EmployeeView } from './components/EmployeeView';
 import { DoctorPortalView } from './components/DoctorPortalView';
+import { ExecutiveBypassView } from './components/ExecutiveBypassView';
 import { AdminUserManagement } from './components/AdminUserManagement';
 import { NewDiscountModal } from './components/NewDiscountModal';
 import { RequestDetailModal } from './components/RequestDetailModal';
@@ -97,6 +98,10 @@ export function AppContent() {
             onSelectRequest={(req) => setSelectedRequest(req)}
             onOpenNewModal={() => setShowNewModal(true)}
             onOpenExcelModal={() => setShowExcelModal(true)}
+          />
+        ) : activeTab === 'bypass' ? (
+          <ExecutiveBypassView
+            onSelectRequest={(req) => setSelectedRequest(req)}
           />
         ) : (
           <AdminUserManagement />

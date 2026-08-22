@@ -73,6 +73,18 @@ export const Header = ({
             OPD Dashboard & Waivers
           </button>
 
+          <button
+            onClick={() => setActiveTab('bypass')}
+            className={`px-4 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all duration-200 ${
+              activeTab === 'bypass'
+                ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-slate-950 font-black shadow-md'
+                : 'text-amber-400 hover:text-amber-200 font-semibold'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span>⚡ Executive Bypass Rights</span>
+          </button>
+
           {['ADMIN', 'SUPERADMIN'].includes(activeUser?.role) && (
             <button
               onClick={() => setActiveTab('admin')}
