@@ -628,12 +628,12 @@ const AUTH = {
 
         // Facility / Maintenance / Housekeeping auto-grants
         if (isFacilityDept) {
-            if (['checklists','departmental-checklist','cleaning','room-checklist','staff-deployment','security-deployment','problems','material-requests','scrap','handover','equipbackdown','work','reports'].indexOf(permission) !== -1) return true;
+            if (['checklists','departmental-checklist','cleaning','room-checklist','rooms','staff-deployment','security-deployment','problems','material-requests','scrap','handover','equipbackdown','work','reports'].indexOf(permission) !== -1) return true;
         }
 
         // Nursing / Clinical auto-grants
         if (isNursingDept) {
-            if (['checklists','departmental-checklist','cleaning','room-checklist','admissions','patient-shifting','handover','material-requests','problems'].indexOf(permission) !== -1) return true;
+            if (['checklists','departmental-checklist','cleaning','room-checklist','rooms','admissions','patient-shifting','handover','material-requests','problems'].indexOf(permission) !== -1) return true;
         }
 
         // Storekeeper / Store auto-grants
@@ -1070,6 +1070,7 @@ const APP = {
             tasks: renderTasks,
             complaints: renderComplaints,
             'room-checklist': renderRoomChecklist,
+            rooms: typeof renderRooms === 'function' ? renderRooms : function(c){ c.innerHTML = '<div class="empty-state">Rooms module not loaded</div>'; },
             admissions: renderAdmissions,
             'lost-found': renderLostFound,
             'admin-checklists': renderAdminChecklists,
@@ -1132,7 +1133,7 @@ const APP = {
             if (!Array.isArray(existingRights) || existingRights.length === 0) {
                 const defaultRights = ['dashboard','users','departments','inventory','gate-security',
                     'projects','ambulance','problems','tasks','complaints',
-                    'room-checklist','admissions','lost-found','checklists','admin-checklists',
+                    'room-checklist','rooms','admissions','lost-found','checklists','admin-checklists',
                     'material-requests','suggestions','reports','employee-dashboard',
                     'departmental-checklist','department-meetings','discounts','purchases',
                     'scrap','handover','cleaning','equipbackdown','staff-deployment',

@@ -339,7 +339,7 @@ function renderPermissionCheckboxes(deptFeatures, userPerms, isEdit) {
     const allFeatures = [
         'dashboard', 'users', 'departments', 'inventory', 'discounts', 'purchases',
         'matrequests', 'scrap', 'gate-security', 'projects', 'ambulance', 'problems',
-        'tasks', 'work', 'complaints', 'suggestions', 'room-checklist', 'admissions',
+        'tasks', 'work', 'complaints', 'suggestions', 'room-checklist', 'rooms', 'admissions',
         'lost-found', 'checklists', 'admin-checklists', 'departmental-checklist',
         'handover', 'cleaning', 'equipbackdown', 'reports', 'staff-deployment',
         'security-deployment', 'patient-shifting'
