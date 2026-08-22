@@ -1108,18 +1108,20 @@
             + '  <button class="tab-btn" onclick="switchDiscountTab(\'account\', this)">Accounting</button>'
             + '  <button class="tab-btn" onclick="switchDiscountTab(\'radiology\', this)">Radiology</button>'
             + '  <button class="tab-btn" onclick="switchDiscountTab(\'reception\', this)">Reception</button>'
+            + '  <button class="tab-btn" style="color:#d97706;font-weight:700;" onclick="switchDiscountTab(\'bypass\', this)">⚡ Executive Bypass</button>'
             + '</div>'
             + '<div id="discountList_admission"></div>'
             + '<div id="discountList_account" style="display:none;"></div>'
             + '<div id="discountList_radiology" style="display:none;"></div>'
             + '<div id="discountList_reception" style="display:none;"></div>'
+            + '<div id="discountList_bypass" style="display:none;"></div>'
             + '</div>';
 
         if (canAddSvc) renderServiceBadges();
         if (canAddDoc) renderDoctorBadges();
 
         global.switchDiscountTab = function(deptKey, btnEl) {
-            ['admission', 'account', 'radiology', 'reception'].forEach(function(dk) {
+            ['admission', 'account', 'radiology', 'reception', 'bypass'].forEach(function(dk) {
                 var el = document.getElementById('discountList_' + dk);
                 if (el) el.style.display = (dk === deptKey) ? 'block' : 'none';
             });
@@ -1128,7 +1130,12 @@
                 btns.forEach(function(b) { b.classList.remove('active'); });
                 btnEl.classList.add('active');
             }
-            global.renderDiscountList(deptKey);
+
+            if (deptKey === 'bypass') {
+                renderBypassTabContent();
+            } else {
+                global.renderDiscountList(deptKey);
+            }
         };
 
         global.renderDiscountList('admission');
@@ -1136,6 +1143,140 @@
         global.renderDiscountList('radiology');
         global.renderDiscountList('reception');
     };
+
+    global.toggleUserBypassRight = function(uname) {
+        var currentUser = getLoggedInUser();
+        var isAdmin = isSystemAdmin(currentUser);
+        if (!isAdmin) {
+            if (global.APP && global.APP.notify) global.APP.notify('Only System Administrator can grant or revoke Bypass Approval permissions.', 'error');
+            else alert('Only System Administrator can grant or revoke Bypass Approval permissions.');
+            return;
+        }
+
+        var users = DB.get('users') || [];
+        var target = users.find(function(u){ return (u.username && u.username.toLowerCase() === uname.toLowerCase()) || u.id === uname; });
+        if (target) {
+            target.canBypassApproval = !target.canBypassApproval;
+            DB.set('users', users);
+            var statusText = target.canBypassApproval ? 'GRANTED' : 'REVOKED';
+            if (global.APP && global.APP.notify) global.APP.notify('Bypass Approval privilege ' + statusText + ' for user "' + (target.fullName || target.username) + '".', 'success');
+            renderBypassTabContent();
+        }
+    };
+
+    function renderBypassTabContent() {
+        var el = document.getElementById('discountList_bypass');
+        if (!el) return;
+
+        var user = getLoggedInUser();
+        var isAdmin = isSystemAdmin(user);
+        var hasUserBypass = userCanBypass(user);
+        var users = DB.get('users') || [];
+
+        var html = '<div style="display:flex;flex-direction:column;gap:16px;">';
+
+        // 1. Executive Status Header Card
+        html += '<div style="background:linear-gradient(135deg, #0f172a, #1e293b);color:#fff;padding:16px 20px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
+            + '  <div>'
+            + '    <h3 style="margin:0;font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;">⚡ Executive Bypass Approval Matrix</h3>'
+            + '    <p style="margin:4px 0 0 0;font-size:12px;color:#94a3b8;">Direct Executive Bypass allows authorized users to approve discount requests immediately, bypassing standard 3-tier routing.</p>'
+            + '  </div>'
+            + '  <div style="text-align:right;">'
+            + '    <span style="font-size:11px;color:#94a3b8;display:block;">Your Bypass Privilege Status:</span>'
+            + '    <span style="font-size:13px;font-weight:800;color:' + (hasUserBypass ? '#f59e0b' : '#94a3b8') + ';">' + (hasUserBypass ? '⚡ GRANTED (Active)' : '🔒 RESTRICTED (Standard Matrix)') + '</span>'
+            + '  </div>'
+            + '</div>';
+
+        // 2. Admin User Rights Directory (Admin Only to Grant/Revoke per User)
+        if (isAdmin) {
+            html += '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:12px;padding:16px;">'
+                + '  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+                + '    <div>'
+                + '      <h4 style="margin:0;font-size:14px;font-weight:700;">👑 Admin User Bypass Rights Directory</h4>'
+                + '      <p style="margin:2px 0 0 0;font-size:12px;color:var(--gray);">Select individual user accounts below to grant or remove Executive Bypass Approval rights.</p>'
+                + '    </div>'
+                + '    <span style="font-size:11px;background:#e0f2fe;color:#0369a1;padding:4px 10px;border-radius:6px;font-weight:bold;">Admin Control Panel</span>'
+                + '  </div>'
+                + '  <div style="display:flex;flex-direction:column;gap:8px;">';
+
+            if (!users.length) {
+                html += '<p style="font-size:13px;color:var(--gray);text-align:center;padding:12px;">No registered users found in system.</p>';
+            } else {
+                users.forEach(function(u) {
+                    var uname = u.username || u.id;
+                    var name = u.fullName || u.name || uname;
+                    var isSysAdmin = u.isSuperAdmin || String(u.role || '').toLowerCase() === 'admin' || String(u.username || '').toLowerCase() === 'admin';
+                    var activeBypass = isSysAdmin || !!u.canBypassApproval;
+
+                    html += '<div style="background:#fff;border:1px solid var(--border);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">'
+                        + '  <div>'
+                        + '    <strong style="font-size:13px;color:var(--dark);">' + name + ' <small style="color:var(--gray);">(' + (u.role || 'USER') + ' — ' + (u.department || 'General') + ')</small></strong>'
+                        + '    <span style="display:block;font-size:11px;font-weight:600;margin-top:2px;color:' + (activeBypass ? '#d97706' : '#64748b') + ';">'
+                        + (activeBypass ? '⚡ Executive Bypass Privilege Active' : '🔒 Standard Approval Routing Only')
+                        + '    </span>'
+                        + '  </div>'
+                        + (isSysAdmin
+                            ? '<span style="font-size:11px;background:#dcfce7;color:#15803d;padding:4px 10px;border-radius:6px;font-weight:bold;">System Admin (Always Active)</span>'
+                            : '<button type="button" class="btn btn-sm ' + (activeBypass ? 'btn-outline-danger' : 'btn-outline-warning') + '" style="font-size:11px;padding:4px 12px;font-weight:700;" onclick="toggleUserBypassRight(\'' + uname.replace(/'/g, "\\'") + '\')">'
+                                + (activeBypass ? '🚫 Revoke Bypass Right' : '⚡ Grant Executive Bypass')
+                                + '</button>')
+                        + '</div>';
+                });
+            }
+            html += '  </div></div>';
+        }
+
+        // 3. Pending Requests Eligible for Executive Bypass
+        html += '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">'
+            + '  <h4 style="margin:0 0 12px 0;font-size:14px;font-weight:700;">📋 Pending Requests Available for Executive Bypass Approval</h4>';
+
+        var allPending = [];
+        ['admission', 'account', 'radiology', 'reception'].forEach(function(deptKey) {
+            var list = DB.get(deptKey) || [];
+            list.forEach(function(req) {
+                if (req.status && req.status.indexOf('PENDING') !== -1) {
+                    req._deptKey = deptKey;
+                    allPending.push(req);
+                }
+            });
+        });
+
+        if (!allPending.length) {
+            html += '<p style="font-size:13px;color:var(--gray);text-align:center;padding:16px;">No pending discount requests requiring bypass approval.</p>';
+        } else {
+            html += '<div style="overflow-x:auto;"><table class="table" style="width:100%;font-size:12px;border-collapse:collapse;">'
+                + '<thead><tr style="background:#f8fafc;border-bottom:1px solid var(--border);text-align:left;">'
+                + '<th style="padding:8px 10px;">Code</th>'
+                + '<th style="padding:8px 10px;">Patient</th>'
+                + '<th style="padding:8px 10px;">Department</th>'
+                + '<th style="padding:8px 10px;">Discount Waiver</th>'
+                + '<th style="padding:8px 10px;">Net Payable</th>'
+                + '<th style="padding:8px 10px;">Routing Status</th>'
+                + '<th style="padding:8px 10px;text-align:center;">Action</th>'
+                + '</tr></thead><tbody>';
+
+            allPending.forEach(function(req) {
+                html += '<tr style="border-bottom:1px solid var(--border);">'
+                    + '<td style="padding:8px 10px;font-weight:bold;color:var(--primary);">' + (req.requestCode || req.id) + '</td>'
+                    + '<td style="padding:8px 10px;"><strong>' + (req.patientName || 'N/A') + '</strong> <small style="color:var(--gray);">(' + (req.patientId || '') + ')</small></td>'
+                    + '<td style="padding:8px 10px;"><span style="text-transform:capitalize;font-weight:600;">' + (req._deptKey) + '</span></td>'
+                    + '<td style="padding:8px 10px;font-weight:700;color:var(--primary);">₹' + (req.calculatedDiscountAmount || 0).toLocaleString('en-IN') + '</td>'
+                    + '<td style="padding:8px 10px;font-weight:700;color:var(--success);">₹' + (req.finalPayableAmount || 0).toLocaleString('en-IN') + '</td>'
+                    + '<td style="padding:8px 10px;"><span style="font-size:11px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#b45309;font-weight:bold;">' + (req.status) + '</span></td>'
+                    + '<td style="padding:8px 10px;text-align:center;">'
+                    + (hasUserBypass
+                        ? '<button class="btn btn-sm btn-primary" style="font-size:11px;padding:4px 10px;font-weight:bold;background:linear-gradient(135deg, #d97706, #b45309);border:none;" onclick="bypassApproveDiscountRequest(\'' + req._deptKey + '\', \'' + req.id + '\')">⚡ Bypass & Approve</button>'
+                        : '<span style="font-size:11px;color:var(--gray);">No Bypass Right</span>')
+                    + '</td>'
+                    + '</tr>';
+            });
+
+            html += '</tbody></table></div>';
+        }
+
+        html += '</div></div>';
+        el.innerHTML = html;
+    }
 
     // -------------------------------------------------------------
     // 7.  Initialisation – run once when the page loads
