@@ -277,26 +277,131 @@ function renderEmployeeDashboard(container) {
     var allTodos = (DB.get('employeeTodos')||[]).filter(function(t){ return t.createdBy===u; });
     var todoPend = allTodos.filter(function(t){ return t.status!=='completed'; }).length;
 
-    var canBreakdown = true;
+    var dNorm = (dept || '').trim().toLowerCase();
 
-    var isFacilityGrp = ['IT', 'Facility', 'Maintenance'].some(function(x){ return x.toLowerCase() === (dept||'').trim().toLowerCase(); });
+    var isAccountGrp   = ['account', 'accounts', 'finance', 'billing', 'accounts & finance', 'billing & accounts'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+    var isReceptionGrp = ['reception', 'front desk', 'admission', 'admissions', 'opd', 'help desk', 'billing & reception'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+    var isNursingGrp   = ['nursing', 'icu', 'ward', 'ot', 'casualty', 'emergency', 'clinical'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+    var isDoctorGrp    = ['doctor', 'doctors', 'medical', 'consultant', 'physician', 'surgeon'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+    var isPharmacyGrp  = ['pharmacy', 'chemist', 'drug store'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+    var isStoreGrp     = ['store', 'stores', 'inventory', 'warehouse'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+    var isItGrp        = ['it', 'computer', 'computers', 'biomedical', 'software'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+    var isFacilityGrp  = ['facility', 'maintenance', 'housekeeping', 'security', 'engineering'].some(function(x){ return dNorm.indexOf(x) !== -1; });
+    var isHrGrp        = ['hr', 'personnel', 'admin', 'human resource'].some(function(x){ return dNorm.indexOf(x) !== -1; });
 
-    var tabs = [
-        { id: 'overview',    label: T('empd2_tab_overview') },
-        { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
-        { id: 'todo',        label: T('empd2_tab_todo'), badge: todoPend, badgeClass: 'badge-warning' },
-        { id: 'checklists',  label: T('empd2_tab_checklists') },
-        { id: 'reports',     label: T('empd2_tab_reports') },
-        ...(dept !== 'IT' ? [{ id: 'cleaning', label: T('empd2_tab_cleaning'), badge: _empData.pendingCleaning.length, badgeClass: 'badge-danger' }] : []),
-        ...(isFacilityGrp ? [{ id: 'handover', label: '🔄 ' + T('empd2_tab_handover') }] : []),
-        ...(isFacilityGrp ? [{ id: 'staffdeploy', label: '🧹 Staff Deployment' }] : []),
-        ...(isFacilityGrp ? [{ id: 'securitydeploy', label: '🛡️ Security Deployment' }] : []),
-        ...(isFacilityGrp ? [{ id: 'patientshift', label: '🚑 Patient Shifting' }] : []),
-        { id: 'performance', label: T('empd2_tab_performance') },
-        { id: 'qgoals',      label: T('empd2_tab_qgoals') }
-    ];
-    if (canBreakdown) {
-        tabs.push({ id: 'equipbackdown', label: '📉 Breakdowns', badge: (DB.get('hodEquipmentBackdowns')||[]).length, badgeClass: 'badge-secondary' });
+    var pendingDiscountsCount = (DB.get('discountRequests') || []).filter(function(r){ return r.status === 'pending'; }).length;
+    var pendingReqsCount     = _empData.myRequests.filter(function(r){ return r.status === 'pending'; }).length;
+    var openProblemsCount    = (DB.get('problems') || []).filter(function(p){ return p.status !== 'resolved'; }).length;
+
+    var tabs = [];
+
+    if (isAccountGrp) {
+        tabs = [
+            { id: 'overview',    label: T('empd2_tab_overview') },
+            { id: 'discounts',   label: '🏷️ Discounts & Approvals', badge: pendingDiscountsCount, badgeClass: 'badge-warning' },
+            { id: 'purchases',   label: '💰 Daily Purchases & Expenses' },
+            { id: 'matrequests', label: '📦 Material Requisitions', badge: pendingReqsCount },
+            { id: 'checklists',  label: '📑 Account Audit Checklists' },
+            { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
+            { id: 'todo',        label: T('empd2_tab_todo'), badge: todoPend, badgeClass: 'badge-warning' },
+            { id: 'reports',     label: T('empd2_tab_reports') },
+            { id: 'performance', label: T('empd2_tab_performance') }
+        ];
+    } else if (isReceptionGrp) {
+        tabs = [
+            { id: 'overview',    label: T('empd2_tab_overview') },
+            { id: 'admissions',  label: '🏥 Patient Admissions & Beds' },
+            { id: 'discounts',   label: '🏷️ Discount Requests' },
+            { id: 'lostfound',   label: '🔍 Lost & Found Registry' },
+            { id: 'complaints',  label: '📝 Patient Complaints' },
+            { id: 'patientshift', label: '🚑 Patient Shifting' },
+            { id: 'checklists',  label: '✅ Front Desk Checklists' },
+            { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
+            { id: 'todo',        label: T('empd2_tab_todo'), badge: todoPend, badgeClass: 'badge-warning' }
+        ];
+    } else if (isNursingGrp) {
+        tabs = [
+            { id: 'overview',    label: '📊 Ward Overview' },
+            { id: 'admissions',  label: '🏥 Ward Census & Patients' },
+            { id: 'cleaning',    label: '🧹 Room & Bed Cleaning', badge: _empData.pendingCleaning.length, badgeClass: 'badge-danger' },
+            { id: 'patientshift', label: '🚑 Patient Shifting' },
+            { id: 'handover',    label: '🔄 Shift Handover' },
+            { id: 'matrequests', label: '📦 Supplies & Requisitions' },
+            { id: 'equipbackdown', label: '📉 Equipment Breakdowns' },
+            { id: 'checklists',  label: '✅ Clinical Checklists' },
+            { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length }
+        ];
+    } else if (isDoctorGrp) {
+        tabs = [
+            { id: 'overview',    label: '📊 Clinical Overview' },
+            { id: 'admissions',  label: '🏥 Inpatient Census' },
+            { id: 'discounts',   label: '🏷️ Discount Endorsements' },
+            { id: 'problems',    label: '🔧 Equipment & IT Requests' },
+            { id: 'suggestions', label: '💡 Clinical Feedback' },
+            { id: 'checklists',  label: '✅ Clinical Checklists' },
+            { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
+            { id: 'reports',     label: '📈 Case Reports' }
+        ];
+    } else if (isPharmacyGrp) {
+        tabs = [
+            { id: 'overview',    label: '📊 Pharmacy Overview' },
+            { id: 'inventory',   label: '📦 Stock & Medicine Inventory' },
+            { id: 'matrequests', label: '📦 Stock Requisitions' },
+            { id: 'equipbackdown', label: '📉 Cold Chain & Breakdowns' },
+            { id: 'checklists',  label: '✅ Pharmacy Daily Checklists' },
+            { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length }
+        ];
+    } else if (isStoreGrp) {
+        tabs = [
+            { id: 'overview',    label: '📊 Store Overview' },
+            { id: 'inventory',   label: '📦 Inventory Master' },
+            { id: 'matrequests', label: '📦 Department Requisitions', badge: pendingReqsCount },
+            { id: 'scrap',       label: '🗑️ Scrap & Disposal' },
+            { id: 'checklists',  label: '✅ Store Checklists' },
+            { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length }
+        ];
+    } else if (isItGrp) {
+        tabs = [
+            { id: 'overview',    label: '📊 IT Overview' },
+            { id: 'problems',    label: '🔧 Problem Tickets', badge: openProblemsCount, badgeClass: 'badge-danger' },
+            { id: 'equipbackdown', label: '📉 Hardware & Server Breakdowns' },
+            { id: 'handover',    label: '🔄 IT Shift Handover' },
+            { id: 'checklists',  label: '✅ System & Backup Checklists' },
+            { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
+            { id: 'todo',        label: T('empd2_tab_todo'), badge: todoPend, badgeClass: 'badge-warning' }
+        ];
+    } else if (isFacilityGrp) {
+        tabs = [
+            { id: 'overview',    label: T('empd2_tab_overview') },
+            { id: 'staffdeploy', label: '🧹 Staff Deployment' },
+            { id: 'securitydeploy', label: '🛡️ Security Deployment' },
+            { id: 'cleaning',    label: '🧹 Room & Floor Cleaning', badge: _empData.pendingCleaning.length, badgeClass: 'badge-danger' },
+            { id: 'scrap',       label: '🗑️ Waste & Scrap Disposal' },
+            { id: 'handover',    label: '🔄 Shift Handover' },
+            { id: 'equipbackdown', label: '📉 Equipment Breakdowns' },
+            { id: 'checklists',  label: '✅ Maintenance Checklists' },
+            { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length }
+        ];
+    } else if (isHrGrp) {
+        tabs = [
+            { id: 'overview',    label: '📊 HR Overview' },
+            { id: 'staffdeploy', label: '🧹 Staff Deployment Logs' },
+            { id: 'complaints',  label: '📝 Grievances & Complaints' },
+            { id: 'suggestions', label: '💡 Staff Suggestions' },
+            { id: 'checklists',  label: '✅ HR Checklists' },
+            { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length }
+        ];
+    } else {
+        tabs = [
+            { id: 'overview',    label: T('empd2_tab_overview') },
+            { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
+            { id: 'todo',        label: T('empd2_tab_todo'), badge: todoPend, badgeClass: 'badge-warning' },
+            { id: 'checklists',  label: T('empd2_tab_checklists') },
+            { id: 'matrequests', label: '📦 Material Requisitions' },
+            { id: 'reports',     label: T('empd2_tab_reports') },
+            { id: 'performance', label: T('empd2_tab_performance') },
+            { id: 'qgoals',      label: T('empd2_tab_qgoals') }
+        ];
     }
 
     var html = ''
@@ -403,6 +508,57 @@ function _renderEmpTab(tab) {
     if (tab === 'performance') { renderEmpPerformanceTab(el); return; }
     if (tab === 'qgoals')     { renderEmpQGoalsTab(el); return; }
     if (tab === 'equipbackdown') { renderEmpBreakdownTab(el); return; }
+    if (tab === 'discounts') {
+        if (typeof global !== 'undefined' && typeof global.renderDiscounts === 'function') global.renderDiscounts(el);
+        else if (typeof renderDiscounts === 'function') renderDiscounts(el);
+        else el.innerHTML = '<div class="empty-state">Discounts module not loaded</div>';
+        return;
+    }
+    if (tab === 'purchases') {
+        if (typeof renderHodPurchases === 'function') renderHodPurchases(el);
+        else el.innerHTML = '<div class="empty-state">Purchases module not loaded</div>';
+        return;
+    }
+    if (tab === 'admissions') {
+        if (typeof renderAdmissions === 'function') renderAdmissions(el);
+        else el.innerHTML = '<div class="empty-state">Admissions module not loaded</div>';
+        return;
+    }
+    if (tab === 'inventory') {
+        if (typeof renderInventory === 'function') renderInventory(el);
+        else el.innerHTML = '<div class="empty-state">Inventory module not loaded</div>';
+        return;
+    }
+    if (tab === 'scrap') {
+        if (typeof renderScrap === 'function') renderScrap(el);
+        else el.innerHTML = '<div class="empty-state">Scrap Disposal module not loaded</div>';
+        return;
+    }
+    if (tab === 'lostfound') {
+        if (typeof renderLostFound === 'function') renderLostFound(el);
+        else el.innerHTML = '<div class="empty-state">Lost & Found module not loaded</div>';
+        return;
+    }
+    if (tab === 'complaints') {
+        if (typeof renderComplaints === 'function') renderComplaints(el);
+        else el.innerHTML = '<div class="empty-state">Complaints module not loaded</div>';
+        return;
+    }
+    if (tab === 'suggestions') {
+        if (typeof renderSuggestions === 'function') renderSuggestions(el);
+        else el.innerHTML = '<div class="empty-state">Suggestions module not loaded</div>';
+        return;
+    }
+    if (tab === 'matrequests') {
+        if (typeof renderMaterialRequests === 'function') renderMaterialRequests(el);
+        else el.innerHTML = '<div class="empty-state">Material Requests module not loaded</div>';
+        return;
+    }
+    if (tab === 'problems') {
+        if (typeof renderProblems === 'function') renderProblems(el);
+        else el.innerHTML = '<div class="empty-state">Problems module not loaded</div>';
+        return;
+    }
 }
 
 function renderEmpQGoalsTab(el) {
