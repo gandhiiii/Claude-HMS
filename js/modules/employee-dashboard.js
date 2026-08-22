@@ -694,16 +694,38 @@ function renderEmpOverview(el) {
     } else {
         recentTasks.forEach(function(t) { html += _workItem(t, d.adminNames, false); });
     }
-    html += '</div>'
-        + '<div>'
+    html += '</div>';
+
+    var user = d.user;
+    var qaList = [
+        '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'work\')">📝 ' + T('empd2_btn_view_tasks') + '</button>',
+        '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'qgoals\')">🎯 Quarterly Goals & Priorities</button>',
+        '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'todo\')">📋 ' + T('empd2_tab_todo') + '</button>'
+    ];
+    if (AUTH.hasPermission(user, 'discounts')) {
+        qaList.push('<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'discounts\')">🏷️ Discounts & Approvals</button>');
+    }
+    if (AUTH.hasPermission(user, 'purchases')) {
+        qaList.push('<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'purchases\')">💰 Daily Purchases & Expenses</button>');
+    }
+    if (AUTH.hasPermission(user, 'checklists')) {
+        qaList.push('<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'checklists\')">✅ ' + T('empd2_btn_open_cl') + '</button>');
+    }
+    if (AUTH.hasPermission(user, 'problems')) {
+        qaList.push('<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="Router.navigate(\'problems\')">🔧 ' + T('empd2_btn_report_prob') + '</button>');
+    }
+    if (AUTH.hasPermission(user, 'material-requests')) {
+        qaList.push('<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empShowMatReqForm()">📦 ' + T('empd2_btn_mat_request') + '</button>');
+        qaList.push('<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empCreateReturn()">🔄 ' + T('empd2_btn_return_mat') + '</button>');
+    }
+    if (AUTH.hasPermission(user, 'reports')) {
+        qaList.push('<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="showReportForm()">📈 ' + T('empd2_btn_submit_rep') + '</button>');
+    }
+
+    html += '<div>'
         + '<div style="font-weight:700;font-size:15px;margin-bottom:10px;">⚡ ' + T('empd2_quick_actions') + '</div>'
         + '<div style="display:flex;flex-direction:column;gap:8px;">'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'work\')">' + T('empd2_btn_view_tasks') + '</button>'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empTabSwitch(\'checklists\')">' + T('empd2_btn_open_cl') + '</button>'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="Router.navigate(\'problems\')">' + T('empd2_btn_report_prob') + '</button>'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empShowMatReqForm()">' + T('empd2_btn_mat_request') + '</button>'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="empCreateReturn()">' + T('empd2_btn_return_mat') + '</button>'
-        + '<button class="btn btn-outline" style="justify-content:flex-start;gap:8px;text-align:left;" onclick="showReportForm()">' + T('empd2_btn_submit_rep') + '</button>'
+        + qaList.join('')
         + '</div>'
         + (pendingReqs.length > 0
             ? '<div style="margin-top:14px;"><div style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--gray);">' + T('empd2_pending_requests') + '</div>'
