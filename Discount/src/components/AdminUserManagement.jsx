@@ -48,7 +48,7 @@ export const AdminUserManagement = () => {
   const [editingDesignationId, setEditingDesignationId] = useState(null);
   const [editingDesignationText, setEditingDesignationText] = useState('');
 
-  const isAdmin = true; // Enabled for all Admin, SuperAdmin, and Account HOD roles
+  const isAdmin = ['ADMIN', 'SUPERADMIN'].includes(activeUser?.role) || activeUser?.username === 'admin' || !!activeUser?.isSuperAdmin;
 
   // New user form state
   const [formData, setFormData] = useState({
@@ -165,6 +165,16 @@ export const AdminUserManagement = () => {
             Switch to Admin Role ({adminUser ? adminUser.name : 'System Admin'})
           </button>
         </div>
+      </div>
+    );
+  if (!isAdmin) {
+    return (
+      <div className="glass-card p-12 text-center rounded-2xl border border-rose-500/30 space-y-3">
+        <ShieldAlert className="w-12 h-12 text-rose-400 mx-auto" />
+        <h2 className="text-xl font-extrabold text-slate-100">Access Restricted</h2>
+        <p className="text-sm text-slate-400 max-w-md mx-auto">
+          The Admin User Directory, Approval Matrix Configuration, and User Privilege Management are strictly restricted to System Administrators.
+        </p>
       </div>
     );
   }

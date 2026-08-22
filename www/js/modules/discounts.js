@@ -471,8 +471,18 @@
         return docs;
     }
 
+    function isSystemAdmin(user) {
+        if (!user) return false;
+        var role = String(user.role || '').toLowerCase();
+        var uname = String(user.username || '').toLowerCase();
+        return user.isSuperAdmin || uname === 'admin' || uname === 'superadmin' || role === 'admin' || role === 'superadmin';
+    }
+
     function canManageDoctors(user) {
-        return true; // Always enable Doctor & Service Directory Control Panel
+        if (!user) return false;
+        var role = String(user.role || '').toLowerCase();
+        var uname = String(user.username || '').toLowerCase();
+        return user.isSuperAdmin || uname === 'admin' || uname === 'superadmin' || role === 'admin' || role === 'superadmin' || role === 'cfo' || role === 'chief_accountant' || role === 'account';
     }
 
     global.removeDoctorByName = function(docName) {
@@ -868,7 +878,7 @@
         var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
         var canAddDoc = canManageDoctors(user);
         var matrix = getApprovalMatrix();
-        var isAdmin = !user || user.isSuperAdmin || ['admin', 'superadmin', 'md', 'director', 'chairman', 'executive'].indexOf(String(user.role || '').toLowerCase()) !== -1;
+        var isAdmin = isSystemAdmin(user);
 
         container.innerHTML = 
             '<div class="card">'
