@@ -239,8 +239,36 @@
     };
 
     // -------------------------------------------------------------
-    // Doctor Master Helpers (Account HOD & Admin permission only)
+    // Doctor & Services Master Helpers (Account HOD & Admin permission)
     // -------------------------------------------------------------
+    var DEFAULT_SERVICES = [
+        { name: 'Consultation Fees', department: 'OPD' },
+        { name: 'Pathology', department: 'Other Support Service' },
+        { name: 'MRI', department: 'Radiology' },
+        { name: 'Open MRI', department: 'Radiology' },
+        { name: 'X-ray', department: 'Radiology' },
+        { name: 'DXA', department: 'Radiology' },
+        { name: 'CT Scan', department: 'Radiology' },
+        { name: 'Sonography / USG', department: 'Radiology' },
+        { name: 'Physiotherapy', department: 'Advance Modality Center' },
+        { name: 'EMG/NCV', department: 'Advance Modality Center' },
+        { name: 'Rehability', department: 'Advance Modality Center' },
+        { name: 'Canteen', department: 'F&B' },
+        { name: 'Pharmcy', department: 'Pharmcy' },
+        { name: 'IPD', department: 'Clinical Operation' },
+        { name: 'Ambulance', department: 'Other Support Service' },
+        { name: 'Pain Management', department: 'Other Support Service' }
+    ];
+
+    function getServicesList() {
+        var services = DB.get('servicesList');
+        if (!Array.isArray(services) || services.length === 0) {
+            services = DEFAULT_SERVICES;
+            DB.set('servicesList', services);
+        }
+        return services;
+    }
+
     function getDoctorsList() {
         var docs = DB.get('doctorsList');
         if (!Array.isArray(docs) || docs.length === 0) {
@@ -251,7 +279,7 @@
     }
 
     function canManageDoctors(user) {
-        return true; // Always enable Doctor Directory Control Panel & Add/Delete buttons
+        return true; // Always enable Doctor & Service Directory Control Panel
     }
 
     global.removeDoctorByName = function(docName) {
@@ -299,6 +327,56 @@
         }).join('');
     }
 
+    global.removeServiceByName = function(svcName) {
+        if (!confirm('Are you sure you want to remove service "' + svcName + '"?')) return;
+        var list = getServicesList();
+        list = list.filter(function(s){ return (typeof s === 'object' ? s.name : s) !== svcName; });
+        DB.set('servicesList', list);
+        if (global.APP && global.APP.notify) global.APP.notify('Service "' + svcName + '" removed!', 'info');
+        renderServiceBadges();
+    };
+
+    global.addServiceFromInlineInput = function() {
+        var nameInput = document.getElementById('newServiceNameInline');
+        var deptInput = document.getElementById('newServiceDeptInline');
+        if (!nameInput || !nameInput.value.trim()) return;
+        var name = nameInput.value.trim();
+        var dept = (deptInput && deptInput.value.trim()) ? deptInput.value.trim() : 'General';
+        var list = getServicesList();
+        if (!list.some(function(s){ return (typeof s === 'object' ? s.name : s).toLowerCase() === name.toLowerCase(); })) {
+            list.push({ name: name, department: dept });
+            DB.set('servicesList', list);
+            if (global.APP && global.APP.notify) global.APP.notify('Service "' + name + '" added successfully!', 'success');
+            nameInput.value = '';
+            if (deptInput) deptInput.value = '';
+            renderServiceBadges();
+        } else {
+            if (global.APP && global.APP.notify) global.APP.notify('Service already exists.', 'warning');
+        }
+    };
+
+    function renderServiceBadges() {
+        var el = document.getElementById('serviceDirectoryBadges');
+        if (!el) return;
+        var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
+        var canAddDoc = canManageDoctors(user);
+        var list = getServicesList();
+
+        if (list.length === 0) {
+            el.innerHTML = '<span style="font-size:12px;color:var(--gray);">No services added yet.</span>';
+            return;
+        }
+
+        el.innerHTML = list.map(function(s) {
+            var sName = typeof s === 'object' ? s.name : s;
+            var sDept = typeof s === 'object' ? (s.department || 'General') : 'General';
+            return '<span class="badge" style="background:var(--white,#fff);border:1px solid var(--border);color:var(--dark);padding:4px 8px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:6px;">'
+                + '🔬 <strong>' + sName + '</strong> <small style="color:var(--gray);">(' + sDept + ')</small>'
+                + (canAddDoc ? ' <button type="button" onclick="removeServiceByName(\'' + sName.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:var(--danger);font-weight:bold;cursor:pointer;padding:0;margin-left:4px;font-size:12px;" title="Remove Service">✕</button>' : '')
+                + '</span>';
+        }).join('');
+    }
+
     global.addNewDoctorPrompt = function() {
         var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
         if (!canManageDoctors(user)) {
@@ -329,6 +407,38 @@
         }
     };
 
+    global.addNewServicePrompt = function() {
+        var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
+        if (!canManageDoctors(user)) {
+            if (global.APP && global.APP.notify) global.APP.notify('Only Accounts HOD and Admins are authorized to add new services.', 'error');
+            else alert('Only Accounts HOD and Admins are authorized to add new services.');
+            return;
+        }
+        var name = prompt('Enter new Service Name (e.g. MRI Scan, Pathology):');
+        if (name && name.trim()) {
+            var dept = prompt('Enter Department for this Service (e.g. Radiology, OPD):', 'General');
+            var list = getServicesList();
+            var cleanName = name.trim();
+            var cleanDept = (dept && dept.trim()) ? dept.trim() : 'General';
+            if (!list.some(function(s){ return (typeof s === 'object' ? s.name : s).toLowerCase() === cleanName.toLowerCase(); })) {
+                list.push({ name: cleanName, department: cleanDept });
+                DB.set('servicesList', list);
+                if (global.APP && global.APP.notify) global.APP.notify('Service "' + cleanName + '" added to master list!', 'success');
+                var sel = document.querySelector('select[name="serviceName"]');
+                if (sel) {
+                    var opt = document.createElement('option');
+                    opt.value = cleanName;
+                    opt.textContent = cleanName + ' (' + cleanDept + ')';
+                    opt.selected = true;
+                    sel.appendChild(opt);
+                }
+                renderServiceBadges();
+            } else {
+                if (global.APP && global.APP.notify) global.APP.notify('Service already exists in master list.', 'warning');
+            }
+        }
+    };
+
     // -------------------------------------------------------------
     // 5.  Reception module – for employees (uses createDiscount above)
     // -------------------------------------------------------------
@@ -336,6 +446,14 @@
         var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
         var docs = getDoctorsList();
         var docOptions = docs.map(function(d){ return '<option value="' + d + '">' + d + '</option>'; }).join('');
+
+        var services = getServicesList();
+        var serviceOptions = services.map(function(s){
+            var sName = typeof s === 'object' ? s.name : s;
+            var sDept = typeof s === 'object' ? (s.department || 'General') : 'General';
+            return '<option value="' + sName + '">' + sName + ' (' + sDept + ')</option>';
+        }).join('');
+
         var canAddDoc = canManageDoctors(user);
 
         var autoPatientId = 'UHID-' + Math.floor(10000 + Math.random() * 90000);
@@ -349,6 +467,15 @@
             '<div class="form-group mb-3">',
             '  <label style="font-weight:600;margin-bottom:4px;display:block;">Patient Full Name *</label>',
             '  <input type="text" name="patientName" class="form-control" placeholder="e.g. Ramesh Kumar" required>',
+            '</div>',
+            '<div class="form-group mb-3">',
+            '  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">',
+            '    <label style="font-weight:600;margin:0;">Hospital Service / Category *</label>',
+            (canAddDoc ? '    <button type="button" class="btn btn-sm btn-outline" style="font-size:11px;padding:2px 8px;" onclick="addNewServicePrompt()">➕ Add Service (Account HOD/Admin)</button>' : '<small style="color:var(--gray);font-size:11px;">Managed by Accounts HOD/Admin</small>'),
+            '  </div>',
+            '  <select name="serviceName" class="form-control" required>',
+            serviceOptions,
+            '  </select>',
             '</div>',
             '<div class="form-group mb-3">',
             '  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">',
@@ -392,6 +519,7 @@
 
         var patientId   = (form.querySelector('[name="patientId"]').value || '').trim();
         var patientName = (form.querySelector('[name="patientName"]').value || '').trim();
+        var serviceName = (form.querySelector('[name="serviceName"]').value || '').trim();
         var doctorName  = (form.querySelector('[name="doctorName"]').value || '').trim();
         var totalBill   = (form.querySelector('[name="totalBillAmount"]').value || '').trim();
         var discType    = (form.querySelector('[name="discountType"]').value || 'PERCENTAGE');
@@ -407,6 +535,7 @@
         var formData = {
             patientId: patientId,
             patientName: patientName,
+            serviceName: serviceName,
             doctorName: doctorName,
             totalBillAmount: Number(totalBill),
             discountType: discType,
@@ -432,7 +561,7 @@
         }
 
         var html = "<div class='table-responsive'><table class='table' style='width:100%;font-size:13px;border-collapse:collapse;'><thead><tr style='background:var(--light-gray);'>"
-            + "<th style='padding:10px;'>Code</th><th style='padding:10px;'>Patient ID</th><th style='padding:10px;'>Patient Name</th><th style='padding:10px;'>Doctor Name</th><th style='padding:10px;'>Total Bill</th><th style='padding:10px;'>Discount</th><th style='padding:10px;'>Payable</th><th style='padding:10px;'>Requested By</th><th style='padding:10px;text-align:center;'>Status</th>"
+            + "<th style='padding:10px;'>Code</th><th style='padding:10px;'>Patient ID</th><th style='padding:10px;'>Patient Name</th><th style='padding:10px;'>Service</th><th style='padding:10px;'>Doctor Name</th><th style='padding:10px;'>Total Bill</th><th style='padding:10px;'>Discount</th><th style='padding:10px;'>Payable</th><th style='padding:10px;'>Requested By</th><th style='padding:10px;text-align:center;'>Status</th>"
             + "</tr></thead><tbody>";
         for (var i = 0; i < list.length; i++) {
             var r = list[i];
@@ -441,6 +570,7 @@
                 + "<td style='padding:10px;'><strong>" + (r.requestCode || "—") + "</strong></td>"
                 + "<td style='padding:10px;'><span class='badge badge-info' style='font-size:11px;'>" + (r.patientId || "—") + "</span></td>"
                 + "<td style='padding:10px;font-weight:600;'>" + (r.patientName || "—") + "</td>"
+                + "<td style='padding:10px;'><span class='badge' style='background:#e3f2fd;color:#0d47a1;font-size:11px;'>" + (r.serviceName || "Consultation Fees") + "</span></td>"
                 + "<td style='padding:10px;'>" + (r.doctorName || "—") + "</td>"
                 + "<td style='padding:10px;font-weight:700;'>₹" + (r.totalBillAmount || 0).toLocaleString('en-IN') + "</td>"
                 + "<td style='padding:10px;color:var(--primary);font-weight:700;'>₹" + (r.calculatedDiscountAmount || 0).toLocaleString('en-IN') + " (" + (r.requestedDiscountVal || 0) + (r.requestedDiscountType === 'PERCENTAGE' ? '%' : '₹') + ")</td>"
@@ -467,12 +597,24 @@
             + '    <p style="font-size:13px;color:var(--gray);margin:4px 0 0 0;">Manage and approve department discount requests across Admission, Accounting, Radiology, and Reception</p>'
             + '  </div>'
             + '  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
-            + (canAddDoc ? '    <button class="btn btn-outline btn-sm" onclick="addNewDoctorPrompt()">➕ Add Doctor (HOD/Admin)</button>' : '')
+            + (canAddDoc ? '    <button class="btn btn-outline btn-sm" onclick="addNewServicePrompt()">➕ Add Service</button>' : '')
+            + (canAddDoc ? '    <button class="btn btn-outline btn-sm" onclick="addNewDoctorPrompt()">➕ Add Doctor</button>' : '')
             + '    <button class="btn btn-primary btn-sm" onclick="showReceptionDiscountForm()">+ New Request</button>'
             + '  </div>'
             + '</div>'
             + (canAddDoc ? 
-                '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:16px;">'
+                '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">'
+                + '  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
+                + '    <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">🔬 Services Directory Control <small style="font-weight:normal;color:var(--gray);">(Account HOD & Admin Permission)</small></div>'
+                + '    <div style="display:flex;gap:6px;">'
+                + '      <input type="text" id="newServiceNameInline" placeholder="Service Name..." class="form-control" style="width:140px;font-size:12px;padding:4px 8px;">'
+                + '      <input type="text" id="newServiceDeptInline" placeholder="Department..." class="form-control" style="width:120px;font-size:12px;padding:4px 8px;">'
+                + '      <button class="btn btn-sm btn-primary" style="font-size:12px;padding:4px 10px;" onclick="addServiceFromInlineInput()">➕ Add Service</button>'
+                + '    </div>'
+                + '  </div>'
+                + '  <div id="serviceDirectoryBadges" style="display:flex;flex-wrap:wrap;gap:6px;"></div>'
+                + '</div>'
+                + '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:16px;">'
                 + '  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
                 + '    <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">🩺 Doctor Directory Control <small style="font-weight:normal;color:var(--gray);">(Account HOD & Admin Permission)</small></div>'
                 + '    <div style="display:flex;gap:6px;">'
@@ -495,7 +637,10 @@
             + '<div id="discountList_reception" style="display:none;"></div>'
             + '</div>';
 
-        if (canAddDoc) renderDoctorBadges();
+        if (canAddDoc) {
+            renderServiceBadges();
+            renderDoctorBadges();
+        }
 
         global.switchDiscountTab = function(deptKey, btnEl) {
             ['admission', 'account', 'radiology', 'reception'].forEach(function(dk) {
