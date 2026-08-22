@@ -348,27 +348,30 @@
         return false;
     }
 
-    global.toggleUserBypassRight = function(uname) {
-        var currentUser = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
-        var isAdmin = !currentUser || currentUser.isSuperAdmin || ['admin', 'superadmin'].indexOf(String(currentUser.role || '').toLowerCase()) !== -1 || String(currentUser.username || '').toLowerCase() === 'admin';
+    global.toggleUserPermissionRight = function(uname, permKey) {
+        var currentUser = getLoggedInUser();
+        var isAdmin = isSystemAdmin(currentUser);
         if (!isAdmin) {
-            if (global.APP && global.APP.notify) global.APP.notify('Only System Administrator can grant or revoke Bypass Approval permissions.', 'error');
-            else alert('Only System Administrator can grant or revoke Bypass Approval permissions.');
+            if (global.APP && global.APP.notify) global.APP.notify('Only System Administrator can configure user permissions.', 'error');
+            else alert('Only System Administrator can configure user permissions.');
             return;
         }
 
         var users = DB.get('users') || [];
         var target = users.find(function(u){ return (u.username && u.username.toLowerCase() === uname.toLowerCase()) || u.id === uname; });
         if (target) {
-            target.canBypassApproval = !target.canBypassApproval;
+            target[permKey] = !target[permKey];
             DB.set('users', users);
-            var statusText = target.canBypassApproval ? 'GRANTED' : 'REVOKED';
-            if (global.APP && global.APP.notify) global.APP.notify('Bypass Approval privilege ' + statusText + ' for user "' + (target.fullName || target.username) + '".', 'success');
-            renderUserBypassBadges();
+            var label = permKey === 'canManageDoctors' ? 'Doctor Master' : permKey === 'canManageServices' ? 'Service Master' : 'Bypass Matrix';
+            var statusText = target[permKey] ? 'GRANTED' : 'REVOKED';
+            if (global.APP && global.APP.notify) global.APP.notify('Permission "' + label + '" ' + statusText + ' for user "' + (target.fullName || target.username) + '".', 'success');
+            renderUserPermissionBadges();
+            var container = document.getElementById('pageContent') || document.querySelector('.page-content');
+            if (container && typeof global.renderDiscounts === 'function') global.renderDiscounts(container);
         }
     };
 
-    function renderUserBypassBadges() {
+    function renderUserPermissionBadges() {
         var el = document.getElementById('userBypassDirectoryBadges');
         if (!el) return;
         var users = DB.get('users') || [];
@@ -381,18 +384,27 @@
             var uname = u.username || u.id;
             var name = u.fullName || u.name || uname;
             var isSysAdmin = u.isSuperAdmin || String(u.role || '').toLowerCase() === 'admin' || String(u.username || '').toLowerCase() === 'admin';
-            var hasBypass = isSysAdmin || !!u.canBypassApproval;
 
-            return '<div style="background:var(--white,#fff);border:1px solid var(--border);padding:8px 12px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;">'
+            var hasBypass = isSysAdmin || !!u.canBypassApproval;
+            var hasDocs = isSysAdmin || !!u.canManageDoctors;
+            var hasSvcs = isSysAdmin || !!u.canManageServices;
+
+            return '<div style="background:var(--white,#fff);border:1px solid var(--border);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px;">'
                 + '<div>'
-                + '  <strong style="font-size:13px;display:block;color:var(--dark);">' + name + ' <small style="color:var(--gray);">(' + (u.role || 'USER') + ')</small></strong>'
-                + '  <span style="font-size:11px;color:' + (hasBypass ? '#2e7d32' : 'var(--gray)') + ';font-weight:600;">' + (hasBypass ? '⚡ Bypass Privilege Active' : '🔒 Standard Approval Matrix Routing') + '</span>'
+                + '  <strong style="font-size:13px;display:block;color:var(--dark);">' + name + ' <small style="color:var(--gray);">(' + (u.role || 'USER') + ' — ' + (u.department || 'General') + ')</small></strong>'
+                + '  <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;">'
+                + '    <span style="font-size:11px;padding:2px 6px;border-radius:4px;background:' + (hasDocs ? '#e8f5e9;color:#2e7d32;' : '#f5f5f5;color:#757575;') + '">🩺 Docs: ' + (hasDocs ? 'Active' : 'Hidden') + '</span>'
+                + '    <span style="font-size:11px;padding:2px 6px;border-radius:4px;background:' + (hasSvcs ? '#e3f2fd;color:#1565c0;' : '#f5f5f5;color:#757575;') + '">🔬 Services: ' + (hasSvcs ? 'Active' : 'Hidden') + '</span>'
+                + '    <span style="font-size:11px;padding:2px 6px;border-radius:4px;background:' + (hasBypass ? '#fff3e0;color:#e65100;' : '#f5f5f5;color:#757575;') + '">⚡ Bypass: ' + (hasBypass ? 'Active' : 'Standard') + '</span>'
+                + '  </div>'
                 + '</div>'
                 + (isSysAdmin 
-                    ? '<span style="font-size:11px;background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:4px;font-weight:bold;">Admin (Always Active)</span>'
-                    : '<button type="button" class="btn btn-sm ' + (hasBypass ? 'btn-outline-danger' : 'btn-outline-primary') + '" style="font-size:11px;padding:3px 8px;" onclick="toggleUserBypassRight(\'' + uname.replace(/'/g, "\\'") + '\')">'
-                        + (hasBypass ? '🚫 Revoke Bypass' : '⚡ Grant Bypass Right')
-                        + '</button>')
+                    ? '<span style="font-size:11px;background:#e8f5e9;color:#2e7d32;padding:4px 10px;border-radius:6px;font-weight:bold;">Admin Full Access</span>'
+                    : '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+                        + '<button type="button" class="btn btn-sm ' + (hasDocs ? 'btn-outline-danger' : 'btn-outline-primary') + '" style="font-size:11px;padding:2px 8px;" onclick="toggleUserPermissionRight(\'' + uname.replace(/'/g, "\\'") + '\', \'canManageDoctors\')">' + (hasDocs ? 'Revoke Docs' : 'Grant Docs') + '</button>'
+                        + '<button type="button" class="btn btn-sm ' + (hasSvcs ? 'btn-outline-danger' : 'btn-outline-primary') + '" style="font-size:11px;padding:2px 8px;" onclick="toggleUserPermissionRight(\'' + uname.replace(/'/g, "\\'") + '\', \'canManageServices\')">' + (hasSvcs ? 'Revoke Svcs' : 'Grant Svcs') + '</button>'
+                        + '<button type="button" class="btn btn-sm ' + (hasBypass ? 'btn-outline-danger' : 'btn-outline-warning') + '" style="font-size:11px;padding:2px 8px;" onclick="toggleUserPermissionRight(\'' + uname.replace(/'/g, "\\'") + '\', \'canBypassApproval\')">' + (hasBypass ? 'Revoke Bypass' : 'Grant Bypass') + '</button>'
+                      + '</div>')
                 + '</div>';
         }).join('');
     }
@@ -504,7 +516,29 @@
     }
 
     function canManageDoctors(user) {
-        return isSystemAdmin(user);
+        if (!user) return false;
+        if (isSystemAdmin(user)) return true;
+        var uname = String(user.username || '').toLowerCase();
+        var users = DB.get('users') || [];
+        var targetUser = users.find(function(u){ 
+            return (u.username && u.username.toLowerCase() === uname) || (u.id && u.id === user.id); 
+        });
+        if (targetUser && targetUser.canManageDoctors) return true;
+        if (user.canManageDoctors) return true;
+        return false;
+    }
+
+    function canManageServices(user) {
+        if (!user) return false;
+        if (isSystemAdmin(user)) return true;
+        var uname = String(user.username || '').toLowerCase();
+        var users = DB.get('users') || [];
+        var targetUser = users.find(function(u){ 
+            return (u.username && u.username.toLowerCase() === uname) || (u.id && u.id === user.id); 
+        });
+        if (targetUser && targetUser.canManageServices) return true;
+        if (user.canManageServices) return true;
+        return false;
     }
 
     global.removeDoctorByName = function(docName) {
@@ -899,6 +933,7 @@
         if (!container) return;
         var user = getLoggedInUser();
         var canAddDoc = canManageDoctors(user);
+        var canAddSvc = canManageServices(user);
         var matrix = getApprovalMatrix();
         var isAdmin = isSystemAdmin(user);
 
@@ -910,7 +945,7 @@
             + '    <p style="font-size:13px;color:var(--gray);margin:4px 0 0 0;">Manage and approve department discount requests across Admission, Accounting, Radiology, and Reception</p>'
             + '  </div>'
             + '  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
-            + (canAddDoc ? '    <button class="btn btn-outline btn-sm" onclick="addNewServicePrompt()">➕ Add Service</button>' : '')
+            + (canAddSvc ? '    <button class="btn btn-outline btn-sm" onclick="addNewServicePrompt()">➕ Add Service</button>' : '')
             + (canAddDoc ? '    <button class="btn btn-outline btn-sm" onclick="addNewDoctorPrompt()">➕ Add Doctor</button>' : '')
             + '    <button class="btn btn-primary btn-sm" onclick="showReceptionDiscountForm()">+ New Request</button>'
             + '  </div>'
@@ -944,15 +979,15 @@
             + (isAdmin ? 
                 '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">'
                 + '  <div style="margin-bottom:8px;">'
-                + '    <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">⚡ User Bypass Rights Directory <small style="font-weight:normal;color:var(--gray);">(Admin Only — Grant or Revoke Executive Bypass Privilege per User)</small></div>'
+                + '    <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">⚡ Admin User Permissions Directory <small style="font-weight:normal;color:var(--gray);">(Admin Only — Configure Doctor, Service, and Bypass Rights per User)</small></div>'
                 + '  </div>'
                 + '  <div id="userBypassDirectoryBadges"></div>'
                 + '</div>'
               : '')
-            + (canAddDoc ? 
+            + (canAddSvc ? 
                 '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">'
                 + '  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
-                + '    <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">🔬 Services Directory Control <small style="font-weight:normal;color:var(--gray);">(Account HOD & Admin Permission)</small></div>'
+                + '    <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">🔬 Services Directory Control <small style="font-weight:normal;color:var(--gray);">(Admin-Granted Permission)</small></div>'
                 + '    <div style="display:flex;gap:6px;">'
                 + '      <input type="text" id="newServiceNameInline" placeholder="Service Name..." class="form-control" style="width:140px;font-size:12px;padding:4px 8px;">'
                 + '      <input type="text" id="newServiceDeptInline" placeholder="Department..." class="form-control" style="width:120px;font-size:12px;padding:4px 8px;">'
@@ -961,9 +996,11 @@
                 + '  </div>'
                 + '  <div id="serviceDirectoryBadges" style="display:flex;flex-wrap:wrap;gap:6px;"></div>'
                 + '</div>'
-                + '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:16px;">'
+              : '')
+            + (canAddDoc ?
+                '<div style="background:var(--light-gray,#f8fafc);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:16px;">'
                 + '  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
-                + '    <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">🩺 Doctor Directory Control <small style="font-weight:normal;color:var(--gray);">(Account HOD & Admin Permission)</small></div>'
+                + '    <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">🩺 Doctor Directory Control <small style="font-weight:normal;color:var(--gray);">(Admin-Granted Permission)</small></div>'
                 + '    <div style="display:flex;gap:6px;">'
                 + '      <input type="text" id="newDoctorInputInline" placeholder="New Doctor Name..." class="form-control" style="width:180px;font-size:12px;padding:4px 8px;">'
                 + '      <button class="btn btn-sm btn-primary" style="font-size:12px;padding:4px 10px;" onclick="addDoctorFromInlineInput()">➕ Add Doctor</button>'
@@ -984,11 +1021,9 @@
             + '<div id="discountList_reception" style="display:none;"></div>'
             + '</div>';
 
-        if (isAdmin) renderUserBypassBadges();
-        if (canAddDoc) {
-            renderServiceBadges();
-            renderDoctorBadges();
-        }
+        if (isAdmin) renderUserPermissionBadges();
+        if (canAddSvc) renderServiceBadges();
+        if (canAddDoc) renderDoctorBadges();
 
         global.switchDiscountTab = function(deptKey, btnEl) {
             ['admission', 'account', 'radiology', 'reception'].forEach(function(dk) {
