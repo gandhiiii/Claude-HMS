@@ -388,18 +388,36 @@ function onRoleChange(select) {
     const grid = document.getElementById('permissionsGrid');
     if (!grid) return;
     const allCbs = grid.querySelectorAll('[name="permissions"]');
+    const adminPerms = ['dashboard', 'users', 'departments', 'feature-rights', 'admin-checklists', 'budget', 'quarterly-priorities', 'hospital-settings', 'data-history'];
+
     const rolePerms = {
-        hod: ['dashboard','employee-dashboard','material-requests','suggestions','tasks','checklists','complaints','problems'],
-        employee: ['employee-dashboard','material-requests','suggestions'],
-        storekeeper: ['dashboard','inventory','material-requests','employee-dashboard'],
-        ambulance_employee: ['ambulance']
+        hod: ['employee-dashboard','material-requests','suggestions','tasks','checklists','complaints','problems','reports'],
+        employee: ['employee-dashboard','material-requests','suggestions','checklists'],
+        storekeeper: ['inventory','material-requests','employee-dashboard','scrap'],
+        ambulance_employee: ['ambulance'],
+        CFO: ['employee-dashboard','discounts','material-requests','suggestions','reports','checklists'],
+        CHIEF_ACCOUNTANT: ['employee-dashboard','discounts','material-requests','suggestions','reports','checklists'],
+        BILLING_MANAGER: ['employee-dashboard','discounts','material-requests','suggestions','reports','checklists'],
+        BILLING_CLERK: ['employee-dashboard','discounts','material-requests','suggestions'],
+        RECEPTIONIST: ['employee-dashboard','discounts','material-requests','suggestions','admissions'],
+        doctor: ['employee-dashboard','discounts','material-requests','suggestions','admissions','patient-shifting'],
+        MD: ['employee-dashboard','discounts','material-requests','suggestions','reports','md-report'],
+        DIRECTOR: ['employee-dashboard','discounts','material-requests','suggestions','reports','md-report'],
+        EXECUTIVE: ['employee-dashboard','discounts','material-requests','suggestions','reports'],
+        CHAIRMAN: ['employee-dashboard','discounts','material-requests','suggestions','reports','md-report'],
+        VICE_CHAIRMAN: ['employee-dashboard','discounts','material-requests','suggestions','reports','md-report']
     };
-    const perms = rolePerms[role];
-    if (perms) {
-        allCbs.forEach(function(cb) {
-            if (perms.indexOf(cb.value) !== -1) cb.checked = true;
-        });
-    }
+
+    const perms = rolePerms[role] || ['employee-dashboard', 'discounts', 'material-requests', 'suggestions'];
+
+    allCbs.forEach(function(cb) {
+        if (role !== 'admin' && adminPerms.indexOf(cb.value) !== -1) {
+            cb.checked = false;
+        } else if (perms.indexOf(cb.value) !== -1) {
+            cb.checked = true;
+        }
+    });
+
     var section = document.getElementById('managedDeptSection');
     if (section) section.style.display = role === 'hod' ? '' : 'none';
 }

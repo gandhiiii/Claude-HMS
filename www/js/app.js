@@ -72,9 +72,9 @@ const Router = {
         const _t = typeof T === 'function' ? T : function(k){ return k; };
         const items = [
             { id: 'dashboard', label: _t('nav_dashboard'), icon: '📊', permission: 'dashboard', adminOnly: true },
-            { id: 'users', label: _t('nav_users'), icon: '👥', permission: 'users' },
-            { id: 'departments', label: _t('nav_departments'), icon: '🏢', permission: 'departments' },
-            { id: 'feature-rights', label: _t('nav_feature_rights'), icon: '🔐', permission: 'departments' },
+            { id: 'users', label: _t('nav_users'), icon: '👥', permission: 'users', adminOnly: true },
+            { id: 'departments', label: _t('nav_departments'), icon: '🏢', permission: 'departments', adminOnly: true },
+            { id: 'feature-rights', label: _t('nav_feature_rights'), icon: '🔐', permission: 'feature-rights', adminOnly: true },
             { id: 'inventory', label: _t('nav_inventory'), icon: '📦', permission: 'inventory' },
             { id: 'scrap', label: '🗑️ Scrap / Disposal', icon: '🗑️', permission: 'scrap' },
             { id: 'gate-security', label: _t('nav_gate_security'), icon: '🛡️', permission: 'gate-security' },
@@ -88,7 +88,7 @@ const Router = {
             { id: 'rooms', label: '🏥 Rooms Master', icon: '🏥', permission: 'rooms' },
             { id: 'admissions', label: _t('nav_admissions'), icon: '🏥', permission: 'admissions' },
             { id: 'lost-found', label: _t('nav_lost_found'), icon: '🔍', permission: 'lost-found' },
-            { id: 'admin-checklists', label: _t('nav_admin_checklists'), icon: '🔖', permission: 'admin-checklists' },
+            { id: 'admin-checklists', label: _t('nav_admin_checklists'), icon: '🔖', permission: 'admin-checklists', adminOnly: true },
             { id: 'material-requests', label: _t('nav_material_requests'), icon: '📦', permission: 'material-requests' },
             { id: 'discounts', label: _t('nav_discounts'), icon: '🏷️', permission: 'discounts' },
             { id: 'suggestions', label: _t('nav_suggestions'), icon: '💡', permission: 'suggestions' },
@@ -140,7 +140,7 @@ const Router = {
         }
 
         // Non-admin staff must not access admin-only modules directly
-        var _adminOnly = ['dashboard', 'data-history', 'budget', 'quarterly-priorities', 'feature-rights', 'hospital-settings'];
+        var _adminOnly = ['dashboard', 'users', 'departments', 'feature-rights', 'admin-checklists', 'data-history', 'budget', 'quarterly-priorities', 'hospital-settings'];
         if (_adminOnly.indexOf(module) !== -1 && !isAdmin) {
             var requestedModule = module;
             if (u.role === 'hod') {

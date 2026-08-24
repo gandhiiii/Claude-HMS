@@ -595,9 +595,10 @@ const AUTH = {
     },
     hasPermission(user, permission) {
         if (!user) return false;
-        // Budget is strictly admin-only — cannot be granted via feature rights
-        if (permission === 'budget') return user.isSuperAdmin || user.role === 'admin';
-        if (permission === 'quarterly-priorities') return user.isSuperAdmin || user.role === 'admin';
+        // Strictly admin-only management permissions — cannot be accessed by standard staff/CFO/employee roles
+        if (['dashboard','users','departments','feature-rights','admin-checklists','budget','quarterly-priorities','hospital-settings','data-history'].indexOf(permission) !== -1) {
+            return !!(user.isSuperAdmin || user.role === 'admin');
+        }
         if (permission === 'purchases') return user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || user.role === 'hod';
         if (permission === 'scrap') {
             if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
@@ -1189,6 +1190,24 @@ const APP = {
             if (!Array.isArray(DB.get('hodLockers')) || DB.get('hodLockers').length === 0) {
                 DB.recoverHodLockers();
             }
+
+            // Sanitize existing non-admin users to ensure admin privileges are not leaked
+            const allUsers = DB.get('users') || [];
+            let usersUpdated = false;
+            const adminPerms = ['dashboard', 'users', 'departments', 'feature-rights', 'admin-checklists', 'budget', 'quarterly-priorities', 'hospital-settings', 'data-history'];
+            allUsers.forEach(function(u) {
+                if (u.role !== 'admin' && u.username !== 'admin' && u.username !== 'superadmin') {
+                    if (u.isSuperAdmin) { u.isSuperAdmin = false; usersUpdated = true; }
+                    if (Array.isArray(u.permissions) && u.permissions.length > 0) {
+                        const cleanPerms = u.permissions.filter(p => adminPerms.indexOf(p) === -1);
+                        if (cleanPerms.length !== u.permissions.length) {
+                            u.permissions = cleanPerms;
+                            usersUpdated = true;
+                        }
+                    }
+                }
+            });
+            if (usersUpdated) DB.set('users', allUsers);
         } catch (e) {
             console.warn('seedData error:', e);
         }
