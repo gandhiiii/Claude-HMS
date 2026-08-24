@@ -1,4 +1,4 @@
-// HMS — CFO Workspace (Executive Financial Suite & Data Management Engine)
+// HMS — CFO Workspace (Executive Financial Suite & High-Visibility Data Control Engine)
 
 (function () {
     'use strict';
@@ -7,6 +7,20 @@
     var _cfoCharts = [];
 
     /* ── Initial Seed Data Getters with Persistent Fallbacks ── */
+    function _getExecKpis() {
+        var items = DB.get('cfo_exec_kpis');
+        if (!Array.isArray(items) || items.length === 0) {
+            items = [
+                { metric: 'Gross Hospital Revenue', current: 14500000, prior: 13800000, target: 14000000, variance: '+₹5.0L (+3.5%)', status: 'On Target' },
+                { metric: 'Operating Costs (OPEX)', current: 9800000, prior: 9500000, target: 9600000, variance: '-₹2.0L (-2.0%)', status: 'Controlled' },
+                { metric: 'Debt Service Coverage (DSCR)', current: '1.85x', prior: '1.75x', target: '1.50x', variance: '+0.35x Safety Margin', status: 'Healthy' },
+                { metric: 'Bed Occupancy Rate', current: '82.4%', prior: '80.1%', target: '78.0%', variance: '+4.4% Utilization', status: 'Optimal' }
+            ];
+            DB.set('cfo_exec_kpis', items);
+        }
+        return items;
+    }
+
     function _getApprovals() {
         var items = DB.get('cfo_approvals_v2');
         if (!Array.isArray(items) || items.length === 0) {
@@ -103,6 +117,7 @@
     }
 
     function _formatCurrency(amt) {
+        if (typeof amt === 'string' && (amt.indexOf('x') !== -1 || amt.indexOf('%') !== -1)) return amt;
         var num = Number(amt) || 0;
         return '₹' + num.toLocaleString('en-IN', { maximumFractionDigits: 0 });
     }
@@ -125,13 +140,14 @@
     }
 
     /* ──────────────────────────────────────────────────────────
-       MODULE 1: 📊 Executive Dashboard
+       MODULE 1: 📊 Executive Dashboard (With Data Entry & Delete)
     ────────────────────────────────────────────────────────── */
     function _renderExecutiveTab() {
         var admissions = DB.get('admissions') || [];
         var activeBeds = admissions.filter(function (a) { return a.status === 'admitted'; }).length;
         var totalRev = admissions.length * 48500 + (DB.get('inventory') || []).length * 1250;
         var revPOB = activeBeds > 0 ? Math.round(totalRev / Math.max(1, activeBeds)) : 14200;
+        var kpis = _getExecKpis();
 
         var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:20px;">'
             + _kpiCard('📈', 'EBITDA Margin', '26.8%', '▲ +2.4% vs last month', '#2e7d32')
@@ -159,15 +175,27 @@
             + '</div>'
 
             + '<div class="card" style="padding:18px;">'
-            + '<div style="font-weight:700;font-size:15px;margin-bottom:12px;">⚡ Executive Financial Health Summary</div>'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+            + '<div style="font-weight:700;font-size:15px;">⚡ Executive Financial Metric Ledger</div>'
+            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddExecKpiModal()">➕ Add Custom Financial Entry</button>'
+            + '</div>'
             + '<div class="table-responsive"><table>'
-            + '<thead><tr><th>Financial Indicator</th><th>Current Status</th><th>Target Benchmark</th><th>Monthly Variance</th><th>Status</th></tr></thead>'
-            + '<tbody>'
-            + '<tr><td><strong>Gross Hospital Revenue</strong></td><td>' + _formatCurrency(14500000) + '</td><td>' + _formatCurrency(14000000) + '</td><td style="color:#2e7d32;">+₹5.0L (+3.5%)</td><td>' + _badge('On Target', 'success') + '</td></tr>'
-            + '<tr><td><strong>Operating Expense (OPEX)</strong></td><td>' + _formatCurrency(9800000) + '</td><td>' + _formatCurrency(9600000) + '</td><td style="color:#c62828;">-₹2.0L (-2.0%)</td><td>' + _badge('Controlled', 'warning') + '</td></tr>'
-            + '<tr><td><strong>Debt Service Coverage (DSCR)</strong></td><td>1.85x</td><td>1.50x Target</td><td>+0.35x Safety Margin</td><td>' + _badge('Healthy', 'success') + '</td></tr>'
-            + '<tr><td><strong>Bed Occupancy Rate</strong></td><td>82.4%</td><td>78.0% Target</td><td>+4.4% Capacity Utilization</td><td>' + _badge('Optimal', 'success') + '</td></tr>'
-            + '</tbody></table></div></div>';
+            + '<thead><tr><th>Financial Indicator Metric</th><th>Current Value</th><th>Prior Period</th><th>Target Benchmark</th><th>Variance</th><th>Status</th><th>Data Control</th></tr></thead>'
+            + '<tbody>';
+
+        kpis.forEach(function (k, idx) {
+            html += '<tr>'
+                + '<td><strong>' + k.metric + '</strong></td>'
+                + '<td style="font-weight:700;">' + _formatCurrency(k.current) + '</td>'
+                + '<td>' + _formatCurrency(k.prior) + '</td>'
+                + '<td>' + _formatCurrency(k.target) + '</td>'
+                + '<td style="color:#2e7d32;font-weight:700;">' + k.variance + '</td>'
+                + '<td>' + _badge(k.status, 'success') + '</td>'
+                + '<td><button class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:11px;" onclick="CfoPortal.deleteExecKpi(' + idx + ')">🗑️ Remove Entry</button></td>'
+                + '</tr>';
+        });
+
+        html += '</tbody></table></div></div>';
 
         setTimeout(function () {
             _makeChart('cfoExecTrendChart', {
@@ -199,7 +227,7 @@
     }
 
     /* ──────────────────────────────────────────────────────────
-       MODULE 2: 💳 Revenue Cycle & Payer Analytics (With Add & Delete)
+       MODULE 2: 💳 Revenue Cycle & Payer Analytics
     ────────────────────────────────────────────────────────── */
     function _renderRcmTab() {
         var claims = _getClaims();
@@ -229,12 +257,12 @@
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
             + '<div style="font-weight:700;font-size:15px;">📜 Insurance & TPA Denial Analysis & Payer Records</div>'
             + '<div style="display:flex;gap:8px;">'
-            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddClaimModal()">➕ Add Payer Claim Record</button>'
+            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddClaimModal()">➕ Add Payer Claim Entry</button>'
             + '<button class="btn btn-sm btn-success" onclick="CfoPortal.exportRcmExcel()">📊 Export RCM Report</button>'
             + '</div>'
             + '</div>'
             + '<div class="table-responsive"><table>'
-            + '<thead><tr><th>Payer / TPA Name</th><th>Total Claims</th><th>Approved (₹)</th><th>Denied (₹)</th><th>Root Cause Category</th><th>Risk Level</th><th>Actions / Data Control</th></tr></thead>'
+            + '<thead><tr><th>Payer / TPA Name</th><th>Total Claims</th><th>Approved (₹)</th><th>Denied (₹)</th><th>Root Cause Category</th><th>Risk Level</th><th>Data Control</th></tr></thead>'
             + '<tbody>';
 
         claims.forEach(function (c, idx) {
@@ -246,7 +274,7 @@
                 + '<td>' + c.cause + '</td>'
                 + '<td>' + _badge(c.risk, c.risk.indexOf('Medium') !== -1 ? 'warning' : 'info') + '</td>'
                 + '<td>'
-                + '<button class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:11px;" onclick="CfoPortal.deleteClaim(' + idx + ')">🗑️ Delete</button>'
+                + '<button class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:11px;" onclick="CfoPortal.deleteClaim(' + idx + ')">🗑️ Remove Entry</button>'
                 + '</td>'
                 + '</tr>';
         });
@@ -277,7 +305,7 @@
     }
 
     /* ──────────────────────────────────────────────────────────
-       MODULE 3: 🏥 Unit Economics & Costing (With Add & Delete)
+       MODULE 3: 🏥 Unit Economics & Costing
     ────────────────────────────────────────────────────────── */
     function _renderUnitEconomicsTab() {
         var specialties = _getSpecialties();
@@ -298,12 +326,12 @@
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
             + '<div style="font-weight:700;font-size:15px;">📋 Activity-Based Costing (ABC Model) & Specialty Costing Ledger</div>'
             + '<div style="display:flex;gap:8px;">'
-            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddSpecialtyModal()">➕ Add Specialty Department</button>'
+            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddSpecialtyModal()">➕ Add Specialty Entry</button>'
             + '<button class="btn btn-sm btn-success" onclick="CfoPortal.exportPnlExcel()">📊 Export Costing Excel</button>'
             + '</div>'
             + '</div>'
             + '<div class="table-responsive"><table>'
-            + '<thead><tr><th>Specialty Department</th><th>Procedure Count</th><th>Gross Revenue</th><th>Direct Cost</th><th>Unit ABC Cost / Proc</th><th>Contribution Margin</th><th>Margin %</th><th>Actions</th></tr></thead>'
+            + '<thead><tr><th>Specialty Department</th><th>Procedure Count</th><th>Gross Revenue</th><th>Direct Cost</th><th>Unit ABC Cost / Proc</th><th>Contribution Margin</th><th>Margin %</th><th>Data Control</th></tr></thead>'
             + '<tbody>';
 
         specialties.forEach(function (s, idx) {
@@ -316,7 +344,7 @@
                 + '<td>' + _formatCurrency(s.abcCost) + '</td>'
                 + '<td style="font-weight:700;color:#2e7d32;">' + _formatCurrency(contrib) + '</td>'
                 + '<td><strong>' + s.margin + '%</strong></td>'
-                + '<td><button class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:11px;" onclick="CfoPortal.deleteSpecialty(' + idx + ')">🗑️ Delete</button></td>'
+                + '<td><button class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:11px;" onclick="CfoPortal.deleteSpecialty(' + idx + ')">🗑️ Remove Entry</button></td>'
                 + '</tr>';
         });
 
@@ -340,7 +368,7 @@
     }
 
     /* ──────────────────────────────────────────────────────────
-       MODULE 4: 📥 Approval Inbox (With Add, Edit, Delete Data Control)
+       MODULE 4: 📥 Approval Inbox
     ────────────────────────────────────────────────────────── */
     function _renderApprovalsTab() {
         var approvals = _getApprovals();
@@ -358,12 +386,12 @@
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
             + '<div style="font-weight:700;font-size:15px;">📥 CFO Approval Inbox (Queue: ' + approvals.length + ')</div>'
             + '<div style="display:flex;gap:8px;">'
-            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddApprovalModal()">➕ Add Requisition</button>'
+            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddApprovalModal()">➕ Add Requisition Entry</button>'
             + '<button class="btn btn-sm btn-success" onclick="CfoPortal.approveAllPending()">✓ Approve All Pending</button>'
             + '</div>'
             + '</div>'
             + '<div class="table-responsive"><table>'
-            + '<thead><tr><th>Req ID</th><th>Approval Category</th><th>Amount (₹)</th><th>Party / Vendor / Patient</th><th>Department</th><th>Justification Reason</th><th>Status</th><th>CFO Decision / Data Control</th></tr></thead>'
+            + '<thead><tr><th>Req ID</th><th>Approval Category</th><th>Amount (₹)</th><th>Party / Vendor / Patient</th><th>Department</th><th>Justification Reason</th><th>Status</th><th>Decision / Data Control</th></tr></thead>'
             + '<tbody>';
 
         approvals.forEach(function (a, idx) {
@@ -381,7 +409,7 @@
                     ? '<button class="btn btn-sm btn-success" style="font-size:11px;padding:3px 8px;" onclick="CfoPortal.processApprovalV2(' + idx + ',\'approved\')">✓ Approve</button>'
                     + '<button class="btn btn-sm btn-warning" style="font-size:11px;padding:3px 8px;" onclick="CfoPortal.processApprovalV2(' + idx + ',\'rejected\')">✗ Reject</button>'
                     : '<span style="font-size:11px;color:var(--gray);align-self:center;">Processed</span>')
-                + '<button class="btn btn-sm btn-danger" style="font-size:11px;padding:3px 8px;" onclick="CfoPortal.deleteApproval(' + idx + ')">🗑️ Remove</button>'
+                + '<button class="btn btn-sm btn-danger" style="font-size:11px;padding:3px 8px;" onclick="CfoPortal.deleteApproval(' + idx + ')">🗑️ Remove Entry</button>'
                 + '</div>'
                 + '</td>'
                 + '</tr>';
@@ -392,7 +420,7 @@
     }
 
     /* ──────────────────────────────────────────────────────────
-       MODULE 5: 📤 Executive & Board Submissions (With Add & Delete CAPEX)
+       MODULE 5: 📤 Executive & Board Submissions
     ────────────────────────────────────────────────────────── */
     function _renderBoardSubmissionsTab() {
         var capex = _getCapex();
@@ -419,7 +447,7 @@
             + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">High-value Medical Equipment ROI, Cash Flow Payback & Financial Feasibility Study</div>'
             + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
             + '<button class="btn btn-primary" style="background:#6a1b9a;" onclick="APP.notify(\'CAPEX Proposals package sent to Board of Directors\',\'success\')">✉️ Submit Proposals to Board</button>'
-            + '<button class="btn btn-outline" onclick="CfoPortal.openAddCapexModal()">➕ Add CAPEX Proposal</button>'
+            + '<button class="btn btn-outline" onclick="CfoPortal.openAddCapexModal()">➕ Add CAPEX Entry</button>'
             + '</div>'
             + '</div>'
             + '</div>'
@@ -427,10 +455,10 @@
             + '<div class="card" style="padding:18px;margin-bottom:20px;">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
             + '<div style="font-weight:700;font-size:15px;">🔬 Active CAPEX Equipment & Proposal Register</div>'
-            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddCapexModal()">➕ Add New CAPEX Proposal</button>'
+            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddCapexModal()">➕ Add New CAPEX Entry</button>'
             + '</div>'
             + '<div class="table-responsive"><table>'
-            + '<thead><tr><th>Equipment Asset</th><th>Department</th><th>Capital Cost (₹)</th><th>Annual Revenue (₹)</th><th>ROI %</th><th>Payback Est.</th><th>Status</th><th>Actions</th></tr></thead>'
+            + '<thead><tr><th>Equipment Asset</th><th>Department</th><th>Capital Cost (₹)</th><th>Annual Revenue (₹)</th><th>ROI %</th><th>Payback Est.</th><th>Status</th><th>Data Control</th></tr></thead>'
             + '<tbody>';
 
         capex.forEach(function (c, idx) {
@@ -442,7 +470,7 @@
                 + '<td><strong>' + c.roi + '</strong></td>'
                 + '<td>' + c.payback + '</td>'
                 + '<td>' + _badge(c.status, 'success') + '</td>'
-                + '<td><button class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:11px;" onclick="CfoPortal.deleteCapex(' + idx + ')">🗑️ Delete</button></td>'
+                + '<td><button class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:11px;" onclick="CfoPortal.deleteCapex(' + idx + ')">🗑️ Remove Entry</button></td>'
                 + '</tr>';
         });
 
@@ -452,7 +480,7 @@
     }
 
     /* ──────────────────────────────────────────────────────────
-       MODULE 6: 🛡️ Audit, Governance & Taxes (With Add & Delete Vendor AP)
+       MODULE 6: 🛡️ Audit, Governance & Taxes
     ────────────────────────────────────────────────────────── */
     function _renderGovernanceTab() {
         var vendors = _getVendors();
@@ -467,10 +495,10 @@
             + '<div class="card" style="padding:18px;margin-bottom:20px;">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
             + '<div style="font-weight:700;font-size:15px;">🏬 Vendor Accounts Payable & Payment Ledger</div>'
-            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddVendorModal()">➕ Add Vendor Bill</button>'
+            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddVendorModal()">➕ Add Vendor Bill Entry</button>'
             + '</div>'
             + '<div class="table-responsive"><table>'
-            + '<thead><tr><th>Supplier / Vendor Name</th><th>Invoices</th><th>Total Payable (₹)</th><th>Current (0-30 Days)</th><th>Overdue (>30 Days)</th><th>Aging Status</th><th>Actions</th></tr></thead>'
+            + '<thead><tr><th>Supplier / Vendor Name</th><th>Invoices</th><th>Total Payable (₹)</th><th>Current (0-30 Days)</th><th>Overdue (>30 Days)</th><th>Aging Status</th><th>Data Control</th></tr></thead>'
             + '<tbody>';
 
         vendors.forEach(function (v, idx) {
@@ -481,7 +509,7 @@
                 + '<td>' + _formatCurrency(v.current) + '</td>'
                 + '<td style="color:#c62828;font-weight:700;">' + _formatCurrency(v.overdue) + '</td>'
                 + '<td>' + _badge(v.overdue > 0 ? v.days + ' Days Overdue' : 'On Schedule', v.overdue > 0 ? 'danger' : 'success') + '</td>'
-                + '<td><button class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:11px;" onclick="CfoPortal.deleteVendor(' + idx + ')">🗑️ Delete</button></td>'
+                + '<td><button class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:11px;" onclick="CfoPortal.deleteVendor(' + idx + ')">🗑️ Remove Entry</button></td>'
                 + '</tr>';
         });
 
@@ -565,6 +593,25 @@
                 + '" data-tab="' + t.id + '" data-color="' + t.color + '">' + t.label + '</button>';
         }).join('');
 
+        /* ── ALWAYS-VISIBLE HIGH-VISIBILITY DATA ENTRY BAR ── */
+        var quickDataBar = '<div style="background:var(--card);border:2px solid #1a73e8;border-radius:14px;padding:14px 20px;margin-bottom:20px;box-shadow:0 4px 14px rgba(26,115,232,0.15);">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
+            + '<div>'
+            + '<div style="font-size:15px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:6px;">'
+            + '<span>⚡ CFO Workspace Data Entry & Data Removal Controls</span>'
+            + '</div>'
+            + '<div style="font-size:12px;color:var(--gray);margin-top:2px;">Click any button below to Add new data entries or use the 🗑️ Delete buttons in tables to remove data.</div>'
+            + '</div>'
+            + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+            + '<button class="btn btn-primary" style="background:#1a73e8;font-weight:700;padding:8px 14px;" onclick="CfoPortal.openAddApprovalModal()">➕ Add Requisition</button>'
+            + '<button class="btn btn-primary" style="background:#2e7d32;font-weight:700;padding:8px 14px;" onclick="CfoPortal.openAddClaimModal()">➕ Add Claim Denial</button>'
+            + '<button class="btn btn-primary" style="background:#6a1b9a;font-weight:700;padding:8px 14px;" onclick="CfoPortal.openAddSpecialtyModal()">➕ Add Specialty Costing</button>'
+            + '<button class="btn btn-primary" style="background:#00bcd4;font-weight:700;padding:8px 14px;" onclick="CfoPortal.openAddCapexModal()">➕ Add CAPEX Proposal</button>'
+            + '<button class="btn btn-primary" style="background:#c62828;font-weight:700;padding:8px 14px;" onclick="CfoPortal.openAddVendorModal()">➕ Add Vendor Bill</button>'
+            + '</div>'
+            + '</div>'
+            + '</div>';
+
         var headerHtml = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:18px;background:linear-gradient(135deg,#0d47a1 0%,#1976d2 100%);padding:20px 24px;border-radius:16px;color:#fff;">'
             + '<div style="display:flex;align-items:center;gap:14px;">'
             + '<div style="width:52px;height:52px;border-radius:12px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:26px;">🏥</div>'
@@ -578,6 +625,7 @@
             + '</div>'
             + '</div>'
 
+            + quickDataBar
             + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;" id="cfoTabBar">' + navButtonsHtml + '</div>'
             + '<div id="cfoTabContent"></div>'
             + '<div id="cfoModalHost"></div>';
@@ -620,6 +668,58 @@
                 });
             }
             _destroyCharts();
+            _renderActiveTabContent();
+        },
+
+        /* ── Exec KPI Actions ── */
+        deleteExecKpi: function (index) {
+            var items = _getExecKpis();
+            if (items[index]) {
+                if (confirm('Remove KPI entry "' + items[index].metric + '"?')) {
+                    var removed = items.splice(index, 1);
+                    DB.set('cfo_exec_kpis', items);
+                    APP.notify('Removed ' + removed[0].metric, 'info');
+                    _renderActiveTabContent();
+                }
+            }
+        },
+
+        openAddExecKpiModal: function () {
+            var modalHtml = '<div class="modal-overlay" style="display:flex;align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;">'
+                + '<div class="modal-card" style="background:var(--card);padding:24px;border-radius:16px;width:100%;max-width:480px;box-shadow:0 10px 30px rgba(0,0,0,0.3);">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
+                + '<h3 style="margin:0;font-size:18px;font-weight:700;">➕ Add Executive Financial Metric Entry</h3>'
+                + '<button class="btn btn-sm btn-outline" onclick="CfoPortal.closeModal()">✕</button>'
+                + '</div>'
+                + '<form onsubmit="CfoPortal.saveAddExecKpi(event)">'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Financial Metric Name</label><input type="text" id="cfoKpiMetric" class="form-control" placeholder="ARPOB (Avg Rev / Patient)" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Current Value</label><input type="text" id="cfoKpiCurrent" class="form-control" placeholder="₹38,400" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Prior Period Value</label><input type="text" id="cfoKpiPrior" class="form-control" placeholder="₹35,000" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Target Benchmark</label><input type="text" id="cfoKpiTarget" class="form-control" placeholder="₹36,000" required /></div>'
+                + '<div class="form-group" style="margin-bottom:16px;"><label style="font-size:12px;font-weight:600;">Monthly Variance</label><input type="text" id="cfoKpiVariance" class="form-control" placeholder="+₹3.4k (+9.7%)" required /></div>'
+                + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
+                + '<button type="button" class="btn btn-outline" onclick="CfoPortal.closeModal()">Cancel</button>'
+                + '<button type="submit" class="btn btn-primary">Save Metric Entry</button>'
+                + '</div></form></div></div>';
+
+            var host = document.getElementById('cfoModalHost');
+            if (host) host.innerHTML = modalHtml;
+        },
+
+        saveAddExecKpi: function (e) {
+            e.preventDefault();
+            var metric = document.getElementById('cfoKpiMetric').value.trim();
+            var current = document.getElementById('cfoKpiCurrent').value.trim();
+            var prior = document.getElementById('cfoKpiPrior').value.trim();
+            var target = document.getElementById('cfoKpiTarget').value.trim();
+            var variance = document.getElementById('cfoKpiVariance').value.trim();
+
+            var items = _getExecKpis();
+            items.unshift({ metric: metric, current: current, prior: prior, target: target, variance: variance, status: 'On Target' });
+
+            DB.set('cfo_exec_kpis', items);
+            CfoPortal.closeModal();
+            APP.notify('Added Metric Entry for ' + metric, 'success');
             _renderActiveTabContent();
         },
 
