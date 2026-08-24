@@ -218,51 +218,64 @@ const Router = {
         const content = document.getElementById('pageContent');
         if (!content) return;
 
-        const renderers = {
-            dashboard: renderDashboard,
-            users: renderUsers,
-            departments: renderDepartments,
-            'feature-rights': renderFeatureRights,
-            inventory: renderInventory,
-            scrap: renderScrap,
-            'gate-security': renderGateSecurity,
-            phase2: renderPhase2,
-            projects: renderProjects,
-            ambulance: renderAmbulance,
-            problems: renderProblems,
-            tasks: renderTasks,
-            complaints: renderComplaints,
-            'room-checklist': renderRoomChecklist,
-            rooms: typeof renderRooms === 'function' ? renderRooms : function(c){ c.innerHTML = '<div class="empty-state">Rooms module not loaded</div>'; },
-            admissions: renderAdmissions,
-            'lost-found': renderLostFound,
-            'admin-checklists': renderAdminChecklists,
-            checklists: renderChecklists,
-            'departmental-checklist': renderDeptChecklists,
-            'department-meetings': renderDeptMeetings,
-            'staff-deployment': renderStaffDeployment,
-            'security-deployment': renderSecurityDeployment,
-            'patient-shifting': renderPatientShifting,
-            'material-requests': renderMaterialRequests,
-            discounts: renderDiscounts,
-            suggestions: renderSuggestions,
-            budget: renderBudget,
-            'quarterly-priorities': renderQPriorities,
-            reports: renderReports,
-            'md-report': renderMdReport,
-            'data-history': renderDataHistory,
-            'employee-dashboard': renderEmployeeDashboard,
-            'hod-dashboard': renderHodDashboard,
-            'storekeeper-dashboard': renderStorekeeperDashboard,
-            'hospital-settings': renderHospitalSettings
+        const getRenderer = (mod) => {
+            const windowFnName = 'render' + mod.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+            if (typeof window[windowFnName] === 'function') return window[windowFnName];
+
+            switch (mod) {
+                case 'dashboard': return typeof renderDashboard === 'function' ? renderDashboard : (c) => typeof DashboardModule !== 'undefined' && DashboardModule.render ? DashboardModule.render(c) : null;
+                case 'users': return typeof renderUsers === 'function' ? renderUsers : null;
+                case 'departments': return typeof renderDepartments === 'function' ? renderDepartments : null;
+                case 'feature-rights': return typeof renderFeatureRights === 'function' ? renderFeatureRights : null;
+                case 'inventory': return typeof renderInventory === 'function' ? renderInventory : null;
+                case 'scrap': return typeof renderScrap === 'function' ? renderScrap : null;
+                case 'gate-security': return typeof renderGateSecurity === 'function' ? renderGateSecurity : null;
+                case 'phase2': return typeof renderPhase2 === 'function' ? renderPhase2 : null;
+                case 'projects': return typeof renderProjects === 'function' ? renderProjects : null;
+                case 'ambulance': return typeof renderAmbulance === 'function' ? renderAmbulance : null;
+                case 'problems': return typeof renderProblems === 'function' ? renderProblems : null;
+                case 'tasks': return typeof renderTasks === 'function' ? renderTasks : null;
+                case 'complaints': return typeof renderComplaints === 'function' ? renderComplaints : null;
+                case 'room-checklist': return typeof renderRoomChecklist === 'function' ? renderRoomChecklist : null;
+                case 'rooms': return typeof renderRooms === 'function' ? renderRooms : (c) => typeof RoomsModule !== 'undefined' ? RoomsModule.render(c) : (c) => { c.innerHTML = '<div class="empty-state">Rooms module not loaded</div>'; };
+                case 'admissions': return typeof renderAdmissions === 'function' ? renderAdmissions : null;
+                case 'lost-found': return typeof renderLostFound === 'function' ? renderLostFound : null;
+                case 'admin-checklists': return typeof renderAdminChecklists === 'function' ? renderAdminChecklists : null;
+                case 'checklists': return typeof renderChecklists === 'function' ? renderChecklists : null;
+                case 'departmental-checklist': return typeof renderDeptChecklists === 'function' ? renderDeptChecklists : null;
+                case 'department-meetings': return typeof renderDeptMeetings === 'function' ? renderDeptMeetings : null;
+                case 'staff-deployment': return typeof renderStaffDeployment === 'function' ? renderStaffDeployment : (c) => typeof StaffDeployment !== 'undefined' ? StaffDeployment.renderFull(c) : null;
+                case 'security-deployment': return typeof renderSecurityDeployment === 'function' ? renderSecurityDeployment : (c) => typeof SecurityDeployment !== 'undefined' ? SecurityDeployment.renderFull(c) : null;
+                case 'patient-shifting': return typeof renderPatientShifting === 'function' ? renderPatientShifting : (c) => typeof PatientShifting !== 'undefined' ? PatientShifting.renderFull(c) : null;
+                case 'material-requests': return typeof renderMaterialRequests === 'function' ? renderMaterialRequests : null;
+                case 'discounts': return typeof renderDiscounts === 'function' ? renderDiscounts : null;
+                case 'suggestions': return typeof renderSuggestions === 'function' ? renderSuggestions : null;
+                case 'budget': return typeof renderBudget === 'function' ? renderBudget : null;
+                case 'quarterly-priorities': return typeof renderQPriorities === 'function' ? renderQPriorities : null;
+                case 'reports': return typeof renderReports === 'function' ? renderReports : null;
+                case 'md-report': return typeof renderMdReport === 'function' ? renderMdReport : null;
+                case 'data-history': return typeof renderDataHistory === 'function' ? renderDataHistory : null;
+                case 'employee-dashboard': return typeof renderEmployeeDashboard === 'function' ? renderEmployeeDashboard : null;
+                case 'hod-dashboard': return typeof renderHodDashboard === 'function' ? renderHodDashboard : null;
+                case 'storekeeper-dashboard': return typeof renderStorekeeperDashboard === 'function' ? renderStorekeeperDashboard : null;
+                case 'hospital-settings': return typeof renderHospitalSettings === 'function' ? renderHospitalSettings : null;
+                default: return null;
+            }
         };
-        if (renderers[module]) {
+
+        const initialRenderer = getRenderer(module);
+        if (initialRenderer || module) {
             content.innerHTML = '<div style="text-align:center;padding:40px;"><div class="spinner"></div><p style="color:var(--gray);margin-top:8px;">Loading...</p></div>';
             setTimeout(() => {
                 try {
-                    if (renderers[module]) renderers[module](content);
+                    const activeRenderer = getRenderer(module);
+                    if (typeof activeRenderer === 'function') {
+                        activeRenderer(content);
+                    } else {
+                        content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray);"><div style="font-size:40px;margin-bottom:8px;">📂</div><p style="font-weight:600;">Module loading or under maintenance</p><p style="font-size:13px;margin-top:4px;">Could not load module renderer for "' + module + '".</p><button class="btn btn-sm btn-primary" style="margin-top:12px;" onclick="Router.navigate(\'' + module + '\')">Retry</button></div>';
+                    }
                 } catch (e) {
-                    content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--danger);"><div style="font-size:40px;margin-bottom:8px;">⚠</div><p style="font-weight:600;">Page failed to load</p><p style="font-size:13px;margin-top:4px;">' + (e.message || e) + '</p><button class="btn btn-sm btn-primary" style="margin-top:12px;" onclick="Router.navigate(\'' + module + '\')">Retry</button></div>';
+                    content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--danger);"><div style="font-size:40px;margin-bottom:8px;">⚠️</div><p style="font-weight:600;">Page failed to load</p><p style="font-size:13px;margin-top:4px;">' + (e.message || e) + '</p><button class="btn btn-sm btn-primary" style="margin-top:12px;" onclick="Router.navigate(\'' + module + '\')">Retry</button></div>';
                     console.error('[Router] render error:', e);
                 }
             }, 80);

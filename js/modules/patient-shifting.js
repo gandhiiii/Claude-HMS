@@ -567,5 +567,8 @@ var PatientShifting = (function () {
 
 /* Router entry point (registered in app.js renderers) */
 function renderPatientShifting(container) {
-    PatientShifting.renderFull(container);
+    if (typeof PatientShifting !== 'undefined' && PatientShifting.renderFull) {
+        PatientShifting.renderFull(container);
+    }
 }
+window.renderPatientShifting = renderPatientShifting;
