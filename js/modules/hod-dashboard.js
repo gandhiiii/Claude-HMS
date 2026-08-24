@@ -7060,4 +7060,7 @@ function _hodDchkOversight(el, user, dept, assignments, team) {
     el.innerHTML = html;
 }
 
+window.renderHodDashboard = renderHodDashboard;
+
+
 

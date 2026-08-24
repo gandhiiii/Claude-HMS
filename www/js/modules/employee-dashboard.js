@@ -3237,4 +3237,7 @@ function empDownloadBreakdownPdf() {
     APP.notify('PDF downloaded', 'success');
 }
 
+window.renderEmployeeDashboard = renderEmployeeDashboard;
+
+
 

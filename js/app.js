@@ -219,46 +219,56 @@ const Router = {
         if (!content) return;
 
         const getRenderer = (mod) => {
-            const windowFnName = 'render' + mod.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
-            if (typeof window[windowFnName] === 'function') return window[windowFnName];
+            if (!mod) return null;
+
+            // 1. Direct camelCase window function lookup (e.g. window.renderDashboard, window.renderHodDashboard, window.renderEmployeeDashboard)
+            const parts = mod.split('-');
+            const camelName = 'render' + parts.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('');
+            if (typeof window[camelName] === 'function') return window[camelName];
+
+            // 2. Direct exact window function lookup
+            if (typeof window['render' + mod] === 'function') return window['render' + mod];
+
+            // 3. Dynamic lookup on window for module-specific renderer maps safely
+            const safeWindowGet = (fnName) => typeof window[fnName] === 'function' ? window[fnName] : null;
 
             switch (mod) {
-                case 'dashboard': return typeof renderDashboard === 'function' ? renderDashboard : (c) => typeof DashboardModule !== 'undefined' && DashboardModule.render ? DashboardModule.render(c) : null;
-                case 'users': return typeof renderUsers === 'function' ? renderUsers : null;
-                case 'departments': return typeof renderDepartments === 'function' ? renderDepartments : null;
-                case 'feature-rights': return typeof renderFeatureRights === 'function' ? renderFeatureRights : null;
-                case 'inventory': return typeof renderInventory === 'function' ? renderInventory : null;
-                case 'scrap': return typeof renderScrap === 'function' ? renderScrap : null;
-                case 'gate-security': return typeof renderGateSecurity === 'function' ? renderGateSecurity : null;
-                case 'phase2': return typeof renderPhase2 === 'function' ? renderPhase2 : null;
-                case 'projects': return typeof renderProjects === 'function' ? renderProjects : null;
-                case 'ambulance': return typeof renderAmbulance === 'function' ? renderAmbulance : null;
-                case 'problems': return typeof renderProblems === 'function' ? renderProblems : null;
-                case 'tasks': return typeof renderTasks === 'function' ? renderTasks : null;
-                case 'complaints': return typeof renderComplaints === 'function' ? renderComplaints : null;
-                case 'room-checklist': return typeof renderRoomChecklist === 'function' ? renderRoomChecklist : null;
-                case 'rooms': return typeof renderRooms === 'function' ? renderRooms : (c) => typeof RoomsModule !== 'undefined' ? RoomsModule.render(c) : (c) => { c.innerHTML = '<div class="empty-state">Rooms module not loaded</div>'; };
-                case 'admissions': return typeof renderAdmissions === 'function' ? renderAdmissions : null;
-                case 'lost-found': return typeof renderLostFound === 'function' ? renderLostFound : null;
-                case 'admin-checklists': return typeof renderAdminChecklists === 'function' ? renderAdminChecklists : null;
-                case 'checklists': return typeof renderChecklists === 'function' ? renderChecklists : null;
-                case 'departmental-checklist': return typeof renderDeptChecklists === 'function' ? renderDeptChecklists : null;
-                case 'department-meetings': return typeof renderDeptMeetings === 'function' ? renderDeptMeetings : null;
-                case 'staff-deployment': return typeof renderStaffDeployment === 'function' ? renderStaffDeployment : (c) => typeof StaffDeployment !== 'undefined' ? StaffDeployment.renderFull(c) : null;
-                case 'security-deployment': return typeof renderSecurityDeployment === 'function' ? renderSecurityDeployment : (c) => typeof SecurityDeployment !== 'undefined' ? SecurityDeployment.renderFull(c) : null;
-                case 'patient-shifting': return typeof renderPatientShifting === 'function' ? renderPatientShifting : (c) => typeof PatientShifting !== 'undefined' ? PatientShifting.renderFull(c) : null;
-                case 'material-requests': return typeof renderMaterialRequests === 'function' ? renderMaterialRequests : null;
-                case 'discounts': return typeof renderDiscounts === 'function' ? renderDiscounts : null;
-                case 'suggestions': return typeof renderSuggestions === 'function' ? renderSuggestions : null;
-                case 'budget': return typeof renderBudget === 'function' ? renderBudget : null;
-                case 'quarterly-priorities': return typeof renderQPriorities === 'function' ? renderQPriorities : null;
-                case 'reports': return typeof renderReports === 'function' ? renderReports : null;
-                case 'md-report': return typeof renderMdReport === 'function' ? renderMdReport : null;
-                case 'data-history': return typeof renderDataHistory === 'function' ? renderDataHistory : null;
-                case 'employee-dashboard': return typeof renderEmployeeDashboard === 'function' ? renderEmployeeDashboard : null;
-                case 'hod-dashboard': return typeof renderHodDashboard === 'function' ? renderHodDashboard : null;
-                case 'storekeeper-dashboard': return typeof renderStorekeeperDashboard === 'function' ? renderStorekeeperDashboard : null;
-                case 'hospital-settings': return typeof renderHospitalSettings === 'function' ? renderHospitalSettings : null;
+                case 'dashboard': return safeWindowGet('renderDashboard') || (typeof DashboardModule !== 'undefined' && DashboardModule.render ? (c) => DashboardModule.render(c) : null);
+                case 'users': return safeWindowGet('renderUsers');
+                case 'departments': return safeWindowGet('renderDepartments');
+                case 'feature-rights': return safeWindowGet('renderFeatureRights');
+                case 'inventory': return safeWindowGet('renderInventory');
+                case 'scrap': return safeWindowGet('renderScrap');
+                case 'gate-security': return safeWindowGet('renderGateSecurity');
+                case 'phase2': return safeWindowGet('renderPhase2');
+                case 'projects': return safeWindowGet('renderProjects');
+                case 'ambulance': return safeWindowGet('renderAmbulance');
+                case 'problems': return safeWindowGet('renderProblems');
+                case 'tasks': return safeWindowGet('renderTasks');
+                case 'complaints': return safeWindowGet('renderComplaints');
+                case 'room-checklist': return safeWindowGet('renderRoomChecklist');
+                case 'rooms': return safeWindowGet('renderRooms') || (typeof RoomsModule !== 'undefined' ? (c) => RoomsModule.render(c) : (c) => { c.innerHTML = '<div class="empty-state">Rooms module not loaded</div>'; });
+                case 'admissions': return safeWindowGet('renderAdmissions');
+                case 'lost-found': return safeWindowGet('renderLostFound');
+                case 'admin-checklists': return safeWindowGet('renderAdminChecklists');
+                case 'checklists': return safeWindowGet('renderChecklists');
+                case 'departmental-checklist': return safeWindowGet('renderDeptChecklists');
+                case 'department-meetings': return safeWindowGet('renderDeptMeetings');
+                case 'staff-deployment': return safeWindowGet('renderStaffDeployment') || (typeof StaffDeployment !== 'undefined' ? (c) => StaffDeployment.renderFull(c) : null);
+                case 'security-deployment': return safeWindowGet('renderSecurityDeployment') || (typeof SecurityDeployment !== 'undefined' ? (c) => SecurityDeployment.renderFull(c) : null);
+                case 'patient-shifting': return safeWindowGet('renderPatientShifting') || (typeof PatientShifting !== 'undefined' ? (c) => PatientShifting.renderFull(c) : null);
+                case 'material-requests': return safeWindowGet('renderMaterialRequests');
+                case 'discounts': return safeWindowGet('renderDiscounts');
+                case 'suggestions': return safeWindowGet('renderSuggestions');
+                case 'budget': return safeWindowGet('renderBudget');
+                case 'quarterly-priorities': return safeWindowGet('renderQPriorities');
+                case 'reports': return safeWindowGet('renderReports');
+                case 'md-report': return safeWindowGet('renderMdReport');
+                case 'data-history': return safeWindowGet('renderDataHistory');
+                case 'employee-dashboard': return safeWindowGet('renderEmployeeDashboard');
+                case 'hod-dashboard': return safeWindowGet('renderHodDashboard');
+                case 'storekeeper-dashboard': return safeWindowGet('renderStorekeeperDashboard');
+                case 'hospital-settings': return safeWindowGet('renderHospitalSettings');
                 default: return null;
             }
         };

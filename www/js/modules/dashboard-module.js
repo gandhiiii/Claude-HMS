@@ -846,3 +846,6 @@ function adminBreakdownDelete(id) {
     var container = document.getElementById('pageContent');
     if (container) renderDashboard(container);
 }
+
+window.renderDashboard = renderDashboard;
+
