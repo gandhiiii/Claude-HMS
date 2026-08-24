@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -57,11 +57,18 @@ function startLocalServer(webDir, onReady) {
 }
 
 function createWindow() {
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+
+    // Dynamically calculate initial window size based on display resolution & aspect ratio
+    const initialWidth = Math.min(Math.max(Math.floor(screenWidth * 0.88), 960), screenWidth);
+    const initialHeight = Math.min(Math.max(Math.floor(screenHeight * 0.88), 640), screenHeight);
+
     mainWindow = new BrowserWindow({
-        width: 1280,
-        height: 840,
-        minWidth: 900,
-        minHeight: 600,
+        width: initialWidth,
+        height: initialHeight,
+        minWidth: Math.min(840, screenWidth),
+        minHeight: Math.min(560, screenHeight),
         title: "Stavya Intelligence HMS",
         icon: path.join(__dirname, '..', 'assets', 'stavya-logo.png'),
         webPreferences: {
