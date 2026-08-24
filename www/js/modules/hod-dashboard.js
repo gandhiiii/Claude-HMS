@@ -5450,6 +5450,12 @@ function hodExportEmployeeReport(employeeName, format) {
         }
         return;
     }
+    var d = _hodData;
+    if (!d || !d.user) { APP.notify('Data not loaded', 'error'); return; }
+    var allUsers = DB.get('users') || [];
+    var emp = allUsers.find(function(u){ return u.fullName === employeeName || u.username === employeeName; });
+    if (!emp) { APP.notify('Employee not found', 'error'); return; }
+    try {
         var wb = XLSX.utils.book_new();
         var today = new Date().toISOString().slice(0,10);
         var nowLabel = new Date().toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'});
