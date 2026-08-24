@@ -103,8 +103,8 @@ function _renderTeamsView(el) {
     deptKeys.forEach(function(dept) {
         var members = groups[dept];
         var hodList   = members.filter(function(u){ return u.role==='hod'; });
-        var empList   = members.filter(function(u){ return u.role==='employee'||u.role==='storekeeper'||u.role==='ambulance_employee'; });
         var adminList = members.filter(function(u){ return u.role==='admin'||u.role==='super_admin'; });
+        var empList   = members.filter(function(u){ return u.role!=='hod' && u.role!=='admin' && u.role!=='super_admin'; });
 
         html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;">'
             // Dept header

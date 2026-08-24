@@ -35,24 +35,22 @@ const DB = {
     get(key) {
         try {
             var raw = localStorage.getItem('hms_' + key);
-            if (raw) {
+            if (raw !== null && raw !== undefined) {
                 var val = JSON.parse(raw);
-                if (Array.isArray(val) && val.length > 0) return val;
-                if (val && typeof val === 'object') {
+                if (val && typeof val === 'object' && !Array.isArray(val)) {
                     var ks = Object.keys(val);
                     if (ks.length > 0 && ks.every(function(k){ return /^\d+$/.test(k); })) {
                         return ks.map(function(k){ return val[k]; });
                     }
                 }
-                if (val != null && (!Array.isArray(val) || val.length > 0)) return val;
+                if (val !== null && val !== undefined) return val;
             }
         } catch (e) {}
         try {
             var raw = sessionStorage.getItem('hms_' + key);
-            if (raw) {
+            if (raw !== null && raw !== undefined) {
                 var val = JSON.parse(raw);
-                if (Array.isArray(val) && val.length > 0) return val;
-                if (val != null) return val;
+                if (val !== null && val !== undefined) return val;
             }
         } catch (e) {}
         if (key === 'users') {
