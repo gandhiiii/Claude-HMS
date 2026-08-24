@@ -45,12 +45,13 @@ function _rChartCard(title, id, h) {
 
 function renderReports(container) {
     var user = AUTH.currentUser();
-    if (!user || (user.role !== 'admin' && !user.isSuperAdmin)) {
+    var hasReportAccess = user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'hod' || (typeof AUTH !== 'undefined' && AUTH.hasPermission(user, 'reports')));
+    if (!user || !hasReportAccess) {
         container.innerHTML = '<div class="card" style="text-align:center;padding:40px;">'
             + '<div style="font-size:48px;margin-bottom:12px;">🔒</div>'
-            + '<h3 style="margin-bottom:8px;">Admin Access Only</h3>'
-            + '<p style="color:var(--gray);font-size:14px;">Reports & Analytics is restricted to administrators.<br>Please use your dashboard for department reports.</p>'
-            + '<button class="btn btn-primary" style="margin-top:16px;" onclick="window._targetEmpTab=\'reports\';window._hodTargetTab=\'hodreports\';Router.navigate(\'' + (user && user.role === 'hod' ? 'hod-dashboard' : 'employee-dashboard') + '\')">← Back to My Reports Dashboard</button>'
+            + '<h3 style="margin-bottom:8px;">Access Restricted</h3>'
+            + '<p style="color:var(--gray);font-size:14px;">Reports & Analytics access permission is required.<br>Please contact your administrator to request access.</p>'
+            + '<button class="btn btn-primary" style="margin-top:16px;" onclick="Router.navigate(\'' + (user && user.role === 'hod' ? 'hod-dashboard' : 'employee-dashboard') + '\')">← Back to Dashboard</button>'
             + '</div>';
         return;
     }
