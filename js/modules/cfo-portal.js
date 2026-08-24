@@ -421,7 +421,10 @@
             return;
         }
 
-        var isCfoOrAdmin = user.role === 'CFO' || user.role === 'admin' || user.isSuperAdmin || (user.permissions && user.permissions.includes('cfo-portal'));
+        var uRole = (user.role || '').toString().trim().toLowerCase();
+        var uPost = (user.post || user.designation || '').toString().trim().toLowerCase();
+        var uName = (user.username || '').toString().trim().toLowerCase();
+        var isCfoOrAdmin = uRole === 'cfo' || uRole.indexOf('cfo') !== -1 || uPost.indexOf('cfo') !== -1 || uName.indexOf('cfo') !== -1 || uRole === 'admin' || user.isSuperAdmin || (user.permissions && user.permissions.includes('cfo-portal'));
         if (!isCfoOrAdmin) {
             container.innerHTML = '<div class="card" style="text-align:center;padding:40px;">'
                 + '<div style="font-size:48px;margin-bottom:12px;">🔒</div>'

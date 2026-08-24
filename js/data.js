@@ -534,26 +534,42 @@ const AUTH = {
         try { sessionStorage.removeItem('hms_t'); } catch (e) {}
     },
     currentUser() {
+        let u = null;
         try {
             let sid = this._sid();
             if (sid) {
                 let d = localStorage.getItem('hms_sid_' + sid);
-                if (d) return JSON.parse(d);
+                if (d) u = JSON.parse(d);
             }
         } catch (e) {}
-        try {
-            let p = new URLSearchParams(window.location.search);
-            let s = p.get('sid');
-            if (s) {
-                let d = localStorage.getItem('hms_sid_' + s);
-                if (d) return JSON.parse(d);
+        if (!u) {
+            try {
+                let p = new URLSearchParams(window.location.search);
+                let s = p.get('sid');
+                if (s) {
+                    let d = localStorage.getItem('hms_sid_' + s);
+                    if (d) u = JSON.parse(d);
+                }
+            } catch (e) {}
+        }
+        if (!u) {
+            try {
+                let d = localStorage.getItem('hms_currentUser');
+                if (d) u = JSON.parse(d);
+            } catch (e) {}
+        }
+        if (u) {
+            var _r = (u.role || '').toString().trim().toLowerCase();
+            var _p = (u.post || u.designation || '').toString().trim().toLowerCase();
+            var _name = (u.username || '').toString().trim().toLowerCase();
+            if (_r === 'cfo' || _r.indexOf('cfo') !== -1 || _p.indexOf('cfo') !== -1 || _name.indexOf('cfo') !== -1) {
+                if (!Array.isArray(u.permissions)) u.permissions = [];
+                if (u.permissions.indexOf('cfo-portal') === -1) {
+                    u.permissions.push('cfo-portal');
+                }
             }
-        } catch (e) {}
-        try {
-            let d = localStorage.getItem('hms_currentUser');
-            if (d) return JSON.parse(d);
-        } catch (e) {}
-        return null;
+        }
+        return u;
     },
     isLoggedIn() {
         return !!this.currentUser();
@@ -610,7 +626,12 @@ const AUTH = {
         }
         if (permission === 'cfo-portal') {
             if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
-            return user.role === 'CFO' || (user.permissions && user.permissions.includes('cfo-portal'));
+            var _cfoR = (user.role || '').toString().trim().toLowerCase();
+            var _cfoP = (user.post || user.designation || '').toString().trim().toLowerCase();
+            var _cfoU = (user.username || '').toString().trim().toLowerCase();
+            if (_cfoR === 'cfo' || _cfoR.indexOf('cfo') !== -1 || _cfoP.indexOf('cfo') !== -1 || _cfoU.indexOf('cfo') !== -1) return true;
+            if (user.permissions && Array.isArray(user.permissions) && user.permissions.indexOf('cfo-portal') !== -1) return true;
+            return false;
         }
         if (permission === 'md-report') {
             if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;

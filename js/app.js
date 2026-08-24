@@ -8,11 +8,16 @@ const Router = {
 
         // Restore last visited module or use role default
         const isAdmin = user.isSuperAdmin || user.role === 'admin';
+        const uRole = (user.role || '').toString().trim().toLowerCase();
+        const uPost = (user.post || user.designation || '').toString().trim().toLowerCase();
+        const uName = (user.username || '').toString().trim().toLowerCase();
+        const isCfo = uRole === 'cfo' || uRole.indexOf('cfo') !== -1 || uPost.indexOf('cfo') !== -1 || uName.indexOf('cfo') !== -1 || (user.permissions && user.permissions.includes('cfo-portal'));
+
         const defaultModule = isAdmin ? 'dashboard'
-            : user.role === 'CFO' ? 'cfo-portal'
-            : user.role === 'hod' ? 'hod-dashboard'
-            : user.role === 'storekeeper' ? 'storekeeper-dashboard'
-            : user.role === 'ambulance_employee' ? 'ambulance'
+            : isCfo ? 'cfo-portal'
+            : uRole === 'hod' ? 'hod-dashboard'
+            : uRole === 'storekeeper' ? 'storekeeper-dashboard'
+            : uRole === 'ambulance_employee' ? 'ambulance'
             : 'employee-dashboard';
         const saved = localStorage.getItem('hms_lastModule');
         let startModule = saved || defaultModule;
