@@ -1,10 +1,85 @@
-// HMS — CFO Workspace (Executive Financial Suite)
+// HMS — CFO Workspace (Executive Financial Suite & Data Management Engine)
 
 (function () {
     'use strict';
 
     var _activeTab = 'executive';
     var _cfoCharts = [];
+
+    /* ── Initial Seed Data Getters with Persistent Fallbacks ── */
+    function _getApprovals() {
+        var items = DB.get('cfo_approvals_v2');
+        if (!Array.isArray(items) || items.length === 0) {
+            items = [
+                { id: 'PO-301', category: 'Vendor Invoice ($5K-$25K)', amount: 450000, vendorOrPatient: 'Sun Pharma Distributors', dept: 'Pharmacy', reason: 'Bulk antibiotic stock invoice clearance', status: 'pending', date: '2026-08-24' },
+                { id: 'PO-302', category: 'Vendor Invoice ($5K-$25K)', amount: 1250000, vendorOrPatient: 'Medtronic India', dept: 'Cardiology', reason: 'Stent inventory invoice payment', status: 'pending', date: '2026-08-24' },
+                { id: 'PO-303', category: 'Vendor Invoice ($5K-$25K)', amount: 680000, vendorOrPatient: 'Olympus Medical', dept: 'Endoscopy', reason: 'Endoscope maintenance contract', status: 'pending', date: '2026-08-24' },
+                { id: 'DSC-101', category: 'Patient Discount Request', amount: 45000, vendorOrPatient: 'Patient: Suresh Kumar', dept: 'IPD Billing', reason: 'Hardship waiver for extended ICU stay', status: 'pending', date: '2026-08-24' },
+                { id: 'DSC-102', category: 'Patient Discount Request', amount: 18500, vendorOrPatient: 'Patient: Meena Sharma', dept: 'OPD Billing', reason: 'Staff relative concession', status: 'pending', date: '2026-08-23' },
+                { id: 'DOC-501', category: 'Doctor Payout Release Batch', amount: 1423000, vendorOrPatient: 'Monthly Doctor Batch (18 Docs)', dept: 'Finance', reason: 'August doctor fee-sharing disbursement', status: 'pending', date: '2026-08-24' },
+                { id: 'WRT-201', category: 'Bad Debt Write-Off', amount: 32000, vendorOrPatient: 'Patient: Unknown / Default', dept: 'Emergency', reason: 'Uncollectible MLC emergency care debt write-off', status: 'pending', date: '2026-08-22' }
+            ];
+            DB.set('cfo_approvals_v2', items);
+        }
+        return items;
+    }
+
+    function _getClaims() {
+        var items = DB.get('cfo_claims');
+        if (!Array.isArray(items) || items.length === 0) {
+            items = [
+                { payer: 'Star Health Insurance', totalClaims: 142, approved: 3250000, denied: 145000, cause: 'Pre-auth Delay', risk: 'Low Risk' },
+                { payer: 'HDFC ERGO Health', totalClaims: 98, approved: 2410000, denied: 82000, cause: 'ICD-10 Coding Mismatch', risk: 'Low Risk' },
+                { payer: 'Ayushman Bharat PM-JAY', totalClaims: 215, approved: 4100000, denied: 310000, cause: 'Package Tariff Cap Exceeded', risk: 'Medium Leakage' },
+                { payer: 'ICICI Lombard TPA', totalClaims: 76, approved: 1850000, denied: 65000, cause: 'Missing Discharge Summary', risk: 'Low Risk' }
+            ];
+            DB.set('cfo_claims', items);
+        }
+        return items;
+    }
+
+    function _getSpecialties() {
+        var items = DB.get('cfo_specialties');
+        if (!Array.isArray(items) || items.length === 0) {
+            items = [
+                { name: 'Cardiology & CathLab', revenue: 4200000, directCost: 2400000, margin: 42.8, procedures: 124, abcCost: 19354 },
+                { name: 'Oncology & Radiation', revenue: 3800000, directCost: 2150000, margin: 43.4, procedures: 95, abcCost: 22631 },
+                { name: 'Orthopedics & Joint', revenue: 3600000, directCost: 2100000, margin: 41.6, procedures: 88, abcCost: 23863 },
+                { name: 'Neurology & Neurosurgery', revenue: 3100000, directCost: 1850000, margin: 40.3, procedures: 64, abcCost: 28906 },
+                { name: 'Radiology & Imaging', revenue: 1850000, directCost: 620000, margin: 66.4, procedures: 450, abcCost: 1377 }
+            ];
+            DB.set('cfo_specialties', items);
+        }
+        return items;
+    }
+
+    function _getCapex() {
+        var items = DB.get('cfo_capex');
+        if (!Array.isArray(items) || items.length === 0) {
+            items = [
+                { name: '1.5T MRI Scanner (Siemens)', dept: 'Radiology', cost: 12500000, revenueYTD: 3400000, roi: '27.2%', payback: '3.6 Years', status: 'Active' },
+                { name: 'CathLab Angiography Machine', dept: 'Cardiology', cost: 18000000, revenueYTD: 5800000, roi: '32.2%', payback: '3.1 Years', status: 'Active' },
+                { name: '4D Ultrasound Machine (GE)', dept: 'Radiology/OBG', cost: 3500000, revenueYTD: 1400000, roi: '40.0%', payback: '2.5 Years', status: 'Active' },
+                { name: 'Modular OT Integration System', dept: 'Surgery', cost: 6500000, revenueYTD: 1900000, roi: '29.2%', payback: '3.4 Years', status: 'Approved' }
+            ];
+            DB.set('cfo_capex', items);
+        }
+        return items;
+    }
+
+    function _getVendors() {
+        var items = DB.get('cfo_vendors');
+        if (!Array.isArray(items) || items.length === 0) {
+            items = [
+                { name: 'Sun Pharma Distributors', invCount: 14, totalDue: 1420000, current: 850000, overdue: 570000, days: 45 },
+                { name: 'Medtronic India Pvt Ltd', invCount: 6, totalDue: 2150000, current: 1900000, overdue: 250000, days: 32 },
+                { name: 'Olympus Medical Systems', invCount: 3, totalDue: 680000, current: 680000, overdue: 0, days: 15 },
+                { name: 'Johnson & Johnson Medical', invCount: 9, totalDue: 1120000, current: 720000, overdue: 400000, days: 60 }
+            ];
+            DB.set('cfo_vendors', items);
+        }
+        return items;
+    }
 
     function _destroyCharts() {
         for (var i = 0; i < _cfoCharts.length; i++) {
@@ -51,7 +126,6 @@
 
     /* ──────────────────────────────────────────────────────────
        MODULE 1: 📊 Executive Dashboard
-       (Financial KPIs: EBITDA, RevPOB, Current Ratio | Cash Flow Runway | Bed Yield)
     ────────────────────────────────────────────────────────── */
     function _renderExecutiveTab() {
         var admissions = DB.get('admissions') || [];
@@ -125,15 +199,18 @@
     }
 
     /* ──────────────────────────────────────────────────────────
-       MODULE 2: 💳 Revenue Cycle & Payer Analytics
-       (AR Aging | Insurance Denials & Root Causes | Revenue Leakage)
+       MODULE 2: 💳 Revenue Cycle & Payer Analytics (With Add & Delete)
     ────────────────────────────────────────────────────────── */
     function _renderRcmTab() {
+        var claims = _getClaims();
+        var totalDenial = claims.reduce(function (s, c) { return s + (c.denied || 0); }, 0);
+        var totalApproved = claims.reduce(function (s, c) { return s + (c.approved || 0); }, 0);
+
         var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px;">'
             + _kpiCard('💳', 'Total Receivables (AR)', _formatCurrency(6850000), 'Outstanding Collections', '#1a73e8')
             + _kpiCard('⏳', '0-30 Days Bucket', _formatCurrency(4120000), '60.1% Current AR', '#2e7d32')
-            + _kpiCard('⚠️', '90+ Days Aging', _formatCurrency(840000), 'High Risk Follow-up', '#c62828')
-            + _kpiCard('📉', 'Unbilled Bed Days Leakage', _formatCurrency(315000), '14 Pending Discharge Clearance', '#f57f17')
+            + _kpiCard('⚠️', 'Total Denied Claims', _formatCurrency(totalDenial), claims.length + ' Payer Records', '#c62828')
+            + _kpiCard('🛡️', 'Total Approved Claims', _formatCurrency(totalApproved), 'Settled Collections', '#6a1b9a')
             + '</div>'
 
             + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;margin-bottom:20px;">'
@@ -150,17 +227,31 @@
 
             + '<div class="card" style="padding:18px;">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
-            + '<div style="font-weight:700;font-size:15px;">📜 Insurance & TPA Denial Analysis & Revenue Leakage Audit</div>'
-            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.exportRcmExcel()">📊 Export RCM Report</button>'
+            + '<div style="font-weight:700;font-size:15px;">📜 Insurance & TPA Denial Analysis & Payer Records</div>'
+            + '<div style="display:flex;gap:8px;">'
+            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddClaimModal()">➕ Add Payer Claim Record</button>'
+            + '<button class="btn btn-sm btn-success" onclick="CfoPortal.exportRcmExcel()">📊 Export RCM Report</button>'
+            + '</div>'
             + '</div>'
             + '<div class="table-responsive"><table>'
-            + '<thead><tr><th>Payer / TPA</th><th>Total Claims</th><th>Approved (₹)</th><th>Denied (₹)</th><th>Root Cause Category</th><th>Revenue Leakage Risk</th><th>Action</th></tr></thead>'
-            + '<tbody>'
-            + '<tr><td>Star Health Insurance</td><td>142</td><td>' + _formatCurrency(3250000) + '</td><td>' + _formatCurrency(145000) + '</td><td>Pre-auth Delay</td><td>' + _badge('Low Risk', 'info') + '</td><td><button class="btn btn-sm btn-outline" onclick="APP.notify(\'Appeal sent to Star Health\',\'info\')">✉️ Appeal</button></td></tr>'
-            + '<tr><td>HDFC ERGO Health</td><td>98</td><td>' + _formatCurrency(2410000) + '</td><td>' + _formatCurrency(82000) + '</td><td>ICD-10 Coding Mismatch</td><td>' + _badge('Low Risk', 'info') + '</td><td><button class="btn btn-sm btn-outline" onclick="APP.notify(\'Coding appeal submitted\',\'info\')">✉️ Appeal</button></td></tr>'
-            + '<tr><td>Ayushman Bharat PM-JAY</td><td>215</td><td>' + _formatCurrency(4100000) + '</td><td>' + _formatCurrency(310000) + '</td><td>Package Tariff Cap Exceeded</td><td>' + _badge('Medium Leakage', 'warning') + '</td><td><button class="btn btn-sm btn-outline" onclick="APP.notify(\'Escalated to NHA Portal\',\'info\')">✉️ Escalated</button></td></tr>'
-            + '<tr><td>ICICI Lombard TPA</td><td>76</td><td>' + _formatCurrency(1850000) + '</td><td>' + _formatCurrency(65000) + '</td><td>Missing Discharge Summary</td><td>' + _badge('Low Risk', 'info') + '</td><td><button class="btn btn-sm btn-outline" onclick="APP.notify(\'Docs submitted\',\'info\')">✉️ Resend</button></td></tr>'
-            + '</tbody></table></div></div>';
+            + '<thead><tr><th>Payer / TPA Name</th><th>Total Claims</th><th>Approved (₹)</th><th>Denied (₹)</th><th>Root Cause Category</th><th>Risk Level</th><th>Actions / Data Control</th></tr></thead>'
+            + '<tbody>';
+
+        claims.forEach(function (c, idx) {
+            html += '<tr>'
+                + '<td><strong>' + c.payer + '</strong></td>'
+                + '<td>' + c.totalClaims + '</td>'
+                + '<td>' + _formatCurrency(c.approved) + '</td>'
+                + '<td style="color:#c62828;font-weight:700;">' + _formatCurrency(c.denied) + '</td>'
+                + '<td>' + c.cause + '</td>'
+                + '<td>' + _badge(c.risk, c.risk.indexOf('Medium') !== -1 ? 'warning' : 'info') + '</td>'
+                + '<td>'
+                + '<button class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:11px;" onclick="CfoPortal.deleteClaim(' + idx + ')">🗑️ Delete</button>'
+                + '</td>'
+                + '</tr>';
+        });
+
+        html += '</tbody></table></div></div>';
 
         setTimeout(function () {
             _makeChart('cfoArAgingChart', {
@@ -186,40 +277,36 @@
     }
 
     /* ──────────────────────────────────────────────────────────
-       MODULE 3: 🏥 Unit Economics & Costing
-       (Specialty P&L: Cardio, Onco, Ortho, Neuro | ABC Costing | OT/ICU Yield)
+       MODULE 3: 🏥 Unit Economics & Costing (With Add & Delete)
     ────────────────────────────────────────────────────────── */
     function _renderUnitEconomicsTab() {
-        var specialties = [
-            { name: 'Cardiology & CathLab', revenue: 4200000, directCost: 2400000, margin: 42.8, procedures: 124, abcCost: 19354 },
-            { name: 'Oncology & Radiation', revenue: 3800000, directCost: 2150000, margin: 43.4, procedures: 95, abcCost: 22631 },
-            { name: 'Orthopedics & Joint', revenue: 3600000, directCost: 2100000, margin: 41.6, procedures: 88, abcCost: 23863 },
-            { name: 'Neurology & Neurosurgery', revenue: 3100000, directCost: 1850000, margin: 40.3, procedures: 64, abcCost: 28906 },
-            { name: 'Radiology & Imaging', revenue: 1850000, directCost: 620000, margin: 66.4, procedures: 450, abcCost: 1377 }
-        ];
+        var specialties = _getSpecialties();
 
         var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:20px;">'
-            + _kpiCard('🏥', 'Highest Margin Specialty', 'Radiology (66.4%)', 'Net Contribution: ₹12.3L', '#2e7d32')
-            + _kpiCard('⚡', 'Top Yield Specialty', 'Cardiology (₹42.0L)', '124 CathLab Surgeries', '#1a73e8')
+            + _kpiCard('🏥', 'Specialties Tracked', specialties.length + ' Departments', 'Unit Economics Active', '#2e7d32')
+            + _kpiCard('⚡', 'Total Gross Revenue', _formatCurrency(specialties.reduce(function(s,x){ return s + x.revenue; }, 0)), 'Specialty Portfolio', '#1a73e8')
             + _kpiCard('🔪', 'OT Hourly Revenue Yield', _formatCurrency(14500), 'Avg OT Hourly Rate', '#6a1b9a')
             + _kpiCard('🛏️', 'ICU Daily Yield / Bed', _formatCurrency(28500), '92% Occupancy Rate', '#f57f17')
             + '</div>'
 
             + '<div class="card" style="padding:18px;margin-bottom:20px;">'
-            + '<div style="font-weight:700;font-size:15px;margin-bottom:14px;">🏢 Specialty P&L (Cardio, Onco, Ortho, Neuro) & ABC Costing</div>'
+            + '<div style="font-weight:700;font-size:15px;margin-bottom:14px;">🏢 Specialty P&L & Direct Costs Breakdown</div>'
             + '<div style="position:relative;height:260px;"><canvas id="cfoSpecialtyPnlChart"></canvas></div>'
             + '</div>'
 
             + '<div class="card" style="padding:18px;">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
-            + '<div style="font-weight:700;font-size:15px;">📋 Activity-Based Costing (ABC Model) & Yield Analysis</div>'
+            + '<div style="font-weight:700;font-size:15px;">📋 Activity-Based Costing (ABC Model) & Specialty Costing Ledger</div>'
+            + '<div style="display:flex;gap:8px;">'
+            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddSpecialtyModal()">➕ Add Specialty Department</button>'
             + '<button class="btn btn-sm btn-success" onclick="CfoPortal.exportPnlExcel()">📊 Export Costing Excel</button>'
             + '</div>'
+            + '</div>'
             + '<div class="table-responsive"><table>'
-            + '<thead><tr><th>Specialty Department</th><th>Procedure Count</th><th>Gross Revenue</th><th>Direct Cost</th><th>Unit ABC Cost / Proc</th><th>Contribution Margin</th><th>Margin %</th></tr></thead>'
+            + '<thead><tr><th>Specialty Department</th><th>Procedure Count</th><th>Gross Revenue</th><th>Direct Cost</th><th>Unit ABC Cost / Proc</th><th>Contribution Margin</th><th>Margin %</th><th>Actions</th></tr></thead>'
             + '<tbody>';
 
-        specialties.forEach(function (s) {
+        specialties.forEach(function (s, idx) {
             var contrib = s.revenue - s.directCost;
             html += '<tr>'
                 + '<td><strong>' + s.name + '</strong></td>'
@@ -229,6 +316,7 @@
                 + '<td>' + _formatCurrency(s.abcCost) + '</td>'
                 + '<td style="font-weight:700;color:#2e7d32;">' + _formatCurrency(contrib) + '</td>'
                 + '<td><strong>' + s.margin + '%</strong></td>'
+                + '<td><button class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:11px;" onclick="CfoPortal.deleteSpecialty(' + idx + ')">🗑️ Delete</button></td>'
                 + '</tr>';
         });
 
@@ -252,37 +340,30 @@
     }
 
     /* ──────────────────────────────────────────────────────────
-       MODULE 4: 📥 Approval Inbox (Pending: 7)
-       (Vendor Invoices [3] | Patient Discounts [2] | Doctor Release [1] | Bad Debt [1])
+       MODULE 4: 📥 Approval Inbox (With Add, Edit, Delete Data Control)
     ────────────────────────────────────────────────────────── */
     function _renderApprovalsTab() {
-        var approvals = DB.get('cfo_approvals_v2') || [
-            { id: 'PO-301', category: 'Vendor Invoice ($5K-$25K)', amount: 450000, vendorOrPatient: 'Sun Pharma Distributors', dept: 'Pharmacy', reason: 'Bulk antibiotic stock invoice clearance', status: 'pending', date: '2026-08-24' },
-            { id: 'PO-302', category: 'Vendor Invoice ($5K-$25K)', amount: 1250000, vendorOrPatient: 'Medtronic India', dept: 'Cardiology', reason: 'Stent inventory invoice payment', status: 'pending', date: '2026-08-24' },
-            { id: 'PO-303', category: 'Vendor Invoice ($5K-$25K)', amount: 680000, vendorOrPatient: 'Olympus Medical', dept: 'Endoscopy', reason: 'Endoscope maintenance contract', status: 'pending', date: '2026-08-24' },
-            { id: 'DSC-101', category: 'Patient Discount Request', amount: 45000, vendorOrPatient: 'Patient: Suresh Kumar', dept: 'IPD Billing', reason: 'Hardship waiver for extended ICU stay', status: 'pending', date: '2026-08-24' },
-            { id: 'DSC-102', category: 'Patient Discount Request', amount: 18500, vendorOrPatient: 'Patient: Meena Sharma', dept: 'OPD Billing', reason: 'Staff relative concession', status: 'pending', date: '2026-08-23' },
-            { id: 'DOC-501', category: 'Doctor Payout Release Batch', amount: 1423000, vendorOrPatient: 'Monthly Doctor Batch (18 Docs)', dept: 'Finance', reason: 'August doctor fee-sharing disbursement', status: 'pending', date: '2026-08-24' },
-            { id: 'WRT-201', category: 'Bad Debt Write-Off', amount: 32000, vendorOrPatient: 'Patient: Unknown / Default', dept: 'Emergency', reason: 'Uncollectible MLC emergency care debt write-off', status: 'pending', date: '2026-08-22' }
-        ];
-
+        var approvals = _getApprovals();
         var pendingCount = approvals.filter(function (a) { return a.status === 'pending'; }).length;
         var pendingValue = approvals.filter(function (a) { return a.status === 'pending'; }).reduce(function (s, a) { return s + a.amount; }, 0);
 
         var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:20px;">'
             + _kpiCard('📥', 'Pending Approval Inbox', pendingCount + ' Requisitions', 'Requires CFO Decision', '#f57f17')
             + _kpiCard('💵', 'Total Pending Value', _formatCurrency(pendingValue), 'CFO Financial Requisitions', '#1a73e8')
-            + _kpiCard('🏢', 'Vendor Invoices [3]', _formatCurrency(2380000), 'Bills $5K - $25K', '#6a1b9a')
-            + _kpiCard('🏷️', 'Discounts & Write-Offs', _formatCurrency(95500), 'Concessions Queue', '#c62828')
+            + _kpiCard('🏢', 'Total Requisitions', approvals.length + ' Items', 'Active Approval Queue', '#6a1b9a')
+            + _kpiCard('✅', 'Approved Requisitions', approvals.filter(function (a) { return a.status === 'approved'; }).length + ' Items', 'Processed Requests', '#2e7d32')
             + '</div>'
 
             + '<div class="card" style="padding:18px;">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
-            + '<div style="font-weight:700;font-size:15px;">📥 CFO Approval Inbox (Pending Queue: ' + pendingCount + ')</div>'
+            + '<div style="font-weight:700;font-size:15px;">📥 CFO Approval Inbox (Queue: ' + approvals.length + ')</div>'
+            + '<div style="display:flex;gap:8px;">'
+            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddApprovalModal()">➕ Add Requisition</button>'
             + '<button class="btn btn-sm btn-success" onclick="CfoPortal.approveAllPending()">✓ Approve All Pending</button>'
             + '</div>'
+            + '</div>'
             + '<div class="table-responsive"><table>'
-            + '<thead><tr><th>Req ID</th><th>Approval Category</th><th>Amount (₹)</th><th>Party / Vendor / Patient</th><th>Department</th><th>Justification Reason</th><th>Status</th><th>CFO Decision</th></tr></thead>'
+            + '<thead><tr><th>Req ID</th><th>Approval Category</th><th>Amount (₹)</th><th>Party / Vendor / Patient</th><th>Department</th><th>Justification Reason</th><th>Status</th><th>CFO Decision / Data Control</th></tr></thead>'
             + '<tbody>';
 
         approvals.forEach(function (a, idx) {
@@ -295,10 +376,13 @@
                 + '<td style="font-size:12px;max-width:220px;">' + a.reason + '</td>'
                 + '<td>' + _badge(a.status.toUpperCase(), a.status === 'approved' ? 'success' : a.status === 'rejected' ? 'danger' : 'warning') + '</td>'
                 + '<td>'
+                + '<div style="display:flex;gap:4px;flex-wrap:wrap;">'
                 + (a.status === 'pending'
-                    ? '<div style="display:flex;gap:4px;"><button class="btn btn-sm btn-success" style="font-size:11px;padding:3px 8px;" onclick="CfoPortal.processApprovalV2(' + idx + ',\'approved\')">✓ Approve</button>'
-                    + '<button class="btn btn-sm btn-danger" style="font-size:11px;padding:3px 8px;" onclick="CfoPortal.processApprovalV2(' + idx + ',\'rejected\')">✗ Reject</button></div>'
-                    : '<span style="font-size:11px;color:var(--gray);">Processed</span>')
+                    ? '<button class="btn btn-sm btn-success" style="font-size:11px;padding:3px 8px;" onclick="CfoPortal.processApprovalV2(' + idx + ',\'approved\')">✓ Approve</button>'
+                    + '<button class="btn btn-sm btn-warning" style="font-size:11px;padding:3px 8px;" onclick="CfoPortal.processApprovalV2(' + idx + ',\'rejected\')">✗ Reject</button>'
+                    : '<span style="font-size:11px;color:var(--gray);align-self:center;">Processed</span>')
+                + '<button class="btn btn-sm btn-danger" style="font-size:11px;padding:3px 8px;" onclick="CfoPortal.deleteApproval(' + idx + ')">🗑️ Remove</button>'
+                + '</div>'
                 + '</td>'
                 + '</tr>';
         });
@@ -308,14 +392,15 @@
     }
 
     /* ──────────────────────────────────────────────────────────
-       MODULE 5: 📤 Executive & Board Submissions
-       (Master Budget to MD/Chairman | CAPEX Proposals to Board | Board Deck Exporter)
+       MODULE 5: 📤 Executive & Board Submissions (With Add & Delete CAPEX)
     ────────────────────────────────────────────────────────── */
     function _renderBoardSubmissionsTab() {
+        var capex = _getCapex();
+
         var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:20px;">'
             + _kpiCard('📤', 'Submissions Status', 'Ready for Submission', 'FY 2025-26 Master Budget', '#2e7d32')
             + _kpiCard('📉', 'Draft Master Budget', _formatCurrency(145000000), 'Submitted to MD & Chairman', '#1a73e8')
-            + _kpiCard('🔬', 'Board CAPEX Proposals', _formatCurrency(45000000), '3 Major Equipment Additions', '#6a1b9a')
+            + _kpiCard('🔬', 'Board CAPEX Proposals', capex.length + ' Proposals', _formatCurrency(capex.reduce(function(s,x){ return s + x.cost; }, 0)), '#6a1b9a')
             + _kpiCard('📑', 'Monthly Board Deck', 'Compiled (PDF/Excel)', 'Executive Board Reporting', '#f57f17')
             + '</div>'
 
@@ -334,79 +419,105 @@
             + '<div style="font-size:13px;color:var(--gray);margin-bottom:14px;">High-value Medical Equipment ROI, Cash Flow Payback & Financial Feasibility Study</div>'
             + '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
             + '<button class="btn btn-primary" style="background:#6a1b9a;" onclick="APP.notify(\'CAPEX Proposals package sent to Board of Directors\',\'success\')">✉️ Submit Proposals to Board</button>'
-            + '<button class="btn btn-outline" onclick="CfoPortal.exportFullExcel()">📄 Download Proposal PDF</button>'
+            + '<button class="btn btn-outline" onclick="CfoPortal.openAddCapexModal()">➕ Add CAPEX Proposal</button>'
             + '</div>'
             + '</div>'
             + '</div>'
 
-            + '<div class="card" style="padding:18px;">'
+            + '<div class="card" style="padding:18px;margin-bottom:20px;">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
-            + '<div style="font-weight:700;font-size:15px;">📊 Monthly Executive Board Deck Exporter</div>'
-            + '<div style="display:flex;gap:8px;">'
-            + '<button class="btn btn-sm btn-success" onclick="CfoPortal.exportFullExcel()">📊 Export Board Deck (Excel)</button>'
-            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.exportBalanceSheetPDF()">📄 Export Board Deck (PDF)</button>'
+            + '<div style="font-weight:700;font-size:15px;">🔬 Active CAPEX Equipment & Proposal Register</div>'
+            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddCapexModal()">➕ Add New CAPEX Proposal</button>'
             + '</div>'
-            + '</div>'
-            + '<div style="font-size:13px;color:var(--text);line-height:1.6;">'
-            + 'The Executive Board Deck aggregates financial statements, EBITDA performance, AR aging, specialty P&L margins, and statutory tax compliance into a single presentation-ready report for the Board of Directors.'
-            + '</div></div>';
+            + '<div class="table-responsive"><table>'
+            + '<thead><tr><th>Equipment Asset</th><th>Department</th><th>Capital Cost (₹)</th><th>Annual Revenue (₹)</th><th>ROI %</th><th>Payback Est.</th><th>Status</th><th>Actions</th></tr></thead>'
+            + '<tbody>';
+
+        capex.forEach(function (c, idx) {
+            html += '<tr>'
+                + '<td><strong>' + c.name + '</strong></td>'
+                + '<td>' + c.dept + '</td>'
+                + '<td>' + _formatCurrency(c.cost) + '</td>'
+                + '<td style="color:#2e7d32;font-weight:700;">' + _formatCurrency(c.revenueYTD) + '</td>'
+                + '<td><strong>' + c.roi + '</strong></td>'
+                + '<td>' + c.payback + '</td>'
+                + '<td>' + _badge(c.status, 'success') + '</td>'
+                + '<td><button class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:11px;" onclick="CfoPortal.deleteCapex(' + idx + ')">🗑️ Delete</button></td>'
+                + '</tr>';
+        });
+
+        html += '</tbody></table></div></div>';
 
         return html;
     }
 
     /* ──────────────────────────────────────────────────────────
-       MODULE 6: 🛡️ Audit, Governance & Taxes
-       (Balance Sheet, P&L, Cash Flow | Tax Compliance GST/TDS | Anti-Fraud Audit)
+       MODULE 6: 🛡️ Audit, Governance & Taxes (With Add & Delete Vendor AP)
     ────────────────────────────────────────────────────────── */
     function _renderGovernanceTab() {
+        var vendors = _getVendors();
+
         var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:20px;">'
             + _kpiCard('📜', 'GST Liability (Net)', _formatCurrency(342000), 'Output GST - ITC Credit', '#1a73e8')
             + _kpiCard('⚖️', 'TDS Payable (Sec 194J)', _formatCurrency(185000), 'Doctor Professional Fees', '#f57f17')
+            + _kpiCard('🏬', 'Vendor Accounts Payable', _formatCurrency(vendors.reduce(function(s,v){ return s + v.totalDue; }, 0)), vendors.length + ' Active Suppliers', '#c62828')
             + _kpiCard('🛡️', 'Anti-Fraud Compliance', '100% Verified', 'Zero Exception Alerts', '#2e7d32')
-            + _kpiCard('🔒', 'Audit Activity Logs', (DB.get('cfo_audit_log') || []).length + 142, 'Immutable Audit Trail', '#6a1b9a')
             + '</div>'
 
-            + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;margin-bottom:20px;">'
-            + '<div class="card" style="padding:18px;">'
-            + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
-            + '<div style="font-weight:700;font-size:15px;">⚖️ Audited Balance Sheet & Cash Flow Summary</div>'
-            + '<button class="btn btn-sm btn-outline" onclick="CfoPortal.exportBalanceSheetPDF()">📄 Export PDF</button>'
+            + '<div class="card" style="padding:18px;margin-bottom:20px;">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
+            + '<div style="font-weight:700;font-size:15px;">🏬 Vendor Accounts Payable & Payment Ledger</div>'
+            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddVendorModal()">➕ Add Vendor Bill</button>'
             + '</div>'
             + '<div class="table-responsive"><table>'
-            + '<thead><tr><th>Asset & Liabilities</th><th>Amount (₹)</th></tr></thead>'
-            + '<tbody>'
-            + '<tr><td><strong>Property, Plant & Equipment (PPE)</strong></td><td>' + _formatCurrency(85000000) + '</td></tr>'
-            + '<tr><td><strong>Current Assets (Cash, AR, Stock)</strong></td><td>' + _formatCurrency(18500000) + '</td></tr>'
-            + '<tr><td><strong>Total Assets</strong></td><td style="font-weight:800;color:#2e7d32;">' + _formatCurrency(103500000) + '</td></tr>'
-            + '<tr style="background:var(--light-gray);"><td colspan="2"></td></tr>'
-            + '<tr><td><strong>Capital Reserves & Retained Earnings</strong></td><td>' + _formatCurrency(82000000) + '</td></tr>'
-            + '<tr><td><strong>Current Liabilities (AP, Taxes, Loans)</strong></td><td>' + _formatCurrency(21500000) + '</td></tr>'
-            + '<tr><td><strong>Total Liabilities & Equity</strong></td><td style="font-weight:800;color:#1a73e8;">' + _formatCurrency(103500000) + '</td></tr>'
-            + '</tbody></table></div></div>'
+            + '<thead><tr><th>Supplier / Vendor Name</th><th>Invoices</th><th>Total Payable (₹)</th><th>Current (0-30 Days)</th><th>Overdue (>30 Days)</th><th>Aging Status</th><th>Actions</th></tr></thead>'
+            + '<tbody>';
 
-            + '<div class="card" style="padding:18px;">'
-            + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
-            + '<div style="font-weight:700;font-size:15px;">📑 Tax Compliance Status (GST, TDS)</div>'
-            + '<button class="btn btn-sm btn-success" onclick="CfoPortal.exportTaxReportExcel()">📊 Export Tax Excel</button>'
-            + '</div>'
-            + '<div class="table-responsive"><table>'
-            + '<thead><tr><th>Tax Category</th><th>Taxable Amount</th><th>Tax Liability (₹)</th><th>Filing Due Date</th><th>Compliance</th></tr></thead>'
-            + '<tbody>'
-            + '<tr><td>GSTR-3B (Medicines & Pharmacy)</td><td>' + _formatCurrency(2800000) + '</td><td>' + _formatCurrency(342000) + '</td><td>20th of Month</td><td>' + _badge('Compliant', 'success') + '</td></tr>'
-            + '<tr><td>TDS 194J (Professional Doctors)</td><td>' + _formatCurrency(1850000) + '</td><td>' + _formatCurrency(185000) + '</td><td>7th of Month</td><td>' + _badge('Compliant', 'success') + '</td></tr>'
-            + '<tr><td>TDS 194C (Vendor Contractors)</td><td>' + _formatCurrency(650000) + '</td><td>' + _formatCurrency(13000) + '</td><td>7th of Month</td><td>' + _badge('Compliant', 'success') + '</td></tr>'
-            + '</tbody></table></div></div>'
-            + '</div>'
+        vendors.forEach(function (v, idx) {
+            html += '<tr>'
+                + '<td><strong>' + v.name + '</strong></td>'
+                + '<td>' + v.invCount + ' Bills</td>'
+                + '<td style="font-weight:700;">' + _formatCurrency(v.totalDue) + '</td>'
+                + '<td>' + _formatCurrency(v.current) + '</td>'
+                + '<td style="color:#c62828;font-weight:700;">' + _formatCurrency(v.overdue) + '</td>'
+                + '<td>' + _badge(v.overdue > 0 ? v.days + ' Days Overdue' : 'On Schedule', v.overdue > 0 ? 'danger' : 'success') + '</td>'
+                + '<td><button class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:11px;" onclick="CfoPortal.deleteVendor(' + idx + ')">🗑️ Delete</button></td>'
+                + '</tr>';
+        });
 
-            + '<div class="card" style="padding:18px;">'
-            + '<div style="font-weight:700;font-size:15px;margin-bottom:12px;">🛡️ Anti-Fraud & Exception Audit Logs</div>'
-            + '<div class="table-responsive"><table>'
-            + '<thead><tr><th>Timestamp</th><th>User Account</th><th>Module / Action</th><th>Audit Event Details</th><th>Risk Level</th></tr></thead>'
-            + '<tbody>'
-            + '<tr><td>2026-08-24 19:20</td><td>cfo_admin</td><td>Approval Inbox</td><td>Approved Vendor Invoice PO-302 (₹12,50,000)</td><td>' + _badge('Normal', 'info') + '</td></tr>'
-            + '<tr><td>2026-08-24 18:45</td><td>chief_accountant</td><td>Doctor Payouts</td><td>Authorized Fee-Sharing Batch Release (₹14,23,000)</td><td>' + _badge('Verified', 'success') + '</td></tr>'
-            + '<tr><td>2026-08-24 16:10</td><td>cfo_admin</td><td>Board Submissions</td><td>Submitted Draft Master Budget to MD & Chairman</td><td>' + _badge('Verified', 'success') + '</td></tr>'
-            + '</tbody></table></div></div>';
+        html += '</tbody></table></div></div>'
+
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;margin-bottom:20px;">'
+        + '<div class="card" style="padding:18px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
+        + '<div style="font-weight:700;font-size:15px;">⚖️ Audited Balance Sheet & Cash Flow Summary</div>'
+        + '<button class="btn btn-sm btn-outline" onclick="CfoPortal.exportBalanceSheetPDF()">📄 Export PDF</button>'
+        + '</div>'
+        + '<div class="table-responsive"><table>'
+        + '<thead><tr><th>Asset & Liabilities</th><th>Amount (₹)</th></tr></thead>'
+        + '<tbody>'
+        + '<tr><td><strong>Property, Plant & Equipment (PPE)</strong></td><td>' + _formatCurrency(85000000) + '</td></tr>'
+        + '<tr><td><strong>Current Assets (Cash, AR, Stock)</strong></td><td>' + _formatCurrency(18500000) + '</td></tr>'
+        + '<tr><td><strong>Total Assets</strong></td><td style="font-weight:800;color:#2e7d32;">' + _formatCurrency(103500000) + '</td></tr>'
+        + '<tr style="background:var(--light-gray);"><td colspan="2"></td></tr>'
+        + '<tr><td><strong>Capital Reserves & Retained Earnings</strong></td><td>' + _formatCurrency(82000000) + '</td></tr>'
+        + '<tr><td><strong>Current Liabilities (AP, Taxes, Loans)</strong></td><td>' + _formatCurrency(21500000) + '</td></tr>'
+        + '<tr><td><strong>Total Liabilities & Equity</strong></td><td style="font-weight:800;color:#1a73e8;">' + _formatCurrency(103500000) + '</td></tr>'
+        + '</tbody></table></div></div>'
+
+        + '<div class="card" style="padding:18px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
+        + '<div style="font-weight:700;font-size:15px;">📑 Tax Compliance Status (GST, TDS)</div>'
+        + '<button class="btn btn-sm btn-success" onclick="CfoPortal.exportTaxReportExcel()">📊 Export Tax Excel</button>'
+        + '</div>'
+        + '<div class="table-responsive"><table>'
+        + '<thead><tr><th>Tax Category</th><th>Taxable Amount</th><th>Tax Liability (₹)</th><th>Filing Due Date</th><th>Compliance</th></tr></thead>'
+        + '<tbody>'
+        + '<tr><td>GSTR-3B (Medicines & Pharmacy)</td><td>' + _formatCurrency(2800000) + '</td><td>' + _formatCurrency(342000) + '</td><td>20th of Month</td><td>' + _badge('Compliant', 'success') + '</td></tr>'
+        + '<tr><td>TDS 194J (Professional Doctors)</td><td>' + _formatCurrency(1850000) + '</td><td>' + _formatCurrency(185000) + '</td><td>7th of Month</td><td>' + _badge('Compliant', 'success') + '</td></tr>'
+        + '<tr><td>TDS 194C (Vendor Contractors)</td><td>' + _formatCurrency(650000) + '</td><td>' + _formatCurrency(13000) + '</td><td>7th of Month</td><td>' + _badge('Compliant', 'success') + '</td></tr>'
+        + '</tbody></table></div></div>'
+        + '</div>';
 
         return html;
     }
@@ -441,7 +552,7 @@
             { id: 'executive', label: '📊 Executive Dashboard', color: '#1a73e8' },
             { id: 'rcm', label: '💳 Revenue Cycle & Payer Analytics', color: '#2e7d32' },
             { id: 'unit_economics', label: '🏥 Unit Economics & Costing', color: '#6a1b9a' },
-            { id: 'approvals', label: '📥 Approval Inbox (Pending: 7)', color: '#f57f17' },
+            { id: 'approvals', label: '📥 Approval Inbox (Pending: ' + _getApprovals().filter(function(a){ return a.status === 'pending'; }).length + ')', color: '#f57f17' },
             { id: 'board_submissions', label: '📤 Executive & Board Submissions', color: '#00bcd4' },
             { id: 'governance', label: '🛡️ Audit, Governance & Taxes', color: '#37474f' }
         ];
@@ -468,7 +579,8 @@
             + '</div>'
 
             + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;" id="cfoTabBar">' + navButtonsHtml + '</div>'
-            + '<div id="cfoTabContent"></div>';
+            + '<div id="cfoTabContent"></div>'
+            + '<div id="cfoModalHost"></div>';
 
         container.innerHTML = headerHtml;
         _renderActiveTabContent();
@@ -486,7 +598,7 @@
         else if (_activeTab === 'governance') contentEl.innerHTML = _renderGovernanceTab();
     }
 
-    /* ── Export & Action Helpers ── */
+    /* ── Export & Interactive Action Methods (Add, Edit, Remove) ── */
     window.CfoPortal = {
         switchTab: function (tabId, btn) {
             _activeTab = tabId;
@@ -511,17 +623,9 @@
             _renderActiveTabContent();
         },
 
+        /* ── Approval Inbox Actions ── */
         processApprovalV2: function (index, decision) {
-            var approvals = DB.get('cfo_approvals_v2') || [
-                { id: 'PO-301', category: 'Vendor Invoice ($5K-$25K)', amount: 450000, vendorOrPatient: 'Sun Pharma Distributors', dept: 'Pharmacy', reason: 'Bulk antibiotic stock invoice clearance', status: 'pending', date: '2026-08-24' },
-                { id: 'PO-302', category: 'Vendor Invoice ($5K-$25K)', amount: 1250000, vendorOrPatient: 'Medtronic India', dept: 'Cardiology', reason: 'Stent inventory invoice payment', status: 'pending', date: '2026-08-24' },
-                { id: 'PO-303', category: 'Vendor Invoice ($5K-$25K)', amount: 680000, vendorOrPatient: 'Olympus Medical', dept: 'Endoscopy', reason: 'Endoscope maintenance contract', status: 'pending', date: '2026-08-24' },
-                { id: 'DSC-101', category: 'Patient Discount Request', amount: 45000, vendorOrPatient: 'Patient: Suresh Kumar', dept: 'IPD Billing', reason: 'Hardship waiver for extended ICU stay', status: 'pending', date: '2026-08-24' },
-                { id: 'DSC-102', category: 'Patient Discount Request', amount: 18500, vendorOrPatient: 'Patient: Meena Sharma', dept: 'OPD Billing', reason: 'Staff relative concession', status: 'pending', date: '2026-08-23' },
-                { id: 'DOC-501', category: 'Doctor Payout Release Batch', amount: 1423000, vendorOrPatient: 'Monthly Doctor Batch (18 Docs)', dept: 'Finance', reason: 'August doctor fee-sharing disbursement', status: 'pending', date: '2026-08-24' },
-                { id: 'WRT-201', category: 'Bad Debt Write-Off', amount: 32000, vendorOrPatient: 'Patient: Unknown / Default', dept: 'Emergency', reason: 'Uncollectible MLC emergency care debt write-off', status: 'pending', date: '2026-08-22' }
-            ];
-
+            var approvals = _getApprovals();
             if (approvals[index]) {
                 approvals[index].status = decision;
                 DB.set('cfo_approvals_v2', approvals);
@@ -531,11 +635,278 @@
         },
 
         approveAllPending: function () {
-            var approvals = DB.get('cfo_approvals_v2') || [];
+            var approvals = _getApprovals();
             approvals.forEach(function (a) { a.status = 'approved'; });
             DB.set('cfo_approvals_v2', approvals);
-            APP.notify('All 7 Pending Requisitions Approved by CFO', 'success');
+            APP.notify('All Pending Requisitions Approved by CFO', 'success');
             _renderActiveTabContent();
+        },
+
+        deleteApproval: function (index) {
+            var approvals = _getApprovals();
+            if (approvals[index]) {
+                if (confirm('Are you sure you want to remove approval item "' + approvals[index].id + '"?')) {
+                    var removed = approvals.splice(index, 1);
+                    DB.set('cfo_approvals_v2', approvals);
+                    APP.notify('Removed ' + removed[0].id + ' from Approval Inbox', 'info');
+                    _renderActiveTabContent();
+                }
+            }
+        },
+
+        openAddApprovalModal: function () {
+            var modalHtml = '<div class="modal-overlay" style="display:flex;align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;">'
+                + '<div class="modal-card" style="background:var(--card);padding:24px;border-radius:16px;width:100%;max-width:480px;box-shadow:0 10px 30px rgba(0,0,0,0.3);">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
+                + '<h3 style="margin:0;font-size:18px;font-weight:700;">➕ Add Requisition to Approval Inbox</h3>'
+                + '<button class="btn btn-sm btn-outline" onclick="CfoPortal.closeModal()">✕</button>'
+                + '</div>'
+                + '<form onsubmit="CfoPortal.saveAddApproval(event)">'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Category</label>'
+                + '<select id="cfoAddCategory" class="form-control" required><option>Vendor Invoice ($5K-$25K)</option><option>Patient Discount Request</option><option>Doctor Payout Release Batch</option><option>Bad Debt Write-Off</option></select></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Amount (₹)</label><input type="number" id="cfoAddAmount" class="form-control" placeholder="45000" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Party / Vendor / Patient Name</label><input type="text" id="cfoAddParty" class="form-control" placeholder="Vendor / Patient Name" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Department</label><input type="text" id="cfoAddDept" class="form-control" placeholder="Pharmacy / Billing" required /></div>'
+                + '<div class="form-group" style="margin-bottom:16px;"><label style="font-size:12px;font-weight:600;">Justification Reason</label><textarea id="cfoAddReason" class="form-control" rows="2" placeholder="Brief reason..." required></textarea></div>'
+                + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
+                + '<button type="button" class="btn btn-outline" onclick="CfoPortal.closeModal()">Cancel</button>'
+                + '<button type="submit" class="btn btn-primary">Save Requisition</button>'
+                + '</div></form></div></div>';
+
+            var host = document.getElementById('cfoModalHost');
+            if (host) host.innerHTML = modalHtml;
+        },
+
+        saveAddApproval: function (e) {
+            e.preventDefault();
+            var category = document.getElementById('cfoAddCategory').value;
+            var amount = Number(document.getElementById('cfoAddAmount').value) || 0;
+            var party = document.getElementById('cfoAddParty').value.trim();
+            var dept = document.getElementById('cfoAddDept').value.trim();
+            var reason = document.getElementById('cfoAddReason').value.trim();
+
+            var approvals = _getApprovals();
+            var newId = 'REQ-' + (Math.floor(100 + Math.random() * 900));
+            approvals.unshift({ id: newId, category: category, amount: amount, vendorOrPatient: party, dept: dept, reason: reason, status: 'pending', date: new Date().toISOString().slice(0, 10) });
+
+            DB.set('cfo_approvals_v2', approvals);
+            CfoPortal.closeModal();
+            APP.notify('Requisition ' + newId + ' added to Approval Inbox', 'success');
+            _renderActiveTabContent();
+        },
+
+        /* ── RCM Claim Actions ── */
+        deleteClaim: function (index) {
+            var claims = _getClaims();
+            if (claims[index]) {
+                if (confirm('Delete Payer Claim record for "' + claims[index].payer + '"?')) {
+                    var removed = claims.splice(index, 1);
+                    DB.set('cfo_claims', claims);
+                    APP.notify('Removed ' + removed[0].payer + ' record', 'info');
+                    _renderActiveTabContent();
+                }
+            }
+        },
+
+        openAddClaimModal: function () {
+            var modalHtml = '<div class="modal-overlay" style="display:flex;align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;">'
+                + '<div class="modal-card" style="background:var(--card);padding:24px;border-radius:16px;width:100%;max-width:480px;box-shadow:0 10px 30px rgba(0,0,0,0.3);">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
+                + '<h3 style="margin:0;font-size:18px;font-weight:700;">➕ Add Payer Claim Denial Record</h3>'
+                + '<button class="btn btn-sm btn-outline" onclick="CfoPortal.closeModal()">✕</button>'
+                + '</div>'
+                + '<form onsubmit="CfoPortal.saveAddClaim(event)">'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Insurance / TPA Name</label><input type="text" id="cfoClaimPayer" class="form-control" placeholder="Max Bupa Insurance" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Total Claims Count</label><input type="number" id="cfoClaimCount" class="form-control" placeholder="50" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Approved Amount (₹)</label><input type="number" id="cfoClaimApproved" class="form-control" placeholder="1500000" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Denied Amount (₹)</label><input type="number" id="cfoClaimDenied" class="form-control" placeholder="75000" required /></div>'
+                + '<div class="form-group" style="margin-bottom:16px;"><label style="font-size:12px;font-weight:600;">Root Cause Category</label><input type="text" id="cfoClaimCause" class="form-control" placeholder="Pre-auth Delay / Tariff Cap" required /></div>'
+                + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
+                + '<button type="button" class="btn btn-outline" onclick="CfoPortal.closeModal()">Cancel</button>'
+                + '<button type="submit" class="btn btn-primary">Save Claim Record</button>'
+                + '</div></form></div></div>';
+
+            var host = document.getElementById('cfoModalHost');
+            if (host) host.innerHTML = modalHtml;
+        },
+
+        saveAddClaim: function (e) {
+            e.preventDefault();
+            var payer = document.getElementById('cfoClaimPayer').value.trim();
+            var count = Number(document.getElementById('cfoClaimCount').value) || 0;
+            var approved = Number(document.getElementById('cfoClaimApproved').value) || 0;
+            var denied = Number(document.getElementById('cfoClaimDenied').value) || 0;
+            var cause = document.getElementById('cfoClaimCause').value.trim();
+
+            var claims = _getClaims();
+            claims.unshift({ payer: payer, totalClaims: count, approved: approved, denied: denied, cause: cause, risk: 'Low Risk' });
+
+            DB.set('cfo_claims', claims);
+            CfoPortal.closeModal();
+            APP.notify('Added Payer Claim record for ' + payer, 'success');
+            _renderActiveTabContent();
+        },
+
+        /* ── Specialty Actions ── */
+        deleteSpecialty: function (index) {
+            var specialties = _getSpecialties();
+            if (specialties[index]) {
+                if (confirm('Delete Specialty Department "' + specialties[index].name + '"?')) {
+                    var removed = specialties.splice(index, 1);
+                    DB.set('cfo_specialties', specialties);
+                    APP.notify('Removed ' + removed[0].name, 'info');
+                    _renderActiveTabContent();
+                }
+            }
+        },
+
+        openAddSpecialtyModal: function () {
+            var modalHtml = '<div class="modal-overlay" style="display:flex;align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;">'
+                + '<div class="modal-card" style="background:var(--card);padding:24px;border-radius:16px;width:100%;max-width:480px;box-shadow:0 10px 30px rgba(0,0,0,0.3);">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
+                + '<h3 style="margin:0;font-size:18px;font-weight:700;">➕ Add Specialty Department Costing</h3>'
+                + '<button class="btn btn-sm btn-outline" onclick="CfoPortal.closeModal()">✕</button>'
+                + '</div>'
+                + '<form onsubmit="CfoPortal.saveAddSpecialty(event)">'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Specialty Department Name</label><input type="text" id="cfoSpecName" class="form-control" placeholder="Gastroenterology" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Procedures Count</label><input type="number" id="cfoSpecCount" class="form-control" placeholder="75" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Gross Revenue (₹)</label><input type="number" id="cfoSpecRev" class="form-control" placeholder="2500000" required /></div>'
+                + '<div class="form-group" style="margin-bottom:16px;"><label style="font-size:12px;font-weight:600;">Direct Costs (₹)</label><input type="number" id="cfoSpecCost" class="form-control" placeholder="1400000" required /></div>'
+                + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
+                + '<button type="button" class="btn btn-outline" onclick="CfoPortal.closeModal()">Cancel</button>'
+                + '<button type="submit" class="btn btn-primary">Save Specialty</button>'
+                + '</div></form></div></div>';
+
+            var host = document.getElementById('cfoModalHost');
+            if (host) host.innerHTML = modalHtml;
+        },
+
+        saveAddSpecialty: function (e) {
+            e.preventDefault();
+            var name = document.getElementById('cfoSpecName').value.trim();
+            var count = Number(document.getElementById('cfoSpecCount').value) || 1;
+            var rev = Number(document.getElementById('cfoSpecRev').value) || 0;
+            var cost = Number(document.getElementById('cfoSpecCost').value) || 0;
+
+            var margin = rev > 0 ? Math.round(((rev - cost) / rev) * 1000) / 10 : 0;
+            var abc = count > 0 ? Math.round(cost / count) : 0;
+
+            var list = _getSpecialties();
+            list.unshift({ name: name, procedures: count, revenue: rev, directCost: cost, margin: margin, abcCost: abc });
+
+            DB.set('cfo_specialties', list);
+            CfoPortal.closeModal();
+            APP.notify('Added Specialty Department ' + name, 'success');
+            _renderActiveTabContent();
+        },
+
+        /* ── CAPEX Actions ── */
+        deleteCapex: function (index) {
+            var list = _getCapex();
+            if (list[index]) {
+                if (confirm('Delete CAPEX Proposal "' + list[index].name + '"?')) {
+                    var removed = list.splice(index, 1);
+                    DB.set('cfo_capex', list);
+                    APP.notify('Removed ' + removed[0].name, 'info');
+                    _renderActiveTabContent();
+                }
+            }
+        },
+
+        openAddCapexModal: function () {
+            var modalHtml = '<div class="modal-overlay" style="display:flex;align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;">'
+                + '<div class="modal-card" style="background:var(--card);padding:24px;border-radius:16px;width:100%;max-width:480px;box-shadow:0 10px 30px rgba(0,0,0,0.3);">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
+                + '<h3 style="margin:0;font-size:18px;font-weight:700;">➕ Add CAPEX Proposal</h3>'
+                + '<button class="btn btn-sm btn-outline" onclick="CfoPortal.closeModal()">✕</button>'
+                + '</div>'
+                + '<form onsubmit="CfoPortal.saveAddCapex(event)">'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Equipment Asset Name</label><input type="text" id="cfoCapexName" class="form-control" placeholder="Linear Accelerator" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Department</label><input type="text" id="cfoCapexDept" class="form-control" placeholder="Oncology" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Capital Cost (₹)</label><input type="number" id="cfoCapexCost" class="form-control" placeholder="25000000" required /></div>'
+                + '<div class="form-group" style="margin-bottom:16px;"><label style="font-size:12px;font-weight:600;">Estimated Annual Revenue (₹)</label><input type="number" id="cfoCapexRev" class="form-control" placeholder="8500000" required /></div>'
+                + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
+                + '<button type="button" class="btn btn-outline" onclick="CfoPortal.closeModal()">Cancel</button>'
+                + '<button type="submit" class="btn btn-primary">Save Proposal</button>'
+                + '</div></form></div></div>';
+
+            var host = document.getElementById('cfoModalHost');
+            if (host) host.innerHTML = modalHtml;
+        },
+
+        saveAddCapex: function (e) {
+            e.preventDefault();
+            var name = document.getElementById('cfoCapexName').value.trim();
+            var dept = document.getElementById('cfoCapexDept').value.trim();
+            var cost = Number(document.getElementById('cfoCapexCost').value) || 0;
+            var rev = Number(document.getElementById('cfoCapexRev').value) || 0;
+
+            var roi = cost > 0 ? Math.round((rev / cost) * 1000) / 10 + '%' : '0%';
+            var payback = rev > 0 ? (Math.round((cost / rev) * 10) / 10) + ' Years' : 'N/A';
+
+            var list = _getCapex();
+            list.unshift({ name: name, dept: dept, cost: cost, revenueYTD: rev, roi: roi, payback: payback, status: 'Proposed' });
+
+            DB.set('cfo_capex', list);
+            CfoPortal.closeModal();
+            APP.notify('Added CAPEX Proposal for ' + name, 'success');
+            _renderActiveTabContent();
+        },
+
+        /* ── Vendor AP Actions ── */
+        deleteVendor: function (index) {
+            var list = _getVendors();
+            if (list[index]) {
+                if (confirm('Delete Vendor bill record for "' + list[index].name + '"?')) {
+                    var removed = list.splice(index, 1);
+                    DB.set('cfo_vendors', list);
+                    APP.notify('Removed ' + removed[0].name, 'info');
+                    _renderActiveTabContent();
+                }
+            }
+        },
+
+        openAddVendorModal: function () {
+            var modalHtml = '<div class="modal-overlay" style="display:flex;align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;">'
+                + '<div class="modal-card" style="background:var(--card);padding:24px;border-radius:16px;width:100%;max-width:480px;box-shadow:0 10px 30px rgba(0,0,0,0.3);">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
+                + '<h3 style="margin:0;font-size:18px;font-weight:700;">➕ Add Vendor Bill</h3>'
+                + '<button class="btn btn-sm btn-outline" onclick="CfoPortal.closeModal()">✕</button>'
+                + '</div>'
+                + '<form onsubmit="CfoPortal.saveAddVendor(event)">'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Supplier / Vendor Name</label><input type="text" id="cfoVendorName" class="form-control" placeholder="Cipla Healthcare" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Invoice Count</label><input type="number" id="cfoVendorInvs" class="form-control" placeholder="4" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Total Payable (₹)</label><input type="number" id="cfoVendorTotal" class="form-control" placeholder="650000" required /></div>'
+                + '<div class="form-group" style="margin-bottom:16px;"><label style="font-size:12px;font-weight:600;">Overdue Amount (>30 Days) (₹)</label><input type="number" id="cfoVendorOverdue" class="form-control" placeholder="150000" required /></div>'
+                + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
+                + '<button type="button" class="btn btn-outline" onclick="CfoPortal.closeModal()">Cancel</button>'
+                + '<button type="submit" class="btn btn-primary">Save Vendor Bill</button>'
+                + '</div></form></div></div>';
+
+            var host = document.getElementById('cfoModalHost');
+            if (host) host.innerHTML = modalHtml;
+        },
+
+        saveAddVendor: function (e) {
+            e.preventDefault();
+            var name = document.getElementById('cfoVendorName').value.trim();
+            var invs = Number(document.getElementById('cfoVendorInvs').value) || 1;
+            var total = Number(document.getElementById('cfoVendorTotal').value) || 0;
+            var overdue = Number(document.getElementById('cfoVendorOverdue').value) || 0;
+            var current = total > overdue ? total - overdue : 0;
+
+            var list = _getVendors();
+            list.unshift({ name: name, invCount: invs, totalDue: total, current: current, overdue: overdue, days: overdue > 0 ? 45 : 15 });
+
+            DB.set('cfo_vendors', list);
+            CfoPortal.closeModal();
+            APP.notify('Added Vendor Bill for ' + name, 'success');
+            _renderActiveTabContent();
+        },
+
+        closeModal: function () {
+            var host = document.getElementById('cfoModalHost');
+            if (host) host.innerHTML = '';
         },
 
         exportFullExcel: function () {
