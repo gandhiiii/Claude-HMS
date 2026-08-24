@@ -9,7 +9,7 @@ const Router = {
         // Restore last visited module or use role default
         const isAdmin = user.isSuperAdmin || user.role === 'admin';
         const defaultModule = isAdmin ? 'dashboard'
-            : (user.role === 'CFO' || user.role === 'CHIEF_ACCOUNTANT') ? 'cfo-portal'
+            : user.role === 'CFO' ? 'cfo-portal'
             : user.role === 'hod' ? 'hod-dashboard'
             : user.role === 'storekeeper' ? 'storekeeper-dashboard'
             : user.role === 'ambulance_employee' ? 'ambulance'

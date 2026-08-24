@@ -421,6 +421,17 @@
             return;
         }
 
+        var isCfoOrAdmin = user.role === 'CFO' || user.role === 'admin' || user.isSuperAdmin || (user.permissions && user.permissions.includes('cfo-portal'));
+        if (!isCfoOrAdmin) {
+            container.innerHTML = '<div class="card" style="text-align:center;padding:40px;">'
+                + '<div style="font-size:48px;margin-bottom:12px;">🔒</div>'
+                + '<h3 style="margin-bottom:8px;">CFO Access Restricted</h3>'
+                + '<p style="color:var(--gray);font-size:14px;">The CFO Workspace is strictly reserved for Chief Financial Officer (CFO) accounts.</p>'
+                + '<button class="btn btn-primary" style="margin-top:16px;" onclick="Router.navigate(\'' + (user.role === 'hod' ? 'hod-dashboard' : 'employee-dashboard') + '\')">← Back to My Dashboard</button>'
+                + '</div>';
+            return;
+        }
+
         _destroyCharts();
 
         var TABS = [

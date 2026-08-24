@@ -610,11 +610,7 @@ const AUTH = {
         }
         if (permission === 'cfo-portal') {
             if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
-            var _cfoRoles = ['CFO', 'CHIEF_ACCOUNTANT', 'BILLING_MANAGER', 'MD', 'DIRECTOR', 'EXECUTIVE', 'CHAIRMAN', 'VICE_CHAIRMAN'];
-            if (_cfoRoles.indexOf(user.role) !== -1) return true;
-            var _cfoDept = (user.department || '').trim().toLowerCase();
-            if (_cfoDept.indexOf('account') !== -1 || _cfoDept.indexOf('finance') !== -1) return true;
-            if (user.permissions && user.permissions.includes('cfo-portal')) return true;
+            return user.role === 'CFO' || (user.permissions && user.permissions.includes('cfo-portal'));
         }
         if (permission === 'md-report') {
             if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
