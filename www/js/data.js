@@ -1200,6 +1200,7 @@ const APP = {
             let usersUpdated = false;
             const adminPerms = ['dashboard', 'users', 'departments', 'feature-rights', 'admin-checklists', 'budget', 'quarterly-priorities', 'hospital-settings', 'data-history'];
             allUsers.forEach(function(u) {
+                const uRole = (u.role || '').toString().toLowerCase();
                 if (u.role !== 'admin' && u.username !== 'admin' && u.username !== 'superadmin') {
                     if (u.isSuperAdmin) { u.isSuperAdmin = false; usersUpdated = true; }
                     if (Array.isArray(u.permissions) && u.permissions.length > 0) {
@@ -1208,6 +1209,13 @@ const APP = {
                             u.permissions = cleanPerms;
                             usersUpdated = true;
                         }
+                    }
+                }
+                if (uRole === 'cfo' || uRole.indexOf('cfo') !== -1) {
+                    if (!Array.isArray(u.permissions)) u.permissions = [];
+                    if (u.permissions.indexOf('cfo-portal') === -1) {
+                        u.permissions.push('cfo-portal');
+                        usersUpdated = true;
                     }
                 }
             });
