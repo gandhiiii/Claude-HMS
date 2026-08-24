@@ -342,7 +342,7 @@ function renderPermissionCheckboxes(deptFeatures, userPerms, isEdit) {
         'tasks', 'work', 'complaints', 'suggestions', 'room-checklist', 'rooms', 'admissions',
         'lost-found', 'checklists', 'admin-checklists', 'departmental-checklist',
         'handover', 'cleaning', 'equipbackdown', 'reports', 'staff-deployment',
-        'security-deployment', 'patient-shifting'
+        'security-deployment', 'patient-shifting', 'cfo-portal'
     ];
 
     const inheritedSet = new Set(deptFeatures || []);

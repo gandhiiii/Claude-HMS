@@ -9,6 +9,7 @@ const Router = {
         // Restore last visited module or use role default
         const isAdmin = user.isSuperAdmin || user.role === 'admin';
         const defaultModule = isAdmin ? 'dashboard'
+            : (user.role === 'CFO' || user.role === 'CHIEF_ACCOUNTANT') ? 'cfo-portal'
             : user.role === 'hod' ? 'hod-dashboard'
             : user.role === 'storekeeper' ? 'storekeeper-dashboard'
             : user.role === 'ambulance_employee' ? 'ambulance'
@@ -99,6 +100,7 @@ const Router = {
             { id: 'reports', label: _t('nav_reports'), icon: '📈', permission: 'reports' },
             { id: 'md-report', label: _t('nav_md_report'), icon: '📋', permission: 'md-report' },
             { id: 'purchases', label: '💰 Daily Purchases', icon: '💰', permission: 'purchases' },
+            { id: 'cfo-portal', label: '📊 CFO Portal', icon: '📊', permission: 'cfo-portal' },
             { id: 'hod-dashboard', label: _t('nav_hod_dashboard'), icon: '👔', permission: 'hod-dashboard' },
             { id: 'employee-dashboard', label: _t('nav_employee_dashboard'), icon: '📊', permission: 'employee-dashboard' },
             { id: 'storekeeper-dashboard', label: _t('nav_storekeeper_dashboard'), icon: '🏪', permission: 'storekeeper-dashboard' },
@@ -268,6 +270,7 @@ const Router = {
                 case 'employee-dashboard': return safeWindowGet('renderEmployeeDashboard');
                 case 'hod-dashboard': return safeWindowGet('renderHodDashboard');
                 case 'storekeeper-dashboard': return safeWindowGet('renderStorekeeperDashboard');
+                case 'cfo-portal': return safeWindowGet('renderCfoPortal');
                 case 'hospital-settings': return safeWindowGet('renderHospitalSettings');
                 default: return null;
             }
