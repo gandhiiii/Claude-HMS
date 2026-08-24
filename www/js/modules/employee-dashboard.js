@@ -472,9 +472,11 @@ function renderEmployeeDashboard(container, initialTab) {
         + '<div style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;font-size:24px;">👤</div>'
         + '<div><div style="font-size:20px;font-weight:700;">' + u + '</div>'
         + '<div style="font-size:13px;opacity:0.85;">' + (dept || 'No Department') + ' &nbsp;·&nbsp; ' + (user.role || 'employee').replace(/_/g,' ') + '</div></div></div>'
+        + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm" style="background:#ffffff;color:var(--primary);font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.15);padding:8px 14px;border-radius:8px;cursor:pointer;" onclick="if(typeof EmpWorkReport!==\'undefined\')EmpWorkReport.openModal();">📄 Download My Work Report</button>'
         + '<div style="text-align:right;opacity:0.85;font-size:13px;">'
         + new Date().toLocaleDateString('en-IN', {weekday:'long',day:'numeric',month:'long',year:'numeric'})
-        + '</div></div>'
+        + '</div></div></div>'
 
         // ── KPI strip ──
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px;">'

@@ -4946,14 +4946,16 @@ function _hodReports(el) {
         +'</div></div></div>'
         // Per-employee report download
         +'<div class="card" style="padding:18px;border-top:3px solid #e65100;">'
-        +'<div style="font-size:15px;font-weight:700;margin-bottom:4px;">👤 Employee Report</div>'
-        +'<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Download detailed report for a team member</div>'
-        +'<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-        +'<select id="hodEmpReportSelect" style="flex:1;min-width:140px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">'
-        +'<option value="">— Select employee —</option>'
-        + (d.team||[]).map(function(m){ return '<option value="' + m.fullName.replace(/"/g,'&quot;') + '">' + m.fullName + '</option>'; }).join('')
+        +'<div style="font-size:15px;font-weight:700;margin-bottom:4px;">👤 Team Member Work Report (Full KPI & Checklists)</div>'
+        +'<div style="font-size:12px;color:var(--gray);margin-bottom:14px;">Preview & download complete work, KPI, and point-by-point checklist report</div>'
+        +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+        +'<select id="hodEmpReportSelect" style="flex:1;min-width:160px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">'
+        +'<option value="">— Select team member —</option>'
+        + (d.team||[]).map(function(m){ return '<option value="' + m.username.replace(/"/g,'&quot;') + '">' + m.fullName + ' (' + m.username + ')</option>'; }).join('')
         +'</select>'
-        +'<button class="btn btn-sm" style="background:#1e7e34;color:#fff;" onclick="var s=document.getElementById(\'hodEmpReportSelect\');if(s.value)hodExportEmployeeReport(s.value);else APP.notify(\'Select an employee\',\'error\')">📥 Download</button>'
+        +'<button class="btn btn-sm btn-primary" onclick="var s=document.getElementById(\'hodEmpReportSelect\');if(s.value){if(typeof EmpWorkReport!==\'undefined\')EmpWorkReport.openModal(s.value);}else APP.notify(\'Select an employee\',\'error\')">👁️ Preview Report</button>'
+        +'<button class="btn btn-sm" style="background:#1e7e34;color:#fff;" onclick="var s=document.getElementById(\'hodEmpReportSelect\');if(s.value){if(typeof EmpWorkReport!==\'undefined\')EmpWorkReport.exportExcel(s.value);}else APP.notify(\'Select an employee\',\'error\')">📊 Excel</button>'
+        +'<button class="btn btn-sm" style="background:#c82333;color:#fff;" onclick="var s=document.getElementById(\'hodEmpReportSelect\');if(s.value){if(typeof EmpWorkReport!==\'undefined\')EmpWorkReport.exportPDF(s.value);}else APP.notify(\'Select an employee\',\'error\')">📄 PDF</button>'
         +'</div></div>'
         +'</div>';
 
@@ -5437,13 +5439,17 @@ function hodDownloadReportExcel(reportId) {
     }
 }
 
-function hodExportEmployeeReport(employeeName) {
-    var d = _hodData;
-    if (!d || !d.user) { APP.notify('Data not loaded', 'error'); return; }
-    var allUsers = DB.get('users') || [];
-    var emp = allUsers.find(function(u){ return u.fullName === employeeName; });
-    if (!emp) { APP.notify('Employee not found', 'error'); return; }
-    try {
+function hodExportEmployeeReport(employeeName, format) {
+    if (typeof EmpWorkReport !== 'undefined') {
+        if (format === 'pdf') {
+            EmpWorkReport.exportPDF(employeeName);
+        } else if (format === 'excel') {
+            EmpWorkReport.exportExcel(employeeName);
+        } else {
+            EmpWorkReport.openModal(employeeName);
+        }
+        return;
+    }
         var wb = XLSX.utils.book_new();
         var today = new Date().toISOString().slice(0,10);
         var nowLabel = new Date().toLocaleDateString('en-IN', {day:'numeric',month:'long',year:'numeric'});
