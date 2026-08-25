@@ -556,17 +556,6 @@ const AUTH = {
                 if (d) u = JSON.parse(d);
             } catch (e) {}
         }
-        if (u) {
-            var _r = (u.role || '').toString().trim().toLowerCase();
-            var _p = (u.post || u.designation || '').toString().trim().toLowerCase();
-            var _name = (u.username || '').toString().trim().toLowerCase();
-            if (_r === 'cfo' || _r.indexOf('cfo') !== -1 || _p.indexOf('cfo') !== -1 || _name.indexOf('cfo') !== -1) {
-                if (!Array.isArray(u.permissions)) u.permissions = [];
-                if (u.permissions.indexOf('cfo-portal') === -1) {
-                    u.permissions.push('cfo-portal');
-                }
-            }
-        }
         return u;
     },
     isLoggedIn() {
@@ -620,15 +609,6 @@ const AUTH = {
                 var _scrapDept = (user.department || '').trim().toLowerCase();
                 if (_scrapDept === 'facility' || _scrapDept === 'it' || _scrapDept === 'maintenance') return true;
             }
-            return false;
-        }
-        if (permission === 'cfo-portal') {
-            if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
-            var _cfoR = (user.role || '').toString().trim().toLowerCase();
-            var _cfoP = (user.post || user.designation || '').toString().trim().toLowerCase();
-            var _cfoU = (user.username || '').toString().trim().toLowerCase();
-            if (_cfoR === 'cfo' || _cfoR.indexOf('cfo') !== -1 || _cfoP.indexOf('cfo') !== -1 || _cfoU.indexOf('cfo') !== -1) return true;
-            if (user.permissions && Array.isArray(user.permissions) && user.permissions.indexOf('cfo-portal') !== -1) return true;
             return false;
         }
         if (permission === 'md-report') {
@@ -1228,13 +1208,6 @@ const APP = {
                             u.permissions = cleanPerms;
                             usersUpdated = true;
                         }
-                    }
-                }
-                if (uRole === 'cfo' || uRole.indexOf('cfo') !== -1) {
-                    if (!Array.isArray(u.permissions)) u.permissions = [];
-                    if (u.permissions.indexOf('cfo-portal') === -1) {
-                        u.permissions.push('cfo-portal');
-                        usersUpdated = true;
                     }
                 }
             });

@@ -439,9 +439,6 @@ function saveUser() {
     });
     // Only save non-disabled checkboxes (disabled = inherited from dept, not user-specific)
     data.permissions = Array.from(form.querySelectorAll('[name="permissions"]:checked:not([disabled])')).map(cb => cb.value);
-    if ((data.role || '').toLowerCase().indexOf('cfo') !== -1) {
-        if (data.permissions.indexOf('cfo-portal') === -1) data.permissions.push('cfo-portal');
-    }
     var managedDepts = Array.from(form.querySelectorAll('[name="managedDept"]:checked')).map(function(cb) { return cb.value; });
 
     if (!data.fullName || !data.username) {

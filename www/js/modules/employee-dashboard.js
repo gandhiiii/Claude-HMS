@@ -478,7 +478,6 @@ function renderEmployeeDashboard(container, initialTab) {
         + '<div><div style="font-size:20px;font-weight:700;">' + u + '</div>'
         + '<div style="font-size:13px;opacity:0.85;">' + (dept || 'No Department') + ' &nbsp;·&nbsp; ' + (user.role || 'employee').replace(/_/g,' ') + '</div></div></div>'
         + '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">'
-        + (AUTH.hasPermission(user, 'cfo-portal') ? '<button class="btn btn-sm" style="background:#0d47a1;color:#fff;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.15);padding:8px 14px;border-radius:8px;cursor:pointer;" onclick="Router.navigate(\'cfo-portal\')">📊 CFO Workspace</button>' : '')
         + '<button class="btn btn-sm" style="background:#ffffff;color:var(--primary);font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.15);padding:8px 14px;border-radius:8px;cursor:pointer;" onclick="if(typeof EmpWorkReport!==\'undefined\')EmpWorkReport.openModal();">📄 Download My Work Report</button>'
         + '<div style="text-align:right;opacity:0.85;font-size:13px;">'
         + new Date().toLocaleDateString('en-IN', {weekday:'long',day:'numeric',month:'long',year:'numeric'})
