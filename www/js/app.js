@@ -12,9 +12,11 @@ const Router = {
         const uPost = (user.post || user.designation || '').toString().trim().toLowerCase();
         const uName = (user.username || '').toString().trim().toLowerCase();
         const isCfo = uRole === 'cfo' || uRole.indexOf('cfo') !== -1 || uPost.indexOf('cfo') !== -1 || uName.indexOf('cfo') !== -1 || (user.permissions && user.permissions.includes('cfo-portal'));
+        const isChiefAccountant = uRole === 'chief_accountant' || uRole.indexOf('accountant') !== -1 || (user.permissions && user.permissions.includes('chief-accountant-portal'));
 
         const defaultModule = isAdmin ? 'dashboard'
             : isCfo ? 'cfo-portal'
+            : isChiefAccountant ? 'chief-accountant-portal'
             : uRole === 'hod' ? 'hod-dashboard'
             : uRole === 'storekeeper' ? 'storekeeper-dashboard'
             : uRole === 'ambulance_employee' ? 'ambulance'
@@ -106,6 +108,7 @@ const Router = {
             { id: 'md-report', label: _t('nav_md_report'), icon: '📋', permission: 'md-report' },
             { id: 'purchases', label: '💰 Daily Purchases', icon: '💰', permission: 'purchases' },
             { id: 'cfo-portal', label: '📊 CFO Portal', icon: '📊', permission: 'cfo-portal' },
+            { id: 'chief-accountant-portal', label: '📁 Chief Accountant Portal', icon: '📁', permission: 'chief-accountant-portal' },
             { id: 'hod-dashboard', label: _t('nav_hod_dashboard'), icon: '👔', permission: 'hod-dashboard' },
             { id: 'employee-dashboard', label: _t('nav_employee_dashboard'), icon: '📊', permission: 'employee-dashboard' },
             { id: 'storekeeper-dashboard', label: _t('nav_storekeeper_dashboard'), icon: '🏪', permission: 'storekeeper-dashboard' },
@@ -276,6 +279,7 @@ const Router = {
                 case 'hod-dashboard': return safeWindowGet('renderHodDashboard');
                 case 'storekeeper-dashboard': return safeWindowGet('renderStorekeeperDashboard');
                 case 'cfo-portal': return safeWindowGet('renderCfoPortal');
+                case 'chief-accountant-portal': return safeWindowGet('renderChiefAccountantPortal');
                 case 'hospital-settings': return safeWindowGet('renderHospitalSettings');
                 default: return null;
             }
