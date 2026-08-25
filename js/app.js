@@ -1,3 +1,8 @@
+if (typeof window.T !== 'function') {
+    window.T = typeof I18N !== 'undefined' && typeof I18N.t === 'function' ? I18N.t : function (k) { return k; };
+}
+var T = window.T;
+
 const Router = {
     currentModule: 'dashboard',
     init() {

@@ -637,6 +637,10 @@
         SUPPORTED: SUPPORTED
     };
     global.T = t;
+    if (typeof window !== 'undefined') {
+        window.T = t;
+        window.I18N = global.I18N;
+    }
     global.LANG = {
         extend: function (map) {
             if (!map) return;

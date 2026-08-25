@@ -3,8 +3,106 @@
 (function () {
     'use strict';
 
-    var _activeTab = 'executive';
+    var T = (typeof window !== 'undefined' && typeof window.T === 'function') ? window.T : (typeof I18N !== 'undefined' && typeof I18N.t === 'function' ? I18N.t : function (k) { return k; });
+    var _activeTab = 'hierarchy';
     var _cfoCharts = [];
+    var _approvalTierFilter = 'all';
+
+    /* ── Executive Authority Threshold Resolver (Dual USD & INR Thresholds) ── */
+    function _getAuthorityTier(amount, category) {
+        var val = Number(amount) || 0;
+        var usd = val / 83; // $1 = ₹83 standard conversion reference
+        var cat = (category || '').toLowerCase();
+
+        if (cat.indexOf('>500k') !== -1 || cat.indexOf('mega capex') !== -1 || usd >= 500000) {
+            return {
+                level: 5,
+                code: 'L5_CHAIRMAN',
+                role: 'CHAIRMAN',
+                name: 'Chairman / Board of Directors',
+                shortName: 'Chairman & Board',
+                thresholdLabel: 'Mega CAPEX > $500K (> ₹4.15 Cr)',
+                usdRange: '> $500K',
+                inrRange: '> ₹4.15 Cr',
+                scope: 'Consolidated Multi-Hospital P&L, Mega CAPEX >$500K, Strategic Direction, Mergers/Acquisitions, Major Capital Infusions',
+                bg: '#ffebee',
+                border: '#c62828',
+                color: '#b71c1c',
+                badgeStyle: 'background:#ffebee;color:#b71c1c;border:1px solid #ef5350;',
+                icon: '👑'
+            };
+        }
+        if (cat.indexOf('100k - 500k') !== -1 || cat.indexOf('100k-$500k') !== -1 || cat.indexOf('high-value capex') !== -1 || usd >= 100000) {
+            return {
+                level: 4,
+                code: 'L4_VICE_CHAIRMAN',
+                role: 'VICE_CHAIRMAN',
+                name: 'Vice Chairman',
+                shortName: 'Vice Chairman',
+                thresholdLabel: 'Strategic Projects, CAPEX $100K - $500K (₹83L - ₹4.15 Cr)',
+                usdRange: '$100K - $500K',
+                inrRange: '₹83L - ₹4.15 Cr',
+                scope: 'Operational Oversight, High-Value CAPEX, Strategic Projects, Annual Budget Sign-off',
+                bg: '#f3e5f5',
+                border: '#7b1fa2',
+                color: '#4a148c',
+                badgeStyle: 'background:#f3e5f5;color:#4a148c;border:1px solid #ab47bc;',
+                icon: '👔'
+            };
+        }
+        if (cat.indexOf('25k - 100k') !== -1 || cat.indexOf('25k-$100k') !== -1 || cat.indexOf('opex override') !== -1 || usd >= 25000) {
+            return {
+                level: 3,
+                code: 'L3_MD',
+                role: 'MD',
+                name: 'Managing Director (MD)',
+                shortName: 'Managing Director',
+                thresholdLabel: 'OPEX Overrides, CAPEX $25K - $100K (₹20.75L - ₹83L)',
+                usdRange: '$25K - $100K',
+                inrRange: '₹20.75L - ₹83L',
+                scope: 'Hospital Operations & Clinical Growth, Doctor Contracts, Departmental Budgets',
+                bg: '#fff3e0',
+                border: '#f57c00',
+                color: '#e65100',
+                badgeStyle: 'background:#fff3e0;color:#e65100;border:1px solid #ffb74d;',
+                icon: '🏥'
+            };
+        }
+        if (cat.indexOf('5k - 25k') !== -1 || cat.indexOf('5k-$25k') !== -1 || cat.indexOf('budget approval') !== -1 || usd >= 5000) {
+            return {
+                level: 2,
+                code: 'L2_CFO',
+                role: 'CFO',
+                name: 'Chief Financial Officer (CFO)',
+                shortName: 'CFO',
+                thresholdLabel: 'Budget Approvals, Payments $5K - $25K (₹4.15L - ₹20.75L)',
+                usdRange: '$5K - $25K',
+                inrRange: '₹4.15L - ₹20.75L',
+                scope: 'Financial Strategy, Cash Runway, RCM, Tax Strategy & Treasury Management',
+                bg: '#e8f5e9',
+                border: '#2e7d32',
+                color: '#1b5e20',
+                badgeStyle: 'background:#e8f5e9;color:#1b5e20;border:1px solid #66bb6a;',
+                icon: '💼'
+            };
+        }
+        return {
+            level: 1,
+            code: 'L1_ACCOUNTANT',
+            role: 'CHIEF_ACCOUNTANT',
+            name: 'Chief Accountant',
+            shortName: 'Chief Accountant',
+            thresholdLabel: 'Entries, Reconciliations, Payments < $5K (< ₹4.15L)',
+            usdRange: '< $5K',
+            inrRange: '< ₹4.15L',
+            scope: 'Transaction Execution, Verification, Book Closing, Vouchers & Initial Sign-off',
+            bg: '#e3f2fd',
+            border: '#1976d2',
+            color: '#0d47a1',
+            badgeStyle: 'background:#e3f2fd;color:#0d47a1;border:1px solid #42a5f5;',
+            icon: '📝'
+        };
+    }
 
     /* ── Initial Seed Data Getters with Persistent Fallbacks ── */
     function _getExecKpis() {
@@ -25,13 +123,13 @@
         var items = DB.get('cfo_approvals_v2');
         if (!Array.isArray(items) || items.length === 0) {
             items = [
-                { id: 'PO-301', category: 'Vendor Invoice ($5K-$25K)', amount: 450000, vendorOrPatient: 'Sun Pharma Distributors', dept: 'Pharmacy', reason: 'Bulk antibiotic stock invoice clearance', status: 'pending', date: '2026-08-24' },
-                { id: 'PO-302', category: 'Vendor Invoice ($5K-$25K)', amount: 1250000, vendorOrPatient: 'Medtronic India', dept: 'Cardiology', reason: 'Stent inventory invoice payment', status: 'pending', date: '2026-08-24' },
-                { id: 'PO-303', category: 'Vendor Invoice ($5K-$25K)', amount: 680000, vendorOrPatient: 'Olympus Medical', dept: 'Endoscopy', reason: 'Endoscope maintenance contract', status: 'pending', date: '2026-08-24' },
-                { id: 'DSC-101', category: 'Patient Discount Request', amount: 45000, vendorOrPatient: 'Patient: Suresh Kumar', dept: 'IPD Billing', reason: 'Hardship waiver for extended ICU stay', status: 'pending', date: '2026-08-24' },
-                { id: 'DSC-102', category: 'Patient Discount Request', amount: 18500, vendorOrPatient: 'Patient: Meena Sharma', dept: 'OPD Billing', reason: 'Staff relative concession', status: 'pending', date: '2026-08-23' },
-                { id: 'DOC-501', category: 'Doctor Payout Release Batch', amount: 1423000, vendorOrPatient: 'Monthly Doctor Batch (18 Docs)', dept: 'Finance', reason: 'August doctor fee-sharing disbursement', status: 'pending', date: '2026-08-24' },
-                { id: 'WRT-201', category: 'Bad Debt Write-Off', amount: 32000, vendorOrPatient: 'Patient: Unknown / Default', dept: 'Emergency', reason: 'Uncollectible MLC emergency care debt write-off', status: 'pending', date: '2026-08-22' }
+                { id: 'REQ-101', category: 'Voucher Sign-off (<$5K)', amount: 180000, vendorOrPatient: 'Apex Lab Supplies', dept: 'Pathology', reason: 'Routine reagent voucher & verification clearance', status: 'pending', date: '2026-08-25' },
+                { id: 'REQ-201', category: 'Vendor Invoice ($5K-$25K)', amount: 1250000, vendorOrPatient: 'Sun Pharma Distributors', dept: 'Pharmacy', reason: 'Bulk antibiotic stock invoice clearance', status: 'pending', date: '2026-08-24' },
+                { id: 'REQ-301', category: 'OPEX Override ($25K-$100K)', amount: 4500000, vendorOrPatient: 'Medtronic India', dept: 'Cardiology', reason: 'Emergency CathLab inventory & OPEX override', status: 'pending', date: '2026-08-24' },
+                { id: 'REQ-401', category: 'Strategic Project ($100K-$500K)', amount: 22500000, vendorOrPatient: 'Olympus Medical Systems', dept: 'Endoscopy', reason: 'High-Value 4K Endoscopy Tower & OT Upgrade', status: 'pending', date: '2026-08-24' },
+                { id: 'REQ-501', category: 'Mega CAPEX (> $500K)', amount: 68000000, vendorOrPatient: 'Siemens Healthineers', dept: 'Radiology & Oncology', reason: 'Consolidated PET-CT & Radiotherapy Linear Accelerator Infusion', status: 'pending', date: '2026-08-22' },
+                { id: 'DSC-101', category: 'Patient Concession Waiver', amount: 45000, vendorOrPatient: 'Patient: Suresh Kumar', dept: 'IPD Billing', reason: 'Hardship waiver for extended ICU stay', status: 'pending', date: '2026-08-24' },
+                { id: 'DOC-501', category: 'Doctor Payout Release Batch', amount: 1423000, vendorOrPatient: 'Monthly Doctor Batch (18 Docs)', dept: 'Finance', reason: 'August doctor fee-sharing disbursement', status: 'pending', date: '2026-08-24' }
             ];
             DB.set('cfo_approvals_v2', items);
         }
@@ -368,52 +466,248 @@
     }
 
     /* ──────────────────────────────────────────────────────────
-       MODULE 4: 📥 Approval Inbox
+       MODULE 0: 🏛️ Executive Approval Hierarchy & Governance Diagram
+    ────────────────────────────────────────────────────────── */
+    function _renderHierarchyTab() {
+        var approvals = _getApprovals();
+        var tiers = [
+            {
+                level: 5,
+                roleTitle: 'CHAIRMAN / BOARD OF DIRECTORS',
+                subtitle: 'Strategic Direction, Mergers/Acquisitions, Major Capital Infusions',
+                limitText: 'Consolidated Multi-Hospital P&L, Mega CAPEX > $500K (> ₹4.15 Cr)',
+                usdThreshold: '> $500,000',
+                inrThreshold: '> ₹4.15 Crores',
+                color: '#b71c1c',
+                bgGradient: 'linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%)',
+                borderColor: '#ef5350',
+                icon: '👑',
+                responsibilities: ['Consolidated Multi-Hospital P&L', 'Mega CAPEX (> $500K)', 'Strategic Direction & Expansion', 'Mergers & Acquisitions', 'Major Capital Infusions']
+            },
+            {
+                level: 4,
+                roleTitle: 'VICE CHAIRMAN',
+                subtitle: 'Operational Oversight, High-Value CAPEX, Annual Budget Sign-off',
+                limitText: 'Strategic Projects, CAPEX $100K - $500K (₹83L - ₹4.15 Cr)',
+                usdThreshold: '$100,000 - $500,000',
+                inrThreshold: '₹83 Lakhs - ₹4.15 Crores',
+                color: '#4a148c',
+                bgGradient: 'linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%)',
+                borderColor: '#ab47bc',
+                icon: '👔',
+                responsibilities: ['Operational Oversight', 'High-Value CAPEX ($100K-$500K)', 'Strategic Hospital Projects', 'Annual Operating Budget Sign-off']
+            },
+            {
+                level: 3,
+                roleTitle: 'MANAGING DIRECTOR (MD)',
+                subtitle: 'Hospital Operations & Clinical Growth, Doctor Contracts & Departmental Budgets',
+                limitText: 'OPEX Overrides, CAPEX $25K - $100K (₹20.75L - ₹83L)',
+                usdThreshold: '$25,000 - $100,000',
+                inrThreshold: '₹20.75 Lakhs - ₹83 Lakhs',
+                color: '#e65100',
+                bgGradient: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
+                borderColor: '#ffa726',
+                icon: '🏥',
+                responsibilities: ['Hospital Operations & Clinical Growth', 'Doctor Contracts & Consultations', 'Departmental Budgets', 'OPEX Overrides & CAPEX ($25K-$100K)']
+            },
+            {
+                level: 2,
+                roleTitle: 'CHIEF FINANCIAL OFFICER (CFO)',
+                subtitle: 'Financial Strategy, Cash Runway, RCM, Tax Strategy & Treasury Management',
+                limitText: 'Budget Approvals, Payments $5K - $25K (₹4.15L - ₹20.75L)',
+                usdThreshold: '$5,000 - $25,000',
+                inrThreshold: '₹4.15 Lakhs - ₹20.75 Lakhs',
+                color: '#1b5e20',
+                bgGradient: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)',
+                borderColor: '#66bb6a',
+                icon: '💼',
+                responsibilities: ['Financial Strategy & Risk Control', 'Cash Runway & Treasury Management', 'Revenue Cycle Management (RCM)', 'Tax Strategy, Budget Approvals & Payments ($5K-$25K)']
+            },
+            {
+                level: 1,
+                roleTitle: 'CHIEF ACCOUNTANT',
+                subtitle: 'Transaction Execution, Verification, Book Closing, Vouchers & Initial Sign-off',
+                limitText: 'Entries, Reconciliations, Payments < $5K (< ₹4.15L)',
+                usdThreshold: '< $5,000',
+                inrThreshold: '< ₹4.15 Lakhs',
+                color: '#0d47a1',
+                bgGradient: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)',
+                borderColor: '#42a5f5',
+                icon: '📝',
+                responsibilities: ['Transaction Execution & Voucher Entry', 'Bank & Ledger Reconciliations', 'Month-End Book Closing', 'Initial Payment Sign-offs (< $5K)']
+            }
+        ];
+
+        var currentUser = AUTH.currentUser();
+        var uRole = (currentUser ? currentUser.role || '' : '').toUpperCase();
+
+        var html = '<div class="card" style="padding:22px;margin-bottom:24px;border:2px solid #1a73e8;background:var(--card);">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">'
+            + '<div>'
+            + '<h3 style="font-size:20px;font-weight:800;margin:0;color:var(--text);display:flex;align-items:center;gap:8px;">'
+            + '<span>🏛️ Executive Approval Hierarchy & Authority Governance Matrix</span>'
+            + '</h3>'
+            + '<div style="font-size:13px;color:var(--gray);margin-top:4px;">Multi-tier financial authorization thresholds, delegation of authority limits, and escalation routing rules.</div>'
+            + '</div>'
+            + '<div style="display:flex;gap:8px;">'
+            + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddApprovalModal()">➕ Add Requisition Entry</button>'
+            + '<button class="btn btn-sm btn-outline" onclick="CfoPortal.openHierarchyHelpModal()">ℹ️ Governance Rules</button>'
+            + '</div>'
+            + '</div>'
+
+            + '<div style="background:var(--light-gray);padding:14px;border-radius:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px;">'
+            + '<div><strong style="color:var(--text);">Current Active User Role:</strong> <span style="background:#1a73e8;color:#fff;padding:4px 10px;border-radius:6px;font-weight:700;font-size:12px;">' + (uRole || 'ADMIN / CFO') + '</span></div>'
+            + '<div style="font-size:12px;color:var(--gray);">Automatic routing assigns requisitions to the lowest executive level possessing sufficient financial threshold.</div>'
+            + '</div>'
+
+            + '<div style="max-width:960px;margin:0 auto;display:flex;flex-direction:column;align-items:center;">';
+
+        tiers.forEach(function (t, idx) {
+            var matchingReqs = approvals.filter(function (a) {
+                var info = _getAuthorityTier(a.amount, a.category);
+                return info.level === t.level;
+            });
+            var pendingCount = matchingReqs.filter(function (a) { return a.status === 'pending'; }).length;
+            var pendingValue = matchingReqs.filter(function (a) { return a.status === 'pending'; }).reduce(function (s, a) { return s + a.amount; }, 0);
+
+            html += '<div style="width:100%;background:' + t.bgGradient + ';border:2px solid ' + t.borderColor + ';border-radius:16px;padding:20px 24px;box-shadow:0 6px 18px rgba(0,0,0,0.06);position:relative;transition:transform 0.2s;" onmouseenter="this.style.transform=\'translateY(-2px)\'" onmouseleave="this.style.transform=\'translateY(0)\'">'
+                + '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:12px;">'
+                + '<div style="display:flex;align-items:center;gap:12px;">'
+                + '<div style="width:48px;height:48px;border-radius:12px;background:#ffffff;box-shadow:0 3px 8px rgba(0,0,0,0.1);display:flex;align-items:center;justify-content:center;font-size:24px;">' + t.icon + '</div>'
+                + '<div>'
+                + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+                + '<h4 style="font-size:18px;font-weight:800;color:' + t.color + ';margin:0;">' + t.roleTitle + '</h4>'
+                + '<span style="background:' + t.color + ';color:#ffffff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;">Level ' + t.level + '</span>'
+                + '</div>'
+                + '<div style="font-size:13px;font-weight:600;color:#333;margin-top:2px;">' + t.subtitle + '</div>'
+                + '</div>'
+                + '</div>'
+
+                + '<div style="text-align:right;">'
+                + '<div style="font-size:12px;font-weight:700;color:' + t.color + ';text-transform:uppercase;letter-spacing:0.5px;">Financial Limit / Threshold</div>'
+                + '<div style="font-size:15px;font-weight:800;color:#111;">' + t.usdThreshold + ' <span style="font-size:12px;color:#555;">(' + t.inrThreshold + ')</span></div>'
+                + '</div>'
+                + '</div>'
+
+                + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-top:14px;background:rgba(255,255,255,0.7);padding:14px;border-radius:12px;border:1px solid ' + t.borderColor + '40;">'
+                + '<div>'
+                + '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;">Core Governance & Scope</div>'
+                + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">'
+                + t.responsibilities.map(function (r) {
+                    return '<span style="background:#ffffff;border:1px solid ' + t.borderColor + '60;color:' + t.color + ';font-size:11px;font-weight:600;padding:2px 7px;border-radius:6px;">' + r + '</span>';
+                }).join('')
+                + '</div>'
+                + '</div>'
+
+                + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">'
+                + '<div>'
+                + '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;">Requisition Queue Status</div>'
+                + '<div style="font-size:14px;font-weight:800;color:' + (pendingCount > 0 ? t.color : '#2e7d32') + ';margin-top:2px;">'
+                + (pendingCount > 0 ? '⏳ ' + pendingCount + ' Pending (' + _formatCurrency(pendingValue) + ')' : '✅ Queue Clear (0 Pending)')
+                + '</div>'
+                + '</div>'
+
+                + '<button class="btn btn-sm" style="background:' + t.color + ';color:#ffffff;font-weight:700;padding:6px 12px;border-radius:8px;" onclick="CfoPortal.filterInboxByTier(' + t.level + ')">📥 View Tier Requisitions</button>'
+                + '</div>'
+                + '</div>'
+                + '</div>';
+
+            if (idx < tiers.length - 1) {
+                html += '<div style="display:flex;flex-direction:column;align-items:center;margin:10px 0;">'
+                    + '<div style="width:3px;height:24px;background:linear-gradient(to bottom, ' + t.color + ', ' + tiers[idx + 1].color + ');"></div>'
+                    + '<div style="font-size:18px;line-height:1;color:var(--primary);margin-top:-4px;">▲</div>'
+                    + '<div style="font-size:10px;font-weight:800;color:var(--gray);text-transform:uppercase;letter-spacing:1px;margin-top:2px;">Escalation Pathway</div>'
+                    + '</div>';
+            }
+        });
+
+        html += '</div></div>';
+        return html;
+    }
+
+    /* ──────────────────────────────────────────────────────────
+       MODULE 4: 📥 Approval Inbox (Multi-Tier Authority Thresholds)
     ────────────────────────────────────────────────────────── */
     function _renderApprovalsTab() {
         var approvals = _getApprovals();
+
+        var filteredApprovals = approvals.filter(function (a) {
+            if (_approvalTierFilter === 'all') return true;
+            var info = _getAuthorityTier(a.amount, a.category);
+            return info.level === Number(_approvalTierFilter);
+        });
+
         var pendingCount = approvals.filter(function (a) { return a.status === 'pending'; }).length;
         var pendingValue = approvals.filter(function (a) { return a.status === 'pending'; }).reduce(function (s, a) { return s + a.amount; }, 0);
 
+        var tierButtons = [
+            { id: 'all', label: 'All Tiers', color: '#1a73e8' },
+            { id: '1', label: '📝 L1 Chief Accountant (<$5K)', color: '#0d47a1' },
+            { id: '2', label: '💼 L2 CFO ($5K-$25K)', color: '#1b5e20' },
+            { id: '3', label: '🏥 L3 MD ($25K-$100K)', color: '#e65100' },
+            { id: '4', label: '👔 L4 Vice Chairman ($100K-$500K)', color: '#7b1fa2' },
+            { id: '5', label: '👑 L5 Chairman (>$500K)', color: '#b71c1c' }
+        ].map(function (tb) {
+            var active = _approvalTierFilter.toString() === tb.id;
+            return '<button onclick="CfoPortal.setApprovalTierFilter(\'' + tb.id + '\')"'
+                + ' style="padding:6px 12px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;'
+                + (active ? 'background:' + tb.color + ';color:#fff;box-shadow:0 2px 6px ' + tb.color + '40;' : 'background:var(--card);color:var(--text);border:1px solid var(--border);')
+                + '">' + tb.label + '</button>';
+        }).join('');
+
         var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:20px;">'
-            + _kpiCard('📥', 'Pending Approval Inbox', pendingCount + ' Requisitions', 'Requires CFO Decision', '#f57f17')
-            + _kpiCard('💵', 'Total Pending Value', _formatCurrency(pendingValue), 'CFO Financial Requisitions', '#1a73e8')
-            + _kpiCard('🏢', 'Total Requisitions', approvals.length + ' Items', 'Active Approval Queue', '#6a1b9a')
+            + _kpiCard('📥', 'Pending Approval Inbox', pendingCount + ' Requisitions', 'Requires Authorized Decision', '#f57f17')
+            + _kpiCard('💵', 'Total Pending Value', _formatCurrency(pendingValue), 'Queued Across Authority Tiers', '#1a73e8')
+            + _kpiCard('🏛️', 'Authority Governance', '5 Executive Tiers', 'Threshold Enforcement Active', '#6a1b9a')
             + _kpiCard('✅', 'Approved Requisitions', approvals.filter(function (a) { return a.status === 'approved'; }).length + ' Items', 'Processed Requests', '#2e7d32')
+            + '</div>'
+
+            + '<div class="card" style="padding:18px;margin-bottom:20px;">'
+            + '<div style="font-weight:700;font-size:14px;margin-bottom:8px;color:var(--text);">🏛️ Filter Approval Queue by Executive Authority Threshold</div>'
+            + '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + tierButtons + '</div>'
             + '</div>'
 
             + '<div class="card" style="padding:18px;">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
-            + '<div style="font-weight:700;font-size:15px;">📥 CFO Approval Inbox (Queue: ' + approvals.length + ')</div>'
+            + '<div style="font-weight:700;font-size:15px;">📥 Multi-Tier Approval Inbox (' + filteredApprovals.length + ' Shown / ' + approvals.length + ' Total)</div>'
             + '<div style="display:flex;gap:8px;">'
             + '<button class="btn btn-sm btn-primary" onclick="CfoPortal.openAddApprovalModal()">➕ Add Requisition Entry</button>'
             + '<button class="btn btn-sm btn-success" onclick="CfoPortal.approveAllPending()">✓ Approve All Pending</button>'
             + '</div>'
             + '</div>'
             + '<div class="table-responsive"><table>'
-            + '<thead><tr><th>Req ID</th><th>Approval Category</th><th>Amount (₹)</th><th>Party / Vendor / Patient</th><th>Department</th><th>Justification Reason</th><th>Status</th><th>Decision / Data Control</th></tr></thead>'
+            + '<thead><tr><th>Req ID</th><th>Required Authority Tier</th><th>Category</th><th>Amount (₹)</th><th>Party / Vendor / Patient</th><th>Department</th><th>Status</th><th>Decision & Escalation Actions</th></tr></thead>'
             + '<tbody>';
 
-        approvals.forEach(function (a, idx) {
-            html += '<tr>'
-                + '<td><strong>' + a.id + '</strong></td>'
-                + '<td>' + _badge(a.category, 'info') + '</td>'
-                + '<td style="font-weight:700;color:#1a73e8;">' + _formatCurrency(a.amount) + '</td>'
-                + '<td>' + a.vendorOrPatient + '</td>'
-                + '<td>' + a.dept + '</td>'
-                + '<td style="font-size:12px;max-width:220px;">' + a.reason + '</td>'
-                + '<td>' + _badge(a.status.toUpperCase(), a.status === 'approved' ? 'success' : a.status === 'rejected' ? 'danger' : 'warning') + '</td>'
-                + '<td>'
-                + '<div style="display:flex;gap:4px;flex-wrap:wrap;">'
-                + (a.status === 'pending'
-                    ? '<button class="btn btn-sm btn-success" style="font-size:11px;padding:3px 8px;" onclick="CfoPortal.processApprovalV2(' + idx + ',\'approved\')">✓ Approve</button>'
-                    + '<button class="btn btn-sm btn-warning" style="font-size:11px;padding:3px 8px;" onclick="CfoPortal.processApprovalV2(' + idx + ',\'rejected\')">✗ Reject</button>'
-                    : '<span style="font-size:11px;color:var(--gray);align-self:center;">Processed</span>')
-                + '<button class="btn btn-sm btn-danger" style="font-size:11px;padding:3px 8px;" onclick="CfoPortal.deleteApproval(' + idx + ')">🗑️ Remove Entry</button>'
-                + '</div>'
-                + '</td>'
-                + '</tr>';
-        });
+        if (filteredApprovals.length === 0) {
+            html += '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--gray);">No requisitions found in this authority tier.</td></tr>';
+        } else {
+            filteredApprovals.forEach(function (a) {
+                var realIdx = approvals.indexOf(a);
+                var tierInfo = _getAuthorityTier(a.amount, a.category);
+
+                html += '<tr>'
+                    + '<td><strong>' + a.id + '</strong></td>'
+                    + '<td><span style="' + tierInfo.badgeStyle + 'font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;">'
+                    + tierInfo.icon + ' L' + tierInfo.level + ': ' + tierInfo.shortName + '</span></td>'
+                    + '<td>' + _badge(a.category, 'info') + '</td>'
+                    + '<td style="font-weight:700;color:#1a73e8;">' + _formatCurrency(a.amount) + '</td>'
+                    + '<td>' + a.vendorOrPatient + '</td>'
+                    + '<td>' + a.dept + '</td>'
+                    + '<td>' + _badge(a.status.toUpperCase(), a.status === 'approved' ? 'success' : a.status === 'rejected' ? 'danger' : 'warning') + '</td>'
+                    + '<td>'
+                    + '<div style="display:flex;gap:4px;flex-wrap:wrap;">'
+                    + (a.status === 'pending'
+                        ? '<button class="btn btn-sm btn-success" style="font-size:11px;padding:3px 8px;" onclick="CfoPortal.processApprovalV2(' + realIdx + ',\'approved\')">✓ Approve (L' + tierInfo.level + ')</button>'
+                        + (tierInfo.level < 5 ? '<button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px;border-color:#7b1fa2;color:#7b1fa2;" onclick="CfoPortal.escalateApproval(' + realIdx + ')">⬆️ Escalate</button>' : '')
+                        + '<button class="btn btn-sm btn-warning" style="font-size:11px;padding:3px 8px;" onclick="CfoPortal.processApprovalV2(' + realIdx + ',\'rejected\')">✗ Reject</button>'
+                        : '<span style="font-size:11px;color:var(--gray);align-self:center;">Processed</span>')
+                    + '<button class="btn btn-sm btn-danger" style="font-size:11px;padding:3px 8px;" onclick="CfoPortal.deleteApproval(' + realIdx + ')">🗑️ Remove</button>'
+                    + '</div>'
+                    + '</td>'
+                    + '</tr>';
+            });
+        }
 
         html += '</tbody></table></div></div>';
         return html;
@@ -563,12 +857,13 @@
         var uRole = (user.role || '').toString().trim().toLowerCase();
         var uPost = (user.post || user.designation || '').toString().trim().toLowerCase();
         var uName = (user.username || '').toString().trim().toLowerCase();
-        var isCfoOrAdmin = uRole === 'cfo' || uRole.indexOf('cfo') !== -1 || uPost.indexOf('cfo') !== -1 || uName.indexOf('cfo') !== -1 || uRole === 'admin' || user.isSuperAdmin || (user.permissions && user.permissions.includes('cfo-portal'));
+        var allowedRoles = ['cfo', 'chief_accountant', 'md', 'vice_chairman', 'chairman', 'executive', 'director', 'admin', 'super_admin'];
+        var isCfoOrAdmin = user.isSuperAdmin || uRole === 'admin' || allowedRoles.indexOf(uRole) !== -1 || uPost.indexOf('cfo') !== -1 || uName.indexOf('cfo') !== -1 || (user.permissions && user.permissions.includes('cfo-portal'));
         if (!isCfoOrAdmin) {
             container.innerHTML = '<div class="card" style="text-align:center;padding:40px;">'
                 + '<div style="font-size:48px;margin-bottom:12px;">🔒</div>'
-                + '<h3 style="margin-bottom:8px;">CFO Access Restricted</h3>'
-                + '<p style="color:var(--gray);font-size:14px;">The CFO Workspace is strictly reserved for Chief Financial Officer (CFO) accounts.</p>'
+                + '<h3 style="margin-bottom:8px;">CFO & Executive Access Restricted</h3>'
+                + '<p style="color:var(--gray);font-size:14px;">The Executive Financial Workspace is strictly reserved for Executive & Financial Officer accounts.</p>'
                 + '<button class="btn btn-primary" style="margin-top:16px;" onclick="Router.navigate(\'' + (user.role === 'hod' ? 'hod-dashboard' : 'employee-dashboard') + '\')">← Back to My Dashboard</button>'
                 + '</div>';
             return;
@@ -577,6 +872,7 @@
         _destroyCharts();
 
         var TABS = [
+            { id: 'hierarchy', label: '🏛️ Approval Hierarchy & Governance', color: '#0d47a1' },
             { id: 'executive', label: '📊 Executive Dashboard', color: '#1a73e8' },
             { id: 'rcm', label: '💳 Revenue Cycle & Payer Analytics', color: '#2e7d32' },
             { id: 'unit_economics', label: '🏥 Unit Economics & Costing', color: '#6a1b9a' },
@@ -598,11 +894,12 @@
             + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
             + '<div>'
             + '<div style="font-size:15px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:6px;">'
-            + '<span>⚡ CFO Workspace Data Entry & Data Removal Controls</span>'
+            + '<span>⚡ CFO Workspace Data Entry & Authority Control Bar</span>'
             + '</div>'
-            + '<div style="font-size:12px;color:var(--gray);margin-top:2px;">Click any button below to Add new data entries or use the 🗑️ Delete buttons in tables to remove data.</div>'
+            + '<div style="font-size:12px;color:var(--gray);margin-top:2px;">Add new financial requisitions or click 🏛️ Governance Rules to inspect executive authority thresholds.</div>'
             + '</div>'
             + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+            + '<button class="btn btn-primary" style="background:#0d47a1;font-weight:700;padding:8px 14px;" onclick="CfoPortal.openHierarchyHelpModal()">🏛️ Governance Matrix</button>'
             + '<button class="btn btn-primary" style="background:#1a73e8;font-weight:700;padding:8px 14px;" onclick="CfoPortal.openAddApprovalModal()">➕ Add Requisition</button>'
             + '<button class="btn btn-primary" style="background:#2e7d32;font-weight:700;padding:8px 14px;" onclick="CfoPortal.openAddClaimModal()">➕ Add Claim Denial</button>'
             + '<button class="btn btn-primary" style="background:#6a1b9a;font-weight:700;padding:8px 14px;" onclick="CfoPortal.openAddSpecialtyModal()">➕ Add Specialty Costing</button>'
@@ -616,8 +913,8 @@
             + '<div style="display:flex;align-items:center;gap:14px;">'
             + '<div style="width:52px;height:52px;border-radius:12px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:26px;">🏥</div>'
             + '<div>'
-            + '<h2 style="font-size:22px;font-weight:800;margin:0;">CFO Workspace</h2>'
-            + '<div style="font-size:13px;opacity:0.85;margin-top:2px;">Executive Dashboard, Revenue Cycle, Unit Economics, Approvals Inbox, Board Submissions & Governance</div>'
+            + '<h2 style="font-size:22px;font-weight:800;margin:0;">CFO & Executive Financial Workspace</h2>'
+            + '<div style="font-size:13px;opacity:0.85;margin-top:2px;">5-Tier Financial Governance Matrix, Multi-Level Approval Inbox & Executive Analytics</div>'
             + '</div>'
             + '</div>'
             + '<div style="display:flex;align-items:center;gap:10px;">'
@@ -638,7 +935,8 @@
         var contentEl = document.getElementById('cfoTabContent');
         if (!contentEl) return;
 
-        if (_activeTab === 'executive') contentEl.innerHTML = _renderExecutiveTab();
+        if (_activeTab === 'hierarchy') contentEl.innerHTML = _renderHierarchyTab();
+        else if (_activeTab === 'executive') contentEl.innerHTML = _renderExecutiveTab();
         else if (_activeTab === 'rcm') contentEl.innerHTML = _renderRcmTab();
         else if (_activeTab === 'unit_economics') contentEl.innerHTML = _renderUnitEconomicsTab();
         else if (_activeTab === 'approvals') contentEl.innerHTML = _renderApprovalsTab();
@@ -648,6 +946,60 @@
 
     /* ── Export & Interactive Action Methods (Add, Edit, Remove) ── */
     window.CfoPortal = {
+        setApprovalTierFilter: function (tier) {
+            _approvalTierFilter = tier;
+            _renderActiveTabContent();
+        },
+
+        filterInboxByTier: function (level) {
+            _approvalTierFilter = level.toString();
+            _activeTab = 'approvals';
+            var container = document.getElementById('app') || document.body;
+            renderCfoPortal(container);
+        },
+
+        escalateApproval: function (index) {
+            var approvals = _getApprovals();
+            if (approvals[index]) {
+                var req = approvals[index];
+                var currentTier = _getAuthorityTier(req.amount, req.category);
+                var nextLevel = Math.min(5, currentTier.level + 1);
+                var nextTier = _getAuthorityTier(nextLevel === 5 ? 500000 * 83 : nextLevel === 4 ? 100000 * 83 : 25000 * 83, '');
+
+                req.reason += ' [Escalated from L' + currentTier.level + ' to L' + nextLevel + ']';
+                DB.set('cfo_approvals_v2', approvals);
+                APP.notify('Requisition ' + req.id + ' escalated to Level ' + nextLevel + ' (' + nextTier.name + ')', 'warning');
+                _renderActiveTabContent();
+            }
+        },
+
+        openHierarchyHelpModal: function () {
+            var modalHtml = '<div class="modal-overlay" style="display:flex;align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;">'
+                + '<div class="modal-card" style="background:var(--card);padding:24px;border-radius:16px;width:100%;max-width:650px;box-shadow:0 10px 30px rgba(0,0,0,0.3);max-height:85vh;overflow-y:auto;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
+                + '<h3 style="margin:0;font-size:18px;font-weight:700;">🏛️ Executive Governance & Financial Delegation Rules</h3>'
+                + '<button class="btn btn-sm btn-outline" onclick="CfoPortal.closeModal()">✕</button>'
+                + '</div>'
+                + '<div style="font-size:13px;line-height:1.6;color:var(--text);">'
+                + '<p><strong>Financial Approval Threshold Matrix Policy:</strong></p>'
+                + '<ul style="padding-left:20px;margin-bottom:16px;">'
+                + '<li><strong>Level 1 — Chief Accountant:</strong> Transaction execution, entries, reconciliations, and routine vendor payments below <strong>$5K (₹4.15 Lakhs)</strong>.</li>'
+                + '<li><strong>Level 2 — Chief Financial Officer (CFO):</strong> Treasury management, cash runway, RCM strategy, budget approvals, and payments between <strong>$5K - $25K (₹4.15L - ₹20.75L)</strong>.</li>'
+                + '<li><strong>Level 3 — Managing Director (MD):</strong> Clinical ops, departmental budgets, doctor fee-share contracts, OPEX overrides, and CAPEX entries between <strong>$25K - $100K (₹20.75L - ₹83L)</strong>.</li>'
+                + '<li><strong>Level 4 — Vice Chairman:</strong> Strategic expansion projects, high-value medical CAPEX, and annual operating budget sign-offs between <strong>$100K - $500K (₹83L - ₹4.15 Cr)</strong>.</li>'
+                + '<li><strong>Level 5 — Chairman / Board of Directors:</strong> Mega CAPEX exceeding <strong>$500K (> ₹4.15 Cr)</strong>, multi-hospital consolidated P&L, M&A, and major equity/capital infusions.</li>'
+                + '</ul>'
+                + '<div style="background:#e3f2fd;padding:12px;border-radius:8px;color:#0d47a1;font-weight:600;font-size:12px;">'
+                + '💡 Automatic Escalation: Requisitions submitted above an officer\'s individual authority limit are flagged and escalated automatically to the next tier inbox.'
+                + '</div>'
+                + '</div>'
+                + '<div style="display:flex;justify-content:flex-end;margin-top:18px;">'
+                + '<button class="btn btn-primary" onclick="CfoPortal.closeModal()">Understood</button>'
+                + '</div></div></div>';
+
+            var host = document.getElementById('cfoModalHost');
+            if (host) host.innerHTML = modalHtml;
+        },
         switchTab: function (tabId, btn) {
             _activeTab = tabId;
             var bar = document.getElementById('cfoTabBar');
@@ -756,18 +1108,29 @@
 
         openAddApprovalModal: function () {
             var modalHtml = '<div class="modal-overlay" style="display:flex;align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;">'
-                + '<div class="modal-card" style="background:var(--card);padding:24px;border-radius:16px;width:100%;max-width:480px;box-shadow:0 10px 30px rgba(0,0,0,0.3);">'
+                + '<div class="modal-card" style="background:var(--card);padding:24px;border-radius:16px;width:100%;max-width:500px;box-shadow:0 10px 30px rgba(0,0,0,0.3);">'
                 + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
                 + '<h3 style="margin:0;font-size:18px;font-weight:700;">➕ Add Requisition to Approval Inbox</h3>'
                 + '<button class="btn btn-sm btn-outline" onclick="CfoPortal.closeModal()">✕</button>'
                 + '</div>'
                 + '<form onsubmit="CfoPortal.saveAddApproval(event)">'
-                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Category</label>'
-                + '<select id="cfoAddCategory" class="form-control" required><option>Vendor Invoice ($5K-$25K)</option><option>Patient Discount Request</option><option>Doctor Payout Release Batch</option><option>Bad Debt Write-Off</option></select></div>'
-                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Amount (₹)</label><input type="number" id="cfoAddAmount" class="form-control" placeholder="45000" required /></div>'
-                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Party / Vendor / Patient Name</label><input type="text" id="cfoAddParty" class="form-control" placeholder="Vendor / Patient Name" required /></div>'
-                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Department</label><input type="text" id="cfoAddDept" class="form-control" placeholder="Pharmacy / Billing" required /></div>'
-                + '<div class="form-group" style="margin-bottom:16px;"><label style="font-size:12px;font-weight:600;">Justification Reason</label><textarea id="cfoAddReason" class="form-control" rows="2" placeholder="Brief reason..." required></textarea></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Approval Category & Authority Scope</label>'
+                + '<select id="cfoAddCategory" class="form-control" onchange="CfoPortal.updateModalTierPreview()" required>'
+                + '<option value="Voucher Sign-off (<$5K)">📝 L1 Chief Accountant — Voucher / Payment (<$5K)</option>'
+                + '<option value="Vendor Invoice ($5K-$25K)">💼 L2 CFO — Vendor Invoice / Payment ($5K-$25K)</option>'
+                + '<option value="OPEX Override ($25K-$100K)">🏥 L3 MD — OPEX Override / CAPEX ($25K-$100K)</option>'
+                + '<option value="Strategic Project ($100K-$500K)">👔 L4 Vice Chairman — Strategic Project CAPEX ($100K-$500K)</option>'
+                + '<option value="Mega CAPEX (> $500K)">👑 L5 Chairman / Board — Mega CAPEX / M&A (> $500K)</option>'
+                + '<option value="Patient Concession Waiver">Patient Concession Waiver</option>'
+                + '<option value="Doctor Payout Release Batch">Doctor Payout Release Batch</option>'
+                + '<option value="Bad Debt Write-Off">Bad Debt Write-Off</option>'
+                + '</select></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Amount (₹)</label>'
+                + '<input type="number" id="cfoAddAmount" class="form-control" placeholder="180000" oninput="CfoPortal.updateModalTierPreview()" required />'
+                + '<div id="cfoModalTierPreview" style="margin-top:6px;font-size:12px;font-weight:700;color:#1a73e8;">Required Authority: L1 Chief Accountant (< $5K)</div></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Party / Vendor / Patient Name</label><input type="text" id="cfoAddParty" class="form-control" placeholder="Vendor / Patient / Contractor Name" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Department</label><input type="text" id="cfoAddDept" class="form-control" placeholder="Pharmacy / Radiology / IPD Billing" required /></div>'
+                + '<div class="form-group" style="margin-bottom:16px;"><label style="font-size:12px;font-weight:600;">Justification Reason</label><textarea id="cfoAddReason" class="form-control" rows="2" placeholder="Provide justification for approval decision..." required></textarea></div>'
                 + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
                 + '<button type="button" class="btn btn-outline" onclick="CfoPortal.closeModal()">Cancel</button>'
                 + '<button type="submit" class="btn btn-primary">Save Requisition</button>'
@@ -775,6 +1138,17 @@
 
             var host = document.getElementById('cfoModalHost');
             if (host) host.innerHTML = modalHtml;
+        },
+
+        updateModalTierPreview: function () {
+            var amtEl = document.getElementById('cfoAddAmount');
+            var catEl = document.getElementById('cfoAddCategory');
+            var prevEl = document.getElementById('cfoModalTierPreview');
+            if (!amtEl || !catEl || !prevEl) return;
+            var amt = Number(amtEl.value) || 0;
+            var cat = catEl.value;
+            var tier = _getAuthorityTier(amt, cat);
+            prevEl.innerHTML = 'Required Authority: <span style="' + tier.badgeStyle + 'padding:2px 6px;border-radius:4px;">' + tier.icon + ' Level ' + tier.level + ': ' + tier.name + ' (' + tier.usdRange + ' / ' + tier.inrRange + ')</span>';
         },
 
         saveAddApproval: function (e) {
@@ -785,13 +1159,23 @@
             var dept = document.getElementById('cfoAddDept').value.trim();
             var reason = document.getElementById('cfoAddReason').value.trim();
 
+            var tier = _getAuthorityTier(amount, category);
             var approvals = _getApprovals();
             var newId = 'REQ-' + (Math.floor(100 + Math.random() * 900));
-            approvals.unshift({ id: newId, category: category, amount: amount, vendorOrPatient: party, dept: dept, reason: reason, status: 'pending', date: new Date().toISOString().slice(0, 10) });
+            approvals.unshift({
+                id: newId,
+                category: category,
+                amount: amount,
+                vendorOrPatient: party,
+                dept: dept,
+                reason: reason + ' [Routed to ' + tier.shortName + ']',
+                status: 'pending',
+                date: new Date().toISOString().slice(0, 10)
+            });
 
             DB.set('cfo_approvals_v2', approvals);
             CfoPortal.closeModal();
-            APP.notify('Requisition ' + newId + ' added to Approval Inbox', 'success');
+            APP.notify('Requisition ' + newId + ' added & routed to Level ' + tier.level + ' (' + tier.shortName + ')', 'success');
             _renderActiveTabContent();
         },
 

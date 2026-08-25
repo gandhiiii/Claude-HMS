@@ -3,6 +3,7 @@
 (function () {
     'use strict';
 
+    var T = (typeof window !== 'undefined' && typeof window.T === 'function') ? window.T : (typeof I18N !== 'undefined' && typeof I18N.t === 'function' ? I18N.t : function (k) { return k; });
     var _activeTab = 'hierarchy';
     var _cfoCharts = [];
     var _approvalTierFilter = 'all';

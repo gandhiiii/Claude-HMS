@@ -1,6 +1,11 @@
 // Employee Dashboard — personal work view, distinct from admin
 // All sections are data-driven; no department hard-coding.
 
+if (typeof window.T !== 'function') {
+    window.T = typeof I18N !== 'undefined' && typeof I18N.t === 'function' ? I18N.t : function (k) { return k; };
+}
+var T = window.T;
+
 var _empTab = 'overview';
 var _empClFilter = 'daily';
 var _empData = {};
