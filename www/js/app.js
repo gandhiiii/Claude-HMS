@@ -134,6 +134,9 @@ const Router = {
         var u = AUTH.currentUser();
         if (!u) { window.location.href = 'index.html'; return; }
         var isAdmin = u.isSuperAdmin || u.role === 'admin';
+        var uRole = (u.role || '').toString().trim().toLowerCase();
+        var isChiefAcc = uRole === 'chief_accountant' || uRole.indexOf('accountant') !== -1 || (u.permissions && u.permissions.includes('chief-accountant-portal'));
+        var isCfoUser = uRole === 'cfo' || uRole.indexOf('cfo') !== -1 || (u.permissions && u.permissions.includes('cfo-portal'));
 
         if (module === 'purchases') {
             window._hodTargetTab = 'purchases';
@@ -141,9 +144,10 @@ const Router = {
         }
 
         // Strict role-based dashboard guard:
-        // Admin dashboard ('dashboard') is strictly restricted to Admin & SuperAdmin
         if (module === 'dashboard' && !isAdmin) {
-            if (u.role === 'hod') module = 'hod-dashboard';
+            if (isChiefAcc) module = 'chief-accountant-portal';
+            else if (isCfoUser) module = 'cfo-portal';
+            else if (u.role === 'hod') module = 'hod-dashboard';
             else if (u.role === 'storekeeper') module = 'storekeeper-dashboard';
             else if (u.role === 'ambulance_employee') module = 'ambulance';
             else module = 'employee-dashboard';

@@ -547,8 +547,26 @@
 
     /* ── Action Handlers ── */
     window.ChiefAccountantPortal = {
-        switchTab: function (tabId) {
+        switchTab: function (tabId, btn) {
             _caActiveTab = tabId;
+            var bar = document.getElementById('caTabBar');
+            if (bar) {
+                bar.querySelectorAll('button').forEach(function (b) {
+                    var isActive = b.dataset.tab === tabId;
+                    if (isActive) {
+                        b.style.background = b.dataset.color;
+                        b.style.color = '#fff';
+                        b.style.border = 'none';
+                        b.style.boxShadow = '0 3px 10px ' + b.dataset.color + '40';
+                    } else {
+                        b.style.background = 'var(--card)';
+                        b.style.color = 'var(--text)';
+                        b.style.border = '1px solid var(--border)';
+                        b.style.boxShadow = 'none';
+                    }
+                });
+            }
+            _destroyCharts();
             _renderCaActiveTab();
         },
 
@@ -618,6 +636,106 @@
                     _renderCaActiveTab();
                 }
             }
+        },
+
+        openAddApModal: function () {
+            var modalHtml = '<div class="modal-overlay" style="display:flex;align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;">'
+                + '<div class="modal-card" style="background:var(--card);padding:24px;border-radius:16px;width:100%;max-width:480px;box-shadow:0 10px 30px rgba(0,0,0,0.3);">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
+                + '<h3 style="margin:0;font-size:18px;font-weight:700;">➕ Verify New Vendor Invoice (AP)</h3>'
+                + '<button class="btn btn-sm btn-outline" onclick="ChiefAccountantPortal.closeModal()">✕</button>'
+                + '</div>'
+                + '<form onsubmit="ChiefAccountantPortal.saveApInvoice(event)">'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Invoice Number</label><input type="text" id="caApInvNo" class="form-control" placeholder="INV-SP-902" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Supplier / Vendor</label><input type="text" id="caApVendor" class="form-control" placeholder="Sun Pharma Distributors" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Department</label><input type="text" id="caApDept" class="form-control" placeholder="Pharmacy / Surgery" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Amount (₹)</label><input type="number" id="caApAmount" class="form-control" placeholder="180000" required /></div>'
+                + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
+                + '<button type="button" class="btn btn-outline" onclick="ChiefAccountantPortal.closeModal()">Cancel</button>'
+                + '<button type="submit" class="btn btn-primary" style="background:#c62828;">Verify Invoice</button>'
+                + '</div></form></div></div>';
+
+            var host = document.getElementById('caModalHost');
+            if (host) host.innerHTML = modalHtml;
+        },
+
+        saveApInvoice: function (e) {
+            e.preventDefault();
+            var invNo = document.getElementById('caApInvNo').value.trim();
+            var vendor = document.getElementById('caApVendor').value.trim();
+            var dept = document.getElementById('caApDept').value.trim();
+            var amount = Number(document.getElementById('caApAmount').value) || 0;
+
+            var invoices = _getApInvoices();
+            var usd = amount / 83;
+            var canDirect = usd < 5000;
+            invoices.unshift({
+                invNo: invNo,
+                vendor: vendor,
+                dept: dept,
+                invDate: new Date().toISOString().slice(0, 10),
+                dueDate: new Date(Date.now() + 15 * 86400000).toISOString().slice(0, 10),
+                amount: amount,
+                verifiedQty: 'Matched 100%',
+                status: canDirect ? 'Verified (<$5K)' : 'Escalated to CFO ($5K-$25K)',
+                canApproveDirectly: canDirect
+            });
+
+            DB.set('ca_ap_invoices', invoices);
+            ChiefAccountantPortal.closeModal();
+            APP.notify('Invoice ' + invNo + ' verified & recorded', 'success');
+            _renderCaActiveTab();
+        },
+
+        openAddArModal: function () {
+            var modalHtml = '<div class="modal-overlay" style="display:flex;align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;">'
+                + '<div class="modal-card" style="background:var(--card);padding:24px;border-radius:16px;width:100%;max-width:480px;box-shadow:0 10px 30px rgba(0,0,0,0.3);">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
+                + '<h3 style="margin:0;font-size:18px;font-weight:700;">➕ Add AR TPA Claim Settlement</h3>'
+                + '<button class="btn btn-sm btn-outline" onclick="ChiefAccountantPortal.closeModal()">✕</button>'
+                + '</div>'
+                + '<form onsubmit="ChiefAccountantPortal.saveArClaim(event)">'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Insurance / TPA Payer</label><input type="text" id="caArPayer" class="form-control" placeholder="Star Health Insurance" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Patient Name</label><input type="text" id="caArPatient" class="form-control" placeholder="Rajesh Shah" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Billed Amount (₹)</label><input type="number" id="caArBilled" class="form-control" placeholder="285000" required /></div>'
+                + '<div class="form-group" style="margin-bottom:12px;"><label style="font-size:12px;font-weight:600;">Approved Amount (₹)</label><input type="number" id="caArApproved" class="form-control" placeholder="265000" required /></div>'
+                + '<div class="form-group" style="margin-bottom:16px;"><label style="font-size:12px;font-weight:600;">Deduction Reason</label><input type="text" id="caArReason" class="form-control" placeholder="Tariff Cap Exceeded" /></div>'
+                + '<div style="display:flex;gap:10px;justify-content:flex-end;">'
+                + '<button type="button" class="btn btn-outline" onclick="ChiefAccountantPortal.closeModal()">Cancel</button>'
+                + '<button type="submit" class="btn btn-primary" style="background:#1a73e8;">Save Settlement</button>'
+                + '</div></form></div></div>';
+
+            var host = document.getElementById('caModalHost');
+            if (host) host.innerHTML = modalHtml;
+        },
+
+        saveArClaim: function (e) {
+            e.preventDefault();
+            var payer = document.getElementById('caArPayer').value.trim();
+            var patient = document.getElementById('caArPatient').value.trim();
+            var billed = Number(document.getElementById('caArBilled').value) || 0;
+            var approved = Number(document.getElementById('caArApproved').value) || 0;
+            var reason = document.getElementById('caArReason').value.trim() || 'Nil';
+            var deduction = Math.max(0, billed - approved);
+
+            var claims = _getArSettlements();
+            var newId = 'CLM-ST-' + (Math.floor(100 + Math.random() * 900));
+            claims.unshift({
+                claimId: newId,
+                payer: payer,
+                patient: patient,
+                billedAmt: billed,
+                approvedAmt: approved,
+                deductionAmt: deduction,
+                deductionReason: reason,
+                status: 'Reconciled',
+                date: new Date().toISOString().slice(0, 10)
+            });
+
+            DB.set('ca_ar_settlements', claims);
+            ChiefAccountantPortal.closeModal();
+            APP.notify('Claim settlement ' + newId + ' recorded', 'success');
+            _renderCaActiveTab();
         },
 
         approveApBill: function (index) {

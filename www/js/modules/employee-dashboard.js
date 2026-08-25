@@ -1826,6 +1826,8 @@ function renderEmpReportsTab(el) {
 function renderEmpPerformanceTab(el) {
     var d  = _empData;
     var q  = d.q;
+    var uRole = (d.user && d.user.role ? d.user.role : '').toString().trim().toLowerCase();
+    var isFinanceOrExec = uRole === 'chief_accountant' || uRole === 'cfo' || uRole === 'md' || uRole === 'chairman' || uRole === 'vice_chairman' || uRole.indexOf('accountant') !== -1;
 
     var tasksDone    = d.myTasks.filter(function(t){ return t.status==='completed'; }).length;
     var probsSolved  = d.myProblems.filter(function(p){ return p.status==='resolved'; }).length;
@@ -1845,9 +1847,9 @@ function renderEmpPerformanceTab(el) {
 
         + '<div class="grid-2" style="gap:20px;margin-bottom:24px;">'
         + _perfCard(T('empd2_perf_task_completion'), tasksDone, d.myTasks.length, taskRate, 'var(--success)')
-        + _perfCard(T('empd2_perf_problem_resolution'), probsSolved, d.myProblems.length, probRate, 'var(--info)')
+        + (!isFinanceOrExec ? _perfCard(T('empd2_perf_problem_resolution'), probsSolved, d.myProblems.length, probRate, 'var(--info)') : '')
         + _perfCard(T('empd2_perf_request_approval'), reqApproved, d.myRequests.length, reqRate, 'var(--warning)')
-        + _perfCard(T('empd2_perf_checklist_compliance'), clDone, d.myChecklists.length, clRate, 'var(--primary)')
+        + (!isFinanceOrExec ? _perfCard(T('empd2_perf_checklist_compliance'), clDone, d.myChecklists.length, clRate, 'var(--primary)') : '')
         + '</div>'
 
         + '<div style="background:var(--light-gray);border-radius:10px;padding:16px;">'
@@ -1856,8 +1858,8 @@ function renderEmpPerformanceTab(el) {
         + _summaryNum(d.myTasks.length, T('empd2_perf_total_tasks'))
         + _summaryNum(tasksDone, T('empd2_perf_completed'))
         + _summaryNum(d.myTasks.filter(function(t){return t.deadline&&new Date(t.deadline)<new Date()&&t.status!=='completed';}).length, T('empd2_perf_overdue'), 'var(--danger)')
-        + _summaryNum(d.myChecklists.length, T('empd2_perf_checklists'))
-        + _summaryNum(d.myProblems.length, T('empd2_perf_issues_raised'))
+        + (!isFinanceOrExec ? _summaryNum(d.myChecklists.length, T('empd2_perf_checklists')) : '')
+        + (!isFinanceOrExec ? _summaryNum(d.myProblems.length, T('empd2_perf_issues_raised')) : '')
         + _summaryNum(d.myRequests.length, T('empd2_perf_requests_sent'))
         + '</div></div>';
 
