@@ -28,11 +28,20 @@ const Router = {
         }
         this.navigate(startModule);
 
-        // Mobile: overlay click closes sidebar
+        // Mobile & Tablet: overlay click closes sidebar
         const overlay = document.getElementById('sidebarOverlay');
         if (overlay) {
             overlay.onclick = () => { Router.closeMobileMenu(); };
         }
+        document.addEventListener('click', (e) => {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('menuToggle');
+            if (sidebar && sidebar.classList.contains('open')) {
+                if (!sidebar.contains(e.target) && (!toggleBtn || !toggleBtn.contains(e.target))) {
+                    Router.closeMobileMenu();
+                }
+            }
+        });
     },
     toggleMobileMenu() {
         const sidebar = document.getElementById('sidebar');
