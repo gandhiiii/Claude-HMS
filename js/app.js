@@ -14,14 +14,8 @@ const Router = {
         // Restore last visited module or use role default
         const isAdmin = user.isSuperAdmin || user.role === 'admin';
         const uRole = (user.role || '').toString().trim().toLowerCase();
-        const uPost = (user.post || user.designation || '').toString().trim().toLowerCase();
-        const uName = (user.username || '').toString().trim().toLowerCase();
-        const isCfo = uRole === 'cfo' || uRole.indexOf('cfo') !== -1 || uPost.indexOf('cfo') !== -1 || uName.indexOf('cfo') !== -1 || (user.permissions && user.permissions.includes('cfo-portal'));
-        const isChiefAccountant = uRole === 'chief_accountant' || uRole.indexOf('accountant') !== -1 || (user.permissions && user.permissions.includes('chief-accountant-portal'));
 
         const defaultModule = isAdmin ? 'dashboard'
-            : isCfo ? 'cfo-portal'
-            : isChiefAccountant ? 'chief-accountant-portal'
             : uRole === 'hod' ? 'hod-dashboard'
             : uRole === 'storekeeper' ? 'storekeeper-dashboard'
             : uRole === 'ambulance_employee' ? 'ambulance'
@@ -112,8 +106,6 @@ const Router = {
             { id: 'reports', label: _t('nav_reports'), icon: '📈', permission: 'reports' },
             { id: 'md-report', label: _t('nav_md_report'), icon: '📋', permission: 'md-report' },
             { id: 'purchases', label: '💰 Daily Purchases', icon: '💰', permission: 'purchases' },
-            { id: 'cfo-portal', label: '📊 CFO Portal', icon: '📊', permission: 'cfo-portal' },
-            { id: 'chief-accountant-portal', label: '📁 Chief Accountant Portal', icon: '📁', permission: 'chief-accountant-portal' },
             { id: 'hod-dashboard', label: _t('nav_hod_dashboard'), icon: '👔', permission: 'hod-dashboard' },
             { id: 'employee-dashboard', label: _t('nav_employee_dashboard'), icon: '📊', permission: 'employee-dashboard' },
             { id: 'storekeeper-dashboard', label: _t('nav_storekeeper_dashboard'), icon: '🏪', permission: 'storekeeper-dashboard' },
@@ -139,9 +131,6 @@ const Router = {
         var u = AUTH.currentUser();
         if (!u) { window.location.href = 'index.html'; return; }
         var isAdmin = u.isSuperAdmin || u.role === 'admin';
-        var uRole = (u.role || '').toString().trim().toLowerCase();
-        var isChiefAcc = uRole === 'chief_accountant' || uRole.indexOf('accountant') !== -1 || (u.permissions && u.permissions.includes('chief-accountant-portal'));
-        var isCfoUser = uRole === 'cfo' || uRole.indexOf('cfo') !== -1 || (u.permissions && u.permissions.includes('cfo-portal'));
 
         if (module === 'purchases') {
             window._hodTargetTab = 'purchases';
@@ -150,9 +139,7 @@ const Router = {
 
         // Strict role-based dashboard guard:
         if (module === 'dashboard' && !isAdmin) {
-            if (isChiefAcc) module = 'chief-accountant-portal';
-            else if (isCfoUser) module = 'cfo-portal';
-            else if (u.role === 'hod') module = 'hod-dashboard';
+            if (u.role === 'hod') module = 'hod-dashboard';
             else if (u.role === 'storekeeper') module = 'storekeeper-dashboard';
             else if (u.role === 'ambulance_employee') module = 'ambulance';
             else module = 'employee-dashboard';
@@ -287,8 +274,6 @@ const Router = {
                 case 'employee-dashboard': return safeWindowGet('renderEmployeeDashboard');
                 case 'hod-dashboard': return safeWindowGet('renderHodDashboard');
                 case 'storekeeper-dashboard': return safeWindowGet('renderStorekeeperDashboard');
-                case 'cfo-portal': return safeWindowGet('renderCfoPortal');
-                case 'chief-accountant-portal': return safeWindowGet('renderChiefAccountantPortal');
                 case 'hospital-settings': return safeWindowGet('renderHospitalSettings');
                 default: return null;
             }

@@ -342,7 +342,7 @@ function renderPermissionCheckboxes(deptFeatures, userPerms, isEdit) {
         'tasks', 'work', 'complaints', 'suggestions', 'room-checklist', 'rooms', 'admissions',
         'lost-found', 'checklists', 'admin-checklists', 'departmental-checklist',
         'handover', 'cleaning', 'equipbackdown', 'reports', 'staff-deployment',
-        'security-deployment', 'patient-shifting', 'cfo-portal', 'chief-accountant-portal'
+        'security-deployment', 'patient-shifting'
     ];
 
     const inheritedSet = new Set(deptFeatures || []);
@@ -397,18 +397,18 @@ function onRoleChange(selectEl) {
         employee: ['employee-dashboard','material-requests','suggestions','checklists'],
         storekeeper: ['inventory','material-requests','employee-dashboard','scrap'],
         ambulance_employee: ['ambulance'],
-        CFO: ['cfo-portal','chief-accountant-portal','employee-dashboard','discounts','material-requests','suggestions','reports','checklists'],
-        cfo: ['cfo-portal','chief-accountant-portal','employee-dashboard','discounts','material-requests','suggestions','reports','checklists'],
-        CHIEF_ACCOUNTANT: ['chief-accountant-portal','cfo-portal','employee-dashboard','discounts','material-requests','suggestions','reports','checklists'],
+        CFO: ['employee-dashboard','discounts','material-requests','suggestions','reports','checklists'],
+        cfo: ['employee-dashboard','discounts','material-requests','suggestions','reports','checklists'],
+        CHIEF_ACCOUNTANT: ['employee-dashboard','discounts','material-requests','suggestions','reports','checklists'],
         BILLING_MANAGER: ['employee-dashboard','discounts','material-requests','suggestions','reports','checklists'],
         BILLING_CLERK: ['employee-dashboard','discounts','material-requests','suggestions'],
         RECEPTIONIST: ['employee-dashboard','discounts','material-requests','suggestions','admissions'],
         doctor: ['employee-dashboard','discounts','material-requests','suggestions','admissions','patient-shifting'],
-        MD: ['cfo-portal','chief-accountant-portal','employee-dashboard','discounts','material-requests','suggestions','reports','md-report'],
-        DIRECTOR: ['cfo-portal','chief-accountant-portal','employee-dashboard','discounts','material-requests','suggestions','reports','md-report'],
-        EXECUTIVE: ['cfo-portal','chief-accountant-portal','employee-dashboard','discounts','material-requests','suggestions','reports'],
-        CHAIRMAN: ['cfo-portal','chief-accountant-portal','employee-dashboard','discounts','material-requests','suggestions','reports','md-report'],
-        VICE_CHAIRMAN: ['cfo-portal','chief-accountant-portal','employee-dashboard','discounts','material-requests','suggestions','reports','md-report']
+        MD: ['employee-dashboard','discounts','material-requests','suggestions','reports','md-report'],
+        DIRECTOR: ['employee-dashboard','discounts','material-requests','suggestions','reports','md-report'],
+        EXECUTIVE: ['employee-dashboard','discounts','material-requests','suggestions','reports'],
+        CHAIRMAN: ['employee-dashboard','discounts','material-requests','suggestions','reports','md-report'],
+        VICE_CHAIRMAN: ['employee-dashboard','discounts','material-requests','suggestions','reports','md-report']
     };
 
     const perms = rolePerms[role] || ['employee-dashboard', 'discounts', 'material-requests', 'suggestions'];
