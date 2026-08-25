@@ -22,8 +22,9 @@ const Router = {
             : 'employee-dashboard';
         const saved = localStorage.getItem('hms_lastModule');
         let startModule = saved || defaultModule;
-        if (!isAdmin && startModule === 'dashboard') {
+        if (startModule === 'chief-accountant-portal' || startModule === 'cfo-portal' || (!isAdmin && startModule === 'dashboard')) {
             startModule = defaultModule;
+            try { localStorage.setItem('hms_lastModule', defaultModule); } catch (e) {}
         }
         this.navigate(startModule);
 
@@ -138,7 +139,7 @@ const Router = {
         }
 
         // Strict role-based dashboard guard:
-        if (module === 'dashboard' && !isAdmin) {
+        if (module === 'chief-accountant-portal' || module === 'cfo-portal' || (module === 'dashboard' && !isAdmin)) {
             if (u.role === 'hod') module = 'hod-dashboard';
             else if (u.role === 'storekeeper') module = 'storekeeper-dashboard';
             else if (u.role === 'ambulance_employee') module = 'ambulance';
@@ -280,6 +281,19 @@ const Router = {
         };
 
         const initialRenderer = getRenderer(module);
+        if (!initialRenderer) {
+            const fallbackModule = isAdmin ? 'dashboard'
+                : u.role === 'hod' ? 'hod-dashboard'
+                : u.role === 'storekeeper' ? 'storekeeper-dashboard'
+                : u.role === 'ambulance_employee' ? 'ambulance'
+                : 'employee-dashboard';
+            if (module !== fallbackModule) {
+                try { localStorage.setItem('hms_lastModule', fallbackModule); } catch (e) {}
+                this.navigate(fallbackModule);
+                return;
+            }
+        }
+
         if (initialRenderer || module) {
             content.innerHTML = '<div style="text-align:center;padding:40px;"><div class="spinner"></div><p style="color:var(--gray);margin-top:8px;">Loading...</p></div>';
             setTimeout(() => {
