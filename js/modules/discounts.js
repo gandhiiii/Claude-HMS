@@ -612,7 +612,7 @@
 
     function canManageDoctors(user) {
         if (!user) user = getLoggedInUser();
-        if (!user) return true; // Default fallback to allow managing doctors
+        if (!user) return false;
         if (isSystemAdmin(user)) return true;
         var role = String(user.role || '').toLowerCase();
         if (role === 'chief_accountant' || role === 'account' || role === 'accounts') return true;
@@ -623,13 +623,13 @@
             return (u.username && u.username.toLowerCase() === uname) || (u.id && u.id === user.id); 
         });
         if (targetUser && (targetUser.canManageDoctors || targetUser.isSuperAdmin || targetUser.role === 'admin' || targetUser.role === 'superadmin' || targetUser.role === 'chief_accountant' || targetUser.role === 'account')) return true;
-        if (user.canManageDoctors) return true;
-        return true; // Allow adding/removing doctors for all authorized users in discounts module
+        if (user.canManageDoctors === true) return true;
+        return false;
     }
 
     function canManageServices(user) {
         if (!user) user = getLoggedInUser();
-        if (!user) return true;
+        if (!user) return false;
         if (isSystemAdmin(user)) return true;
         var role = String(user.role || '').toLowerCase();
         if (role === 'chief_accountant' || role === 'account' || role === 'accounts') return true;
@@ -640,8 +640,8 @@
             return (u.username && u.username.toLowerCase() === uname) || (u.id && u.id === user.id); 
         });
         if (targetUser && (targetUser.canManageServices || targetUser.isSuperAdmin || targetUser.role === 'admin' || targetUser.role === 'superadmin' || targetUser.role === 'chief_accountant' || targetUser.role === 'account')) return true;
-        if (user.canManageServices) return true;
-        return true;
+        if (user.canManageServices === true) return true;
+        return false;
     }
 
     global.removeDoctorByName = window.removeDoctorByName = function(docName) {
