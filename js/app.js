@@ -107,7 +107,7 @@ const Router = {
             { id: 'lost-found', label: _t('nav_lost_found'), icon: '🔍', permission: 'lost-found' },
             { id: 'admin-checklists', label: _t('nav_admin_checklists'), icon: '🔖', permission: 'admin-checklists', adminOnly: true },
             { id: 'material-requests', label: _t('nav_material_requests'), icon: '📦', permission: 'material-requests' },
-            { id: 'discounts', label: _t('nav_discounts'), icon: '🏷️', permission: 'discounts' },
+            { id: 'discounts', label: _t('nav_discounts'), icon: '🏷️', permission: 'discounts', adminOnly: true },
             { id: 'suggestions', label: _t('nav_suggestions'), icon: '💡', permission: 'suggestions' },
             { id: 'budget', label: _t('nav_budget'), icon: '💰', permission: 'budget', adminOnly: true },
             { id: 'quarterly-priorities', label: _t('nav_quarterly'), icon: '🎯', permission: 'quarterly-priorities', adminOnly: true },

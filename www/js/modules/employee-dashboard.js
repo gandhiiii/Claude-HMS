@@ -313,10 +313,8 @@ function renderEmployeeDashboard(container, initialTab) {
     if (isAccountGrp) {
         tabs = [
             { id: 'overview',    label: T('empd2_tab_overview') },
-            { id: 'discounts',   label: '🏷️ Discounts & Approvals', badge: pendingDiscountsCount, badgeClass: 'badge-warning' },
             { id: 'purchases',   label: '💰 Daily Purchases & Expenses' },
             { id: 'matrequests', label: '📦 Material Requisitions', badge: pendingReqsCount },
-            { id: 'checklists',  label: '📑 Account Audit Checklists' },
             { id: 'work',        label: T('empd2_tab_work'), badge: _empData.myTasks.filter(function(t){return t.status!=='completed';}).length },
             { id: 'todo',        label: T('empd2_tab_todo'), badge: todoPend, badgeClass: 'badge-warning' },
             { id: 'reports',     label: T('empd2_tab_reports') },
@@ -707,16 +705,6 @@ function renderEmpOverview(el) {
             + '<div style="font-size:20px;font-weight:800;color:var(--primary);margin-top:2px;">₹' + totalPurchaseSum.toLocaleString('en-IN') + '</div>'
             + '<div style="font-size:11px;color:var(--gray);">' + myPurchases.length + ' purchase entry(ies)</div>'
             + '</div>'
-            + '<div style="background:#fff3e0;padding:12px;border-radius:10px;text-align:center;">'
-            + '<div style="font-size:11px;color:var(--gray);font-weight:600;">DISCOUNT REQUESTS</div>'
-            + '<div style="font-size:20px;font-weight:800;color:#e65100;margin-top:2px;">' + myDiscounts.length + '</div>'
-            + '<div style="font-size:11px;color:var(--gray);">' + myDiscounts.filter(function(r){return r.status==='approved';}).length + ' approved</div>'
-            + '</div>'
-            + '<div style="background:#e8f5e9;padding:12px;border-radius:10px;text-align:center;">'
-            + '<div style="font-size:11px;color:var(--gray);font-weight:600;">AUDIT CHECKLISTS</div>'
-            + '<div style="font-size:20px;font-weight:800;color:var(--success);margin-top:2px;">' + myClDone.length + '</div>'
-            + '<div style="font-size:11px;color:var(--gray);">' + d.myChecklists.length + ' total assigned</div>'
-            + '</div>'
             + '<div style="background:#f3e5f5;padding:12px;border-radius:10px;text-align:center;">'
             + '<div style="font-size:11px;color:var(--gray);font-weight:600;">TASKS & REPORTS</div>'
             + '<div style="font-size:20px;font-weight:800;color:#6a1b9a;margin-top:2px;">' + (myTasksDone.length + myReports.length) + '</div>'
@@ -733,24 +721,6 @@ function renderEmpOverview(el) {
                 amount: p.amount ? '₹' + parseFloat(p.amount).toLocaleString('en-IN') : '',
                 date: p.createdAt || p.date || '',
                 status: p.status || 'completed'
-            });
-        });
-        myDiscounts.forEach(function(r) {
-            myWorkFeed.push({
-                type: '🏷️ Discount Request',
-                title: (r.patientName ? r.patientName + ' - ' : '') + (r.reason || 'Discount Request'),
-                amount: r.amount ? '₹' + parseFloat(r.amount).toLocaleString('en-IN') : (r.discountPct ? r.discountPct + '%' : ''),
-                date: r.createdAt || r.date || '',
-                status: r.status || 'pending'
-            });
-        });
-        d.myChecklists.forEach(function(c) {
-            myWorkFeed.push({
-                type: '📑 Audit Checklist',
-                title: c.title || 'Account Audit Checklist',
-                amount: c.status === 'completed' ? '100% OK' : 'In Progress',
-                date: c.createdAt || c.updatedAt || '',
-                status: c.status || 'active'
             });
         });
         myReports.forEach(function(rp) {
