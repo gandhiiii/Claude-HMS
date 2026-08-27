@@ -877,6 +877,15 @@
         var html = [
             '<form id="receptionForm">',
             '<div class="form-group mb-3">',
+            '  <label style="font-weight:600;margin-bottom:4px;display:block;">Department / Category *</label>',
+            '  <select name="targetDepartment" class="form-control" required>',
+            '    <option value="admission">Admission</option>',
+            '    <option value="account">Accounting</option>',
+            '    <option value="radiology">Radiology</option>',
+            '    <option value="reception" selected>Reception</option>',
+            '  </select>',
+            '</div>',
+            '<div class="form-group mb-3">',
             '  <label style="font-weight:600;margin-bottom:4px;display:block;">Patient ID / UHID No. *</label>',
             '  <input type="text" name="patientId" class="form-control" value="' + autoPatientId + '" required>',
             '</div>',
@@ -969,6 +978,7 @@
         var form = document.getElementById('receptionForm');
         if (!form) return;
 
+        var targetDept  = (form.querySelector('[name="targetDepartment"]').value || 'reception').trim();
         var patientId   = (form.querySelector('[name="patientId"]').value || '').trim();
         var patientName = (form.querySelector('[name="patientName"]').value || '').trim();
         var serviceName = (form.querySelector('[name="serviceName"]').value || '').trim();
@@ -997,7 +1007,7 @@
             isBypass: isBypass
         };
 
-        global.createDiscount("reception", formData);
+        global.createDiscount(targetDept, formData);
         global.closeFormModal();
     };
 
