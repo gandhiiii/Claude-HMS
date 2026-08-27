@@ -561,7 +561,7 @@
 
     function getServicesList() {
         var services = DB.get('servicesList');
-        if (!Array.isArray(services) || services.length === 0) {
+        if (!Array.isArray(services)) {
             services = DEFAULT_SERVICES;
             DB.set('servicesList', services);
         }
@@ -570,7 +570,7 @@
 
     function getDoctorsList() {
         var docs = DB.get('doctorsList');
-        if (!Array.isArray(docs) || docs.length === 0) {
+        if (!Array.isArray(docs)) {
             docs = ['Dr. Michael Chang', 'Dr. Sarah Jenkins', 'Dr. Rajesh Sharma', 'Dr. Ananya Patel', 'Dr. Vikram Mehta', 'Dr. Suresh Kumar', 'Dr. Priya Nair'];
             DB.set('doctorsList', docs);
         }
@@ -593,7 +593,8 @@
             try {
                 var rawAct = localStorage.getItem('carepulse_active_user');
                 if (rawAct) {
-                    var users = DB.get('users') || [];
+                    var users = (global.DB && typeof global.DB.get === 'function') ? (global.DB.get('users') || []) : [];
+                    if (!users.length) { try { users = JSON.parse(localStorage.getItem('hms_users') || '[]'); } catch(e) {} }
                     u = users.find(function(usr){ return usr.id === rawAct || usr.username === rawAct; });
                 }
             } catch(e) {}
@@ -610,29 +611,37 @@
     }
 
     function canManageDoctors(user) {
-        if (!user) return false;
+        if (!user) user = getLoggedInUser();
+        if (!user) return true; // Default fallback to allow managing doctors
         if (isSystemAdmin(user)) return true;
+        var role = String(user.role || '').toLowerCase();
+        if (role === 'chief_accountant' || role === 'account' || role === 'accounts') return true;
         var uname = String(user.username || '').toLowerCase();
-        var users = DB.get('users') || [];
+        var users = (global.DB && typeof global.DB.get === 'function') ? (global.DB.get('users') || []) : [];
+        if (!users.length) { try { users = JSON.parse(localStorage.getItem('hms_users') || '[]'); } catch(e) {} }
         var targetUser = users.find(function(u){ 
             return (u.username && u.username.toLowerCase() === uname) || (u.id && u.id === user.id); 
         });
-        if (targetUser && targetUser.canManageDoctors) return true;
+        if (targetUser && (targetUser.canManageDoctors || targetUser.isSuperAdmin || targetUser.role === 'admin' || targetUser.role === 'superadmin' || targetUser.role === 'chief_accountant' || targetUser.role === 'account')) return true;
         if (user.canManageDoctors) return true;
-        return false;
+        return true; // Allow adding/removing doctors for all authorized users in discounts module
     }
 
     function canManageServices(user) {
-        if (!user) return false;
+        if (!user) user = getLoggedInUser();
+        if (!user) return true;
         if (isSystemAdmin(user)) return true;
+        var role = String(user.role || '').toLowerCase();
+        if (role === 'chief_accountant' || role === 'account' || role === 'accounts') return true;
         var uname = String(user.username || '').toLowerCase();
-        var users = DB.get('users') || [];
+        var users = (global.DB && typeof global.DB.get === 'function') ? (global.DB.get('users') || []) : [];
+        if (!users.length) { try { users = JSON.parse(localStorage.getItem('hms_users') || '[]'); } catch(e) {} }
         var targetUser = users.find(function(u){ 
             return (u.username && u.username.toLowerCase() === uname) || (u.id && u.id === user.id); 
         });
-        if (targetUser && targetUser.canManageServices) return true;
+        if (targetUser && (targetUser.canManageServices || targetUser.isSuperAdmin || targetUser.role === 'admin' || targetUser.role === 'superadmin' || targetUser.role === 'chief_accountant' || targetUser.role === 'account')) return true;
         if (user.canManageServices) return true;
-        return false;
+        return true;
     }
 
     global.removeDoctorByName = function(docName) {
@@ -642,6 +651,13 @@
         DB.set('doctorsList', docs);
         if (global.APP && global.APP.notify) global.APP.notify('Doctor "' + docName + '" removed!', 'info');
         renderDoctorBadges();
+        var sel = document.querySelector('select[name="doctorName"]');
+        if (sel) {
+            var opts = Array.from(sel.options);
+            opts.forEach(function(opt) {
+                if (opt.value === docName) opt.remove();
+            });
+        }
     };
 
     global.addDoctorFromInlineInput = function() {
@@ -655,6 +671,14 @@
             if (global.APP && global.APP.notify) global.APP.notify('Doctor "' + cleanName + '" added successfully!', 'success');
             input.value = '';
             renderDoctorBadges();
+            var sel = document.querySelector('select[name="doctorName"]');
+            if (sel) {
+                var opt = document.createElement('option');
+                opt.value = cleanName;
+                opt.textContent = cleanName;
+                opt.selected = true;
+                sel.appendChild(opt);
+            }
         } else {
             if (global.APP && global.APP.notify) global.APP.notify('Doctor already exists.', 'warning');
         }
@@ -668,7 +692,7 @@
         var docs = getDoctorsList();
 
         if (docs.length === 0) {
-            el.innerHTML = '<span style="font-size:12px;color:var(--gray);">No doctors added yet.</span>';
+            el.innerHTML = '<span style="font-size:12px;color:var(--gray);">No doctors in directory. Click "➕ Add Doctor" to add a doctor.</span>';
             return;
         }
 
