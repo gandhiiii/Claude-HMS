@@ -662,7 +662,10 @@
 
     global.addDoctorFromInlineInput = function() {
         var input = document.getElementById('newDoctorInputInline');
-        if (!input || !input.value.trim()) return;
+        if (!input || !input.value.trim()) {
+            if (global.APP && global.APP.notify) global.APP.notify('Please type a doctor name first.', 'warning');
+            return;
+        }
         var cleanName = input.value.trim();
         var docs = getDoctorsList();
         if (docs.indexOf(cleanName) === -1) {
@@ -680,26 +683,25 @@
                 sel.appendChild(opt);
             }
         } else {
-            if (global.APP && global.APP.notify) global.APP.notify('Doctor already exists.', 'warning');
+            if (global.APP && global.APP.notify) global.APP.notify('Doctor already exists in directory.', 'warning');
         }
     };
 
     function renderDoctorBadges() {
         var el = document.getElementById('doctorDirectoryBadges');
         if (!el) return;
-        var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
-        var canAddDoc = canManageDoctors(user);
         var docs = getDoctorsList();
 
         if (docs.length === 0) {
-            el.innerHTML = '<span style="font-size:12px;color:var(--gray);">No doctors in directory. Click "➕ Add Doctor" to add a doctor.</span>';
+            el.innerHTML = '<span style="font-size:12px;color:var(--gray);">No doctors in directory. Type name above and click "+ Add Doctor".</span>';
             return;
         }
 
         el.innerHTML = docs.map(function(d) {
-            return '<span class="badge" style="background:var(--white,#fff);border:1px solid var(--border);color:var(--dark);padding:4px 8px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:6px;">'
+            var safeName = d.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            return '<span class="badge" style="background:var(--white,#fff);border:1px solid var(--border);color:var(--dark);padding:5px 10px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:6px;margin-right:4px;margin-bottom:4px;box-shadow:0 1px 2px rgba(0,0,0,0.05);">'
                 + '🩺 ' + d
-                + (canAddDoc ? ' <button type="button" onclick="removeDoctorByName(\'' + d.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:var(--danger);font-weight:bold;cursor:pointer;padding:0;margin-left:4px;font-size:12px;" title="Remove Doctor">✕</button>' : '')
+                + ' <button type="button" onclick="removeDoctorByName(\'' + safeName + '\')" style="background:#fee2e2;border:1px solid #fca5a5;color:#dc2626;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;cursor:pointer;padding:0;margin-left:6px;font-size:11px;line-height:1;" title="Remove Doctor">✕</button>'
                 + '</span>';
         }).join('');
     }
@@ -716,7 +718,10 @@
     global.addServiceFromInlineInput = function() {
         var nameInput = document.getElementById('newServiceNameInline');
         var deptInput = document.getElementById('newServiceDeptInline');
-        if (!nameInput || !nameInput.value.trim()) return;
+        if (!nameInput || !nameInput.value.trim()) {
+            if (global.APP && global.APP.notify) global.APP.notify('Please type a service name first.', 'warning');
+            return;
+        }
         var name = nameInput.value.trim();
         var dept = (deptInput && deptInput.value.trim()) ? deptInput.value.trim() : 'General';
         var list = getServicesList();
@@ -735,21 +740,20 @@
     function renderServiceBadges() {
         var el = document.getElementById('serviceDirectoryBadges');
         if (!el) return;
-        var user = (global.AUTH && global.AUTH.currentUser) ? global.AUTH.currentUser() : null;
-        var canAddDoc = canManageDoctors(user);
         var list = getServicesList();
 
         if (list.length === 0) {
-            el.innerHTML = '<span style="font-size:12px;color:var(--gray);">No services added yet.</span>';
+            el.innerHTML = '<span style="font-size:12px;color:var(--gray);">No services in directory. Type name above and click "+ Add Service".</span>';
             return;
         }
 
         el.innerHTML = list.map(function(s) {
             var sName = typeof s === 'object' ? s.name : s;
             var sDept = typeof s === 'object' ? (s.department || 'General') : 'General';
-            return '<span class="badge" style="background:var(--white,#fff);border:1px solid var(--border);color:var(--dark);padding:4px 8px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:6px;">'
+            var safeName = sName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            return '<span class="badge" style="background:var(--white,#fff);border:1px solid var(--border);color:var(--dark);padding:5px 10px;border-radius:6px;font-size:12px;display:inline-flex;align-items:center;gap:6px;margin-right:4px;margin-bottom:4px;box-shadow:0 1px 2px rgba(0,0,0,0.05);">'
                 + '🔬 <strong>' + sName + '</strong> <small style="color:var(--gray);">(' + sDept + ')</small>'
-                + (canAddDoc ? ' <button type="button" onclick="removeServiceByName(\'' + sName.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:var(--danger);font-weight:bold;cursor:pointer;padding:0;margin-left:4px;font-size:12px;" title="Remove Service">✕</button>' : '')
+                + ' <button type="button" onclick="removeServiceByName(\'' + safeName + '\')" style="background:#fee2e2;border:1px solid #fca5a5;color:#dc2626;border-radius:50%;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;cursor:pointer;padding:0;margin-left:6px;font-size:11px;line-height:1;" title="Remove Service">✕</button>'
                 + '</span>';
         }).join('');
     }
