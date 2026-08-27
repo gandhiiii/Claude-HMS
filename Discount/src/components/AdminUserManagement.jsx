@@ -167,16 +167,6 @@ export const AdminUserManagement = () => {
         </div>
       </div>
     );
-  if (!isAdmin) {
-    return (
-      <div className="glass-card p-12 text-center rounded-2xl border border-rose-500/30 space-y-3">
-        <ShieldAlert className="w-12 h-12 text-rose-400 mx-auto" />
-        <h2 className="text-xl font-extrabold text-slate-100">Access Restricted</h2>
-        <p className="text-sm text-slate-400 max-w-md mx-auto">
-          The Admin User Directory, Approval Matrix Configuration, and User Privilege Management are strictly restricted to System Administrators.
-        </p>
-      </div>
-    );
   }
 
   return (

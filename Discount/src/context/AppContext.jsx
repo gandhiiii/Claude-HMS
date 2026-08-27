@@ -1338,14 +1338,24 @@ export const AppProvider = ({ children }) => {
       triggerToast(`Department "${trimmed}" already exists.`, 'warning');
       return;
     }
-    setDepartments(prev => [...prev, trimmed]);
+    setDepartments(prev => {
+      const next = [...prev, trimmed];
+      localStorage.setItem('carepulse_departments', JSON.stringify(next));
+      pushToLocalServerSync({ departments: next });
+      return next;
+    });
     triggerToast(`New department "${trimmed}" added successfully by Admin!`, 'success');
   };
 
   const deleteDepartment = (deptName) => {
     if (!deptName) return;
     const target = deptName.trim().toLowerCase();
-    setDepartments(prev => prev.filter(d => d.trim().toLowerCase() !== target));
+    setDepartments(prev => {
+      const next = prev.filter(d => d.trim().toLowerCase() !== target);
+      localStorage.setItem('carepulse_departments', JSON.stringify(next));
+      pushToLocalServerSync({ departments: next });
+      return next;
+    });
     triggerToast(`Department "${deptName}" removed.`, 'info');
   };
 
@@ -1357,14 +1367,24 @@ export const AppProvider = ({ children }) => {
       triggerToast(`Service "${trimmed}" already exists.`, 'warning');
       return;
     }
-    setServices(prev => [...prev, trimmed]);
+    setServices(prev => {
+      const next = [...prev, trimmed];
+      localStorage.setItem('carepulse_services', JSON.stringify(next));
+      pushToLocalServerSync({ services: next });
+      return next;
+    });
     triggerToast(`New hospital service "${trimmed}" added successfully by Admin!`, 'success');
   };
 
   const deleteService = (serviceName) => {
     if (!serviceName) return;
     const target = serviceName.trim().toLowerCase();
-    setServices(prev => prev.filter(s => s.trim().toLowerCase() !== target));
+    setServices(prev => {
+      const next = prev.filter(s => s.trim().toLowerCase() !== target);
+      localStorage.setItem('carepulse_services', JSON.stringify(next));
+      pushToLocalServerSync({ services: next });
+      return next;
+    });
     triggerToast(`Hospital service "${serviceName}" removed.`, 'info');
   };
 
@@ -1376,19 +1396,31 @@ export const AppProvider = ({ children }) => {
       triggerToast(`Doctor "${trimmed}" already exists.`, 'warning');
       return;
     }
-    setDoctors(prev => [...prev, trimmed]);
+    setDoctors(prev => {
+      const next = [...prev, trimmed];
+      localStorage.setItem('carepulse_doctors', JSON.stringify(next));
+      pushToLocalServerSync({ doctors: next });
+      return next;
+    });
     triggerToast(`New doctor "${trimmed}" added to directory successfully!`, 'success');
   };
 
   const deleteDoctor = (doctorName) => {
     if (!doctorName) return;
     const target = doctorName.trim().toLowerCase();
-    setDoctors(prev => prev.filter(d => d.trim().toLowerCase() !== target));
+    setDoctors(prev => {
+      const next = prev.filter(d => d.trim().toLowerCase() !== target);
+      localStorage.setItem('carepulse_doctors', JSON.stringify(next));
+      pushToLocalServerSync({ doctors: next });
+      return next;
+    });
     triggerToast(`Doctor "${doctorName}" removed from directory.`, 'info');
   };
 
   const clearAllDoctors = () => {
     setDoctors([]);
+    localStorage.setItem('carepulse_doctors', JSON.stringify([]));
+    pushToLocalServerSync({ doctors: [] });
     triggerToast('All preset doctors cleared from directory.', 'info');
   };
 
