@@ -1128,7 +1128,7 @@
                 + '  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
                 + '    <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">🩺 Doctor Directory Control <small style="font-weight:normal;color:var(--gray);">(Admin-Granted Permission)</small></div>'
                 + '    <div style="display:flex;gap:6px;">'
-                + '      <input type="text" id="newDoctorInputInline" placeholder="New Doctor Name..." class="form-control" style="width:180px;font-size:12px;padding:4px 8px;" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addDoctorFromInlineInput();}">
+                + '      <input type="text" id="newDoctorInputInline" placeholder="New Doctor Name..." class="form-control" style="width:180px;font-size:12px;padding:4px 8px;" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addDoctorFromInlineInput();}">'
                 + '      <button type="button" class="btn btn-sm btn-primary" style="font-size:12px;padding:4px 10px;" onclick="addDoctorFromInlineInput()">➕ Add Doctor</button>'
                 + '    </div>'
                 + '  </div>'
