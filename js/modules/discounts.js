@@ -644,12 +644,13 @@
         return true;
     }
 
-    global.removeDoctorByName = function(docName) {
+    global.removeDoctorByName = window.removeDoctorByName = function(docName) {
         if (!confirm('Are you sure you want to remove "' + docName + '" from the Doctor Directory?')) return;
         var docs = getDoctorsList();
         docs = docs.filter(function(d){ return d !== docName; });
         DB.set('doctorsList', docs);
         if (global.APP && global.APP.notify) global.APP.notify('Doctor "' + docName + '" removed!', 'info');
+        else alert('Doctor "' + docName + '" removed!');
         renderDoctorBadges();
         var sel = document.querySelector('select[name="doctorName"]');
         if (sel) {
@@ -660,10 +661,11 @@
         }
     };
 
-    global.addDoctorFromInlineInput = function() {
+    global.addDoctorFromInlineInput = window.addDoctorFromInlineInput = function() {
         var input = document.getElementById('newDoctorInputInline');
         if (!input || !input.value.trim()) {
             if (global.APP && global.APP.notify) global.APP.notify('Please type a doctor name first.', 'warning');
+            else alert('Please type a doctor name first.');
             return;
         }
         var cleanName = input.value.trim();
@@ -672,6 +674,7 @@
             docs.push(cleanName);
             DB.set('doctorsList', docs);
             if (global.APP && global.APP.notify) global.APP.notify('Doctor "' + cleanName + '" added successfully!', 'success');
+            else alert('Doctor "' + cleanName + '" added successfully!');
             input.value = '';
             renderDoctorBadges();
             var sel = document.querySelector('select[name="doctorName"]');
@@ -684,6 +687,7 @@
             }
         } else {
             if (global.APP && global.APP.notify) global.APP.notify('Doctor already exists in directory.', 'warning');
+            else alert('Doctor already exists in directory.');
         }
     };
 
@@ -1124,8 +1128,8 @@
                 + '  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
                 + '    <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;">🩺 Doctor Directory Control <small style="font-weight:normal;color:var(--gray);">(Admin-Granted Permission)</small></div>'
                 + '    <div style="display:flex;gap:6px;">'
-                + '      <input type="text" id="newDoctorInputInline" placeholder="New Doctor Name..." class="form-control" style="width:180px;font-size:12px;padding:4px 8px;">'
-                + '      <button class="btn btn-sm btn-primary" style="font-size:12px;padding:4px 10px;" onclick="addDoctorFromInlineInput()">➕ Add Doctor</button>'
+                + '      <input type="text" id="newDoctorInputInline" placeholder="New Doctor Name..." class="form-control" style="width:180px;font-size:12px;padding:4px 8px;" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addDoctorFromInlineInput();}">
+                + '      <button type="button" class="btn btn-sm btn-primary" style="font-size:12px;padding:4px 10px;" onclick="addDoctorFromInlineInput()">➕ Add Doctor</button>'
                 + '    </div>'
                 + '  </div>'
                 + '  <div id="doctorDirectoryBadges" style="display:flex;flex-wrap:wrap;gap:6px;"></div>'
