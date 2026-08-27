@@ -6765,7 +6765,10 @@ function _hodDchkTemplates(el, user, dept, templates, units, floors) {
             + (fixedItems.length ? ' · ' + fixedItems.length + ' fixed' : '')
             + (customItems.length ? ' · ' + customItems.length + ' custom' : '')
             + '</div></div>'
+            + '<div style="display:flex;gap:6px;align-items:center;">'
             + '<button class="btn btn-sm btn-outline" onclick="hodDchkManageItems(\'' + tpl.id + '\')">Manage Items</button>'
+            + '<button class="btn btn-sm btn-danger" style="font-size:11px;padding:4px 8px;" onclick="hodDchkDeleteTemplate(\'' + tpl.id + '\')">🗑️ Delete</button>'
+            + '</div>'
             + '</div>'
             + '<div style="padding:10px 16px 14px;">';
 
@@ -6811,6 +6814,19 @@ function hodDchkNewTemplate() {
         hodDchkSubSwitch('templates', document.querySelector('.tab-btn'));
     } else {
         APP.notify(result.message, 'error');
+    }
+}
+
+function hodDchkDeleteTemplate(tplId) {
+    var user = AUTH.currentUser();
+    if (!user) return;
+    if (!confirm('Are you sure you want to delete this entire checklist template?')) return;
+    var result = typeof CHECKLISTS !== 'undefined' ? CHECKLISTS.deleteTemplate(user, tplId) : null;
+    if (result && result.success) {
+        APP.notify('Checklist template deleted', 'success');
+        hodDchkSubSwitch('templates', document.querySelector('.tab-btn'));
+    } else {
+        APP.notify((result && result.message) || 'Failed to delete template', 'error');
     }
 }
 

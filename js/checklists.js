@@ -119,10 +119,18 @@
     /* ───────────────────────────── permissions ──────────────────────────── */
 
     function isAdmin(user) {
-        return !!user && (user.role === ROLES.ADMIN || user.isSuperAdmin === true);
+        return !!user && (user.role === ROLES.ADMIN || user.role === 'admin' || user.role === 'superadmin' || user.isSuperAdmin === true);
     }
     function isHodOf(user, department) {
-        return !!user && user.role === ROLES.HOD && user.department === department;
+        if (!user) return false;
+        if (isAdmin(user)) return true;
+        var uDept = (user.department || '').trim().toLowerCase();
+        var tDept = (department || '').trim().toLowerCase();
+        var isAccountUser = uDept.indexOf('account') !== -1 || uDept.indexOf('finance') !== -1 || uDept.indexOf('billing') !== -1;
+        var isAccountTarget = tDept.indexOf('account') !== -1 || tDept.indexOf('finance') !== -1 || tDept.indexOf('billing') !== -1;
+        var deptMatch = uDept === tDept || (isAccountUser && isAccountTarget);
+        var isHodRole = ['hod', 'head', 'manager', 'chief_accountant', 'CHIEF_ACCOUNTANT', 'cfo', 'CFO', 'ACCOUNTANT', 'BILLING_MANAGER', 'director', 'DIRECTOR', 'md', 'MD', 'executive', 'EXECUTIVE'].indexOf(user.role) !== -1;
+        return isHodRole && deptMatch;
     }
     /** May this user create templates / manage custom items for `department`? */
     function canManage(user, department) {
@@ -269,6 +277,18 @@
         };
         templates.push(tpl); save(K_TEMPLATES, templates);
         return ok({ template: tpl });
+    }
+
+    function deleteTemplate(user, templateId) {
+        var templates = load(K_TEMPLATES);
+        var tpl = templates.find(function (t) { return t.id === templateId; });
+        if (!tpl) return err('ERR_NOT_FOUND', 'Checklist template not found.');
+        if (!canManage(user, tpl.department)) {
+            return err('ERR_PERMISSION', 'You can only delete checklists for your own department.');
+        }
+        templates = templates.filter(function (t) { return t.id !== templateId; });
+        save(K_TEMPLATES, templates);
+        return ok({ id: templateId });
     }
 
     /* ─────────────────────────────── items ──────────────────────────────── */
@@ -698,6 +718,7 @@
         listTemplates: listTemplates,
         getTemplate: getTemplate,
         createTemplate: createTemplate,
+        deleteTemplate: deleteTemplate,
         addItem: addItem,
         updateItem: updateItem,
         removeItem: removeItem,

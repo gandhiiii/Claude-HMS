@@ -156,7 +156,7 @@ const Router = {
         }
 
         // Non-admin staff must not access admin-only modules directly
-        var _adminOnly = ['dashboard', 'users', 'departments', 'feature-rights', 'admin-checklists', 'data-history', 'budget', 'quarterly-priorities', 'hospital-settings'];
+        var _adminOnly = ['dashboard', 'users', 'departments', 'feature-rights', 'admin-checklists', 'data-history', 'budget', 'quarterly-priorities', 'hospital-settings', 'reports'];
         if (_adminOnly.indexOf(module) !== -1 && !isAdmin) {
             var requestedModule = module;
             if (u.role === 'hod') {

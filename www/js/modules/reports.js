@@ -45,17 +45,18 @@ function _rChartCard(title, id, h) {
 
 function renderReports(container) {
     var user = AUTH.currentUser();
-    var hasReportAccess = user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'hod' || (typeof AUTH !== 'undefined' && AUTH.hasPermission(user, 'reports')));
-    if (!user || !hasReportAccess) {
-        container.innerHTML = '<div class="card" style="text-align:center;padding:40px;">'
-            + '<div style="font-size:48px;margin-bottom:12px;">🔒</div>'
-            + '<h3 style="margin-bottom:8px;">Access Restricted</h3>'
-            + '<p style="color:var(--gray);font-size:14px;">Reports & Analytics access permission is required.<br>Please contact your administrator to request access.</p>'
-            + '<button class="btn btn-primary" style="margin-top:16px;" onclick="Router.navigate(\'' + (user && user.role === 'hod' ? 'hod-dashboard' : 'employee-dashboard') + '\')">← Back to Dashboard</button>'
-            + '</div>';
+    var isAdmin = user && (user.isSuperAdmin || user.role === 'admin');
+    if (!user) return;
+    if (!isAdmin) {
+        if (user.role === 'hod') {
+            window._hodTargetTab = 'hodreports';
+            Router.navigate('hod-dashboard');
+        } else {
+            window._targetEmpTab = 'reports';
+            Router.navigate('employee-dashboard');
+        }
         return;
     }
-    var isAdmin = user && (user.isSuperAdmin || user.role === 'admin');
     var TABS = [
         { id: 'summary',     label: '📑 Summary',     color: '#37474f' },
         { id: 'overview',    label: '📊 Overview',    color: '#1a73e8' },

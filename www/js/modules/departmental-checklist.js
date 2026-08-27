@@ -4,7 +4,8 @@ const DCHK_UNITS = ['', 'V', '°C', '%', 'bar', 'A', 'kW', 'L/min', 'psi', 'ppm'
 
 function renderDeptChecklists(container) {
     const user = AUTH.currentUser();
-    const isMgmt = user.role === 'admin' || user.isSuperAdmin || user.role === 'hod';
+    const mgmtRoles = ['admin', 'superadmin', 'hod', 'head', 'manager', 'chief_accountant', 'CHIEF_ACCOUNTANT', 'cfo', 'CFO', 'ACCOUNTANT', 'BILLING_MANAGER', 'director', 'DIRECTOR', 'md', 'MD', 'executive', 'EXECUTIVE'];
+    const isMgmt = user.isSuperAdmin || mgmtRoles.indexOf(user.role) !== -1;
     // Non-mgmt users start on Fill tab
     if (!isMgmt && (dchkTab === 'templates' || dchkTab === 'assign' || dchkTab === 'oversight')) {
         dchkTab = 'fill';
