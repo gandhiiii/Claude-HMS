@@ -191,53 +191,11 @@ const INITIAL_REQUESTS = [
   }
 ];
 
-const INITIAL_DEPARTMENTS = [
-  'OPD',
-  'Other Support Service',
-  'Radiology',
-  'Advance Modality Center',
-  'F&B',
-  'Pharmcy',
-  'Clinical Operation'
-];
+const INITIAL_DEPARTMENTS = [];
 
-const INITIAL_SERVICES = [
-  'Consultation Fees',
-  'Pathology',
-  'MRI',
-  'Open MRI',
-  'X-ray',
-  'DXA',
-  'CT Scan',
-  'Sonography / USG',
-  'Physiotherapy',
-  'EMG/NCV',
-  'Rehability',
-  'Canteen',
-  'Pharmcy',
-  'IPD',
-  'Ambulance',
-  'Pain Management'
-];
+const INITIAL_SERVICES = [];
 
-export const SERVICE_DEPARTMENT_MAP = {
-  'Consultation Fees': 'OPD',
-  'Pathology': 'Other Support Service',
-  'MRI': 'Radiology',
-  'Open MRI': 'Radiology',
-  'X-ray': 'Radiology',
-  'DXA': 'Radiology',
-  'CT Scan': 'Radiology',
-  'Sonography / USG': 'Radiology',
-  'Physiotherapy': 'Advance Modality Center',
-  'EMG/NCV': 'Advance Modality Center',
-  'Rehability': 'Advance Modality Center',
-  'Canteen': 'F&B',
-  'Pharmcy': 'Pharmcy',
-  'IPD': 'Clinical Operation',
-  'Ambulance': 'Other Support Service',
-  'Pain Management': 'Other Support Service'
-};
+export const SERVICE_DEPARTMENT_MAP = {};
 
 export const getDepartmentForService = (serviceName) => {
   if (!serviceName) return 'OPD';
