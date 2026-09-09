@@ -8399,8 +8399,32 @@ function hodExportReport(type) {
 window.renderHodDashboard = renderHodDashboard;
 window.hodExportReport = hodExportReport;
 window._renderBiomedicalHodDashboard = _renderBiomedicalHodDashboard;
+window.toggleBiomedicalSidebar = function() {
+    var sb = document.getElementById('sidebar');
+    var mc = document.querySelector('.main-content');
+    if (!sb || !mc) return;
+    if (sb.style.display === 'none') {
+        sb.style.display = 'block';
+        mc.style.marginLeft = 'var(--sidebar-width, 250px)';
+        mc.style.width = 'calc(100% - var(--sidebar-width, 250px))';
+    } else {
+        sb.style.display = 'none';
+        mc.style.marginLeft = '0';
+        mc.style.width = '100%';
+    }
+};
 
 function _renderBiomedicalHodDashboard(container, user, dept, u, team) {
+    try {
+        var sb = document.getElementById('sidebar');
+        var mc = document.querySelector('.main-content');
+        if (sb) sb.style.display = 'none';
+        if (mc) {
+            mc.style.marginLeft = '0';
+            mc.style.width = '100%';
+        }
+    } catch(e) {}
+
     var assets = DB.get('hod_assets') || [];
     var bioAssets = assets.filter(function(a){ return (a.department||'').trim().toLowerCase() === 'biomedical'; });
     var breakdowns = DB.get('hod_breakdowns') || [];
@@ -8428,6 +8452,7 @@ function _renderBiomedicalHodDashboard(container, user, dept, u, team) {
         + '<button class="btn btn-sm" style="background:#6366f1;color:#fff;font-weight:700;border:none;border-radius:8px;padding:8px 14px;" onclick="showBioEquipForm()">➕ Add Equipment</button>'
         + '<button class="btn btn-sm" style="background:#10b981;color:#fff;font-weight:700;border:none;border-radius:8px;padding:8px 14px;" onclick="showBioLogImplantationModal()">🦴 OT Implantation</button>'
         + '<button class="btn btn-sm" style="background:#f59e0b;color:#fff;font-weight:700;border:none;border-radius:8px;padding:8px 14px;" onclick="hodOpenModal(\'addBreakdown\')">🚨 Log Ticket</button>'
+        + '<button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;font-weight:700;border:1px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px 14px;" onclick="toggleBiomedicalSidebar()" title="Toggle Left Sidebar">👁️ Sidebar</button>'
         + '</div></div></div>'
 
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px;">'

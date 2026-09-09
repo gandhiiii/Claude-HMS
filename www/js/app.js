@@ -202,8 +202,17 @@ const Router = {
             try { navItem.scrollIntoView({ block: 'nearest' }); } catch(e) {}
         }
 
-        // Close sidebar on mobile
-        document.getElementById('sidebar').classList.remove('open');
+        // Close sidebar on mobile & restore sidebar display if leaving Biomedical HOD dashboard
+        const sbEl = document.getElementById('sidebar');
+        const mcEl = document.querySelector('.main-content');
+        if (module !== 'hod-dashboard') {
+            if (sbEl && sbEl.style.display === 'none') sbEl.style.display = '';
+            if (mcEl && (mcEl.style.marginLeft === '0px' || mcEl.style.marginLeft === '0')) {
+                mcEl.style.marginLeft = '';
+                mcEl.style.width = '';
+            }
+        }
+        if (sbEl) sbEl.classList.remove('open');
         const overlay = document.getElementById('sidebarOverlay');
         if (overlay) overlay.classList.remove('active');
 
