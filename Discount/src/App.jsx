@@ -5,6 +5,7 @@ import { Dashboard } from './components/Dashboard';
 import { EmployeeView } from './components/EmployeeView';
 import { DoctorPortalView } from './components/DoctorPortalView';
 import { ExecutiveBypassView } from './components/ExecutiveBypassView';
+import { BiomedicalInventoryView } from './components/BiomedicalInventoryView';
 import { AdminUserManagement } from './components/AdminUserManagement';
 import { NewDiscountModal } from './components/NewDiscountModal';
 import { RequestDetailModal } from './components/RequestDetailModal';
@@ -21,7 +22,7 @@ import { AlertCircle, CheckCircle, Info, ShieldAlert } from 'lucide-react';
 export function AppContent() {
   const { toastAlert, isAuthenticated, activeUser, isBillingRole } = useApp();
 
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' or 'admin'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'biomedical', 'bypass', or 'admin'
   const [showNewModal, setShowNewModal] = useState(false);
   const [showExcelModal, setShowExcelModal] = useState(false);
   const [showNotifDrawer, setShowNotifDrawer] = useState(false);
@@ -99,6 +100,8 @@ export function AppContent() {
             onOpenNewModal={() => setShowNewModal(true)}
             onOpenExcelModal={() => setShowExcelModal(true)}
           />
+        ) : activeTab === 'biomedical' ? (
+          <BiomedicalInventoryView />
         ) : activeTab === 'bypass' ? (
           <ExecutiveBypassView
             onSelectRequest={(req) => setSelectedRequest(req)}

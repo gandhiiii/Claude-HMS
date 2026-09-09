@@ -14,7 +14,9 @@ import {
   RotateCcw,
   Smartphone,
   Globe,
-  Link2
+  Link2,
+  Zap,
+  Activity
 } from 'lucide-react';
 
 export const Header = ({ 
@@ -61,10 +63,10 @@ export const Header = ({
         </div>
 
         {/* Center Tabs: Show to Admin, SuperAdmin, HOD & Account roles */}
-        <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+        <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 flex-wrap gap-1">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`px-4 py-1.5 rounded-lg text-xs transition-all duration-200 ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs transition-all duration-200 ${
               activeTab === 'dashboard'
                 ? 'bg-gradient-to-r from-sky-400 to-teal-300 text-slate-950 font-black shadow-md'
                 : 'text-slate-400 hover:text-slate-200 font-semibold'
@@ -74,8 +76,20 @@ export const Header = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('biomedical')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all duration-200 ${
+              activeTab === 'biomedical'
+                ? 'bg-gradient-to-r from-indigo-400 to-sky-300 text-slate-950 font-black shadow-md'
+                : 'text-indigo-300 hover:text-indigo-100 font-semibold'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>🧬 Biomedical Equipment</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('bypass')}
-            className={`px-4 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all duration-200 ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all duration-200 ${
               activeTab === 'bypass'
                 ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-slate-950 font-black shadow-md'
                 : 'text-amber-400 hover:text-amber-200 font-semibold'
@@ -88,14 +102,14 @@ export const Header = ({
           {['ADMIN', 'SUPERADMIN'].includes(activeUser?.role) && (
             <button
               onClick={() => setActiveTab('admin')}
-              className={`px-4 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all duration-200 ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all duration-200 ${
                 activeTab === 'admin'
                   ? 'bg-gradient-to-r from-sky-400 to-teal-300 text-slate-950 font-black shadow-md'
                   : 'text-slate-400 hover:text-slate-200 font-semibold'
               }`}
             >
               <Users className="w-3.5 h-3.5" />
-              <span>Admin Directory & User Control</span>
+              <span>Admin Directory</span>
             </button>
           )}
         </div>

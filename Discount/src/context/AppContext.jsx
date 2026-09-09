@@ -216,6 +216,100 @@ const INITIAL_DOCTORS = [
   'Dr. Ananya Sharma'
 ];
 
+export const INITIAL_BIOMEDICAL_EQUIPMENT = [
+  {
+    id: 'BIO-EQ-001',
+    name: 'High-End Spine OT Microscope (Leica M530)',
+    department: 'Spine OT',
+    serialNo: 'SN-LEICA-9942',
+    model: 'M530 OH6',
+    manufacturer: 'Leica Microsystems',
+    status: 'Operational',
+    installationDate: '2023-05-15',
+    lastPmDate: '2026-06-10',
+    nextPmDue: '2026-12-10',
+    calibrationStatus: 'Valid',
+    nextCalibrationDue: '2027-01-15',
+    amcContract: 'Active AMC (Leica India)',
+    assignedEngineer: 'Er. Rajesh Varma',
+    cost: 14500000,
+    location: 'OT-2 Spine Super Speciality'
+  },
+  {
+    id: 'BIO-EQ-002',
+    name: 'C-Arm 3D Surgical Imaging System (Ziehm Vision RFD)',
+    department: 'Radiology & OT',
+    serialNo: 'SN-ZIEHM-8812',
+    model: 'Vision RFD 3D',
+    manufacturer: 'Ziehm Imaging',
+    status: 'Operational',
+    installationDate: '2022-11-20',
+    lastPmDate: '2026-07-01',
+    nextPmDue: '2026-11-01',
+    calibrationStatus: 'Valid',
+    nextCalibrationDue: '2026-11-15',
+    amcContract: 'Comprehensive CMC',
+    assignedEngineer: 'Er. Amit Patel',
+    cost: 18500000,
+    location: 'OT-1 Neuro & Spine'
+  },
+  {
+    id: 'BIO-EQ-003',
+    name: 'Multipara Cardiac Monitor (Mindray BeneVision N17)',
+    department: 'ICU',
+    serialNo: 'SN-MIND-4421',
+    model: 'BeneVision N17',
+    manufacturer: 'Mindray Medical',
+    status: 'Breakdown',
+    installationDate: '2023-01-10',
+    lastPmDate: '2026-04-12',
+    nextPmDue: '2026-10-12',
+    calibrationStatus: 'Pending',
+    nextCalibrationDue: '2026-09-01',
+    amcContract: 'Active AMC',
+    assignedEngineer: 'Er. Vikram Mehta',
+    cost: 850000,
+    location: 'ICU Bed 04'
+  },
+  {
+    id: 'BIO-EQ-004',
+    name: 'High Frequency Anaesthesia Workstation (Dräger Primus)',
+    department: 'Spine OT',
+    serialNo: 'SN-DRAG-7731',
+    model: 'Primus IE',
+    manufacturer: 'Dräger Medical',
+    status: 'Maintenance',
+    installationDate: '2021-08-05',
+    lastPmDate: '2026-08-20',
+    nextPmDue: '2026-10-20',
+    calibrationStatus: 'Valid',
+    nextCalibrationDue: '2026-12-01',
+    amcContract: 'Comprehensive CMC',
+    assignedEngineer: 'Er. Sanjay Shah',
+    cost: 4200000,
+    location: 'OT-3 Emergency Spine'
+  },
+  {
+    id: 'BIO-EQ-005',
+    name: 'Pedicle Screw Surgical Instrument Set & OT Implants',
+    department: 'Implant Store',
+    serialNo: 'SN-IMP-1092',
+    model: 'Titanium Multi-Lock',
+    manufacturer: 'Medtronic Spinal',
+    status: 'Operational',
+    installationDate: '2024-02-01',
+    lastPmDate: '2026-08-01',
+    nextPmDue: '2027-02-01',
+    calibrationStatus: 'Valid',
+    nextCalibrationDue: '2027-02-01',
+    amcContract: 'Vendor Warranty',
+    assignedEngineer: 'Bio-Store Incharge',
+    cost: 2900000,
+    location: 'Central Implant Store Room'
+  }
+];
+
+
 export const AppProvider = ({ children }) => {
   const [users, setUsers] = useState(() => {
     const saved = localStorage.getItem('carepulse_users');
@@ -275,6 +369,46 @@ export const AppProvider = ({ children }) => {
     }
     return INITIAL_REQUESTS;
   });
+
+  const [biomedicalEquipment, setBiomedicalEquipment] = useState(() => {
+    const saved = localStorage.getItem('carepulse_biomedical_equipment');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return INITIAL_BIOMEDICAL_EQUIPMENT;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('carepulse_biomedical_equipment', JSON.stringify(biomedicalEquipment));
+  }, [biomedicalEquipment]);
+
+  const addBiomedicalEquipment = (item) => {
+    const newItem = {
+      id: `BIO-EQ-${String(Date.now()).slice(-4)}`,
+      status: 'Operational',
+      calibrationStatus: 'Valid',
+      installationDate: new Date().toISOString().split('T')[0],
+      lastPmDate: new Date().toISOString().split('T')[0],
+      nextPmDue: new Date(Date.now() + 180 * 86400000).toISOString().split('T')[0],
+      nextCalibrationDue: new Date(Date.now() + 365 * 86400000).toISOString().split('T')[0],
+      ...item
+    };
+    setBiomedicalEquipment(prev => [newItem, ...prev]);
+    triggerToast(`Registered Biomedical Equipment: ${newItem.name}`, 'success');
+  };
+
+  const updateBiomedicalEquipment = (id, updates) => {
+    setBiomedicalEquipment(prev => prev.map(eq => eq.id === id ? { ...eq, ...updates } : eq));
+    triggerToast(`Updated Biomedical record (${id})`, 'info');
+  };
+
+  const deleteBiomedicalEquipment = (id) => {
+    setBiomedicalEquipment(prev => prev.filter(eq => eq.id !== id));
+    triggerToast(`Removed Equipment record (${id})`, 'warning');
+  };
 
   const [activeUser, setActiveUser] = useState(() => {
     const savedRole = localStorage.getItem('carepulse_active_user');
@@ -1401,11 +1535,13 @@ export const AppProvider = ({ children }) => {
     localStorage.removeItem('carepulse_doctors');
     localStorage.removeItem('carepulse_requests');
     localStorage.removeItem('carepulse_notifs');
+    localStorage.removeItem('carepulse_biomedical_equipment');
     setUsers(INITIAL_USERS);
     setDepartments(INITIAL_DEPARTMENTS);
     setServices(INITIAL_SERVICES);
     setDoctors(INITIAL_DOCTORS);
     setRequests(INITIAL_REQUESTS);
+    setBiomedicalEquipment(INITIAL_BIOMEDICAL_EQUIPMENT);
     setActiveUser(INITIAL_USERS.find(u => u.role === 'ADMIN') || INITIAL_USERS[0]);
     triggerToast('System data reset to default configuration!', 'info');
   };
@@ -1458,7 +1594,11 @@ export const AppProvider = ({ children }) => {
         commonIp,
         setCommonIp,
         copyToClipboard,
-        manualSync
+        manualSync,
+        biomedicalEquipment,
+        addBiomedicalEquipment,
+        updateBiomedicalEquipment,
+        deleteBiomedicalEquipment
       }}
     >
       {children}
