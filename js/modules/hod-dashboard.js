@@ -270,11 +270,6 @@ function renderHodDashboard(container) {
         tabs.push({ id: 'uniform', label: '👕 Uniform', badge: (DB.get('hodUniforms') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU && x.status === 'pending'; }).length, bc: 'badge-warning' });
         tabs.push({ id: 'uniformreturn', label: '↩️ Uniform Return', badge: (DB.get('hodUniforms') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU && x.status === 'returned'; }).length, bc: 'badge-secondary' });
     }
-    var canLocker = true;
-    if (canLocker) {
-        tabs.push({ id: 'locker', label: '🔐 Locker', badge: (DB.get('hodLockers') || []).filter(function(x){ return x && x.status === 'pending'; }).length, bc: 'badge-warning' });
-        tabs.push({ id: 'lockerreturn', label: '↩️ Locker Return', badge: (DB.get('hodLockers') || []).filter(function(x){ return x && x.status === 'returned'; }).length, bc: 'badge-secondary' });
-    }
     var canHandover = (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') ||
         ['it', 'facility', 'maintenance'].indexOf(_dlowU) !== -1;
     if (canHandover) {
@@ -382,8 +377,6 @@ function _renderHodTab(tab) {
                 equipbackdown: _hodEquipBreakdown,
                 uniform: _hodUniform,
                 uniformreturn: _hodUniformReturn,
-                locker: _hodLocker,
-                lockerreturn: _hodLockerReturn,
                 handover: _hodHandovers,
                 hodtodo: _hodTodo,
                 hodworkreport: _hodWorkReport,
