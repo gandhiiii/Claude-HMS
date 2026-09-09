@@ -350,14 +350,7 @@ function renderHodDashboard(container) {
               + '<button class="btn btn-sm btn-danger">View & Solve</button></div>'
             : '')
 
-        // Tab bar — flex-wrap so all tabs are always visible on any screen width
-        + '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:4px 4px 0;display:flex;flex-wrap:wrap;gap:2px;border-bottom:none;">'
-        + tabs.map(function (t) {
-            var lbl = t.label + (t.badge > 0 ? ' <span class="badge ' + (t.bc || 'badge-primary') + '" style="font-size:10px;margin-left:2px;">' + t.badge + '</span>' : '');
-            return '<button class="hod-tab-btn' + (t.id === activeTab ? ' active' : '') + '" data-tab="' + t.id + '" onclick="hodTabSwitch(\'' + t.id + '\')">' + lbl + '</button>';
-        }).join('')
-        + '</div>'
-        + '<div style="background:var(--card);border:1px solid var(--border);border-top:3px solid #6a1b9a;border-radius:0 0 12px 12px;padding:18px;" id="hodTabContent"></div>';
+        + '<div style="background:var(--card);border:1px solid var(--border);border-top:3px solid #6a1b9a;border-radius:12px;padding:18px;" id="hodTabContent"></div>';
 
     container.innerHTML = html;
     _hodTab = activeTab;
