@@ -610,6 +610,13 @@ const AUTH = {
             if (user.permissions && (user.permissions.includes('biomedical-inventory') || user.permissions.includes('biomedical') || user.permissions.includes('biomedical-module'))) return true;
             return false;
         }
+        if (permission === 'equipment-health-core') {
+            if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || user.role === 'hod') return true;
+            var _ehDept = (user.department || '').trim().toLowerCase();
+            if (_ehDept.indexOf('biomedical') !== -1 || _ehDept.indexOf('it') !== -1 || _ehDept.indexOf('maintenance') !== -1) return true;
+            if (user.permissions && (user.permissions.includes('equipment-health-core') || user.permissions.includes('biomedical-inventory') || user.permissions.includes('biomedical'))) return true;
+            return true;
+        }
         if (permission === 'scrap') {
             if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
             if (user.role === 'hod') {

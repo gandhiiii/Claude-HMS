@@ -144,7 +144,7 @@ function renderEquipmentHealthCore(container) {
                     <div style="font-size:12px;color:#64748b;margin-top:2px;">Simple, clean hospital equipment health status, telemetry & maintenance tracker</div>
                 </div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    <button class="btn btn-sm btn-outline" onclick="renderEquipmentHealthCore(document.getElementById('appContent')||document.getElementById('hodTabContent'))">🔄 Refresh</button>
+                    <button class="btn btn-sm btn-outline" onclick="renderEquipmentHealthCore(document.getElementById('pageContent')||document.getElementById('hodTabContent'))">🔄 Refresh</button>
                     <button class="btn btn-sm btn-primary" onclick="eqCoreOpenChainModal()">🔗 8-Stage Lifecycle Chain</button>
                 </div>
             </div>
@@ -351,7 +351,7 @@ function renderEquipmentHealthCore(container) {
 
 function simpleEqSetDept(dept) {
     simpleEqFilterDept = dept;
-    renderEquipmentHealthCore(document.getElementById('appContent') || document.getElementById('hodTabContent'));
+    renderEquipmentHealthCore(document.getElementById('pageContent') || document.getElementById('hodTabContent') || document.getElementById('main-content'));
 }
 
 function eqCoreRunTerminalCmd(cmd) {
@@ -444,6 +444,16 @@ function _ensureSimpleHealthCoreSeedData() {
         _hodEnsureAssetSeedData('ICU');
         _hodEnsureAssetSeedData('OT');
         _hodEnsureAssetSeedData('Radiology');
+    }
+    var assets = DB.get('hod_assets') || [];
+    if (!assets.length) {
+        DB.set('hod_assets', [
+            { id: 'ast_sp1', assetTag: 'AST-SPINE-001', name: 'Medtronic O-Arm 3D Imaging System', category: 'Capital Equipment', model: 'O-arm O2 System', serialNo: 'SN-MED-9941', department: 'Spine', location: 'Spine OT Room 3', purchasePrice: 4200000, purchaseDate: '2023-01-15', status: 'Working', vendor: 'Medtronic India', qrCode: 'QR-SPINE-001' },
+            { id: 'ast_sp2', assetTag: 'AST-SPINE-002', name: 'StealthStation S8 Surgical Navigation', category: 'Surgical Navigation', model: 'StealthStation S8', serialNo: 'SN-NAV-3321', department: 'Spine', location: 'Spine OT Room 3', purchasePrice: 2800000, purchaseDate: '2023-04-10', status: 'Working', vendor: 'Medtronic India', qrCode: 'QR-SPINE-002' },
+            { id: 'ast_bio1', assetTag: 'AST-BIO-001', name: 'Drager Evita V800 Ventilator', category: 'Life Support', model: 'Evita V800', serialNo: 'SN-DRG-1102', department: 'Biomedical', location: 'ICU Bed 4', purchasePrice: 1200000, purchaseDate: '2024-02-12', status: 'Working', vendor: 'Drager Medical', qrCode: 'QR-BIO-001' },
+            { id: 'ast_rad1', assetTag: 'AST-RAD-001', name: 'Siemens Somatom 128-Slice CT Scanner', category: 'Radiology Imaging', model: 'Somatom Go.Top', serialNo: 'SN-SIE-7781', department: 'Radiology', location: 'CT Scan Bay', purchasePrice: 8500000, purchaseDate: '2022-09-01', status: 'Working', vendor: 'Siemens Healthineers', qrCode: 'QR-RAD-001' },
+            { id: 'ast_icu1', assetTag: 'AST-ICU-001', name: 'Mindray BeneVision N17 Patient Monitor', category: 'Patient Monitoring', model: 'BeneVision N17', serialNo: 'SN-MND-4491', department: 'ICU', location: 'ICU Bed 1', purchasePrice: 450000, purchaseDate: '2024-01-20', status: 'Working', vendor: 'Mindray India', qrCode: 'QR-ICU-001' }
+        ]);
     }
 }
 
