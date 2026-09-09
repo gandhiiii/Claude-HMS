@@ -3408,37 +3408,53 @@ function showBioTrainingForm(recId) {
     </form>`;
 
     APP.openModal(`${isEdit?'Edit':'Add'} Training Record`, html, { width: '720px' });
-    setTimeout(() => {
-        const form = document.getElementById('bioTrainingForm');
-        if (!form) return;
-        form.addEventListener('submit', e => {
+    setTimeout(function() {
+        var form = document.getElementById('bioTrainingForm');
+        if (!form) { console.error('bioTrainingForm not found in DOM'); return; }
+        form.onsubmit = function(e) {
             e.preventDefault();
-            const fd = new FormData(form);
-            const data = {};
-            fd.forEach((v,k) => {
-                if (k === 'attendee_cb') return;
-                data[k] = (data[k] ? data[k] + ',' : '') + v.trim();
-            });
-            // Collect checked attendees
-            const checked = Array.from(form.querySelectorAll('[name="attendee_cb"]:checked')).map(cb => cb.value);
-            data.attendees = [...checked, ...(data.attendeesManual||'').split(',').map(s=>s.trim()).filter(Boolean)].join(', ');
-            if (!data.topic || !data.category) { alert('Please fill required fields.'); return; }
-            const recs = DB.get('bio_training') || [];
-            if (data.id) {
-                const idx = recs.findIndex(r => r.id === data.id);
-                if (idx !== -1) recs[idx] = Object.assign(recs[idx], data, { updatedAt: new Date().toISOString() });
-            } else {
-                data.id = 'train_' + Date.now();
-                data.createdAt = new Date().toISOString();
-                recs.push(data);
+            e.stopPropagation();
+            try {
+                var data = {};
+                // Read all inputs, selects, textareas directly from DOM
+                form.querySelectorAll('input,select,textarea').forEach(function(el) {
+                    if (!el.name || el.name === 'attendee_cb') return;
+                    data[el.name] = (el.value || '').trim();
+                });
+                // Collect checked attendee checkboxes
+                var checked = [];
+                form.querySelectorAll('[name="attendee_cb"]:checked').forEach(function(cb) {
+                    checked.push(cb.value);
+                });
+                var manual = (data.attendeesManual || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+                data.attendees = checked.concat(manual).join(', ');
+
+                if (!data.topic)    { alert('Training Topic is required.'); return false; }
+                if (!data.category) { alert('Please select a Category.'); return false; }
+
+                var recs = DB.get('bio_training') || [];
+                if (data.id) {
+                    var idx = -1;
+                    for (var i = 0; i < recs.length; i++) { if (recs[i].id === data.id) { idx = i; break; } }
+                    if (idx !== -1) Object.assign(recs[idx], data, { updatedAt: new Date().toISOString() });
+                } else {
+                    data.id = 'train_' + Date.now();
+                    data.createdAt = new Date().toISOString();
+                    recs.push(data);
+                }
+                DB.set('bio_training', recs);
+                APP.closeModal();
+                APP.notify('Training record saved!', 'success');
+                bioInvTab = 'training';
+                var cont = document.getElementById('pageContent') || document.getElementById('bioHodInventoryContainer');
+                if (cont) renderBiomedicalInventory(cont);
+            } catch(err) {
+                console.error('Training save error:', err);
+                alert('Save failed: ' + err.message);
             }
-            DB.set('bio_training', recs);
-            APP.closeModal();
-            APP.notify('Training record saved!', 'success');
-            bioInvTab = 'training';
-            renderBiomedicalInventory(document.getElementById('pageContent') || document.getElementById('bioHodInventoryContainer'));
-        });
-    }, 100);
+            return false;
+        };
+    }, 150);
 }
 
 function deleteBioTraining(id) {
