@@ -8418,10 +8418,10 @@ function _renderBiomedicalHodDashboard(container, user, dept, u, team) {
     try {
         var sb = document.getElementById('sidebar');
         var mc = document.querySelector('.main-content');
-        if (sb) sb.style.display = 'none';
+        if (sb) sb.style.display = '';
         if (mc) {
-            mc.style.marginLeft = '0';
-            mc.style.width = '100%';
+            mc.style.marginLeft = '';
+            mc.style.width = '';
         }
     } catch(e) {}
 
@@ -8452,7 +8452,6 @@ function _renderBiomedicalHodDashboard(container, user, dept, u, team) {
         + '<button class="btn btn-sm" style="background:#6366f1;color:#fff;font-weight:700;border:none;border-radius:8px;padding:8px 14px;" onclick="showBioEquipForm()">➕ Add Equipment</button>'
         + '<button class="btn btn-sm" style="background:#10b981;color:#fff;font-weight:700;border:none;border-radius:8px;padding:8px 14px;" onclick="showBioLogImplantationModal()">🦴 OT Implantation</button>'
         + '<button class="btn btn-sm" style="background:#f59e0b;color:#fff;font-weight:700;border:none;border-radius:8px;padding:8px 14px;" onclick="hodOpenModal(\'addBreakdown\')">🚨 Log Ticket</button>'
-        + '<button class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:#fff;font-weight:700;border:1px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px 14px;" onclick="toggleBiomedicalSidebar()" title="Toggle Left Sidebar">👁️ Sidebar</button>'
         + '</div></div></div>'
 
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px;">'
