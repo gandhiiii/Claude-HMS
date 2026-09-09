@@ -2156,7 +2156,8 @@ function _hodCategoryOptions(selected) {
         { v: 'service_cost', l: 'Service Cost' },
         { v: 'other',        l: 'Other' }
     ];
-    var html = '<option value="">Select category</option>';
+    if (!selected) selected = 'consumable';
+    var html = '';
     cats.forEach(function (c) {
         html += '<option value="' + c.v + '"' + (c.v === selected ? ' selected' : '') + '>' + c.l + '</option>';
     });
@@ -2165,24 +2166,33 @@ function _hodCategoryOptions(selected) {
 
 function _hodDeptOptions(selected) {
     var depts = (DB.get('departments') || []).filter(function (d) { return d.active !== false; });
-    var current = window._hodActiveDept || (AUTH.currentUser() || {}).department || '';
+    var user = (typeof AUTH !== 'undefined' && AUTH.currentUser) ? AUTH.currentUser() : {};
+    var current = window._hodActiveDept || user.department || 'Biomedical';
     if (!selected) selected = current;
-    if (depts.length === 0) return '<option value="">Facility</option>';
-    var html = '<option value="">Select department</option>';
+    var esc = function(v){ return String(v||'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    var html = '';
+    var found = false;
     depts.forEach(function (d) {
-        html += '<option value="' + esc(d.name) + '"' + (d.name === selected ? ' selected' : '') + '>' + esc(d.name) + '</option>';
+        var isSel = (d.name || '').trim().toLowerCase() === (selected || '').trim().toLowerCase();
+        if (isSel) found = true;
+        html += '<option value="' + esc(d.name) + '"' + (isSel ? ' selected' : '') + '>' + esc(d.name) + '</option>';
     });
+    if (!found && selected) {
+        html = '<option value="' + esc(selected) + '" selected>' + esc(selected) + '</option>' + html;
+    }
     return html;
 }
 
 function hodCreatePurchase() {
+    var user = (typeof AUTH !== 'undefined' && AUTH.currentUser) ? AUTH.currentUser() : {};
+    var currentDept = window._hodActiveDept || user.department || 'Biomedical';
     var form = '<form id="hodPurchaseForm">'
         + '<div class="form-group"><label>Department *</label>'
-        + '<select name="department" class="form-control" required>' + _hodDeptOptions('') + '</select></div>'
-        + '<div class="form-group"><label>Item / Goods Name *</label><input type="text" name="itemName" class="form-control" required placeholder="e.g. Floor disinfectant 5L"></div>'
+        + '<select name="department" class="form-control" required>' + _hodDeptOptions(currentDept) + '</select></div>'
+        + '<div class="form-group"><label>Item / Goods Name *</label><input type="text" name="itemName" class="form-control" required placeholder="e.g. Syringe Pump / Floor Disinfectant 5L"></div>'
         + '<div class="form-group"><label>Category *</label>'
         + '<select name="category" class="form-control" required>'
-        + _hodCategoryOptions('')
+        + _hodCategoryOptions('consumable')
         + '</select></div>'
         + '<div class="grid-3" style="gap:10px;">'
         + '<div class="form-group"><label>Quantity</label><input type="number" name="quantity" class="form-control" min="1" value="1" oninput="hodPurchaseCalcTotal()"></div>'
@@ -2190,14 +2200,14 @@ function hodCreatePurchase() {
         + '<div class="form-group"><label>Total (auto-calc)</label><input type="text" id="hodPurchaseTotal" class="form-control" readonly style="background:var(--light-gray);font-weight:700;"></div>'
         + '</div>'
         + '<div class="grid-2" style="gap:10px;">'
-        + '<div class="form-group"><label>Location / Store *</label><input type="text" name="location" class="form-control" required placeholder="e.g. General Store, Counter 3"></div>'
+        + '<div class="form-group"><label>Location / Store</label><input type="text" name="location" class="form-control" placeholder="e.g. General Store, Counter 3" value="Main Store"></div>'
         + '<div class="form-group"><label>Vendor / Supplier</label><input type="text" name="vendor" class="form-control" placeholder="e.g. ABC Traders"></div>'
         + '</div>'
         + '<div class="grid-2" style="gap:10px;">'
-        + '<div class="form-group"><label>Bill Date</label><input type="date" name="billDate" class="form-control"></div>'
-        + '<div class="form-group"><label>Invoice / Bill No</label><input type="text" name="billNo" class="form-control" placeholder="e.g. INV-2024-001"></div>'
+        + '<div class="form-group"><label>Bill Date</label><input type="date" name="billDate" class="form-control" value="' + new Date().toISOString().slice(0,10) + '"></div>'
+        + '<div class="form-group"><label>Invoice / Bill No</label><input type="text" name="billNo" class="form-control" placeholder="e.g. INV-2026-001"></div>'
         + '</div>'
-        + '<div class="form-group"><label>Description / Purpose *</label><textarea name="description" class="form-control" rows="3" required placeholder="Why is this purchase needed? How will it be used?"></textarea></div>'
+        + '<div class="form-group"><label>Description / Purpose</label><textarea name="description" class="form-control" rows="2" placeholder="Why is this purchase needed?">Daily Departmental Expense / Stock Purchase</textarea></div>'
         + '<hr style="margin:12px 0;border-color:var(--border);">'
         + '<div class="form-group"><label>Approval Required <span style="font-size:11px;color:var(--gray);">(who needs to approve this?)</span></label>'
         + '<select name="approvalType" class="form-control" onchange="hodToggleApprovalFields()" style="margin-bottom:8px;">'
@@ -2220,33 +2230,44 @@ function hodCreatePurchase() {
 }
 
 function hodSavePurchase() {
-    var user = AUTH.currentUser();
-    if (!user) return false;
+    var user = (typeof AUTH !== 'undefined' && AUTH.currentUser) ? AUTH.currentUser() : { username: 'admin', fullName: 'Administrator' };
+    if (!user) user = { username: 'admin', fullName: 'Administrator' };
     var data = getFormData('hodPurchaseForm');
-    if (!data.itemName || !data.price || !data.location || !data.description || !data.category || !data.department) {
-        APP.notify('Please fill all required fields', 'error'); return false;
+
+    var dept = data.department || window._hodActiveDept || user.department || 'Biomedical';
+    var category = data.category || 'consumable';
+    var location = data.location || 'Main Store';
+    var description = data.description || data.itemName || 'Daily Purchase Record';
+
+    if (!data.itemName || !data.price) {
+        if (typeof APP !== 'undefined' && APP.notify) APP.notify('Please fill Item Name and Price', 'error');
+        return false;
     }
     var qty = parseFloat(data.quantity) || 1;
     var price = parseFloat(data.price) || 0;
-    if (price <= 0) { APP.notify('Enter a valid price', 'error'); return false; }
+    if (price <= 0) {
+        if (typeof APP !== 'undefined' && APP.notify) APP.notify('Enter a valid price', 'error');
+        return false;
+    }
     var approvalType = data.approvalType || 'none';
     var approvalOther = data.approvalOther || '';
     var preApprovedBy = data.preApprovedBy || '';
     var recStatus = approvalType === 'none' ? 'approved' : (approvalType === 'pre-approved' ? 'approved' : 'pending');
-    var dept = data.department || window._hodActiveDept || user.department || '';
     var title = data.itemName;
-    DB.add('hodPurchases', {
+
+    var newRec = {
+        id: 'pur_' + Date.now(),
         title: title,
         itemName: data.itemName,
-        category: data.category,
+        category: category,
         quantity: qty,
         price: price,
         total: qty * price,
-        location: data.location,
-        vendor: data.vendor || '',
-        description: data.description,
+        location: location,
+        vendor: data.vendor || 'Local Vendor',
+        description: description,
         department: dept,
-        billDate: data.billDate || '',
+        billDate: data.billDate || new Date().toISOString().slice(0,10),
         billNo: data.billNo || '',
         status: recStatus,
         approvalType: approvalType,
@@ -2254,15 +2275,27 @@ function hodSavePurchase() {
         preApprovedBy: preApprovedBy,
         approvedBy: recStatus === 'approved' ? (preApprovedBy || (approvalType === 'none' ? 'No approval needed' : '')) : '',
         approvedAt: recStatus === 'approved' ? new Date().toISOString() : '',
-        createdBy: user.username,
-        createdByName: user.fullName,
+        createdBy: user.username || 'user',
+        createdByName: user.fullName || user.username || 'User',
         createdAt: new Date().toISOString()
-    });
-    APP.notify('Purchase request submitted for approval!', 'success');
+    };
+
+    DB.add('hodPurchases', newRec);
+
+    if (typeof APP !== 'undefined' && APP.notify) APP.notify('Purchase request saved successfully!', 'success');
+
     var deptLow = dept.trim().toLowerCase();
-    _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return (p.department||'').trim().toLowerCase() === deptLow; });
-    _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
-    _renderHodTab('purchases');
+    if (typeof _hodData !== 'undefined' && _hodData) {
+        _hodData.deptPurchases = (DB.get('hodPurchases') || []).filter(function (p) { return (p.department||'').trim().toLowerCase() === deptLow; });
+        _hodData.pendingPurchases = _hodData.deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
+    }
+
+    var container = document.getElementById('hodTabContent') || document.getElementById('bioHodInventoryContainer');
+    if (container && typeof _hodPurchases === 'function') {
+        _hodPurchases(container);
+    } else if (typeof _renderHodTab === 'function') {
+        _renderHodTab('purchases');
+    }
     return true;
 }
 
@@ -8399,6 +8432,16 @@ function hodExportReport(type) {
 window.renderHodDashboard = renderHodDashboard;
 window.hodExportReport = hodExportReport;
 window._renderBiomedicalHodDashboard = _renderBiomedicalHodDashboard;
+window.hodCreatePurchase = hodCreatePurchase;
+window.hodSavePurchase = hodSavePurchase;
+window.hodApprovePurchase = hodApprovePurchase;
+window.hodRejectPurchase = hodRejectPurchase;
+window.hodDeletePurchase = hodDeletePurchase;
+window.hodEditPurchase = hodEditPurchase;
+window.hodUpdatePurchase = hodUpdatePurchase;
+window.hodPurchaseCalcTotal = hodPurchaseCalcTotal;
+window.hodPurchaseCalcTotalEdit = hodPurchaseCalcTotalEdit;
+window.hodToggleApprovalFields = hodToggleApprovalFields;
 window.toggleBiomedicalSidebar = function() {
     var sb = document.getElementById('sidebar');
     var mc = document.querySelector('.main-content');
