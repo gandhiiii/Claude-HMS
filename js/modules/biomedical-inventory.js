@@ -511,11 +511,12 @@ function renderBiomedicalInventory(container) {
                     </p>
                 </div>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                    ${bioInvTab === 'items' ? `<button class="btn btn-primary btn-sm" onclick="showBioEquipForm()">➕ Add Equipment</button>` : ''}
-                    ${bioInvTab === 'implants' ? `<button class="btn btn-primary btn-sm" onclick="showBioImplantForm()">➕ Add Implant Item</button><button class="btn btn-success btn-sm" onclick="showBioLogImplantationModal()">🦴 Log Patient Implantation</button>` : ''}
-                    ${bioInvTab === 'purchases' ? `<button class="btn btn-primary btn-sm" onclick="showBioPurchaseForm()">➕ Add Purchase Entry</button>` : ''}
-                    ${bioInvTab === 'meetings' ? `<button class="btn btn-primary btn-sm" onclick="showBioMeetingForm()">➕ Schedule Meeting</button>` : ''}
-                    ${bioInvTab === 'todos' ? `<button class="btn btn-primary btn-sm" onclick="showBioTodoForm()">➕ Add Biomedical Task</button>` : ''}
+                    <button class="btn btn-primary btn-sm" onclick="showBioEquipForm()">➕ Add Equipment</button>
+                    <button class="btn btn-primary btn-sm" onclick="showBioImplantForm()">➕ Add Implant</button>
+                    <button class="btn btn-success btn-sm" onclick="showBioLogImplantationModal()">🦴 Log OT Implantation</button>
+                    <button class="btn btn-primary btn-sm" onclick="showBioPurchaseForm()">➕ Purchase Entry</button>
+                    <button class="btn btn-primary btn-sm" onclick="showBioMeetingForm()">➕ Meeting</button>
+                    <button class="btn btn-primary btn-sm" onclick="showBioTodoForm()">➕ Task</button>
                     <button class="btn btn-sm" style="background:#1e7e34;color:#fff;" onclick="bioInvDownloadExcel()">📥 Excel Export</button>
                     <button class="btn btn-sm" style="background:#c82333;color:#fff;" onclick="bioInvDownloadPdf()">📄 PDF Export</button>
                 </div>
@@ -524,36 +525,7 @@ function renderBiomedicalInventory(container) {
             <!-- Stats Bar -->
             <div class="grid-4 mb-4" id="bioInvStats"></div>
 
-            <!-- Tab Navigation (8 Tabs) -->
-            <div class="tabs mb-4" style="border-bottom:2px solid var(--border);display:flex;gap:4px;overflow-x:auto;padding-bottom:4px;">
-                <button class="tab-btn ${bioInvTab === 'items' ? 'active' : ''}" onclick="switchBioInvTab('items', this)">
-                    📦 Equipment Master
-                </button>
-                <button class="tab-btn ${bioInvTab === 'implants' ? 'active' : ''}" onclick="switchBioInvTab('implants', this)">
-                    🦴 Implant Inventory &amp; Usage
-                </button>
-                <button class="tab-btn ${bioInvTab === 'purchases' ? 'active' : ''}" onclick="switchBioInvTab('purchases', this)">
-                    Receipt &amp; Gate Entry
-                </button>
-                <button class="tab-btn ${bioInvTab === 'contracts' ? 'active' : ''}" onclick="switchBioInvTab('contracts', this)">
-                    📜 AMC / CMC &amp; Warranty Monitor
-                </button>
-                <button class="tab-btn ${bioInvTab === 'history' ? 'active' : ''}" onclick="switchBioInvTab('history', this)">
-                    🛠️ Service &amp; Breakdown Log
-                </button>
-                <button class="tab-btn ${bioInvTab === 'meetings' ? 'active' : ''}" onclick="switchBioInvTab('meetings', this)">
-                    📅 Staff Meetings
-                </button>
-                <button class="tab-btn ${bioInvTab === 'todos' ? 'active' : ''}" onclick="switchBioInvTab('todos', this)">
-                    ✅ Biomedical To-Do List
-                </button>
-                <button class="tab-btn ${bioInvTab === 'checklists' ? 'active' : ''}" onclick="switchBioInvTab('checklists', this)">
-                    📋 Safety Checklists
-                </button>
-            </div>
-
-            <!-- Barcode Scanner Quick Box for Equipment / Implants -->
-            ${(bioInvTab === 'items' || bioInvTab === 'implants') ? `
+            <!-- Barcode Scanner Quick Box -->
             <div class="card mb-4" style="padding:12px 16px;background:#f0f6ff;border:1px solid #c2d7f8;">
                 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
                     <span style="font-weight:600;font-size:13px;display:flex;align-items:center;gap:4px;">
@@ -564,9 +536,8 @@ function renderBiomedicalInventory(container) {
                     <span id="bioBarcodeScanResult" style="font-size:12px;color:var(--gray);"></span>
                 </div>
             </div>
-            ` : ''}
 
-            <!-- Main Tab Content Container -->
+            <!-- Main Content Container (All Sections Stacked) -->
             <div id="bioInvContent"></div>
         </div>
     `;
@@ -689,19 +660,78 @@ function getFilteredImplants() {
     });
 }
 
-/* ── Render Active Tab Content ── */
+/* ── Render All Sections (No Tabs) ── */
 function renderBioInvTabContent() {
     const content = document.getElementById('bioInvContent');
     if (!content) return;
 
-    if (bioInvTab === 'items') content.innerHTML = renderBioItemsTab();
-    else if (bioInvTab === 'implants') content.innerHTML = renderBioImplantsTab();
-    else if (bioInvTab === 'purchases') content.innerHTML = renderBioPurchasesTab();
-    else if (bioInvTab === 'contracts') content.innerHTML = renderBioContractsTab();
-    else if (bioInvTab === 'history') content.innerHTML = renderBioHistoryTab();
-    else if (bioInvTab === 'meetings') content.innerHTML = renderBioMeetingsTab();
-    else if (bioInvTab === 'todos') content.innerHTML = renderBioTodosTab();
-    else if (bioInvTab === 'checklists') content.innerHTML = renderBioChecklistsTab();
+    content.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:24px;">
+            <div id="sec-items" style="border:1px solid #cbd5e1;border-radius:10px;padding:16px;background:#fff;">
+                <h3 style="margin-top:0;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+                    <span>📦 Equipment Master</span>
+                    <button class="btn btn-primary btn-sm" onclick="showBioEquipForm()">➕ Add Equipment</button>
+                </h3>
+                ${renderBioItemsTab()}
+            </div>
+
+            <div id="sec-implants" style="border:1px solid #cbd5e1;border-radius:10px;padding:16px;background:#fff;">
+                <h3 style="margin-top:0;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+                    <span>🦴 Implant Inventory &amp; OT Usage</span>
+                    <div>
+                        <button class="btn btn-primary btn-sm" onclick="showBioImplantForm()">➕ Add Implant</button>
+                        <button class="btn btn-success btn-sm" onclick="showBioLogImplantationModal()">🦴 Log OT Implantation</button>
+                    </div>
+                </h3>
+                ${renderBioImplantsTab()}
+            </div>
+
+            <div id="sec-purchases" style="border:1px solid #cbd5e1;border-radius:10px;padding:16px;background:#fff;">
+                <h3 style="margin-top:0;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+                    <span>🧾 Receipt &amp; Gate Entry</span>
+                    <button class="btn btn-primary btn-sm" onclick="showBioPurchaseForm()">➕ Purchase Entry</button>
+                </h3>
+                ${renderBioPurchasesTab()}
+            </div>
+
+            <div id="sec-contracts" style="border:1px solid #cbd5e1;border-radius:10px;padding:16px;background:#fff;">
+                <h3 style="margin-top:0;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;">
+                    📜 AMC / CMC &amp; Warranty Monitor
+                </h3>
+                ${renderBioContractsTab()}
+            </div>
+
+            <div id="sec-history" style="border:1px solid #cbd5e1;border-radius:10px;padding:16px;background:#fff;">
+                <h3 style="margin-top:0;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;">
+                    🛠️ Service &amp; Breakdown Log
+                </h3>
+                ${renderBioHistoryTab()}
+            </div>
+
+            <div id="sec-meetings" style="border:1px solid #cbd5e1;border-radius:10px;padding:16px;background:#fff;">
+                <h3 style="margin-top:0;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+                    <span>📅 Staff Meetings</span>
+                    <button class="btn btn-primary btn-sm" onclick="showBioMeetingForm()">➕ Schedule Meeting</button>
+                </h3>
+                ${renderBioMeetingsTab()}
+            </div>
+
+            <div id="sec-todos" style="border:1px solid #cbd5e1;border-radius:10px;padding:16px;background:#fff;">
+                <h3 style="margin-top:0;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;display:flex;align-items:center;justify-content:space-between;">
+                    <span>✅ Biomedical To-Do List</span>
+                    <button class="btn btn-primary btn-sm" onclick="showBioTodoForm()">➕ Add Task</button>
+                </h3>
+                ${renderBioTodosTab()}
+            </div>
+
+            <div id="sec-checklists" style="border:1px solid #cbd5e1;border-radius:10px;padding:16px;background:#fff;">
+                <h3 style="margin-top:0;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;">
+                    📋 Safety Checklists
+                </h3>
+                ${renderBioChecklistsTab()}
+            </div>
+        </div>
+    `;
 }
 
 /* ===========================================================================
