@@ -3222,7 +3222,7 @@ function deleteBioCondemn(id) {
 /* ===========================================================================
    TRAINING SECTION
    HOD adds training records. Department employees can view.
-   Categories: Equipment, Instrument, DRM (Daily Record Maintenance), O&O (Operation & Observation)
+   Categories: Equipment, Instrument, DRM (Daily Rhythm Meeting), O&O (Obstacles & Opportunities)
    =========================================================================== */
 function renderBioTrainingTab() {
     const records  = DB.get('bio_training') || [];
@@ -3275,7 +3275,7 @@ function renderBioTrainingTab() {
             <span style="font-size:32px;">🎓</span>
             <div>
                 <div style="font-size:17px;font-weight:800;">Training &amp; Skill Development Register</div>
-                <div style="font-size:12px;opacity:.85;">Equipment | Instrument | DRM (Daily Record Maintenance) | O&O (Operation & Observation) | NABH Compliance Training</div>
+                <div style="font-size:12px;opacity:.85;">Equipment | Instrument | DRM (Daily Rhythm Meeting) | O&O (Obstacles & Opportunities) | NABH Compliance Training</div>
             </div>
         </div>
 
