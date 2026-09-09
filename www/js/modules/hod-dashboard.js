@@ -466,62 +466,59 @@ function _hodOverview(el) {
                 + '</div>';
         });
     }
-    html += '</div></div>';
+    html += '</div></div>'
 
-    var isBiomedical = (d.dept || '').trim().toLowerCase() === 'biomedical';
-    if (!isBiomedical) {
         // Quick actions
-        html += '<div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;">'
-            + '<div style="font-weight:700;font-size:14px;margin-bottom:10px;">⚡ Quick Actions</div>'
-            + '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
-            + '<button class="btn btn-primary" onclick="hodCreateTask()">📝 Assign Task</button>'
-            + '<button class="btn btn-outline" style="background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7;font-weight:600;" onclick="hodTabSwitch(\'purchases\')">💰 Daily Purchases</button>'
-            + '<button class="btn btn-outline" style="background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7;font-weight:600;" onclick="hodCreatePurchase()">+ New Purchase</button>'
-            + '<button class="btn btn-outline" onclick="hodTabSwitch(\'admissions\')">🏥 Admissions</button>'
-            + '<button class="btn btn-outline" onclick="hodTabSwitch(\'team\')">👥 Add Member</button>'
-            + '<button class="btn btn-outline" onclick="hodCreateRequest()">📦 Material Request</button>'
-            + '<button class="btn btn-outline" onclick="hodShowReportForm()">📋 Send Report</button>'
-            + '<button class="btn btn-sm" style="background:#1a237e;color:#fff;border:none;" onclick="hodDownloadMasterReport()">📊 Master Report</button>'
-            + '</div></div>';
+        + '<div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;">'
+        + '<div style="font-weight:700;font-size:14px;margin-bottom:10px;">⚡ Quick Actions</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
+        + '<button class="btn btn-primary" onclick="hodCreateTask()">📝 Assign Task</button>'
+        + '<button class="btn btn-outline" style="background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7;font-weight:600;" onclick="hodTabSwitch(\'purchases\')">💰 Daily Purchases</button>'
+        + '<button class="btn btn-outline" style="background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7;font-weight:600;" onclick="hodCreatePurchase()">+ New Purchase</button>'
+        + '<button class="btn btn-outline" onclick="hodTabSwitch(\'admissions\')">🏥 Admissions</button>'
+        + '<button class="btn btn-outline" onclick="hodTabSwitch(\'team\')">👥 Add Member</button>'
+        + '<button class="btn btn-outline" onclick="hodCreateRequest()">📦 Material Request</button>'
+        + '<button class="btn btn-outline" onclick="hodShowReportForm()">📋 Send Report</button>'
+        + '<button class="btn btn-sm" style="background:#1a237e;color:#fff;border:none;" onclick="hodDownloadMasterReport()">📊 Master Report</button>'
+        + '</div></div>';
 
-        // ── Embedded Daily Purchases Records Summary Widget ──
-        var allP = _hodEnsureSamplePurchases();
-        var isFacOrAdmin = (d.user.isSuperAdmin || d.user.role === 'admin' || d.user.role === 'super_admin') || (d.user.department||'').trim().toLowerCase() === 'facility';
-        var facP = allP.filter(function(p){
-            if (isFacOrAdmin) return true;
-            return (p.department||'').trim().toLowerCase() === (d.dept||'').trim().toLowerCase();
+    // ── Embedded Daily Purchases Records Summary Widget ──
+    var allP = _hodEnsureSamplePurchases();
+    var isFacOrAdmin = (d.user.isSuperAdmin || d.user.role === 'admin' || d.user.role === 'super_admin') || (d.user.department||'').trim().toLowerCase() === 'facility';
+    var facP = allP.filter(function(p){
+        if (isFacOrAdmin) return true;
+        return (p.department||'').trim().toLowerCase() === (d.dept||'').trim().toLowerCase();
+    });
+
+    html += '<div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:12px;padding:16px;margin-top:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:15px;color:#1b5e20;">💰 Daily Purchases & Expenses — Facility & Department Records (' + facP.length + ' Total)</div>'
+        + '<div style="display:flex;gap:6px;">'
+        + '<button class="btn btn-sm" style="background:#1b5e20;color:#fff;border:none;" onclick="hodTabSwitch(\'purchases\')">View All Purchases →</button>'
+        + '<button class="btn btn-sm" style="background:#2e7d32;color:#fff;border:none;" onclick="hodCreatePurchase()">+ New Purchase</button>'
+        + '</div></div>'
+        + '<div class="table-responsive"><table class="table" style="font-size:12px;background:#fff;border-radius:8px;margin:0;"><thead><tr>'
+        + '<th>Date</th><th>Title / Item</th><th>Dept</th><th>Total Value</th><th>Status</th>'
+        + '</tr></thead><tbody>';
+
+    if (facP.length === 0) {
+        html += '<tr><td colspan="5" style="text-align:center;color:var(--gray);padding:14px;">No purchase records entered yet.</td></tr>';
+    } else {
+        facP.slice(0, 5).forEach(function(p){
+            var dateStr = p.billDate ? APP.formatDate(p.billDate) : APP.formatDate(p.createdAt);
+            var stBadge = p.status === 'approved' ? '<span class="badge badge-success" style="font-size:10px;">✓ Approved</span>'
+                : p.status === 'rejected' ? '<span class="badge badge-danger" style="font-size:10px;">✗ Rejected</span>'
+                : '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>';
+            html += '<tr>'
+                + '<td>' + dateStr + '</td>'
+                + '<td><strong>' + (p.title || 'Purchase') + '</strong><br><small style="color:var(--gray);">' + (p.itemName || '—') + '</small></td>'
+                + '<td><span class="badge badge-info" style="font-size:10px;">' + (p.department || 'Facility') + '</span></td>'
+                + '<td><strong>₹' + (parseFloat(p.total) || 0).toFixed(2) + '</strong></td>'
+                + '<td>' + stBadge + '</td>'
+                + '</tr>';
         });
-
-        html += '<div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:12px;padding:16px;margin-top:16px;">'
-            + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">'
-            + '<div style="font-weight:700;font-size:15px;color:#1b5e20;">💰 Daily Purchases & Expenses — Facility & Department Records (' + facP.length + ' Total)</div>'
-            + '<div style="display:flex;gap:6px;">'
-            + '<button class="btn btn-sm" style="background:#1b5e20;color:#fff;border:none;" onclick="hodTabSwitch(\'purchases\')">View All Purchases →</button>'
-            + '<button class="btn btn-sm" style="background:#2e7d32;color:#fff;border:none;" onclick="hodCreatePurchase()">+ New Purchase</button>'
-            + '</div></div>'
-            + '<div class="table-responsive"><table class="table" style="font-size:12px;background:#fff;border-radius:8px;margin:0;"><thead><tr>'
-            + '<th>Date</th><th>Title / Item</th><th>Dept</th><th>Total Value</th><th>Status</th>'
-            + '</tr></thead><tbody>';
-
-        if (facP.length === 0) {
-            html += '<tr><td colspan="5" style="text-align:center;color:var(--gray);padding:14px;">No purchase records entered yet.</td></tr>';
-        } else {
-            facP.slice(0, 5).forEach(function(p){
-                var dateStr = p.billDate ? APP.formatDate(p.billDate) : APP.formatDate(p.createdAt);
-                var stBadge = p.status === 'approved' ? '<span class="badge badge-success" style="font-size:10px;">✓ Approved</span>'
-                    : p.status === 'rejected' ? '<span class="badge badge-danger" style="font-size:10px;">✗ Rejected</span>'
-                    : '<span class="badge badge-warning" style="font-size:10px;">⏳ Pending</span>';
-                html += '<tr>'
-                    + '<td>' + dateStr + '</td>'
-                    + '<td><strong>' + (p.title || 'Purchase') + '</strong><br><small style="color:var(--gray);">' + (p.itemName || '—') + '</small></td>'
-                    + '<td><span class="badge badge-info" style="font-size:10px;">' + (p.department || 'Facility') + '</span></td>'
-                    + '<td><strong>₹' + (parseFloat(p.total) || 0).toFixed(2) + '</strong></td>'
-                    + '<td>' + stBadge + '</td>'
-                    + '</tr>';
-            });
-        }
-        html += '</tbody></table></div></div>';
     }
+    html += '</tbody></table></div></div>';
 
     el.innerHTML = remHtml + html;
 }
