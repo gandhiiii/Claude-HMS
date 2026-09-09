@@ -1,3 +1,20 @@
+function getDefaultUsers() {
+    return [
+        { id: 'usr_admin', fullName: 'System Administrator', username: 'admin', password: 'admin', role: 'admin', department: 'Admin', email: 'admin@hospital.org', phone: '+91 98765 00001', isSuperAdmin: true },
+        { id: 'usr_superadmin', fullName: 'Super Admin', username: 'superadmin', password: 'admin', role: 'superadmin', department: 'Executive', email: 'superadmin@hospital.org', phone: '+91 98765 00002', isSuperAdmin: true },
+        { id: 'usr_biomedical', fullName: 'Er. Hardik Shah', username: 'biomedical', password: 'biomedical', role: 'hod', department: 'Biomedical', email: 'hardik.bme@hospital.org', phone: '+91 98765 00003', isSuperAdmin: false },
+        { id: 'usr_bme_tech', fullName: 'Sr. BME Tech Officer', username: 'bme_tech', password: 'bme', role: 'employee', department: 'Biomedical', email: 'bme.tech@hospital.org', phone: '+91 98765 00004', isSuperAdmin: false },
+        { id: 'usr_account', fullName: 'Accounts HOD', username: 'account', password: 'account', role: 'chief_accountant', department: 'Accounts', email: 'accounts@hospital.org', phone: '+91 98765 00005', isSuperAdmin: false },
+        { id: 'usr_reception', fullName: 'Reception Staff', username: 'reception', password: 'reception', role: 'receptionist', department: 'Reception', email: 'reception@hospital.org', phone: '+91 98765 00006', isSuperAdmin: false },
+        { id: 'usr_storekeeper', fullName: 'Storekeeper Manager', username: 'storekeeper', password: 'storekeeper', role: 'storekeeper', department: 'Store', email: 'store@hospital.org', phone: '+91 98765 00007', isSuperAdmin: false },
+        { id: 'usr_doc_sarah', fullName: 'Dr. Sarah Jenkins', username: 'doc_sarah', password: 'password', role: 'doctor', department: 'Radiology', email: 'sarah.j@hospital.org', phone: '+91 98765 00008', isSuperAdmin: false },
+        { id: 'usr_doc_rajesh', fullName: 'Dr. Rajesh Kumar', username: 'doc_rajesh', password: 'password', role: 'doctor', department: 'OPD', email: 'rajesh.k@hospital.org', phone: '+91 98765 00009', isSuperAdmin: false },
+        { id: 'usr_facility', fullName: 'Facility Manager', username: 'facility', password: 'facility', role: 'hod', department: 'Facility', email: 'facility@hospital.org', phone: '+91 98765 00010', isSuperAdmin: false },
+        { id: 'usr_it_hod', fullName: 'IT Manager', username: 'ithod', password: 'ithod', role: 'hod', department: 'IT', email: 'it.hod@hospital.org', phone: '+91 98765 00011', isSuperAdmin: false }
+    ];
+}
+window.getDefaultUsers = getDefaultUsers;
+
 const DB = {
     _channel: typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('hms_sync') : null,
     _listeners: [],
@@ -43,23 +60,32 @@ const DB = {
                         return ks.map(function(k){ return val[k]; });
                     }
                 }
-                if (val !== null && val !== undefined) return val;
+                if (val !== null && val !== undefined) {
+                    if (key === 'users' && Array.isArray(val) && val.length === 0) {
+                        var defaults = getDefaultUsers();
+                        try { this.set('users', defaults); } catch(e2){}
+                        return defaults;
+                    }
+                    return val;
+                }
             }
         } catch (e) {}
         try {
             var raw = sessionStorage.getItem('hms_' + key);
             if (raw !== null && raw !== undefined) {
                 var val = JSON.parse(raw);
-                if (val !== null && val !== undefined) return val;
+                if (val !== null && val !== undefined) {
+                    if (key === 'users' && Array.isArray(val) && val.length === 0) {
+                        var defaults = getDefaultUsers();
+                        try { this.set('users', defaults); } catch(e2){}
+                        return defaults;
+                    }
+                    return val;
+                }
             }
         } catch (e) {}
         if (key === 'users') {
-            var defaults = typeof getDefaultUsers === 'function' ? getDefaultUsers() : [
-                { id: 'usr_admin', fullName: 'System Administrator', username: 'admin', password: 'admin', role: 'admin', department: 'Admin', isSuperAdmin: true },
-                { id: 'usr_superadmin', fullName: 'Super Admin', username: 'superadmin', password: 'admin', role: 'superadmin', department: 'Executive', isSuperAdmin: true },
-                { id: 'usr_account', fullName: 'Accounts HOD', username: 'account', password: 'account', role: 'chief_accountant', department: 'Accounts', isSuperAdmin: false },
-                { id: 'usr_reception', fullName: 'Reception Staff', username: 'reception', password: 'reception', role: 'receptionist', department: 'Reception', isSuperAdmin: false }
-            ];
+            var defaults = getDefaultUsers();
             try { this.set('users', defaults); } catch(e2){}
             return defaults;
         }
