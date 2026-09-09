@@ -3185,31 +3185,44 @@ function showBioCondemnForm(recId) {
     </form>`;
 
     APP.openModal(`${isEdit?'Edit':'New'} Condemnation Record`, html, { width: '720px' });
-    setTimeout(() => {
-        const form = document.getElementById('bioCondemnForm');
-        if (!form) return;
-        form.addEventListener('submit', e => {
+    setTimeout(function() {
+        var form = document.getElementById('bioCondemnForm');
+        if (!form) { console.error('bioCondemnForm not found in DOM'); return; }
+        form.onsubmit = function(e) {
             e.preventDefault();
-            const fd = new FormData(form);
-            const data = {};
-            fd.forEach((v,k) => { data[k] = v.trim(); });
-            if (!data.itemName || !data.itemType || !data.reason) { alert('Please fill required fields.'); return; }
-            const recs = DB.get('bio_condemnation') || [];
-            if (data.id) {
-                const idx = recs.findIndex(r => r.id === data.id);
-                if (idx !== -1) recs[idx] = Object.assign(recs[idx], data, { updatedAt: new Date().toISOString() });
-            } else {
-                data.id = 'cond_' + Date.now();
-                data.createdAt = new Date().toISOString();
-                recs.push(data);
+            e.stopPropagation();
+            try {
+                var data = {};
+                // Read all inputs, selects, textareas directly from DOM
+                form.querySelectorAll('input,select,textarea').forEach(function(el) {
+                    if (el.name) data[el.name] = (el.value || '').trim();
+                });
+                if (!data.itemName) { alert('Item Name is required.'); return false; }
+                if (!data.itemType) { alert('Please select an Item Type.'); return false; }
+                if (!data.reason)   { alert('Reason for Condemnation is required.'); return false; }
+                var recs = DB.get('bio_condemnation') || [];
+                if (data.id) {
+                    var idx = -1;
+                    for (var i = 0; i < recs.length; i++) { if (recs[i].id === data.id) { idx = i; break; } }
+                    if (idx !== -1) Object.assign(recs[idx], data, { updatedAt: new Date().toISOString() });
+                } else {
+                    data.id = 'cond_' + Date.now();
+                    data.createdAt = new Date().toISOString();
+                    recs.push(data);
+                }
+                DB.set('bio_condemnation', recs);
+                APP.closeModal();
+                APP.notify('Condemnation record saved!', 'success');
+                bioInvTab = 'condemnation';
+                var cont = document.getElementById('pageContent') || document.getElementById('bioHodInventoryContainer');
+                if (cont) renderBiomedicalInventory(cont);
+            } catch(err) {
+                console.error('Condemnation save error:', err);
+                alert('Save failed: ' + err.message);
             }
-            DB.set('bio_condemnation', recs);
-            APP.closeModal();
-            APP.notify('Condemnation record saved!', 'success');
-            bioInvTab = 'condemnation';
-            renderBiomedicalInventory(document.getElementById('pageContent') || document.getElementById('bioHodInventoryContainer'));
-        });
-    }, 100);
+            return false;
+        };
+    }, 150);
 }
 
 function deleteBioCondemn(id) {
