@@ -276,7 +276,17 @@ function renderHodDashboard(container) {
         tabs.push({ id: 'handover', label: '🔄 Handover', badge: (DB.get('handovers') || []).filter(function(x){ return (x.department||'').trim().toLowerCase() === _dlowU; }).length, bc: 'badge-info' });
     }
 
+    if (_dlowU === 'biomedical') {
+        tabs = tabs.filter(function(t) {
+            return t.id !== 'admissions' && t.id !== 'dept-checklist' && t.id !== 'locker' && t.id !== 'lockerreturn';
+        });
+    }
+
+    var validTabIds = tabs.map(function(t){ return t.id; });
     var activeTab = window._hodTargetTab || _hodTab || 'overview';
+    if (validTabIds.indexOf(activeTab) === -1) {
+        activeTab = validTabIds.indexOf('dept-assets') !== -1 ? 'dept-assets' : 'overview';
+    }
     window._hodTargetTab = null;
 
     var html = ''
@@ -303,7 +313,7 @@ function renderHodDashboard(container) {
         + _hKpi('⏱️', 'Over TAT',       _hodData.overTatTasks.length,         '#fff8e1', '#ff6f00', 'tasks')
         + _hKpi('✅', 'Checklists Due', pendingCl,                            '#e8f5e9', 'var(--secondary)', 'checklists')
         + _hKpi('📦', 'Inventory Items', deptInventory.length,                '#e0f2f1', '#00796b', 'inventory')
-        + _hKpi('🧹', 'Rooms to Clean', cleaning.length,                      '#fce4ec', 'var(--danger)', 'admissions')
+        + (_dlowU !== 'biomedical' ? _hKpi('🧹', 'Rooms to Clean', cleaning.length, '#fce4ec', 'var(--danger)', 'admissions') : '')
         + (canPurchases ? _hKpi('💰', 'Purchase Requests', deptPurchases.length, '#e8f5e9', '#2e7d32', 'purchases') : '')
         + (canService ? _hKpi('🔧', 'Service Due', dueServices.length, '#ffebee', 'var(--danger)', 'equipservice') : '')
         + _hKpi('📋', 'My TODOs', hodPendingTodos,                             '#fce4ec', '#e91e63', 'hodtodo')
@@ -315,7 +325,7 @@ function renderHodDashboard(container) {
               + '<span style="font-size:13px;font-weight:600;color:var(--danger);">⚠️ ' + _hodData.overdueTasks.length + ' overdue task(s) in your team</span>'
               + '<button class="btn btn-sm btn-danger" onclick="hodTabSwitch(\'tasks\')">View</button></div>'
             : '')
-        + (cleaning.length > 0
+        + (cleaning.length > 0 && _dlowU !== 'biomedical'
             ? '<div style="background:#fff3e0;border:1px solid var(--warning);border-radius:8px;padding:10px 16px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;" onclick="hodTabSwitch(\'admissions\')">'
               + '<span style="font-size:13px;font-weight:600;color:#e65100;">🧹 ' + cleaning.length + ' room(s) awaiting cleaning</span>'
               + '<button class="btn btn-sm btn-warning" style="color:#fff;">Manage</button></div>'
