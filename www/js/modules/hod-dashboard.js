@@ -236,8 +236,12 @@ function renderHodDashboard(container) {
     var upcomingServices = equipServices.filter(function(e){ return e.status !== 'done' && e.nextServiceDue && new Date(e.nextServiceDue) > new Date(); });
     var backdowns = canBreakdown ? (DB.get('hodEquipmentBackdowns') || []) : [];
 
+    var deptAssetsCount = (DB.get('hod_assets') || []).filter(function(a){ return (a.department||'').trim().toLowerCase() === (dept||'').trim().toLowerCase(); }).length;
+    var openBreakdownCount = (DB.get('hod_breakdowns') || []).filter(function(b){ return (b.department||'').trim().toLowerCase() === (dept||'').trim().toLowerCase() && b.status !== 'resolved'; }).length;
+
     var tabs = [
         { id: 'overview',    label: 'Overview' },
+        { id: 'dept-assets', label: '🏥 Dept Assets & Ops', badge: openBreakdownCount > 0 ? openBreakdownCount : (deptAssetsCount || 0), bc: openBreakdownCount > 0 ? 'badge-danger' : 'badge-info' },
         { id: 'admissions',  label: 'Admissions' },
         { id: 'tasks',       label: 'Tasks', badge: _hodData.overdueTasks.length, bc: 'badge-danger' },
         { id: 'team',        label: '👥 My Team', badge: team.length, bc: 'badge-success' },
@@ -382,7 +386,8 @@ function _renderHodTab(tab) {
                 lockerreturn: _hodLockerReturn,
                 handover: _hodHandovers,
                 hodtodo: _hodTodo,
-                hodworkreport: _hodWorkReport };
+                hodworkreport: _hodWorkReport,
+                'dept-assets': _hodDeptAssets };
     if (map[tab]) map[tab](el);
 }
 
@@ -7080,6 +7085,1052 @@ function _hodDchkOversight(el, user, dept, assignments, team) {
     }
 
     el.innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════════
+   DEPARTMENT ASSETS & OPERATIONS HUB (15 SUB-MODULES)
+═══════════════════════════════════════════════ */
+var _hodAssetsSubTab = 'assets';
+
+function hodSwitchAssetsSubTab(subTab) {
+    _hodAssetsSubTab = subTab;
+    var el = document.getElementById('hodTabContent');
+    if (el && _hodTab === 'dept-assets') {
+        _hodDeptAssets(el);
+    }
+}
+
+function _hodEnsureAssetSeedData(dept) {
+    var dLow = (dept || '').trim().toLowerCase();
+    
+    // 1. Assets Master
+    var assets = DB.get('hod_assets') || [];
+    var deptAssets = assets.filter(function(a){ return (a.department||'').trim().toLowerCase() === dLow; });
+    if (!deptAssets.length) {
+        var seedAssets = [
+            { id: 'ast_101', assetTag: 'AST-' + dept.toUpperCase().slice(0,3) + '-001', name: dept + ' Primary Workstation', category: 'Capital Equipment', model: 'Pro-Series 5000', serialNo: 'SN-8849201', department: dept, location: dept + ' Main Room 1', purchasePrice: 450000, purchaseDate: '2024-03-15', status: 'Working', vendor: 'MedTech Solutions Ltd', qrCode: 'QR-AST-001' },
+            { id: 'ast_102', assetTag: 'AST-' + dept.toUpperCase().slice(0,3) + '-002', name: dept + ' High Precision Monitor', category: 'Patient Monitoring', model: 'VistaCare V12', serialNo: 'SN-7738291', department: dept, location: dept + ' Bay 2', purchasePrice: 180000, purchaseDate: '2024-06-10', status: 'Working', vendor: 'CareSupply Corp', qrCode: 'QR-AST-002' },
+            { id: 'ast_103', assetTag: 'AST-' + dept.toUpperCase().slice(0,3) + '-003', name: dept + ' Backup Power Console', category: 'Support Utility', model: 'PowerGuard 3KVA', serialNo: 'SN-4492019', department: dept, location: dept + ' Utility Room', purchasePrice: 95000, purchaseDate: '2023-11-20', status: 'Under Maintenance', vendor: 'ElectroServ India', qrCode: 'QR-AST-003' }
+        ];
+        DB.set('hod_assets', assets.concat(seedAssets));
+    }
+
+    // 2. Breakdowns
+    var breakdowns = DB.get('hod_breakdowns') || [];
+    var deptB = breakdowns.filter(function(b){ return (b.department||'').trim().toLowerCase() === dLow; });
+    if (!deptB.length) {
+        var seedB = [
+            { id: 'brk_201', ticketNo: 'TKT-1001', assetTag: 'AST-' + dept.toUpperCase().slice(0,3) + '-003', assetName: dept + ' Backup Power Console', department: dept, description: 'Intermittent voltage fluctuation during power transfer.', priority: 'High', reportedBy: 'Duty Tech', reportedAt: '2026-09-08 09:30', status: 'In-Progress', assignedTech: 'Senior Engr (ElectroServ)', repairCost: 4500 },
+            { id: 'brk_202', ticketNo: 'TKT-1002', assetTag: 'AST-' + dept.toUpperCase().slice(0,3) + '-001', assetName: dept + ' Primary Workstation', department: dept, description: 'Display sensor calibration drift observed.', priority: 'Medium', reportedBy: 'HOD', reportedAt: '2026-09-05 14:00', status: 'Resolved', assignedTech: 'MedTech Solutions', repairCost: 0 }
+        ];
+        DB.set('hod_breakdowns', breakdowns.concat(seedB));
+    }
+
+    // 3. PM Schedules
+    var pms = DB.get('hod_pm_schedules') || [];
+    var deptPM = pms.filter(function(p){ return (p.department||'').trim().toLowerCase() === dLow; });
+    if (!deptPM.length) {
+        var seedPM = [
+            { id: 'pm_301', assetTag: 'AST-' + dept.toUpperCase().slice(0,3) + '-001', assetName: dept + ' Primary Workstation', department: dept, frequency: 'Quarterly', lastPmDate: '2026-06-10', nextPmDue: '2026-09-10', serviceAgency: 'MedTech Solutions', status: 'Scheduled', checklistDone: true },
+            { id: 'pm_302', assetTag: 'AST-' + dept.toUpperCase().slice(0,3) + '-002', assetName: dept + ' High Precision Monitor', department: dept, frequency: 'Semi-Annual', lastPmDate: '2026-03-15', nextPmDue: '2026-09-15', serviceAgency: 'CareSupply Corp', status: 'Scheduled', checklistDone: true }
+        ];
+        DB.set('hod_pm_schedules', pms.concat(seedPM));
+    }
+
+    // 4. Calibration
+    var cals = DB.get('hod_calibrations') || [];
+    var deptCal = cals.filter(function(c){ return (c.department||'').trim().toLowerCase() === dLow; });
+    if (!deptCal.length) {
+        var seedCal = [
+            { id: 'cal_401', instrumentName: dept + ' Digital Pressure Calibrator', assetTag: 'AST-' + dept.toUpperCase().slice(0,3) + '-001', department: dept, labVendor: 'NABL Certified Test Lab', certificateNo: 'CAL-2026-8891', calDate: '2026-01-10', expiryDate: '2027-01-09', tolerance: '±0.02%', status: 'Valid' },
+            { id: 'cal_402', instrumentName: dept + ' Electrical Safety Analyzer', assetTag: 'AST-' + dept.toUpperCase().slice(0,3) + '-002', department: dept, labVendor: 'Precision Calibrations Ltd', certificateNo: 'CAL-2025-4410', calDate: '2025-09-20', expiryDate: '2026-09-19', tolerance: '±0.05%', status: 'Expiring Soon' }
+        ];
+        DB.set('hod_calibrations', cals.concat(seedCal));
+    }
+
+    // 5. AMC / CMC Contracts
+    var cnts = DB.get('hod_contracts') || [];
+    var deptCnt = cnts.filter(function(c){ return (c.department||'').trim().toLowerCase() === dLow; });
+    if (!deptCnt.length) {
+        var seedCnt = [
+            { id: 'cnt_501', assetName: dept + ' Primary Workstation', department: dept, contractType: 'CMC', provider: 'MedTech Solutions Ltd', startDate: '2025-04-01', expiryDate: '2027-03-31', annualCost: 45000, status: 'Active' },
+            { id: 'cnt_502', assetName: dept + ' High Precision Monitor', department: dept, contractType: 'AMC', provider: 'CareSupply Corp', startDate: '2025-10-01', expiryDate: '2026-09-30', annualCost: 18000, status: 'Expiring Soon' }
+        ];
+        DB.set('hod_contracts', cnts.concat(seedCnt));
+    }
+
+    // 6. Radiology
+    var rads = DB.get('hod_radiology_equipment') || [];
+    var deptRad = rads.filter(function(r){ return (r.department||'').trim().toLowerCase() === dLow; });
+    if (!deptRad.length) {
+        var seedRad = [
+            { id: 'rad_601', assetTag: 'RAD-CT-01', name: '32-Slice CT Scanner System', department: dept, model: 'Somatom Go.Up', aerbLicense: 'AERB-LIC-99481', aerbExpiry: '2027-12-31', exposureHours: 1420, radiationSafety: 'Cleared', qaStatus: 'Pass' },
+            { id: 'rad_602', assetTag: 'RAD-XR-02', name: 'Digital Radiography X-Ray Unit', department: dept, model: 'Multix Impact', aerbLicense: 'AERB-LIC-44821', aerbExpiry: '2026-11-15', exposureHours: 850, radiationSafety: 'Cleared', qaStatus: 'Pass' }
+        ];
+        DB.set('hod_radiology_equipment', rads.concat(seedRad));
+    }
+
+    // 7. OT Equipment
+    var ots = DB.get('hod_ot_equipment') || [];
+    var deptOt = ots.filter(function(o){ return (o.department||'').trim().toLowerCase() === dLow; });
+    if (!deptOt.length) {
+        var seedOt = [
+            { id: 'ot_701', name: 'Advanced Anesthesia Workstation', department: dept, roomNo: 'OT-1 Major Surgical', preSurgeryCheck: 'Passed', sterilizationDate: '2026-09-08 18:00', backupPowerTest: 'OK', status: 'Ready for Surgery' },
+            { id: 'ot_702', name: 'LED Surgical Shadowless Light Unit', department: dept, roomNo: 'OT-2 Ortho Surgical', preSurgeryCheck: 'Passed', sterilizationDate: '2026-09-08 17:30', backupPowerTest: 'OK', status: 'Ready for Surgery' }
+        ];
+        DB.set('hod_ot_equipment', ots.concat(seedOt));
+    }
+
+    // 8. Spare Parts
+    var sprs = DB.get('hod_spares') || [];
+    var deptSpr = sprs.filter(function(s){ return (s.department||'').trim().toLowerCase() === dLow; });
+    if (!deptSpr.length) {
+        var seedSpr = [
+            { id: 'spr_801', partName: 'SpO2 Finger Sensor Probe', compatibleMachine: dept + ' High Precision Monitor', partNo: 'PRB-SPO2-01', quantity: 8, minLevel: 3, unitPrice: 3500, vendor: 'CareSupply Corp', status: 'In Stock' },
+            { id: 'spr_802', partName: 'ECG 10-Lead Trunk Cable', compatibleMachine: dept + ' Primary Workstation', partNo: 'CBL-ECG-10', quantity: 2, minLevel: 4, unitPrice: 4200, vendor: 'MedTech Solutions', status: 'Low Stock - Reorder' }
+        ];
+        DB.set('hod_spares', sprs.concat(seedSpr));
+    }
+
+    // 9. Vendors
+    var vnds = DB.get('hod_vendors') || [];
+    var deptVnd = vnds.filter(function(v){ return (v.department||'').trim().toLowerCase() === dLow; });
+    if (!deptVnd.length) {
+        var seedVnd = [
+            { id: 'vnd_901', companyName: 'MedTech Solutions Ltd', serviceType: 'OEM Supplier & Service Agency', contactPerson: 'Mr. Rajesh Sharma', phone: '+91 98765 43210', email: 'service@medtechsolutions.in', activeContracts: 2, rating: 5, status: 'Empaneled', department: dept },
+            { id: 'vnd_902', companyName: 'Precision Calibrations India', serviceType: 'NABL Calibration Lab', contactPerson: 'Ms. Anita Desai', phone: '+91 98112 33445', email: 'support@precisioncal.in', activeContracts: 1, rating: 4.8, status: 'Empaneled', department: dept }
+        ];
+        DB.set('hod_vendors', vnds.concat(seedVnd));
+    }
+
+    // 10. Requisitions
+    var reqs = DB.get('hod_requisitions') || [];
+    var deptReq = reqs.filter(function(r){ return (r.department||'').trim().toLowerCase() === dLow; });
+    if (!deptReq.length) {
+        var seedReq = [
+            { id: 'req_1001', title: 'Replacement Battery Module for Defibrillator', department: dept, estCost: 18500, priority: 'High', justification: 'Backup battery health at 45%. Recommended replacement for emergency readiness.', status: 'Pending Approval', createdDate: '2026-09-07' }
+        ];
+        DB.set('hod_requisitions', reqs.concat(seedReq));
+    }
+
+    // 11. Utilization
+    var utls = DB.get('hod_utilization') || [];
+    var deptUtl = utls.filter(function(u){ return (u.department||'').trim().toLowerCase() === dLow; });
+    if (!deptUtl.length) {
+        var seedUtl = [
+            { id: 'utl_1101', assetName: dept + ' Primary Workstation', department: dept, dailyHours: 8.5, weeklyHours: 48, procedureCount: 34, utilizationRate: 85, status: 'Optimal High Demand' },
+            { id: 'utl_1102', assetName: dept + ' High Precision Monitor', department: dept, dailyHours: 14.0, weeklyHours: 82, procedureCount: 52, utilizationRate: 92, status: 'Heavy Usage' }
+        ];
+        DB.set('hod_utilization', utls.concat(seedUtl));
+    }
+
+    // 12. Downtime Analysis
+    var dwts = DB.get('hod_downtime') || [];
+    var deptDwt = dwts.filter(function(d){ return (d.department||'').trim().toLowerCase() === dLow; });
+    if (!deptDwt.length) {
+        var seedDwt = [
+            { id: 'dwt_1201', assetName: dept + ' Backup Power Console', department: dept, failureDate: '2026-09-04', downtimeHours: 6.5, rootCause: 'Power Surge Board Fault', revenueImpact: 12000, resolution: 'Control board replaced under service ticket.', mttrHours: 6.5 }
+        ];
+        DB.set('hod_downtime', dwts.concat(seedDwt));
+    }
+
+    // 13. Compliance / NABH
+    var cmps = DB.get('hod_compliance') || [];
+    var deptCmp = cmps.filter(function(c){ return (c.department||'').trim().toLowerCase() === dLow; });
+    if (!deptCmp.length) {
+        var seedCmp = [
+            { id: 'cmp_1301', clause: 'NABH FMS.4', requirement: 'Preventive maintenance & calibration of all medical equipment.', department: dept, status: 'Compliant', proofDoc: 'PM_CAL_REGISTER_2026.pdf', lastAudit: '2026-08-15' },
+            { id: 'cmp_1302', clause: 'NABH BMO.2', requirement: 'Electrical safety and grounding check sign-off for critical care units.', department: dept, status: 'Compliant', proofDoc: 'ELEC_SAFETY_CERT_2026.pdf', lastAudit: '2026-08-20' }
+        ];
+        DB.set('hod_compliance', cmps.concat(seedCmp));
+    }
+
+    // 14. Terminal Logs
+    var trms = DB.get('hod_issue_terminal') || [];
+    var deptTrm = trms.filter(function(t){ return (t.department||'').trim().toLowerCase() === dLow; });
+    if (!deptTrm.length) {
+        var seedTrm = [
+            { id: 'trm_1401', assetTag: 'AST-' + dept.toUpperCase().slice(0,3) + '-002', issueType: 'Cable Contact Error', urgency: 'Medium', description: 'Probe connection loose during patient setup.', staffName: 'Nurse Preeti', timestamp: '2026-09-09 08:45', status: 'Logged' }
+        ];
+        DB.set('hod_issue_terminal', trms.concat(seedTrm));
+    }
+}
+
+function _hodDeptAssets(el) {
+    var d = _hodData || {};
+    var dept = d.dept || 'Biomedical';
+
+    _hodEnsureAssetSeedData(dept);
+
+    var assets = (DB.get('hod_assets') || []).filter(function(a){ return (a.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+    var breakdowns = (DB.get('hod_breakdowns') || []).filter(function(b){ return (b.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+    var openB = breakdowns.filter(function(b){ return b.status !== 'resolved'; });
+    var pms = (DB.get('hod_pm_schedules') || []).filter(function(p){ return (p.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+    var overduePM = pms.filter(function(p){ return p.status !== 'completed' && p.nextPmDue && new Date(p.nextPmDue) <= new Date(); });
+
+    var subTabs = [
+        { id: 'assets', label: '🏷️ Asset Register', badge: assets.length, bc: 'badge-info' },
+        { id: 'breakdown', label: '🛠️ Breakdown / Complaints', badge: openB.length, bc: 'badge-danger' },
+        { id: 'pm', label: '📅 Preventive Maintenance', badge: overduePM.length, bc: 'badge-warning' },
+        { id: 'calibration', label: '📐 Calibration' },
+        { id: 'contracts', label: '📜 AMC / CMC & Warranty' },
+        { id: 'radiology', label: '🩻 Radiology Equipment' },
+        { id: 'ot', label: '🏥 OT Equipment' },
+        { id: 'spares', label: '🧩 Spare Parts' },
+        { id: 'vendors', label: '🏢 Vendor Management' },
+        { id: 'requisition', label: '📑 Purchase / Requisition' },
+        { id: 'utilization', label: '⏱️ Equipment Utilization' },
+        { id: 'downtime', label: '📊 Downtime Analysis' },
+        { id: 'compliance', label: '🛡️ Compliance / NABH' },
+        { id: 'analytics', label: '📈 Reports & Analytics' },
+        { id: 'terminal', label: '💻 Issue Terminal' }
+    ];
+
+    var html = '<div style="background:linear-gradient(135deg,#0d47a1,#1565c0);border-radius:12px;padding:16px 20px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">'
+        + '<div><div style="font-size:18px;font-weight:700;">🏥 ' + dept + ' Asset & Equipment Operational Hub</div>'
+        + '<div style="font-size:12px;opacity:.9;">Department-based equipment lifecycle, breakdown, maintenance, calibration, vendors & compliance management.</div></div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm btn-light" style="font-weight:600;" onclick="hodOpenModal(\'addAsset\')">+ Add Asset</button>'
+        + '<button class="btn btn-sm btn-warning" style="color:#fff;font-weight:600;" onclick="hodOpenModal(\'addBreakdown\')">🚨 Log Fault / Ticket</button>'
+        + '<button class="btn btn-sm btn-success" style="font-weight:600;" onclick="hodOpenModal(\'issueTerminal\')">💻 Quick Issue Kiosk</button>'
+        + '</div></div>'
+
+        + '<div style="display:flex;flex-wrap:wrap;gap:4px;background:var(--light-gray);padding:6px;border-radius:10px;margin-bottom:16px;">'
+        + subTabs.map(function(t){
+            var active = t.id === _hodAssetsSubTab ? 'background:#0d47a1;color:#fff;font-weight:700;' : 'background:#fff;color:var(--text);';
+            var bHtml = t.badge ? ' <span class="badge ' + (t.bc || 'badge-primary') + '" style="font-size:10px;margin-left:3px;">' + t.badge + '</span>' : '';
+            return '<button class="btn btn-sm" style="border:none;border-radius:6px;font-size:12px;padding:6px 12px;cursor:pointer;transition:.15s;' + active + '" onclick="hodSwitchAssetsSubTab(\'' + t.id + '\')">' + t.label + bHtml + '</button>';
+        }).join('')
+        + '</div>'
+        + '<div id="hodAssetsSubContent"></div>';
+
+    el.innerHTML = html;
+    _renderHodAssetsSubTab(_hodAssetsSubTab);
+}
+
+function _renderHodAssetsSubTab(subTab) {
+    var container = document.getElementById('hodAssetsSubContent');
+    if (!container) return;
+
+    var map = {
+        assets: _hodSubAssets,
+        breakdown: _hodSubBreakdowns,
+        pm: _hodSubPM,
+        calibration: _hodSubCalibration,
+        contracts: _hodSubContracts,
+        radiology: _hodSubRadiology,
+        ot: _hodSubOT,
+        spares: _hodSubSpares,
+        vendors: _hodSubVendors,
+        requisition: _hodSubRequisitions,
+        utilization: _hodSubUtilization,
+        downtime: _hodSubDowntime,
+        compliance: _hodSubCompliance,
+        analytics: _hodSubAnalytics,
+        terminal: _hodSubTerminal
+    };
+
+    if (map[subTab]) {
+        map[subTab](container);
+    } else {
+        _hodSubAssets(container);
+    }
+}
+
+/* 1. ASSET REGISTER SUB-TAB */
+function _hodSubAssets(el) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+    var assets = (DB.get('hod_assets') || []).filter(function(a){ return (a.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+    
+    var working = assets.filter(function(a){ return a.status === 'Working'; }).length;
+    var maint = assets.filter(function(a){ return a.status === 'Under Maintenance'; }).length;
+    var totalVal = assets.reduce(function(acc, a){ return acc + (parseFloat(a.purchasePrice)||0); }, 0);
+
+    var html = '<div class="grid-4" style="gap:10px;margin-bottom:16px;">'
+        + '<div style="background:#e3f2fd;border:1px solid #90caf9;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#1565c0;font-weight:600;">TOTAL ASSETS</div><div style="font-size:22px;font-weight:700;color:#0d47a1;">' + assets.length + '</div></div>'
+        + '<div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#2e7d32;font-weight:600;">WORKING</div><div style="font-size:22px;font-weight:700;color:#1b5e20;">' + working + '</div></div>'
+        + '<div style="background:#fff3e0;border:1px solid #ffe0b2;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#e65100;font-weight:600;">UNDER MAINTENANCE</div><div style="font-size:22px;font-weight:700;color:#bf360c;">' + maint + '</div></div>'
+        + '<div style="background:#ffebee;border:1px solid #ffcdd2;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#c62828;font-weight:600;">TOTAL VALUATION</div><div style="font-size:20px;font-weight:700;color:#b71c1c;">₹' + totalVal.toLocaleString('en-IN') + '</div></div>'
+        + '</div>'
+
+        + '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:15px;">🏷️ ' + dept + ' Asset Register</div>'
+        + '<button class="btn btn-sm btn-primary" onclick="hodOpenModal(\'addAsset\')">+ New Asset Entry</button>'
+        + '</div>'
+        + '<div class="table-responsive"><table class="table" style="font-size:12px;margin:0;"><thead><tr>'
+        + '<th>Asset Tag</th><th>Equipment Name</th><th>Model / Serial No</th><th>Location</th><th>Category</th><th>Purchase Price</th><th>Status</th><th>Vendor</th><th>Action</th>'
+        + '</tr></thead><tbody>';
+
+    if (assets.length === 0) {
+        html += '<tr><td colspan="9" style="text-align:center;color:var(--gray);padding:20px;">No asset records registered for ' + dept + '. Click "+ New Asset Entry" to add one.</td></tr>';
+    } else {
+        assets.forEach(function(a){
+            var stBadge = a.status === 'Working' ? 'badge-success' : a.status === 'Breakdown' ? 'badge-danger' : 'badge-warning';
+            html += '<tr>'
+                + '<td><strong style="color:#0d47a1;">' + (a.assetTag || 'AST-000') + '</strong></td>'
+                + '<td><strong>' + (a.name || 'Equipment') + '</strong></td>'
+                + '<td>' + (a.model || '—') + '<br><small style="color:var(--gray);">' + (a.serialNo || '') + '</small></td>'
+                + '<td>' + (a.location || '—') + '</td>'
+                + '<td>' + (a.category || 'General') + '</td>'
+                + '<td>₹' + (parseFloat(a.purchasePrice)||0).toLocaleString('en-IN') + '</td>'
+                + '<td><span class="badge ' + stBadge + '">' + (a.status || 'Working') + '</span></td>'
+                + '<td>' + (a.vendor || '—') + '</td>'
+                + '<td><button class="btn btn-sm btn-outline" style="font-size:11px;padding:2px 6px;" onclick="hodDeleteAsset(\'' + a.id + '\')">🗑️</button></td>'
+                + '</tr>';
+        });
+    }
+    html += '</tbody></table></div></div>';
+    el.innerHTML = html;
+}
+
+/* 2. BREAKDOWN MANAGEMENT SUB-TAB */
+function _hodSubBreakdowns(el) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+    var bks = (DB.get('hod_breakdowns') || []).filter(function(b){ return (b.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+
+    var openB = bks.filter(function(b){ return b.status === 'Open' || b.status === 'In-Progress'; }).length;
+    var resB = bks.filter(function(b){ return b.status === 'Resolved'; }).length;
+    var totalCost = bks.reduce(function(acc, b){ return acc + (parseFloat(b.repairCost)||0); }, 0);
+
+    var html = '<div class="grid-3" style="gap:10px;margin-bottom:16px;">'
+        + '<div style="background:#ffebee;border:1px solid #ffcdd2;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#c62828;font-weight:600;">ACTIVE BREAKDOWNS</div><div style="font-size:22px;font-weight:700;color:#b71c1c;">' + openB + '</div></div>'
+        + '<div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#2e7d32;font-weight:600;">RESOLVED TICKETS</div><div style="font-size:22px;font-weight:700;color:#1b5e20;">' + resB + '</div></div>'
+        + '<div style="background:#fff3e0;border:1px solid #ffe0b2;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#e65100;font-weight:600;">TOTAL REPAIR COST</div><div style="font-size:20px;font-weight:700;color:#bf360c;">₹' + totalCost.toLocaleString('en-IN') + '</div></div>'
+        + '</div>'
+
+        + '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:15px;">🛠️ Equipment Breakdown & Fault Tickets (' + bks.length + ')</div>'
+        + '<button class="btn btn-sm btn-danger" onclick="hodOpenModal(\'addBreakdown\')">🚨 Log New Fault Ticket</button>'
+        + '</div>'
+        + '<div class="table-responsive"><table class="table" style="font-size:12px;margin:0;"><thead><tr>'
+        + '<th>Ticket No</th><th>Asset Tag & Name</th><th>Fault Description</th><th>Priority</th><th>Reported At</th><th>Assigned Tech</th><th>Status</th><th>Repair Cost</th><th>Action</th>'
+        + '</tr></thead><tbody>';
+
+    if (bks.length === 0) {
+        html += '<tr><td colspan="9" style="text-align:center;color:var(--gray);padding:20px;">No breakdown tickets logged. All equipment running smoothly!</td></tr>';
+    } else {
+        bks.forEach(function(b){
+            var pBadge = b.priority === 'High' || b.priority === 'Urgent' ? 'badge-danger' : 'badge-warning';
+            var stBadge = b.status === 'Resolved' ? 'badge-success' : 'badge-danger';
+            html += '<tr>'
+                + '<td><strong>' + (b.ticketNo || 'TKT-00') + '</strong></td>'
+                + '<td><strong>' + (b.assetName || 'Equipment') + '</strong><br><small style="color:var(--gray);">' + (b.assetTag || '') + '</small></td>'
+                + '<td>' + (b.description || '—') + '</td>'
+                + '<td><span class="badge ' + pBadge + '">' + (b.priority || 'Normal') + '</span></td>'
+                + '<td>' + (b.reportedAt || '—') + '</td>'
+                + '<td>' + (b.assignedTech || 'Unassigned') + '</td>'
+                + '<td><span class="badge ' + stBadge + '">' + (b.status || 'Open') + '</span></td>'
+                + '<td>₹' + (parseFloat(b.repairCost)||0).toLocaleString('en-IN') + '</td>'
+                + '<td>' + (b.status !== 'Resolved' ? '<button class="btn btn-sm btn-success" style="font-size:11px;padding:2px 6px;" onclick="hodResolveBreakdown(\'' + b.id + '\')">✓ Resolve</button>' : '<span style="color:var(--success);font-size:11px;">✓ Closed</span>') + '</td>'
+                + '</tr>';
+        });
+    }
+    html += '</tbody></table></div></div>';
+    el.innerHTML = html;
+}
+
+/* 3. PREVENTIVE MAINTENANCE SUB-TAB */
+function _hodSubPM(el) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+    var pms = (DB.get('hod_pm_schedules') || []).filter(function(p){ return (p.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+
+    var html = '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:15px;">📅 Preventive Maintenance (PM) Calendar & Logs</div>'
+        + '<button class="btn btn-sm btn-primary" onclick="hodOpenModal(\'addPM\')">+ Schedule PM</button>'
+        + '</div>'
+        + '<div class="table-responsive"><table class="table" style="font-size:12px;margin:0;"><thead><tr>'
+        + '<th>Asset Tag</th><th>Asset Name</th><th>PM Frequency</th><th>Last Service Date</th><th>Next PM Due</th><th>Service Agency</th><th>Checklist Status</th><th>Action</th>'
+        + '</tr></thead><tbody>';
+
+    if (pms.length === 0) {
+        html += '<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:20px;">No PM schedules added. Click "+ Schedule PM" to set up maintenance routines.</td></tr>';
+    } else {
+        pms.forEach(function(p){
+            var isOverdue = p.nextPmDue && new Date(p.nextPmDue) <= new Date() && p.status !== 'completed';
+            var stBadge = isOverdue ? 'badge-danger' : 'badge-success';
+            html += '<tr>'
+                + '<td><strong>' + (p.assetTag || 'AST-00') + '</strong></td>'
+                + '<td><strong>' + (p.assetName || 'Equipment') + '</strong></td>'
+                + '<td>' + (p.frequency || 'Quarterly') + '</td>'
+                + '<td>' + (p.lastPmDate || '—') + '</td>'
+                + '<td><strong style="' + (isOverdue ? 'color:var(--danger);' : '') + '">' + (p.nextPmDue || '—') + '</strong></td>'
+                + '<td>' + (p.serviceAgency || 'Internal Team') + '</td>'
+                + '<td><span class="badge ' + stBadge + '">' + (isOverdue ? '⚠️ Overdue' : '✓ Up to date') + '</span></td>'
+                + '<td><button class="btn btn-sm btn-success" style="font-size:11px;padding:2px 6px;" onclick="hodMarkPmCompleted(\'' + p.id + '\')">✅ Complete PM</button></td>'
+                + '</tr>';
+        });
+    }
+    html += '</tbody></table></div></div>';
+    el.innerHTML = html;
+}
+
+/* 4. CALIBRATION SUB-TAB */
+function _hodSubCalibration(el) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+    var cals = (DB.get('hod_calibrations') || []).filter(function(c){ return (c.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+
+    var html = '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:15px;">📐 Precision Calibration Register & NABL Certificates</div>'
+        + '<button class="btn btn-sm btn-primary" onclick="hodOpenModal(\'addCalibration\')">+ Add Calibration Record</button>'
+        + '</div>'
+        + '<div class="table-responsive"><table class="table" style="font-size:12px;margin:0;"><thead><tr>'
+        + '<th>Instrument Name</th><th>Asset Tag</th><th>Certified NABL Lab</th><th>Certificate No</th><th>Calibrated Date</th><th>Validity Expiry</th><th>Tolerance</th><th>Status</th>'
+        + '</tr></thead><tbody>';
+
+    if (cals.length === 0) {
+        html += '<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:20px;">No calibration records found for ' + dept + '.</td></tr>';
+    } else {
+        cals.forEach(function(c){
+            var stBadge = c.status === 'Valid' ? 'badge-success' : 'badge-warning';
+            html += '<tr>'
+                + '<td><strong>' + (c.instrumentName || 'Instrument') + '</strong></td>'
+                + '<td>' + (c.assetTag || '—') + '</td>'
+                + '<td>' + (c.labVendor || '—') + '</td>'
+                + '<td><span class="badge badge-info">' + (c.certificateNo || 'CAL-000') + '</span></td>'
+                + '<td>' + (c.calDate || '—') + '</td>'
+                + '<td><strong>' + (c.expiryDate || '—') + '</strong></td>'
+                + '<td>' + (c.tolerance || '±0.01%') + '</td>'
+                + '<td><span class="badge ' + stBadge + '">' + (c.status || 'Valid') + '</span></td>'
+                + '</tr>';
+        });
+    }
+    html += '</tbody></table></div></div>';
+    el.innerHTML = html;
+}
+
+/* 5. AMC / CMC CONTRACTS SUB-TAB */
+function _hodSubContracts(el) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+    var cnts = (DB.get('hod_contracts') || []).filter(function(c){ return (c.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+
+    var html = '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:15px;">📜 AMC / CMC & Warranty Contracts Lifecycle</div>'
+        + '<button class="btn btn-sm btn-primary" onclick="hodOpenModal(\'addContract\')">+ New Contract</button>'
+        + '</div>'
+        + '<div class="table-responsive"><table class="table" style="font-size:12px;margin:0;"><thead><tr>'
+        + '<th>Equipment Name</th><th>Type</th><th>Provider / Agency</th><th>Start Date</th><th>Expiry Date</th><th>Annual Cost</th><th>Status</th>'
+        + '</tr></thead><tbody>';
+
+    if (cnts.length === 0) {
+        html += '<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No AMC/CMC contracts logged.</td></tr>';
+    } else {
+        cnts.forEach(function(c){
+            var stBadge = c.status === 'Active' ? 'badge-success' : 'badge-warning';
+            html += '<tr>'
+                + '<td><strong>' + (c.assetName || 'Equipment') + '</strong></td>'
+                + '<td><span class="badge badge-primary">' + (c.contractType || 'AMC') + '</span></td>'
+                + '<td>' + (c.provider || '—') + '</td>'
+                + '<td>' + (c.startDate || '—') + '</td>'
+                + '<td><strong>' + (c.expiryDate || '—') + '</strong></td>'
+                + '<td>₹' + (parseFloat(c.annualCost)||0).toLocaleString('en-IN') + '</td>'
+                + '<td><span class="badge ' + stBadge + '">' + (c.status || 'Active') + '</span></td>'
+                + '</tr>';
+        });
+    }
+    html += '</tbody></table></div></div>';
+    el.innerHTML = html;
+}
+
+/* 6. RADIOLOGY SUB-TAB */
+function _hodSubRadiology(el) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+    var rads = (DB.get('hod_radiology_equipment') || []).filter(function(r){ return (r.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+
+    var html = '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:15px;">🩻 Diagnostic Radiology Systems & AERB Compliance</div>'
+        + '<button class="btn btn-sm btn-info" style="color:#fff;" onclick="APP.notify(\'AERB License sync complete\',\'info\')">🔄 Sync AERB Portal</button>'
+        + '</div>'
+        + '<div class="table-responsive"><table class="table" style="font-size:12px;margin:0;"><thead><tr>'
+        + '<th>Asset Tag</th><th>System Name</th><th>Model</th><th>AERB License No</th><th>License Expiry</th><th>Exposure Hours</th><th>QA Status</th>'
+        + '</tr></thead><tbody>';
+
+    if (rads.length === 0) {
+        html += '<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No specific radiology items configured for ' + dept + '.</td></tr>';
+    } else {
+        rads.forEach(function(r){
+            html += '<tr>'
+                + '<td><strong>' + (r.assetTag || 'RAD-00') + '</strong></td>'
+                + '<td><strong>' + (r.name || 'Radiology Unit') + '</strong></td>'
+                + '<td>' + (r.model || '—') + '</td>'
+                + '<td><span class="badge badge-info">' + (r.aerbLicense || '—') + '</span></td>'
+                + '<td>' + (r.aerbExpiry || '—') + '</td>'
+                + '<td>' + (r.exposureHours || 0) + ' hrs</td>'
+                + '<td><span class="badge badge-success">✓ ' + (r.qaStatus || 'Pass') + '</span></td>'
+                + '</tr>';
+        });
+    }
+    html += '</tbody></table></div></div>';
+    el.innerHTML = html;
+}
+
+/* 7. OT EQUIPMENT SUB-TAB */
+function _hodSubOT(el) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+    var ots = (DB.get('hod_ot_equipment') || []).filter(function(o){ return (o.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+
+    var html = '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:15px;">🏥 Operation Theatre Equipment & Pre-Surgery Verification</div>'
+        + '<button class="btn btn-sm btn-success" onclick="APP.notify(\'Pre-surgery checklist verified for all OT rooms\',\'success\')">✅ Signoff Pre-Surgery Checklist</button>'
+        + '</div>'
+        + '<div class="table-responsive"><table class="table" style="font-size:12px;margin:0;"><thead><tr>'
+        + '<th>Equipment Name</th><th>OT Location</th><th>Pre-Surgery Safety Check</th><th>Sterilization Log</th><th>Backup Power</th><th>Status</th>'
+        + '</tr></thead><tbody>';
+
+    if (ots.length === 0) {
+        html += '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No OT equipment registered for ' + dept + '.</td></tr>';
+    } else {
+        ots.forEach(function(o){
+            html += '<tr>'
+                + '<td><strong>' + (o.name || 'OT Machine') + '</strong></td>'
+                + '<td>' + (o.roomNo || 'OT Room') + '</td>'
+                + '<td><span class="badge badge-success">✓ ' + (o.preSurgeryCheck || 'Passed') + '</span></td>'
+                + '<td>' + (o.sterilizationDate || '—') + '</td>'
+                + '<td><span class="badge badge-info">' + (o.backupPowerTest || 'OK') + '</span></td>'
+                + '<td><span class="badge badge-success">' + (o.status || 'Ready') + '</span></td>'
+                + '</tr>';
+        });
+    }
+    html += '</tbody></table></div></div>';
+    el.innerHTML = html;
+}
+
+/* 8. SPARE PARTS SUB-TAB */
+function _hodSubSpares(el) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+    var sprs = (DB.get('hod_spares') || []).filter(function(s){ return (s.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+
+    var html = '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:15px;">🧩 Spare Parts & Consumables Inventory</div>'
+        + '<button class="btn btn-sm btn-primary" onclick="hodOpenModal(\'addSpare\')">+ Add Spare Part</button>'
+        + '</div>'
+        + '<div class="table-responsive"><table class="table" style="font-size:12px;margin:0;"><thead><tr>'
+        + '<th>Spare Part Name</th><th>Compatible Equipment</th><th>Part No</th><th>Quantity in Stock</th><th>Min Reorder Level</th><th>Unit Price</th><th>Supplier</th><th>Status</th>'
+        + '</tr></thead><tbody>';
+
+    if (sprs.length === 0) {
+        html += '<tr><td colspan="8" style="text-align:center;color:var(--gray);padding:20px;">No spare parts registered.</td></tr>';
+    } else {
+        sprs.forEach(function(s){
+            var isLow = parseFloat(s.quantity) <= parseFloat(s.minLevel);
+            var stBadge = isLow ? 'badge-danger' : 'badge-success';
+            html += '<tr>'
+                + '<td><strong>' + (s.partName || 'Part') + '</strong></td>'
+                + '<td>' + (s.compatibleMachine || '—') + '</td>'
+                + '<td><code>' + (s.partNo || '—') + '</code></td>'
+                + '<td><strong style="font-size:14px;' + (isLow ? 'color:var(--danger);' : '') + '">' + (s.quantity || 0) + '</strong></td>'
+                + '<td>' + (s.minLevel || 0) + '</td>'
+                + '<td>₹' + (parseFloat(s.unitPrice)||0).toLocaleString('en-IN') + '</td>'
+                + '<td>' + (s.vendor || '—') + '</td>'
+                + '<td><span class="badge ' + stBadge + '">' + (isLow ? '⚠️ Low Stock' : '✓ In Stock') + '</span></td>'
+                + '</tr>';
+        });
+    }
+    html += '</tbody></table></div></div>';
+    el.innerHTML = html;
+}
+
+/* 9. VENDOR MANAGEMENT SUB-TAB */
+function _hodSubVendors(el) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+    var vnds = (DB.get('hod_vendors') || []).filter(function(v){ return (v.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+
+    var html = '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:15px;">🏢 Empaneled Vendors & Service Agencies Directory</div>'
+        + '<button class="btn btn-sm btn-primary" onclick="hodOpenModal(\'addVendor\')">+ Empanel Vendor</button>'
+        + '</div>'
+        + '<div class="table-responsive"><table class="table" style="font-size:12px;margin:0;"><thead><tr>'
+        + '<th>Company Name</th><th>Service Type</th><th>Contact Person</th><th>Phone / Email</th><th>Active Contracts</th><th>Rating</th><th>Status</th>'
+        + '</tr></thead><tbody>';
+
+    if (vnds.length === 0) {
+        html += '<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No vendors empaneled for ' + dept + '.</td></tr>';
+    } else {
+        vnds.forEach(function(v){
+            html += '<tr>'
+                + '<td><strong>' + (v.companyName || 'Vendor') + '</strong></td>'
+                + '<td>' + (v.serviceType || 'Supplier') + '</td>'
+                + '<td>' + (v.contactPerson || '—') + '</td>'
+                + '<td>' + (v.phone || '') + '<br><small style="color:var(--gray);">' + (v.email || '') + '</small></td>'
+                + '<td><span class="badge badge-info">' + (v.activeContracts || 0) + ' active</span></td>'
+                + '<td>⭐ ' + (v.rating || 5.0) + '</td>'
+                + '<td><span class="badge badge-success">' + (v.status || 'Empaneled') + '</span></td>'
+                + '</tr>';
+        });
+    }
+    html += '</tbody></table></div></div>';
+    el.innerHTML = html;
+}
+
+/* 10. REQUISITION SUB-TAB */
+function _hodSubRequisitions(el) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+    var reqs = (DB.get('hod_requisitions') || []).filter(function(r){ return (r.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+
+    var html = '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:15px;">📑 Equipment & Spare Purchase Requisitions</div>'
+        + '<button class="btn btn-sm btn-primary" onclick="hodOpenModal(\'addRequisition\')">+ Create Purchase Indent</button>'
+        + '</div>'
+        + '<div class="table-responsive"><table class="table" style="font-size:12px;margin:0;"><thead><tr>'
+        + '<th>Req ID</th><th>Title / Item Description</th><th>Est. Cost</th><th>Priority</th><th>Justification</th><th>Date</th><th>Status</th>'
+        + '</tr></thead><tbody>';
+
+    if (reqs.length === 0) {
+        html += '<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No purchase requisitions logged. Click "+ Create Purchase Indent" to request equipment/spares.</td></tr>';
+    } else {
+        reqs.forEach(function(r){
+            html += '<tr>'
+                + '<td><strong>' + (r.id || 'REQ-00') + '</strong></td>'
+                + '<td><strong>' + (r.title || 'Requisition') + '</strong></td>'
+                + '<td>₹' + (parseFloat(r.estCost)||0).toLocaleString('en-IN') + '</td>'
+                + '<td><span class="badge badge-warning">' + (r.priority || 'Normal') + '</span></td>'
+                + '<td>' + (r.justification || '—') + '</td>'
+                + '<td>' + (r.createdDate || '—') + '</td>'
+                + '<td><span class="badge badge-info">' + (r.status || 'Pending') + '</span></td>'
+                + '</tr>';
+        });
+    }
+    html += '</tbody></table></div></div>';
+    el.innerHTML = html;
+}
+
+/* 11. UTILIZATION SUB-TAB */
+function _hodSubUtilization(el) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+    var utls = (DB.get('hod_utilization') || []).filter(function(u){ return (u.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+
+    var html = '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:15px;">⏱️ Equipment Utilization & Operational Hours Log</div>'
+        + '<button class="btn btn-sm btn-info" style="color:#fff;" onclick="APP.notify(\'Utilization metrics logged\',\'success\')">📊 Refresh Metrics</button>'
+        + '</div>'
+        + '<div class="table-responsive"><table class="table" style="font-size:12px;margin:0;"><thead><tr>'
+        + '<th>Equipment Name</th><th>Daily Operating Hrs</th><th>Weekly Total Hrs</th><th>Patient Scans / Procedures</th><th>Utilization Rate %</th><th>Status</th>'
+        + '</tr></thead><tbody>';
+
+    if (utls.length === 0) {
+        html += '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No runtime logs recorded yet.</td></tr>';
+    } else {
+        utls.forEach(function(u){
+            html += '<tr>'
+                + '<td><strong>' + (u.assetName || 'Equipment') + '</strong></td>'
+                + '<td>' + (u.dailyHours || 0) + ' hrs/day</td>'
+                + '<td>' + (u.weeklyHours || 0) + ' hrs/wk</td>'
+                + '<td>' + (u.procedureCount || 0) + ' patients</td>'
+                + '<td><strong style="color:var(--success);">' + (u.utilizationRate || 80) + '%</strong></td>'
+                + '<td><span class="badge badge-success">' + (u.status || 'Optimal') + '</span></td>'
+                + '</tr>';
+        });
+    }
+    html += '</tbody></table></div></div>';
+    el.innerHTML = html;
+}
+
+/* 12. DOWNTIME ANALYSIS SUB-TAB */
+function _hodSubDowntime(el) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+    var dwts = (DB.get('hod_downtime') || []).filter(function(d){ return (d.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+
+    var html = '<div class="grid-3" style="gap:10px;margin-bottom:16px;">'
+        + '<div style="background:#e3f2fd;border:1px solid #90caf9;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#1565c0;font-weight:600;">AVG MTBF (DAYS)</div><div style="font-size:22px;font-weight:700;color:#0d47a1;">45 Days</div></div>'
+        + '<div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#2e7d32;font-weight:600;">AVG MTTR (HOURS)</div><div style="font-size:22px;font-weight:700;color:#1b5e20;">6.5 Hours</div></div>'
+        + '<div style="background:#ffebee;border:1px solid #ffcdd2;border-radius:10px;padding:12px;"><div style="font-size:11px;color:#c62828;font-weight:600;">SERVICE IMPACT LOSS</div><div style="font-size:20px;font-weight:700;color:#b71c1c;">₹12,000</div></div>'
+        + '</div>'
+
+        + '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">'
+        + '<div style="font-weight:700;font-size:15px;margin-bottom:12px;">📊 Equipment Reliability & Downtime Event Analysis</div>'
+        + '<div class="table-responsive"><table class="table" style="font-size:12px;margin:0;"><thead><tr>'
+        + '<th>Equipment Name</th><th>Failure Date</th><th>Downtime (Hrs)</th><th>Root Cause Category</th><th>Revenue / Service Loss</th><th>MTTR (Hrs)</th>'
+        + '</tr></thead><tbody>';
+
+    if (dwts.length === 0) {
+        html += '<tr><td colspan="6" style="text-align:center;color:var(--gray);padding:20px;">No downtime events logged. Reliability is 100%!</td></tr>';
+    } else {
+        dwts.forEach(function(d){
+            html += '<tr>'
+                + '<td><strong>' + (d.assetName || 'Equipment') + '</strong></td>'
+                + '<td>' + (d.failureDate || '—') + '</td>'
+                + '<td><strong style="color:var(--danger);">' + (d.downtimeHours || 0) + ' hrs</strong></td>'
+                + '<td>' + (d.rootCause || 'General Fault') + '</td>'
+                + '<td>₹' + (parseFloat(d.revenueImpact)||0).toLocaleString('en-IN') + '</td>'
+                + '<td>' + (d.mttrHours || 0) + ' hrs</td>'
+                + '</tr>';
+        });
+    }
+    html += '</tbody></table></div></div>';
+    el.innerHTML = html;
+}
+
+/* 13. COMPLIANCE / NABH SUB-TAB */
+function _hodSubCompliance(el) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+    var cmps = (DB.get('hod_compliance') || []).filter(function(c){ return (c.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+
+    var html = '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+        + '<div style="font-weight:700;font-size:15px;">🛡️ NABH Equipment Standards & Statutory Compliance Audit</div>'
+        + '<button class="btn btn-sm btn-success" onclick="APP.notify(\'NABH Compliance Audit checklist verified 100%\',\'success\')">✅ Perform Audit Sign-off</button>'
+        + '</div>'
+        + '<div class="table-responsive"><table class="table" style="font-size:12px;margin:0;"><thead><tr>'
+        + '<th>NABH Clause</th><th>Requirement Summary</th><th>Audit Proof Document</th><th>Last Audit Date</th><th>Compliance Status</th>'
+        + '</tr></thead><tbody>';
+
+    if (cmps.length === 0) {
+        html += '<tr><td colspan="5" style="text-align:center;color:var(--gray);padding:20px;">No compliance checklists assigned for ' + dept + '.</td></tr>';
+    } else {
+        cmps.forEach(function(c){
+            html += '<tr>'
+                + '<td><span class="badge badge-primary">' + (c.clause || 'NABH-FMS') + '</span></td>'
+                + '<td><strong>' + (c.requirement || 'Standard') + '</strong></td>'
+                + '<td>📄 ' + (c.proofDoc || 'Proof Document.pdf') + '</td>'
+                + '<td>' + (c.lastAudit || '—') + '</td>'
+                + '<td><span class="badge badge-success">✓ ' + (c.status || 'Compliant') + '</span></td>'
+                + '</tr>';
+        });
+    }
+    html += '</tbody></table></div></div>';
+    el.innerHTML = html;
+}
+
+/* 14. REPORTS & ANALYTICS SUB-TAB */
+function _hodSubAnalytics(el) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+
+    var html = '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:18px;">'
+        + '<div style="font-weight:700;font-size:16px;margin-bottom:6px;">📈 ' + dept + ' Asset & Equipment Reports & Analytics</div>'
+        + '<div style="font-size:12px;color:var(--gray);margin-bottom:16px;">Export official PDF/Excel reports for management audit and NABH inspections.</div>'
+        
+        + '<div class="grid-3" style="gap:14px;">'
+        + '<div style="background:#f8f9fa;border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">'
+        + '<div style="font-size:28px;margin-bottom:6px;">📄</div>'
+        + '<div style="font-weight:700;font-size:13px;margin-bottom:4px;">Master Asset Register</div>'
+        + '<div style="font-size:11px;color:var(--gray);margin-bottom:10px;">Complete inventory list with valuation and specs</div>'
+        + '<button class="btn btn-sm btn-primary" onclick="hodExportReport(\'assets\')">📥 Export Excel</button>'
+        + '</div>'
+
+        + '<div style="background:#f8f9fa;border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">'
+        + '<div style="font-size:28px;margin-bottom:6px;">🛠️</div>'
+        + '<div style="font-weight:700;font-size:13px;margin-bottom:4px;">Maintenance & Breakdown History</div>'
+        + '<div style="font-size:11px;color:var(--gray);margin-bottom:10px;">PM schedules, ticket resolutions & repair costs</div>'
+        + '<button class="btn btn-sm btn-primary" onclick="hodExportReport(\'maintenance\')">📥 Export Excel</button>'
+        + '</div>'
+
+        + '<div style="background:#f8f9fa;border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;">'
+        + '<div style="font-size:28px;margin-bottom:6px;">🛡️</div>'
+        + '<div style="font-weight:700;font-size:13px;margin-bottom:4px;">NABH Statutory Audit Pack</div>'
+        + '<div style="font-size:11px;color:var(--gray);margin-bottom:10px;">AERB, Calibration, AMC/CMC & PM certificates</div>'
+        + '<button class="btn btn-sm btn-success" onclick="hodExportReport(\'nabh\')">📥 Download Audit Pack</button>'
+        + '</div>'
+        + '</div></div>';
+
+    el.innerHTML = html;
+}
+
+/* 15. ISSUE TERMINAL KIOSK SUB-TAB */
+function _hodSubTerminal(el) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+    var trms = (DB.get('hod_issue_terminal') || []).filter(function(t){ return (t.department||'').trim().toLowerCase() === dept.trim().toLowerCase(); });
+
+    var html = '<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
+        + '<div><div style="font-weight:700;font-size:15px;">💻 Quick Fault & Issue Reporting Kiosk Terminal</div>'
+        + '<div style="font-size:12px;color:var(--gray);">Instant ticket creation interface for ward nurses and duty doctors.</div></div>'
+        + '<button class="btn btn-sm btn-danger" onclick="hodOpenModal(\'issueTerminal\')">⚡ Express Report Issue</button>'
+        + '</div>'
+
+        + '<div class="table-responsive"><table class="table" style="font-size:12px;margin:0;"><thead><tr>'
+        + '<th>Asset Tag</th><th>Issue Category</th><th>Urgency Level</th><th>Description</th><th>Reported By</th><th>Time</th><th>Status</th>'
+        + '</tr></thead><tbody>';
+
+    if (trms.length === 0) {
+        html += '<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:20px;">No kiosk issues logged today.</td></tr>';
+    } else {
+        trms.forEach(function(t){
+            var uBadge = t.urgency === 'High' || t.urgency === 'Urgent' ? 'badge-danger' : 'badge-warning';
+            html += '<tr>'
+                + '<td><strong>' + (t.assetTag || 'AST-00') + '</strong></td>'
+                + '<td>' + (t.issueType || 'General') + '</td>'
+                + '<td><span class="badge ' + uBadge + '">' + (t.urgency || 'Normal') + '</span></td>'
+                + '<td>' + (t.description || '—') + '</td>'
+                + '<td>👤 ' + (t.staffName || 'Staff') + '</td>'
+                + '<td>' + (t.timestamp || '—') + '</td>'
+                + '<td><span class="badge badge-info">' + (t.status || 'Logged') + '</span></td>'
+                + '</tr>';
+        });
+    }
+    html += '</tbody></table></div></div>';
+    el.innerHTML = html;
+}
+
+/* ── MODALS AND ACTION HANDLERS FOR THE 15 MODULES ── */
+
+function hodOpenModal(type) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+    var modalId = 'hodGenModal';
+    var old = document.getElementById(modalId);
+    if (old) old.remove();
+
+    var title = 'Add New Entry';
+    var formBody = '';
+
+    if (type === 'addAsset') {
+        title = '🏷️ Register New Asset (' + dept + ')';
+        formBody = ''
+            + '<div class="form-group"><label>Asset Tag ID</label><input type="text" id="m_assetTag" class="form-control" value="AST-' + dept.toUpperCase().slice(0,3) + '-' + Math.floor(100 + Math.random()*900) + '"></div>'
+            + '<div class="form-group"><label>Equipment / Asset Name</label><input type="text" id="m_name" class="form-control" placeholder="e.g. Biphasic Defibrillator"></div>'
+            + '<div class="form-group"><label>Category</label><input type="text" id="m_category" class="form-control" value="Capital Equipment"></div>'
+            + '<div class="form-group"><label>Model & Serial No</label><input type="text" id="m_model" class="form-control" placeholder="Model - SN-XXXX"></div>'
+            + '<div class="form-group"><label>Room / Location</label><input type="text" id="m_location" class="form-control" placeholder="Room No / Location"></div>'
+            + '<div class="form-group"><label>Purchase Price (₹)</label><input type="number" id="m_price" class="form-control" value="150000"></div>'
+            + '<div class="form-group"><label>Supplier Vendor</label><input type="text" id="m_vendor" class="form-control" placeholder="Vendor Name"></div>';
+    } else if (type === 'addBreakdown') {
+        title = '🚨 Log Equipment Breakdown Ticket';
+        formBody = ''
+            + '<div class="form-group"><label>Asset Tag / Name</label><input type="text" id="m_b_asset" class="form-control" placeholder="e.g. AST-BIO-001 Primary Workstation"></div>'
+            + '<div class="form-group"><label>Fault Description</label><textarea id="m_b_desc" class="form-control" rows="3" placeholder="Describe issue observed..."></textarea></div>'
+            + '<div class="form-group"><label>Priority</label><select id="m_b_priority" class="form-control"><option value="High">High</option><option value="Urgent">Urgent</option><option value="Normal">Normal</option></select></div>'
+            + '<div class="form-group"><label>Assigned Technician / Vendor</label><input type="text" id="m_b_tech" class="form-control" placeholder="Technician Name"></div>';
+    } else if (type === 'issueTerminal') {
+        title = '💻 Kiosk Issue Reporting';
+        formBody = ''
+            + '<div class="form-group"><label>Asset Tag / ID</label><input type="text" id="m_t_tag" class="form-control" placeholder="e.g. AST-BIO-002"></div>'
+            + '<div class="form-group"><label>Issue Type</label><select id="m_t_type" class="form-control"><option>Cable Contact Error</option><option>Power / Battery Issue</option><option>Display / Sensor Fault</option><option>Physical Damage</option></select></div>'
+            + '<div class="form-group"><label>Urgency</label><select id="m_t_urgency" class="form-control"><option>Urgent</option><option>High</option><option>Medium</option></select></div>'
+            + '<div class="form-group"><label>Description</label><textarea id="m_t_desc" class="form-control" rows="2"></textarea></div>'
+            + '<div class="form-group"><label>Reported By (Staff Name)</label><input type="text" id="m_t_staff" class="form-control" placeholder="Nurse / Staff Name"></div>';
+    } else if (type === 'addPM') {
+        title = '📅 Schedule Preventive Maintenance';
+        formBody = ''
+            + '<div class="form-group"><label>Asset Tag & Name</label><input type="text" id="m_pm_asset" class="form-control" placeholder="Asset Name"></div>'
+            + '<div class="form-group"><label>Frequency</label><select id="m_pm_freq" class="form-control"><option>Monthly</option><option>Quarterly</option><option>Semi-Annual</option><option>Annual</option></select></div>'
+            + '<div class="form-group"><label>Next PM Due Date</label><input type="date" id="m_pm_due" class="form-control" value="2026-10-15"></div>'
+            + '<div class="form-group"><label>Service Agency / Technician</label><input type="text" id="m_pm_agency" class="form-control" placeholder="Agency Name"></div>';
+    } else if (type === 'addCalibration') {
+        title = '📐 Add Calibration Record';
+        formBody = ''
+            + '<div class="form-group"><label>Instrument Name</label><input type="text" id="m_cal_name" class="form-control" placeholder="Instrument Name"></div>'
+            + '<div class="form-group"><label>NABL Certified Lab</label><input type="text" id="m_cal_lab" class="form-control" placeholder="Lab Name"></div>'
+            + '<div class="form-group"><label>Certificate Number</label><input type="text" id="m_cal_cert" class="form-control" value="CAL-2026-' + Math.floor(1000+Math.random()*9000) + '"></div>'
+            + '<div class="form-group"><label>Expiry Date</label><input type="date" id="m_cal_exp" class="form-control" value="2027-09-09"></div>';
+    } else if (type === 'addContract') {
+        title = '📜 Add AMC / CMC Contract';
+        formBody = ''
+            + '<div class="form-group"><label>Equipment Name</label><input type="text" id="m_cnt_name" class="form-control" placeholder="Equipment Name"></div>'
+            + '<div class="form-group"><label>Contract Type</label><select id="m_cnt_type" class="form-control"><option>AMC</option><option>CMC</option><option>Warranty</option></select></div>'
+            + '<div class="form-group"><label>Provider Vendor</label><input type="text" id="m_cnt_provider" class="form-control" placeholder="Vendor Name"></div>'
+            + '<div class="form-group"><label>Expiry Date</label><input type="date" id="m_cnt_exp" class="form-control" value="2027-03-31"></div>'
+            + '<div class="form-group"><label>Annual Cost (₹)</label><input type="number" id="m_cnt_cost" class="form-control" value="25000"></div>';
+    } else if (type === 'addSpare') {
+        title = '🧩 Add Spare Part';
+        formBody = ''
+            + '<div class="form-group"><label>Spare Part Name</label><input type="text" id="m_spr_name" class="form-control" placeholder="Part Name"></div>'
+            + '<div class="form-group"><label>Part Number</label><input type="text" id="m_spr_no" class="form-control" placeholder="Part No"></div>'
+            + '<div class="form-group"><label>Quantity</label><input type="number" id="m_spr_qty" class="form-control" value="5"></div>'
+            + '<div class="form-group"><label>Unit Price (₹)</label><input type="number" id="m_spr_price" class="form-control" value="2500"></div>';
+    } else if (type === 'addVendor') {
+        title = '🏢 Empanel New Vendor';
+        formBody = ''
+            + '<div class="form-group"><label>Company Name</label><input type="text" id="m_vnd_name" class="form-control" placeholder="Company Name"></div>'
+            + '<div class="form-group"><label>Contact Person</label><input type="text" id="m_vnd_person" class="form-control" placeholder="Name"></div>'
+            + '<div class="form-group"><label>Phone</label><input type="text" id="m_vnd_phone" class="form-control" placeholder="+91 98765 43210"></div>';
+    } else if (type === 'addRequisition') {
+        title = '📑 Create Purchase Requisition';
+        formBody = ''
+            + '<div class="form-group"><label>Item / Title</label><input type="text" id="m_req_title" class="form-control" placeholder="Equipment or Spare Description"></div>'
+            + '<div class="form-group"><label>Estimated Cost (₹)</label><input type="number" id="m_req_cost" class="form-control" value="35000"></div>'
+            + '<div class="form-group"><label>Justification</label><textarea id="m_req_just" class="form-control" rows="2"></textarea></div>';
+    }
+
+    var div = document.createElement('div');
+    div.id = modalId;
+    div.className = 'modal-backdrop';
+    div.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;';
+    div.innerHTML = ''
+        + '<div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;max-height:90vh;overflow-y:auto;box-shadow:0 10px 30px rgba(0,0,0,0.3);">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">'
+        + '<h3 style="margin:0;font-size:16px;font-weight:700;">' + title + '</h3>'
+        + '<button style="background:none;border:none;font-size:20px;cursor:pointer;" onclick="document.getElementById(\'' + modalId + '\').remove()">×</button>'
+        + '</div>'
+        + formBody
+        + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">'
+        + '<button class="btn btn-outline" onclick="document.getElementById(\'' + modalId + '\').remove()">Cancel</button>'
+        + '<button class="btn btn-primary" onclick="hodSaveModalData(\'' + type + '\')">Save Record</button>'
+        + '</div></div>';
+
+    document.body.appendChild(div);
+}
+
+function hodSaveModalData(type) {
+    var dept = (_hodData && _hodData.dept) || 'Biomedical';
+    
+    if (type === 'addAsset') {
+        var tag = (document.getElementById('m_assetTag')||{}).value || 'AST-001';
+        var name = (document.getElementById('m_name')||{}).value || 'New Equipment';
+        var cat = (document.getElementById('m_category')||{}).value || 'Capital Equipment';
+        var model = (document.getElementById('m_model')||{}).value || 'Standard Model';
+        var loc = (document.getElementById('m_location')||{}).value || dept + ' Main';
+        var price = parseFloat((document.getElementById('m_price')||{}).value) || 0;
+        var vnd = (document.getElementById('m_vendor')||{}).value || 'Standard Vendor';
+
+        var newItem = { id: 'ast_' + Date.now(), assetTag: tag, name: name, category: cat, model: model, department: dept, location: loc, purchasePrice: price, vendor: vnd, status: 'Working', purchaseDate: new Date().toISOString().slice(0,10) };
+        var assets = DB.get('hod_assets') || [];
+        assets.push(newItem);
+        DB.set('hod_assets', assets);
+        APP.notify('Asset created successfully!', 'success');
+
+    } else if (type === 'addBreakdown') {
+        var asset = (document.getElementById('m_b_asset')||{}).value || 'Equipment';
+        var desc = (document.getElementById('m_b_desc')||{}).value || 'Issue reported';
+        var prio = (document.getElementById('m_b_priority')||{}).value || 'High';
+        var tech = (document.getElementById('m_b_tech')||{}).value || 'Internal Tech';
+
+        var newB = { id: 'brk_' + Date.now(), ticketNo: 'TKT-' + Math.floor(1000+Math.random()*9000), assetName: asset, assetTag: 'AST-00', department: dept, description: desc, priority: prio, reportedAt: new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}), status: 'Open', assignedTech: tech, repairCost: 0 };
+        var bks = DB.get('hod_breakdowns') || [];
+        bks.push(newB);
+        DB.set('hod_breakdowns', bks);
+        APP.notify('Breakdown ticket logged!', 'danger');
+
+    } else if (type === 'issueTerminal') {
+        var ttag = (document.getElementById('m_t_tag')||{}).value || 'AST-001';
+        var ttype = (document.getElementById('m_t_type')||{}).value || 'General Fault';
+        var turg = (document.getElementById('m_t_urgency')||{}).value || 'Urgent';
+        var tdesc = (document.getElementById('m_t_desc')||{}).value || 'Reported via Kiosk';
+        var tstaff = (document.getElementById('m_t_staff')||{}).value || 'Staff';
+
+        var newT = { id: 'trm_' + Date.now(), assetTag: ttag, issueType: ttype, urgency: turg, description: tdesc, staffName: tstaff, department: dept, timestamp: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}), status: 'Logged' };
+        var trms = DB.get('hod_issue_terminal') || [];
+        trms.push(newT);
+        DB.set('hod_issue_terminal', trms);
+        APP.notify('Fault logged via Issue Terminal!', 'success');
+
+    } else if (type === 'addPM') {
+        var pmAsset = (document.getElementById('m_pm_asset')||{}).value || 'Equipment';
+        var pmFreq = (document.getElementById('m_pm_freq')||{}).value || 'Quarterly';
+        var pmDue = (document.getElementById('m_pm_due')||{}).value || '2026-10-15';
+        var pmAgency = (document.getElementById('m_pm_agency')||{}).value || 'Service Agency';
+
+        var newPM = { id: 'pm_' + Date.now(), assetTag: 'AST-00', assetName: pmAsset, department: dept, frequency: pmFreq, lastPmDate: new Date().toISOString().slice(0,10), nextPmDue: pmDue, serviceAgency: pmAgency, status: 'Scheduled', checklistDone: true };
+        var pms = DB.get('hod_pm_schedules') || [];
+        pms.push(newPM);
+        DB.set('hod_pm_schedules', pms);
+        APP.notify('PM Routine Scheduled!', 'success');
+
+    } else if (type === 'addCalibration') {
+        var calName = (document.getElementById('m_cal_name')||{}).value || 'Instrument';
+        var calLab = (document.getElementById('m_cal_lab')||{}).value || 'NABL Lab';
+        var calCert = (document.getElementById('m_cal_cert')||{}).value || 'CAL-2026-01';
+        var calExp = (document.getElementById('m_cal_exp')||{}).value || '2027-09-09';
+
+        var newCal = { id: 'cal_' + Date.now(), instrumentName: calName, assetTag: 'AST-00', department: dept, labVendor: calLab, certificateNo: calCert, calDate: new Date().toISOString().slice(0,10), expiryDate: calExp, tolerance: '±0.02%', status: 'Valid' };
+        var cals = DB.get('hod_calibrations') || [];
+        cals.push(newCal);
+        DB.set('hod_calibrations', cals);
+        APP.notify('Calibration record saved!', 'success');
+
+    } else if (type === 'addContract') {
+        var cntName = (document.getElementById('m_cnt_name')||{}).value || 'Equipment';
+        var cntType = (document.getElementById('m_cnt_type')||{}).value || 'AMC';
+        var cntProv = (document.getElementById('m_cnt_provider')||{}).value || 'Vendor';
+        var cntExp = (document.getElementById('m_cnt_exp')||{}).value || '2027-03-31';
+        var cntCost = parseFloat((document.getElementById('m_cnt_cost')||{}).value) || 0;
+
+        var newCnt = { id: 'cnt_' + Date.now(), assetName: cntName, department: dept, contractType: cntType, provider: cntProv, startDate: new Date().toISOString().slice(0,10), expiryDate: cntExp, annualCost: cntCost, status: 'Active' };
+        var cnts = DB.get('hod_contracts') || [];
+        cnts.push(newCnt);
+        DB.set('hod_contracts', cnts);
+        APP.notify('Contract record saved!', 'success');
+
+    } else if (type === 'addSpare') {
+        var sprName = (document.getElementById('m_spr_name')||{}).value || 'Spare Part';
+        var sprNo = (document.getElementById('m_spr_no')||{}).value || 'PRT-001';
+        var sprQty = parseInt((document.getElementById('m_spr_qty')||{}).value) || 1;
+        var sprPrice = parseFloat((document.getElementById('m_spr_price')||{}).value) || 0;
+
+        var newSpr = { id: 'spr_' + Date.now(), partName: sprName, compatibleMachine: 'General', partNo: sprNo, quantity: sprQty, minLevel: 2, unitPrice: sprPrice, vendor: 'Supplier', status: 'In Stock', department: dept };
+        var sprs = DB.get('hod_spares') || [];
+        sprs.push(newSpr);
+        DB.set('hod_spares', sprs);
+        APP.notify('Spare part added!', 'success');
+
+    } else if (type === 'addVendor') {
+        var vndName = (document.getElementById('m_vnd_name')||{}).value || 'Vendor Co.';
+        var vndPerson = (document.getElementById('m_vnd_person')||{}).value || 'Contact Person';
+        var vndPhone = (document.getElementById('m_vnd_phone')||{}).value || '+91 90000 00000';
+
+        var newVnd = { id: 'vnd_' + Date.now(), companyName: vndName, serviceType: 'Supplier Agency', contactPerson: vndPerson, phone: vndPhone, email: 'contact@vendor.com', activeContracts: 1, rating: 5, status: 'Empaneled', department: dept };
+        var vnds = DB.get('hod_vendors') || [];
+        vnds.push(newVnd);
+        DB.set('hod_vendors', vnds);
+        APP.notify('Vendor Empaneled!', 'success');
+
+    } else if (type === 'addRequisition') {
+        var reqTitle = (document.getElementById('m_req_title')||{}).value || 'Equipment Requisition';
+        var reqCost = parseFloat((document.getElementById('m_req_cost')||{}).value) || 0;
+        var reqJust = (document.getElementById('m_req_just')||{}).value || 'Required for department operations';
+
+        var newReq = { id: 'req_' + Date.now(), title: reqTitle, department: dept, estCost: reqCost, priority: 'High', justification: reqJust, status: 'Pending Approval', createdDate: new Date().toISOString().slice(0,10) };
+        var reqs = DB.get('hod_requisitions') || [];
+        reqs.push(newReq);
+        DB.set('hod_requisitions', reqs);
+        APP.notify('Purchase Requisition created!', 'success');
+    }
+
+    var m = document.getElementById('hodGenModal');
+    if (m) m.remove();
+
+    var el = document.getElementById('hodTabContent');
+    if (el && _hodTab === 'dept-assets') {
+        _hodDeptAssets(el);
+    }
+}
+
+function hodResolveBreakdown(id) {
+    var bks = DB.get('hod_breakdowns') || [];
+    var idx = bks.findIndex(function(b){ return String(b.id) === String(id); });
+    if (idx !== -1) {
+        bks[idx].status = 'Resolved';
+        DB.set('hod_breakdowns', bks);
+        APP.notify('Breakdown ticket marked resolved!', 'success');
+        var el = document.getElementById('hodTabContent');
+        if (el && _hodTab === 'dept-assets') _hodDeptAssets(el);
+    }
+}
+
+function hodMarkPmCompleted(id) {
+    var pms = DB.get('hod_pm_schedules') || [];
+    var idx = pms.findIndex(function(p){ return String(p.id) === String(id); });
+    if (idx !== -1) {
+        pms[idx].status = 'completed';
+        pms[idx].lastPmDate = new Date().toISOString().slice(0,10);
+        DB.set('hod_pm_schedules', pms);
+        APP.notify('Preventive maintenance marked completed!', 'success');
+        var el = document.getElementById('hodTabContent');
+        if (el && _hodTab === 'dept-assets') _hodDeptAssets(el);
+    }
+}
+
+function hodDeleteAsset(id) {
+    if (confirm('Delete this asset entry?')) {
+        var assets = DB.get('hod_assets') || [];
+        assets = assets.filter(function(a){ return String(a.id) !== String(id); });
+        DB.set('hod_assets', assets);
+        APP.notify('Asset deleted', 'info');
+        var el = document.getElementById('hodTabContent');
+        if (el && _hodTab === 'dept-assets') _hodDeptAssets(el);
+    }
+}
+
+function hodExportReport(type) {
+    APP.notify('Exporting ' + type + ' report to Excel...', 'info');
 }
 
 window.renderHodDashboard = renderHodDashboard;
