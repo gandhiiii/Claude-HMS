@@ -142,7 +142,7 @@
             nav_departments: 'Departments',
             nav_feature_rights: 'Feature Rights',
             nav_inventory: 'Inventory',
-            nav_biomedical_inventory: 'Biomedical Inventory',
+            nav_biomedical_inventory: 'Biomedical Asset & Equipment Operational Hub',
             nav_gate_security: 'Gate Security',
             nav_phase2: 'Phase 2',
             nav_projects: 'Projects',
