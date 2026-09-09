@@ -23,7 +23,20 @@ let bioImplantSearch = '';
 let bioImplantCatFilter = '';
 let bioActiveChecklistId = null;
 
+const BIO_EQUIPMENT_TYPES = [
+    'Major Equipment',
+    'Minor Equipment',
+    'Instrument',
+    'Consumable',
+    'Disposable',
+    'Accessories',
+    'Implant',
+    'Spare Part',
+    'Other'
+];
+
 const BIO_CATEGORIES = [
+    // ── Clinical Equipment ──
     'Life Support Equipment',
     'Diagnostic & Imaging',
     'Patient Monitoring',
@@ -32,6 +45,31 @@ const BIO_CATEGORIES = [
     'Therapeutic & Rehabilitation',
     'Dental & Ophthalmic',
     'Central Sterilization (CSSD)',
+    'Radiology & X-Ray',
+    'Endoscopy & Laparoscopy',
+    'Physiotherapy & Rehab',
+    'Cardiology Equipment',
+    'Neurology Equipment',
+    'Neonatal & Pediatric Equipment',
+    'Anaesthesia Equipment',
+    // ── Instruments ──
+    'Surgical Instruments',
+    'Diagnostic Instruments',
+    'OT Instruments',
+    // ── Consumables & Disposables ──
+    'Consumable Supplies',
+    'Disposable Items',
+    'Sutures & Wound Care',
+    'IV & Infusion Supplies',
+    'Gloves & PPE',
+    // ── Accessories ──
+    'Equipment Accessories',
+    'Cables & Sensors',
+    'Electrodes & Probes',
+    'Batteries & Power Accessories',
+    // ── Other ──
+    'Spare Parts & Components',
+    'IT & Biomedical Software',
     'Other Biomedical'
 ];
 
@@ -1495,8 +1533,16 @@ function showBioEquipForm(equipId) {
                     <input type="text" name="assetTag" class="form-control" value="${equip?.assetTag || 'BIO-EQ-' + Math.floor(1000 + Math.random()*9000)}" required>
                 </div>
                 <div class="form-group">
+                    <label>Equipment Type</label>
+                    <select name="equipType" class="form-control">
+                        <option value="">-- Select Type --</option>
+                        ${BIO_EQUIPMENT_TYPES.map(t => `<option value="${t}" ${equip?.equipType === t ? 'selected' : ''}>${t}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
                     <label>Category</label>
                     <select name="category" class="form-control">
+                        <option value="">-- Select Category --</option>
                         ${catOpts}
                     </select>
                 </div>
@@ -1769,7 +1815,6 @@ function bioOnImplantSelectChange(selectEl) {
 }
 window.bioOnImplantSelectChange = bioOnImplantSelectChange;
 
-/* ── 3. Patient Implantation Usage Modal ── */
 function showBioLogImplantationModal(implantId) {
     const user = AUTH.currentUser();
     const isHodOrAdmin = !user || (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || user.role === 'hod');
@@ -1910,10 +1955,6 @@ function showBioLogImplantationModal(implantId) {
         });
 
         APP.notify(`Patient implantation recorded: ${formData.implantName} (${formData.implantType})`, 'success');
-        renderBiomedicalInventory(document.getElementById('pageContent'));
-        return true;
-    });
-}
         renderBiomedicalInventory(document.getElementById('pageContent'));
         return true;
     });
