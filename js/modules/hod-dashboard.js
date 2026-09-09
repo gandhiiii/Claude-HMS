@@ -277,9 +277,21 @@ function renderHodDashboard(container) {
     }
 
     if (_dlowU === 'biomedical') {
-        tabs = tabs.filter(function(t) {
-            return t.id !== 'admissions' && t.id !== 'dept-checklist' && t.id !== 'locker' && t.id !== 'lockerreturn';
-        });
+        tabs = [
+            { id: 'overview',        label: 'Overview' },
+            { id: 'tasks',           label: 'Tasks', badge: _hodData.overdueTasks.length, bc: 'badge-danger' },
+            { id: 'team',            label: '👥 My Team', badge: team.length, bc: 'badge-success' },
+            { id: 'checklists',      label: 'Checklist', badge: pendingCl, bc: 'badge-info' },
+            { id: 'dept-assets',     label: '🧬 Biomedical Inventory', badge: openBreakdownCount > 0 ? openBreakdownCount : (deptAssetsCount || 0), bc: openBreakdownCount > 0 ? 'badge-danger' : 'badge-info' },
+            { id: 'requests',        label: '🔧 Problem and Request', badge: pendingReq + openProblems, bc: 'badge-danger' },
+            { id: 'performance',     label: '📊 Department Performance — Biomedical' },
+            { id: 'hodreports',      label: '📤 Department Reports — Biomedical', badge: teamReports.length, bc: 'badge-danger' },
+            { id: 'hodqp',           label: '🎯 Quarterly Priorities' },
+            { id: 'purchases',       label: '💰 Daily Purchases & Expenses — Biomedical', badge: pendingPurchases, bc: 'badge-warning' },
+            { id: 'equipbackdown',   label: '📉 Equipment Breakdown Records — Biomedical', badge: backdowns.length, bc: 'badge-secondary' },
+            { id: 'hodtodo',         label: '📋 HOD TODO', badge: hodPendingTodos, bc: 'badge-danger' },
+            { id: 'hodworkreport',   label: '📊 Work Report — Biomedical' }
+        ];
     }
 
     var validTabIds = tabs.map(function(t){ return t.id; });
