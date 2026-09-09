@@ -282,6 +282,7 @@ function renderHodDashboard(container) {
             { id: 'tasks',           label: 'Tasks', badge: _hodData.overdueTasks.length, bc: 'badge-danger' },
             { id: 'team',            label: '👥 My Team', badge: team.length, bc: 'badge-success' },
             { id: 'checklists',      label: 'Checklist', badge: pendingCl, bc: 'badge-info' },
+            { id: 'inventory',       label: '🧬 Biomedical Inventory', badge: (DB.get('inventory') || []).filter(function(i){ return (i.department||'').trim().toLowerCase() === 'biomedical'; }).length, bc: 'badge-info' },
             { id: 'dept-assets',     label: '🏥 Biomedical Asset & Equipment Operational Hub', badge: openBreakdownCount > 0 ? openBreakdownCount : (deptAssetsCount || 0), bc: openBreakdownCount > 0 ? 'badge-danger' : 'badge-info' },
             { id: 'requests',        label: '🔧 Problem and Request', badge: pendingReq + openProblems, bc: 'badge-danger' },
             { id: 'performance',     label: '📊 Department Performance — Biomedical' },
