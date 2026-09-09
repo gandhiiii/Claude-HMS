@@ -7293,6 +7293,7 @@ function _hodDeptAssets(el) {
         + '<button class="btn btn-sm btn-light" style="font-weight:600;" onclick="hodOpenModal(\'addAsset\')">+ Add Asset</button>'
         + '<button class="btn btn-sm btn-warning" style="color:#fff;font-weight:600;" onclick="hodOpenModal(\'addBreakdown\')">🚨 Log Fault / Ticket</button>'
         + '<button class="btn btn-sm btn-success" style="font-weight:600;" onclick="hodOpenModal(\'issueTerminal\')">💻 Quick Issue Kiosk</button>'
+        + '<button class="btn btn-sm" style="background:#6366f1;color:#fff;font-weight:600;border:none;" onclick="Router.navigate(\'equipment-health-core\')">🌌 Health Core Command</button>'
         + '</div></div>'
 
         + '<div style="display:flex;flex-wrap:wrap;gap:4px;background:var(--light-gray);padding:6px;border-radius:10px;margin-bottom:16px;">'
