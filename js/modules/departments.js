@@ -1,5 +1,5 @@
 const ALL_FEATURES = [
-    'dashboard', 'users', 'departments', 'inventory', 'gate-security',
+    'dashboard', 'users', 'departments', 'inventory', 'biomedical-inventory', 'gate-security',
     'projects', 'ambulance', 'problems', 'tasks', 'complaints',
     'room-checklist', 'admissions', 'lost-found', 'checklists', 'admin-checklists',
     'equipment-service', 'equipment-breakdown', 'purchases'

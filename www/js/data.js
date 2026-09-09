@@ -132,7 +132,7 @@ const DB = {
     /* ── All keys synced to the cloud / exported in backups ── */
     _ALL_KEYS: [
         'users', 'departments', 'featureRights',
-        'inventory', 'inventory_receipts', 'scraps', 'scrapConfig',
+        'inventory', 'biomedical_inventory', 'biomedical_implants', 'biomedical_implantation_logs', 'biomedical_purchases', 'biomedical_meetings', 'biomedical_todos', 'biomedical_checklists', 'biomedical_checklist_logs', 'inventory_receipts', 'scraps', 'scrapConfig',
         'gatesecurity', 'phase2Tasks',
         'projects', 'ambulance', 'ambulance_trips',
         'problems', 'tasks', 'hodTasks', 'hodRequests', 'hodPurchases',
@@ -603,6 +603,13 @@ const AUTH = {
             return !!(user.isSuperAdmin || user.role === 'admin');
         }
         if (permission === 'purchases') return user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || user.role === 'hod';
+        if (permission === 'biomedical-inventory' || permission === 'biomedical' || permission === 'biomedical-module') {
+            if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
+            var _bioDept = (user.department || '').trim().toLowerCase();
+            if (_bioDept.indexOf('biomedical') !== -1 || _bioDept.indexOf('bio medical') !== -1 || _bioDept.indexOf('bio-medical') !== -1) return true;
+            if (user.permissions && (user.permissions.includes('biomedical-inventory') || user.permissions.includes('biomedical') || user.permissions.includes('biomedical-module'))) return true;
+            return false;
+        }
         if (permission === 'scrap') {
             if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
             if (user.role === 'hod') {
@@ -1167,7 +1174,7 @@ const APP = {
                 DB.set('departmentMeetings', []);
             }
             if (!Array.isArray(existingRights) || existingRights.length === 0) {
-                const defaultRights = ['dashboard','users','departments','inventory','gate-security',
+                const defaultRights = ['dashboard','users','departments','inventory','biomedical-inventory','gate-security',
                     'projects','ambulance','problems','tasks','complaints',
                     'room-checklist','rooms','admissions','lost-found','checklists','admin-checklists',
                     'material-requests','suggestions','reports','employee-dashboard',
@@ -1175,6 +1182,161 @@ const APP = {
                     'scrap','handover','cleaning','equipbackdown','staff-deployment',
                     'security-deployment','patient-shifting'];
                 DB.set('featureRights', defaultRights);
+            } else if (!existingRights.includes('biomedical-inventory')) {
+                existingRights.push('biomedical-inventory');
+                DB.set('featureRights', existingRights);
+            }
+            if (!Array.isArray(DB.get('biomedical_inventory')) || DB.get('biomedical_inventory').length === 0) {
+                const sampleBioItems = [
+                    {
+                        id: 'bio_eq_101',
+                        assetTag: 'BIO-EQ-1001',
+                        name: 'Biphasic Defibrillator Monitor',
+                        model: 'BeneHeart D3',
+                        serialNo: 'DEF-2024-0019',
+                        category: 'Life Support Equipment',
+                        department: 'Biomedical',
+                        location: 'ICU - Room 102',
+                        purchasePrice: 350000,
+                        contractType: 'CMC',
+                        status: 'Working',
+                        warrantyStart: '2023-04-15',
+                        warrantyExpiry: '2025-04-14',
+                        amcCmcStart: '2025-04-15',
+                        amcCmcExpiry: '2027-04-14',
+                        amcCmcCost: 35000,
+                        manufacturer: 'Mindray Medical',
+                        vendorName: 'MedTech Solutions India',
+                        vendorContact: 'Rajesh Sharma',
+                        vendorPhone: '+91 98765 43210',
+                        vendorEmail: 'service@medtechsol.com',
+                        lastServiceDate: '2026-06-10',
+                        nextPmDue: '2026-12-10',
+                        calibrationDue: '2027-01-15',
+                        notes: 'Routine PM done, battery test passed.'
+                    },
+                    {
+                        id: 'bio_eq_102',
+                        assetTag: 'BIO-EQ-1002',
+                        name: 'Patient Monitor 5-Para',
+                        model: 'B40 Monitor',
+                        serialNo: 'MON-2024-8841',
+                        category: 'Patient Monitoring',
+                        department: 'OT',
+                        location: 'OT - Operating Room 2',
+                        purchasePrice: 185000,
+                        contractType: 'Warranty',
+                        status: 'Working',
+                        warrantyStart: '2024-10-01',
+                        warrantyExpiry: '2026-09-30',
+                        amcCmcStart: '',
+                        amcCmcExpiry: '',
+                        amcCmcCost: 0,
+                        manufacturer: 'GE Healthcare',
+                        vendorName: 'BioSys India Pvt Ltd',
+                        vendorContact: 'Priya Verma',
+                        vendorPhone: '+91 98123 77654',
+                        vendorEmail: 'support@biosys.in',
+                        lastServiceDate: '2026-05-18',
+                        nextPmDue: '2026-11-18',
+                        calibrationDue: '2026-10-01',
+                        notes: 'SpO2 sensor replaced under warranty.'
+                    },
+                    {
+                        id: 'bio_eq_103',
+                        assetTag: 'BIO-EQ-1003',
+                        name: 'Advanced ICU Ventilator',
+                        model: 'Savina 300',
+                        serialNo: 'VEN-2023-7712',
+                        category: 'Life Support Equipment',
+                        department: 'Biomedical',
+                        location: 'MICU - Bed 5',
+                        purchasePrice: 1250000,
+                        contractType: 'AMC',
+                        status: 'Under Maintenance',
+                        warrantyStart: '2023-01-10',
+                        warrantyExpiry: '2024-01-09',
+                        amcCmcStart: '2025-09-16',
+                        amcCmcExpiry: '2026-09-15',
+                        amcCmcCost: 85000,
+                        manufacturer: 'Dräger',
+                        vendorName: 'Hospicare India',
+                        vendorContact: 'Amitabh Sen',
+                        vendorPhone: '+91 99000 11223',
+                        vendorEmail: 'service@hospicare.com',
+                        lastServiceDate: '2026-03-12',
+                        nextPmDue: '2026-09-12',
+                        calibrationDue: '2026-09-20',
+                        notes: 'Flow sensor calibration pending. Servicing scheduled.'
+                    },
+                    {
+                        id: 'bio_eq_104',
+                        assetTag: 'BIO-EQ-1004',
+                        name: '12-Channel ECG Machine',
+                        model: 'Cardiovit AT-102',
+                        serialNo: 'ECG-2024-3310',
+                        category: 'Diagnostic & Imaging',
+                        department: 'Emergency',
+                        location: 'Emergency / Casualty',
+                        purchasePrice: 95000,
+                        contractType: 'Warranty',
+                        status: 'Working',
+                        warrantyStart: '2025-01-15',
+                        warrantyExpiry: '2027-01-14',
+                        amcCmcStart: '',
+                        amcCmcExpiry: '',
+                        amcCmcCost: 0,
+                        manufacturer: 'Schiller',
+                        vendorName: 'MedTech Solutions India',
+                        vendorContact: 'Rajesh Sharma',
+                        vendorPhone: '+91 98765 43210',
+                        vendorEmail: 'service@medtechsol.com',
+                        lastServiceDate: '2026-07-01',
+                        nextPmDue: '2027-01-01',
+                        calibrationDue: '2027-01-14',
+                        notes: 'New installation.'
+                    },
+                    {
+                        id: 'bio_eq_105',
+                        assetTag: 'BIO-EQ-1005',
+                        name: 'Surgical C-Arm X-Ray System',
+                        model: 'Cios Select',
+                        serialNo: 'CARM-2021-0902',
+                        category: 'Diagnostic & Imaging',
+                        department: 'Orthopedics',
+                        location: 'Ortho OT',
+                        purchasePrice: 2800000,
+                        contractType: 'CMC',
+                        status: 'Breakdown',
+                        warrantyStart: '2021-05-20',
+                        warrantyExpiry: '2022-05-19',
+                        amcCmcStart: '2024-05-20',
+                        amcCmcExpiry: '2026-05-19',
+                        amcCmcCost: 180000,
+                        manufacturer: 'Siemens Healthineers',
+                        vendorName: 'Siemens India Healthcare',
+                        vendorContact: 'Vikram Mehta',
+                        vendorPhone: '+91 98222 33445',
+                        vendorEmail: 'service.health@siemens.com',
+                        lastServiceDate: '2026-04-01',
+                        nextPmDue: '2026-07-01',
+                        calibrationDue: '2026-05-15',
+                        notes: 'Image intensifier power supply unit failure reported. Contract renewal required.'
+                    }
+                ];
+                DB.set('biomedical_inventory', sampleBioItems);
+            }
+            var existingDepts = DB.get('departments') || [];
+            if (!existingDepts.some(d => (d.name || '').toLowerCase() === 'biomedical')) {
+                existingDepts.push({
+                    id: 'dept_biomedical',
+                    name: 'Biomedical',
+                    code: 'BIOMEDICAL',
+                    head: 'Biomedical In-Charge',
+                    active: true,
+                    features: ['biomedical-inventory', 'inventory', 'problems', 'tasks', 'complaints', 'departmental-checklist']
+                });
+                DB.set('departments', existingDepts);
             }
             const floors = DB.get('floorItems');
             if (!Array.isArray(floors) || floors.length === 0) {

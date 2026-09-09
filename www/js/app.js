@@ -93,6 +93,7 @@ const Router = {
             { id: 'departments', label: _t('nav_departments'), icon: '🏢', permission: 'departments', adminOnly: true },
             { id: 'feature-rights', label: _t('nav_feature_rights'), icon: '🔐', permission: 'feature-rights', adminOnly: true },
             { id: 'inventory', label: _t('nav_inventory'), icon: '📦', permission: 'inventory' },
+            { id: 'biomedical-inventory', label: _t('nav_biomedical_inventory'), icon: '🧬', permission: 'biomedical-inventory' },
             { id: 'scrap', label: '🗑️ Scrap / Disposal', icon: '🗑️', permission: 'scrap' },
             { id: 'gate-security', label: _t('nav_gate_security'), icon: '🛡️', permission: 'gate-security' },
             { id: 'phase2', label: _t('nav_phase2'), icon: '🏗️', permission: 'projects' },
@@ -170,6 +171,13 @@ const Router = {
                 if (requestedModule === 'reports') window._targetEmpTab = 'reports';
             }
         }
+        // Biomedical Department restriction guard
+        if ((module === 'biomedical-inventory' || module === 'biomedical' || module === 'biomedical-module') && !AUTH.hasPermission(u, 'biomedical-inventory')) {
+            if (typeof APP !== 'undefined' && APP.notify) APP.notify('Access Denied: Biomedical module is strictly reserved for Biomedical department staff and administrators.', 'error');
+            if (u.role === 'hod') module = 'hod-dashboard';
+            else if (u.role === 'storekeeper') module = 'storekeeper-dashboard';
+            else module = 'employee-dashboard';
+        }
 
         // Cleanup ambulance tracking when leaving that module
         if (APP.currentModule === 'ambulance' && module !== 'ambulance') {
@@ -201,6 +209,9 @@ const Router = {
         const navKeyMap = {
             dashboard: 'nav_dashboard', users: 'nav_users', departments: 'nav_departments',
             'feature-rights': 'nav_feature_rights', inventory: 'nav_inventory',
+            'biomedical-inventory': 'nav_biomedical_inventory',
+            'biomedical': 'nav_biomedical_inventory',
+            'biomedical-module': 'nav_biomedical_inventory',
             scrap: 'Scrap / Disposal',
             'gate-security': 'nav_gate_security', phase2: 'nav_phase2',
             projects: 'nav_projects', ambulance: 'nav_ambulance',
@@ -254,6 +265,9 @@ const Router = {
                 case 'departments': return safeWindowGet('renderDepartments');
                 case 'feature-rights': return safeWindowGet('renderFeatureRights');
                 case 'inventory': return safeWindowGet('renderInventory');
+                case 'biomedical-inventory':
+                case 'biomedical':
+                case 'biomedical-module': return safeWindowGet('renderBiomedicalInventory') || safeWindowGet('renderBiomedical');
                 case 'scrap': return safeWindowGet('renderScrap');
                 case 'gate-security': return safeWindowGet('renderGateSecurity');
                 case 'phase2': return safeWindowGet('renderPhase2');

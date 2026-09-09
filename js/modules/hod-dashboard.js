@@ -39,14 +39,14 @@ var _hodInvSubTab = 'general'; // 'general' | 'linen' | 'housekeeping'
 var _hodSpecialInvType = 'linen';
 var _hodSpecialInvEditId = null;
 
-var HOD_DEFAULT_DEPTS = ['IT', 'Facility', 'Maintenance'];
+var HOD_DEFAULT_DEPTS = ['IT', 'Facility', 'Maintenance', 'Biomedical'];
 
 function _hodInDeptList(dept, feature) {
     var u = AUTH.currentUser();
     if (!u) return true;
     if (u.isSuperAdmin || u.role === 'admin' || u.role === 'super_admin') return true;
     var userDept = (u.department || '').trim().toLowerCase();
-    if (userDept === 'facility' || userDept === 'it' || userDept === 'maintenance') return true;
+    if (userDept === 'facility' || userDept === 'it' || userDept === 'maintenance' || userDept === 'biomedical') return true;
     if (feature === 'purchases') return true;
     var d = (dept || u.department || '').trim().toLowerCase();
     if (HOD_DEFAULT_DEPTS.some(function(x){ return x.toLowerCase() === d; })) return true;
