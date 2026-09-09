@@ -122,6 +122,11 @@ function renderHodDashboard(container) {
     var team        = _getHodTeam(user);
     var teamNames   = team.map(function (m) { return m.fullName; });
 
+    if ((dept || '').trim().toLowerCase() === 'biomedical') {
+        _renderBiomedicalHodDashboard(container, user, dept, u, team);
+        return;
+    }
+
     // HOD's own tasks (dept-scoped, created by this HOD)
     var allHodTasks = DB.get('hodTasks') || [];
     var myTasks     = allHodTasks.filter(function (t) { return t.department === dept; });
@@ -8393,6 +8398,101 @@ function hodExportReport(type) {
 
 window.renderHodDashboard = renderHodDashboard;
 window.hodExportReport = hodExportReport;
+window._renderBiomedicalHodDashboard = _renderBiomedicalHodDashboard;
+
+function _renderBiomedicalHodDashboard(container, user, dept, u, team) {
+    var assets = DB.get('hod_assets') || [];
+    var bioAssets = assets.filter(function(a){ return (a.department||'').trim().toLowerCase() === 'biomedical'; });
+    var breakdowns = DB.get('hod_breakdowns') || [];
+    var openB = breakdowns.filter(function(b){ return (b.department||'').trim().toLowerCase() === 'biomedical' && b.status !== 'resolved'; });
+    var implants = DB.get('biomedical_implants') || [];
+    var pms = DB.get('hod_pm_schedules') || [];
+    var duePm = pms.filter(function(p){ return (p.department||'').trim().toLowerCase() === 'biomedical' && p.status !== 'completed' && p.nextPmDue && new Date(p.nextPmDue) <= new Date(); });
+    var cals = DB.get('hod_calibrations') || [];
+    var dueCal = cals.filter(function(c){ return (c.department||'').trim().toLowerCase() === 'biomedical' && c.status !== 'completed' && c.nextCalDue && new Date(c.nextCalDue) <= new Date(); });
+
+    var html = '<div class="biomedical-hod-dashboard" style="background:#f8fafc;padding:4px;border-radius:16px;">'
+        + '<div style="background:linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%);border-radius:16px;padding:24px;color:#fff;margin-bottom:20px;box-shadow:0 10px 25px -5px rgba(15,23,42,0.3);position:relative;overflow:hidden;">'
+        + '<div style="position:absolute;right:-20px;top:-20px;font-size:140px;opacity:0.07;pointer-events:none;">🩺</div>'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;">'
+        + '<div style="display:flex;align-items:center;gap:16px;">'
+        + '<div style="width:60px;height:60px;border-radius:14px;background:rgba(255,255,255,0.15);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;font-size:30px;border:1px solid rgba(255,255,255,0.25);">'
+        + '🧬</div>'
+        + '<div>'
+        + '<div style="display:inline-block;background:rgba(99,102,241,0.3);border:1px solid rgba(129,140,248,0.4);color:#c7d2fe;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.5px;margin-bottom:4px;">'
+        + 'BIOMEDICAL HOD EXECUTIVE COMMAND CENTER</div>'
+        + '<h2 style="margin:0;font-size:22px;font-weight:800;letter-spacing:-0.5px;">' + u + '</h2>'
+        + '<div style="font-size:13px;opacity:0.85;margin-top:2px;">Head of Biomedical Engineering & Medical Equipment Asset Lifecycle</div>'
+        + '</div></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm" style="background:#6366f1;color:#fff;font-weight:700;border:none;border-radius:8px;padding:8px 14px;" onclick="showBioEquipForm()">➕ Add Equipment</button>'
+        + '<button class="btn btn-sm" style="background:#10b981;color:#fff;font-weight:700;border:none;border-radius:8px;padding:8px 14px;" onclick="showBioLogImplantationModal()">🦴 OT Implantation</button>'
+        + '<button class="btn btn-sm" style="background:#f59e0b;color:#fff;font-weight:700;border:none;border-radius:8px;padding:8px 14px;" onclick="hodOpenModal(\'addBreakdown\')">🚨 Log Ticket</button>'
+        + '</div></div></div>'
+
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px;">'
+        + '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+        + '<span style="font-size:12px;font-weight:700;color:#64748b;">MEDICAL ASSETS</span>'
+        + '<span style="background:#eff6ff;color:#3b82f6;padding:4px 8px;border-radius:8px;font-size:14px;">📦</span></div>'
+        + '<div style="font-size:26px;font-weight:800;color:#0f172a;">' + bioAssets.length + '</div>'
+        + '<div style="font-size:11px;color:#64748b;margin-top:4px;">Active Equipment Register</div></div>'
+
+        + '<div style="background:#fff;border:1px solid ' + (openB.length > 0 ? '#fca5a5' : '#e2e8f0') + ';border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+        + '<span style="font-size:12px;font-weight:700;color:' + (openB.length > 0 ? '#dc2626' : '#64748b') + ';">BREAKDOWN TICKETS</span>'
+        + '<span style="background:#fef2f2;color:#ef4444;padding:4px 8px;border-radius:8px;font-size:14px;">🛠️</span></div>'
+        + '<div style="font-size:26px;font-weight:800;color:' + (openB.length > 0 ? '#dc2626' : '#0f172a') + ';">' + openB.length + '</div>'
+        + '<div style="font-size:11px;color:' + (openB.length > 0 ? '#dc2626' : '#64748b') + ';margin-top:4px;">Unresolved Faults</div></div>'
+
+        + '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+        + '<span style="font-size:12px;font-weight:700;color:#64748b;">IMPLANT INVENTORY</span>'
+        + '<span style="background:#ecfdf5;color:#10b981;padding:4px 8px;border-radius:8px;font-size:14px;">🦴</span></div>'
+        + '<div style="font-size:26px;font-weight:800;color:#0f172a;">' + implants.length + '</div>'
+        + '<div style="font-size:11px;color:#64748b;margin-top:4px;">OT Prosthesis Items</div></div>'
+
+        + '<div style="background:#fff;border:1px solid ' + (duePm.length > 0 ? '#fde68a' : '#e2e8f0') + ';border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+        + '<span style="font-size:12px;font-weight:700;color:' + (duePm.length > 0 ? '#d97706' : '#64748b') + ';">PM DUE</span>'
+        + '<span style="background:#fffbeb;color:#f59e0b;padding:4px 8px;border-radius:8px;font-size:14px;">📅</span></div>'
+        + '<div style="font-size:26px;font-weight:800;color:' + (duePm.length > 0 ? '#d97706' : '#0f172a') + ';">' + duePm.length + '</div>'
+        + '<div style="font-size:11px;color:#64748b;margin-top:4px;">Preventive Maintenance</div></div>'
+
+        + '<div style="background:#fff;border:1px solid ' + (dueCal.length > 0 ? '#cbd5e1' : '#e2e8f0') + ';border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+        + '<span style="font-size:12px;font-weight:700;color:#64748b;">CALIBRATION DUE</span>'
+        + '<span style="background:#f3e8ff;color:#a855f7;padding:4px 8px;border-radius:8px;font-size:14px;">📐</span></div>'
+        + '<div style="font-size:26px;font-weight:800;color:#0f172a;">' + dueCal.length + '</div>'
+        + '<div style="font-size:11px;color:#64748b;margin-top:4px;">NABH Safety Status</div></div>'
+        + '</div>'
+
+        + '<div style="display:grid;grid-template-columns:1fr;gap:20px;">'
+        + '<div style="background:#fff;border:1px solid #cbd5e1;border-radius:14px;padding:20px;box-shadow:0 2px 4px rgba(0,0,0,0.02);">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #f1f5f9;">'
+        + '<div><h3 style="margin:0;font-size:18px;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px;">'
+        + '<span>🏥</span> Biomedical Asset & Equipment Operational Hub</h3>'
+        + '<div style="font-size:12px;color:#64748b;margin-top:2px;">Complete 15-module Lifecycle, Maintenance, Breakdowns & NABH Compliance</div></div></div>'
+        + '<div id="bioHodHubContainer"></div></div>'
+
+        + '<div style="background:#fff;border:1px solid #cbd5e1;border-radius:14px;padding:20px;box-shadow:0 2px 4px rgba(0,0,0,0.02);">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #f1f5f9;">'
+        + '<div><h3 style="margin:0;font-size:18px;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px;">'
+        + '<span>🧬</span> Biomedical Inventory & Implant Store</h3>'
+        + '<div style="font-size:12px;color:#64748b;margin-top:2px;">Equipment Stock, OT Prosthesis Register, Gate Entries & Safety Checklists</div></div></div>'
+        + '<div id="bioHodInventoryContainer"></div></div></div>'
+        + '</div>';
+
+    container.innerHTML = html;
+
+    var hubEl = document.getElementById('bioHodHubContainer');
+    if (hubEl) _hodDeptAssets(hubEl);
+    var invEl = document.getElementById('bioHodInventoryContainer');
+    if (invEl && typeof renderBiomedicalInventory === 'function') {
+        renderBiomedicalInventory(invEl);
+    }
+}
+
 
 
 
