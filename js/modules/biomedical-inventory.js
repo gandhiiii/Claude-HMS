@@ -1740,104 +1740,175 @@ function showBioImplantForm(implantId) {
     }, true);
 }
 
-/* ── 3. Patient Implantation Usage Modal ── */
+function bioOnImplantSelectChange(selectEl) {
+    if (!selectEl) return;
+    var opt = selectEl.options[selectEl.selectedIndex];
+    if (!opt) return;
+
+    var name = opt.getAttribute('data-name');
+    var type = opt.getAttribute('data-type');
+    var batch = opt.getAttribute('data-batch');
+    var serial = opt.getAttribute('data-serial');
+
+    if (name) {
+        var nameInput = document.getElementById('bioImplantNameInput');
+        if (nameInput) nameInput.value = name;
+    }
+    if (type) {
+        var typeSelect = document.getElementById('bioImplantTypeSelect');
+        if (typeSelect) typeSelect.value = type;
+    }
+    if (batch) {
+        var batchInput = document.getElementById('bioImplantBatchInput');
+        if (batchInput) batchInput.value = batch;
+    }
+    if (serial) {
+        var serialInput = document.getElementById('bioImplantSerialInput');
+        if (serialInput) serialInput.value = serial;
+    }
+}
+window.bioOnImplantSelectChange = bioOnImplantSelectChange;
+
 function showBioLogImplantationModal(implantId) {
+    const user = AUTH.currentUser();
+    const isHodOrAdmin = !user || (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || user.role === 'hod');
+
     const implants = DB.get('biomedical_implants') || [];
     const impOpts = implants.map(i =>
-        `<option value="${i.id}" ${implantId === i.id ? 'selected' : ''}>${i.name} (Batch: ${i.batchNo} | Qty: ${i.quantity})</option>`
+        `<option value="${i.id}" ${implantId === i.id ? 'selected' : ''} data-name="${(i.name||'').replace(/"/g, '&quot;')}" data-type="${(i.category||'').replace(/"/g, '&quot;')}" data-batch="${(i.batchNo||'').replace(/"/g, '&quot;')}" data-serial="${(i.serialNo||'').replace(/"/g, '&quot;')}">${i.name} (Batch: ${i.batchNo} | Qty: ${i.quantity})</option>`
     ).join('');
+
+    const selectedImp = implantId ? implants.find(i => i.id === implantId) : null;
+    const initialName = selectedImp ? selectedImp.name : '';
+    const initialType = selectedImp ? (selectedImp.category || 'Orthopedic & Joint Prosthesis') : 'Orthopedic & Joint Prosthesis';
+    const initialBatch = selectedImp ? (selectedImp.batchNo || '') : '';
+    const initialSerial = selectedImp ? (selectedImp.serialNo || '') : '';
 
     const formHtml = `
         <form id="bioLogImplantForm">
-            <div class="form-group mb-3">
-                <label>Select Implant Item *</label>
-                <select name="implantId" class="form-control" required>
-                    <option value="">-- Choose Implant --</option>
-                    ${impOpts}
-                </select>
+            <div style="background:#f8fafc;padding:12px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:14px;">
+                <div class="form-group mb-2">
+                    <label style="font-weight:700;font-size:12px;color:#334155;">Select Existing Inventory Implant (Optional Auto-Fill)</label>
+                    <select name="implantId" id="bioImplantSelect" class="form-control" onchange="bioOnImplantSelectChange(this)">
+                        <option value="">-- Choose Existing Implant (or Enter Custom Implant Below) --</option>
+                        ${impOpts}
+                    </select>
+                </div>
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-                <div class="form-group">
-                    <label>Patient ID *</label>
-                    <input type="text" name="patientId" class="form-control" placeholder="e.g. P-9021" required>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                <div class="form-group" style="grid-column: span 2;">
+                    <label style="font-weight:700;color:#0f172a;">Implant Name * ${isHodOrAdmin ? '<span class="badge badge-info" style="font-size:10px;margin-left:4px;">HOD/Admin Edit Enabled</span>' : ''}</label>
+                    <input type="text" name="implantName" id="bioImplantNameInput" class="form-control" value="${initialName.replace(/"/g, '&quot;')}" placeholder="e.g. Cobalt-Chrome Total Knee Joint Replacement Prosthesis" required>
+                    <small style="font-size:11px;color:#64748b;">HOD and Admin can directly specify or edit the exact Implant Name for surgical logging.</small>
                 </div>
+
                 <div class="form-group">
-                    <label>Patient Full Name *</label>
-                    <input type="text" name="patientName" class="form-control" placeholder="e.g. Ramesh Patel" required>
+                    <label style="font-weight:700;color:#0f172a;">Implant Type / Category *</label>
+                    <select name="implantType" id="bioImplantTypeSelect" class="form-control" required>
+                        <option value="Orthopedic & Joint Prosthesis" ${initialType==='Orthopedic & Joint Prosthesis'?'selected':''}>Orthopedic & Joint Prosthesis</option>
+                        <option value="Cardiovascular & Pacemakers" ${initialType==='Cardiovascular & Pacemakers'?'selected':''}>Cardiovascular & Pacemakers</option>
+                        <option value="Ophthalmic Intraocular Lenses (IOL)" ${initialType==='Ophthalmic Intraocular Lenses (IOL)'?'selected':''}>Ophthalmic Intraocular Lenses (IOL)</option>
+                        <option value="Spine & Neurosurgical Implants" ${initialType==='Spine & Neurosurgical Implants'?'selected':''}>Spine & Neurosurgical Implants</option>
+                        <option value="Dental & Maxillofacial" ${initialType==='Dental & Maxillofacial'?'selected':''}>Dental & Maxillofacial</option>
+                        <option value="Vascular Stents & Grafts" ${initialType==='Vascular Stents & Grafts'?'selected':''}>Vascular Stents & Grafts</option>
+                        <option value="General Surgical Implants" ${initialType==='General Surgical Implants'?'selected':''}>General Surgical Implants</option>
+                        <option value="Other Custom Implant" ${initialType==='Other Custom Implant'?'selected':''}>Other Custom Implant</option>
+                    </select>
                 </div>
+
                 <div class="form-group">
-                    <label>Date of Surgery *</label>
-                    <input type="date" name="surgeryDate" class="form-control" value="${new Date().toISOString().slice(0, 10)}" required>
+                    <label style="font-weight:700;color:#0f172a;">Batch / Lot Number</label>
+                    <input type="text" name="batchNo" id="bioImplantBatchInput" class="form-control" value="${initialBatch.replace(/"/g, '&quot;')}" placeholder="e.g. B-77492">
                 </div>
+
                 <div class="form-group">
-                    <label>OT Room Number</label>
-                    <input type="text" name="otRoom" class="form-control" placeholder="e.g. OT-1 Ortho">
+                    <label style="font-weight:700;color:#0f172a;">Serial Number</label>
+                    <input type="text" name="serialNo" id="bioImplantSerialInput" class="form-control" value="${initialSerial.replace(/"/g, '&quot;')}" placeholder="e.g. SN-KNEE-901">
                 </div>
+
                 <div class="form-group">
-                    <label>Operating Surgeon Name</label>
-                    <input type="text" name="surgeonName" class="form-control" placeholder="e.g. Dr. Vikram Shah">
-                </div>
-                <div class="form-group">
-                    <label>Scrub Nurse / BME Officer</label>
-                    <input type="text" name="nurseName" class="form-control" placeholder="e.g. Sr. Mary Kurien">
-                </div>
-                <div class="form-group">
-                    <label>Quantity Used</label>
+                    <label style="font-weight:700;color:#0f172a;">Quantity Used *</label>
                     <input type="number" name="quantityUsed" class="form-control" value="1" min="1" required>
                 </div>
             </div>
 
+            <div style="border-top:1px solid #e2e8f0;padding-top:12px;margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group">
+                    <label style="font-weight:700;color:#0f172a;">Patient ID (UHID / IPD) *</label>
+                    <input type="text" name="patientId" class="form-control" placeholder="e.g. P-9021" required>
+                </div>
+                <div class="form-group">
+                    <label style="font-weight:700;color:#0f172a;">Patient Full Name *</label>
+                    <input type="text" name="patientName" class="form-control" placeholder="e.g. Ramesh Patel" required>
+                </div>
+                <div class="form-group">
+                    <label style="font-weight:700;color:#0f172a;">Date of Surgery *</label>
+                    <input type="date" name="surgeryDate" class="form-control" value="${new Date().toISOString().slice(0, 10)}" required>
+                </div>
+                <div class="form-group">
+                    <label style="font-weight:700;color:#0f172a;">OT Suite / Room Number</label>
+                    <input type="text" name="otRoom" class="form-control" placeholder="e.g. OT-1 Ortho">
+                </div>
+                <div class="form-group">
+                    <label style="font-weight:700;color:#0f172a;">Operating Surgeon Name</label>
+                    <input type="text" name="surgeonName" class="form-control" placeholder="e.g. Dr. Vikram Shah">
+                </div>
+                <div class="form-group">
+                    <label style="font-weight:700;color:#0f172a;">Scrub Nurse / BME Officer</label>
+                    <input type="text" name="nurseName" class="form-control" placeholder="e.g. Sr. Mary Kurien">
+                </div>
+            </div>
+
             <div class="form-group" style="margin-top:12px;">
-                <label>Surgical / Implantation Notes</label>
-                <textarea name="notes" class="form-control" rows="2" placeholder="Positioning notes, verification checklist signed..."></textarea>
+                <label style="font-weight:700;color:#0f172a;">Surgical & Implantation Notes</label>
+                <textarea name="notes" class="form-control" rows="2" placeholder="Positioning notes, sterile package check, surgeon verification signed..."></textarea>
             </div>
         </form>
     `;
 
     openFormModal('🦴 Record Patient Implantation (OT Usage)', formHtml, () => {
         const formData = getFormData('bioLogImplantForm');
-        if (!formData.implantId || !formData.patientName) {
-            APP.notify('Implant and Patient Name are required', 'error');
-            return false;
-        }
-
-        const targetImp = DB.getById('biomedical_implants', formData.implantId);
-        if (!targetImp) {
-            APP.notify('Selected implant not found', 'error');
+        if (!formData.implantName || !formData.patientName) {
+            APP.notify('Implant Name and Patient Name are required', 'error');
             return false;
         }
 
         const qtyUsed = parseFloat(formData.quantityUsed) || 1;
-        const currentStock = parseFloat(targetImp.quantity) || 0;
 
-        if (currentStock < qtyUsed) {
-            APP.notify(`Insufficient implant stock! Only ${currentStock} unit(s) available.`, 'error');
-            return false;
+        if (formData.implantId) {
+            const targetImp = DB.getById('biomedical_implants', formData.implantId);
+            if (targetImp) {
+                const currentStock = parseFloat(targetImp.quantity) || 0;
+                if (currentStock < qtyUsed) {
+                    APP.notify(`Insufficient implant stock! Only ${currentStock} unit(s) available.`, 'error');
+                    return false;
+                }
+                // Deduct stock
+                DB.update('biomedical_implants', targetImp.id, {
+                    quantity: currentStock - qtyUsed
+                });
+            }
         }
-
-        // Deduct stock
-        DB.update('biomedical_implants', targetImp.id, {
-            quantity: currentStock - qtyUsed
-        });
 
         // Add log entry
         DB.add('biomedical_implantation_logs', {
-            implantId: targetImp.id,
-            implantName: targetImp.name,
-            batchNo: targetImp.batchNo,
-            serialNo: targetImp.serialNo,
-            patientId: formData.patientId,
+            implantId: formData.implantId || ('imp_cust_' + Date.now()),
+            implantName: formData.implantName,
+            implantType: formData.implantType || 'Orthopedic & Joint Prosthesis',
+            batchNo: formData.batchNo || '',
+            serialNo: formData.serialNo || '',
+            patientId: formData.patientId || '',
             patientName: formData.patientName,
             surgeryDate: formData.surgeryDate,
-            otRoom: formData.otRoom,
-            surgeonName: formData.surgeonName,
-            nurseName: formData.nurseName,
+            otRoom: formData.otRoom || '',
+            surgeonName: formData.surgeonName || '',
+            nurseName: formData.nurseName || '',
             quantityUsed: qtyUsed,
-            notes: formData.notes
+            notes: formData.notes || ''
         });
 
-        APP.notify(`Patient implantation logged! Stock updated to ${currentStock - qtyUsed} units.`, 'success');
+        APP.notify(`Patient implantation recorded: ${formData.implantName} (${formData.implantType})`, 'success');
         renderBiomedicalInventory(document.getElementById('pageContent'));
         return true;
     });
