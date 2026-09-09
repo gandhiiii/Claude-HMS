@@ -8146,208 +8146,259 @@ function hodDeleteAsset(id) {
 }
 
 function hodExportReport(type) {
-    if (typeof XLSX === 'undefined') {
-        APP.notify('Excel library (XLSX) not loaded. Please wait a moment and try again.', 'error');
-        return;
-    }
-
     var dept = (_hodData && _hodData.dept) || 'Biomedical';
     var dLow = dept.trim().toLowerCase();
     var todayStr = new Date().toISOString().slice(0, 10);
 
+    // 1. Primary Method: Excel (.xlsx) via XLSX library
+    if (typeof XLSX !== 'undefined') {
+        try {
+            var wb = XLSX.utils.book_new();
+
+            if (type === 'assets') {
+                var assets = (DB.get('hod_assets') || []).filter(function(a){
+                    return !dLow || (a.department || '').trim().toLowerCase() === dLow || dLow === 'biomedical';
+                });
+
+                var totalVal = assets.reduce(function(acc, a){ return acc + (parseFloat(a.purchasePrice) || 0); }, 0);
+                var workingCount = assets.filter(function(a){ return a.status === 'Working'; }).length;
+                var breakdownCount = assets.filter(function(a){ return a.status === 'Breakdown'; }).length;
+                var maintCount = assets.filter(function(a){ return a.status === 'Under Maintenance'; }).length;
+
+                var summarySheet = [
+                    [dept.toUpperCase() + ' MASTER ASSET REGISTER REPORT'],
+                    ['Export Date', todayStr],
+                    ['Department', dept],
+                    ['Total Asset Count', assets.length],
+                    ['Working Assets', workingCount],
+                    ['Under Maintenance', maintCount],
+                    ['Breakdown Assets', breakdownCount],
+                    ['Total Valuation (₹)', totalVal],
+                    [],
+                    ['Asset Tag', 'Equipment Name', 'Category', 'Model', 'Serial No', 'Department', 'Location', 'Purchase Price (₹)', 'Purchase Date', 'Status', 'Vendor', 'QR Code']
+                ];
+
+                assets.forEach(function(a) {
+                    summarySheet.push([
+                        a.assetTag || '',
+                        a.name || '',
+                        a.category || '',
+                        a.model || '',
+                        a.serialNo || '',
+                        a.department || dept,
+                        a.location || '',
+                        parseFloat(a.purchasePrice) || 0,
+                        a.purchaseDate || '',
+                        a.status || 'Working',
+                        a.vendor || '',
+                        a.qrCode || ''
+                    ]);
+                });
+
+                var ws = XLSX.utils.aoa_to_sheet(summarySheet);
+                XLSX.utils.book_append_sheet(wb, ws, 'Master Asset Register');
+                var filename = 'Master_Asset_Register_' + dept.replace(/[^a-z0-9]/gi, '_') + '_' + todayStr + '.xlsx';
+                XLSX.writeFile(wb, filename);
+                if (typeof APP !== 'undefined' && APP.notify) APP.notify('Master Asset Register Excel downloaded: ' + filename, 'success');
+                return;
+
+            } else if (type === 'maintenance') {
+                var breakdowns = (DB.get('hod_breakdowns') || []).filter(function(b){
+                    return !dLow || (b.department || '').trim().toLowerCase() === dLow || dLow === 'biomedical';
+                });
+                var pms = (DB.get('hod_pm_schedules') || []).filter(function(p){
+                    return !dLow || (p.department || '').trim().toLowerCase() === dLow || dLow === 'biomedical';
+                });
+                var cals = (DB.get('hod_calibrations') || []).filter(function(c){
+                    return !dLow || (c.department || '').trim().toLowerCase() === dLow || dLow === 'biomedical';
+                });
+
+                var brkSheet = [
+                    ['Ticket No', 'Asset Tag', 'Asset Name', 'Department', 'Priority', 'Reported By', 'Reported At', 'Status', 'Assigned Engineer', 'Repair Cost (₹)']
+                ];
+                breakdowns.forEach(function(b) {
+                    brkSheet.push([
+                        b.ticketNo || b.id || '',
+                        b.assetTag || '',
+                        b.assetName || '',
+                        b.department || dept,
+                        b.priority || 'Medium',
+                        b.reportedBy || '',
+                        b.reportedAt || '',
+                        b.status || 'Open',
+                        b.assignedTech || b.engineer || '',
+                        parseFloat(b.repairCost) || 0
+                    ]);
+                });
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(brkSheet), 'Breakdown Tickets');
+
+                var pmSheet = [
+                    ['Asset Tag', 'Asset Name', 'Department', 'Frequency', 'Last PM Date', 'Next PM Due', 'Service Agency', 'Status']
+                ];
+                pms.forEach(function(p) {
+                    pmSheet.push([
+                        p.assetTag || '',
+                        p.assetName || '',
+                        p.department || dept,
+                        p.frequency || 'Quarterly',
+                        p.lastPmDate || '',
+                        p.nextPmDue || '',
+                        p.serviceAgency || '',
+                        p.status || 'Scheduled'
+                    ]);
+                });
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pmSheet), 'PM Schedules');
+
+                var calSheet = [
+                    ['Instrument Name', 'Asset Tag', 'Department', 'Lab / Vendor', 'Cert No', 'Cal Date', 'Expiry Date', 'Tolerance', 'Status']
+                ];
+                cals.forEach(function(c) {
+                    calSheet.push([
+                        c.instrumentName || c.name || '',
+                        c.assetTag || '',
+                        c.department || dept,
+                        c.labVendor || '',
+                        c.certificateNo || '',
+                        c.calDate || '',
+                        c.expiryDate || '',
+                        c.tolerance || '',
+                        c.status || 'Valid'
+                    ]);
+                });
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(calSheet), 'Calibrations');
+
+                var filename = 'Maintenance_Breakdown_History_' + dept.replace(/[^a-z0-9]/gi, '_') + '_' + todayStr + '.xlsx';
+                XLSX.writeFile(wb, filename);
+                if (typeof APP !== 'undefined' && APP.notify) APP.notify('Maintenance & Breakdown History report downloaded: ' + filename, 'success');
+                return;
+
+            } else if (type === 'nabh') {
+                var cals = DB.get('hod_calibrations') || [];
+                var pms = DB.get('hod_pm_schedules') || [];
+                var contracts = DB.get('hod_contracts') || [];
+
+                var validCals = cals.filter(function(c){ return c.status === 'Valid'; }).length;
+                var totalCals = cals.length || 1;
+                var calPct = Math.round((validCals / totalCals) * 100);
+
+                var donePM = pms.filter(function(p){ return p.status === 'completed'; }).length;
+                var totalPM = pms.length || 1;
+                var pmPct = Math.round((donePM / totalPM) * 100);
+
+                var nabhSummary = [
+                    [dept.toUpperCase() + ' NABH STATUTORY AUDIT READINESS REPORT'],
+                    ['Export Date', todayStr],
+                    ['Department', dept],
+                    ['Overall Audit Readiness', calPct >= 80 && pmPct >= 80 ? 'HIGH (NABH COMPLIANT)' : 'MODERATE'],
+                    ['Calibration Compliance Rate', calPct + '% (' + validCals + '/' + totalCals + ')'],
+                    ['PM Completion Rate', pmPct + '% (' + donePM + '/' + totalPM + ')'],
+                    ['Active Maintenance Contracts (AMC/CMC)', contracts.length],
+                    [],
+                    ['SECTION 1: CALIBRATION COMPLIANCE REGISTER'],
+                    ['Instrument Name', 'Asset Tag', 'Lab Vendor', 'Cert No', 'Cal Date', 'Expiry Date', 'Tolerance', 'Status']
+                ];
+
+                cals.forEach(function(c) {
+                    nabhSummary.push([
+                        c.instrumentName || '',
+                        c.assetTag || '',
+                        c.labVendor || '',
+                        c.certificateNo || '',
+                        c.calDate || '',
+                        c.expiryDate || '',
+                        c.tolerance || '',
+                        c.status || 'Valid'
+                    ]);
+                });
+
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(nabhSummary), 'NABH Audit Summary');
+
+                var contractSheet = [
+                    ['Contract No', 'Vendor', 'Type', 'Start Date', 'Expiry Date', 'Annual Cost (₹)', 'Scope / Coverage', 'Status']
+                ];
+                contracts.forEach(function(ct) {
+                    contractSheet.push([
+                        ct.contractNo || ct.id || '',
+                        ct.vendor || '',
+                        ct.type || 'AMC',
+                        ct.startDate || '',
+                        ct.expiryDate || '',
+                        parseFloat(ct.annualCost) || 0,
+                        ct.coverage || 'Full Parts & Service',
+                        ct.status || 'Active'
+                    ]);
+                });
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(contractSheet), 'AMC CMC Contracts');
+
+                var filename = 'NABH_Statutory_Audit_Pack_' + dept.replace(/[^a-z0-9]/gi, '_') + '_' + todayStr + '.xlsx';
+                XLSX.writeFile(wb, filename);
+                if (typeof APP !== 'undefined' && APP.notify) APP.notify('NABH Statutory Audit Pack downloaded: ' + filename, 'success');
+                return;
+            }
+        } catch (e) {
+            console.error('XLSX export failed, trying CSV fallback...', e);
+        }
+    }
+
+    // 2. Secondary Method: Pure JS CSV / Blob Download Fallback
     try {
-        var wb = XLSX.utils.book_new();
+        var csvRows = [];
+        var outFilename = 'Report_' + type + '_' + todayStr + '.csv';
 
         if (type === 'assets') {
-            var assets = (DB.get('hod_assets') || []).filter(function(a){
-                return !dLow || (a.department || '').trim().toLowerCase() === dLow || dLow === 'biomedical';
-            });
-
-            var totalVal = assets.reduce(function(acc, a){ return acc + (parseFloat(a.purchasePrice) || 0); }, 0);
-            var workingCount = assets.filter(function(a){ return a.status === 'Working'; }).length;
-            var breakdownCount = assets.filter(function(a){ return a.status === 'Breakdown'; }).length;
-            var maintCount = assets.filter(function(a){ return a.status === 'Under Maintenance'; }).length;
-
-            var summarySheet = [
-                [dept.toUpperCase() + ' MASTER ASSET REGISTER REPORT'],
-                ['Export Date', todayStr],
-                ['Department', dept],
-                ['Total Asset Count', assets.length],
-                ['Working Assets', workingCount],
-                ['Under Maintenance', maintCount],
-                ['Breakdown Assets', breakdownCount],
-                ['Total Valuation (₹)', totalVal],
-                [],
-                ['Asset Tag', 'Equipment Name', 'Category', 'Model', 'Serial No', 'Department', 'Location', 'Purchase Price (₹)', 'Purchase Date', 'Status', 'Vendor', 'QR Code']
-            ];
-
+            outFilename = 'Master_Asset_Register_' + dept.replace(/[^a-z0-9]/gi, '_') + '_' + todayStr + '.csv';
+            csvRows.push([dept.toUpperCase() + ' MASTER ASSET REGISTER REPORT']);
+            csvRows.push(['Export Date', todayStr]);
+            csvRows.push(['Asset Tag', 'Equipment Name', 'Category', 'Model', 'Serial No', 'Department', 'Location', 'Purchase Price', 'Purchase Date', 'Status', 'Vendor']);
+            var assets = DB.get('hod_assets') || [];
             assets.forEach(function(a) {
-                summarySheet.push([
-                    a.assetTag || '',
-                    a.name || '',
-                    a.category || '',
-                    a.model || '',
-                    a.serialNo || '',
-                    a.department || dept,
-                    a.location || '',
-                    parseFloat(a.purchasePrice) || 0,
-                    a.purchaseDate || '',
-                    a.status || 'Working',
-                    a.vendor || '',
-                    a.qrCode || ''
-                ]);
+                csvRows.push([a.assetTag||'', a.name||'', a.category||'', a.model||'', a.serialNo||'', a.department||dept, a.location||'', a.purchasePrice||0, a.purchaseDate||'', a.status||'Working', a.vendor||'']);
             });
-
-            var ws = XLSX.utils.aoa_to_sheet(summarySheet);
-            XLSX.utils.book_append_sheet(wb, ws, 'Master Asset Register');
-            var filename = 'Master_Asset_Register_' + dept.replace(/[^a-z0-9]/gi, '_') + '_' + todayStr + '.xlsx';
-            XLSX.writeFile(wb, filename);
-            APP.notify('Master Asset Register Excel report downloaded: ' + filename, 'success');
-
         } else if (type === 'maintenance') {
-            var breakdowns = (DB.get('hod_breakdowns') || []).filter(function(b){
-                return !dLow || (b.department || '').trim().toLowerCase() === dLow || dLow === 'biomedical';
-            });
-            var pms = (DB.get('hod_pm_schedules') || []).filter(function(p){
-                return !dLow || (p.department || '').trim().toLowerCase() === dLow || dLow === 'biomedical';
-            });
-            var cals = (DB.get('hod_calibrations') || []).filter(function(c){
-                return !dLow || (c.department || '').trim().toLowerCase() === dLow || dLow === 'biomedical';
-            });
-
-            // Sheet 1: Breakdowns
-            var brkSheet = [
-                ['Ticket No', 'Asset Tag', 'Asset Name', 'Department', 'Priority', 'Reported By', 'Reported At', 'Status', 'Assigned Engineer', 'Repair Cost (₹)']
-            ];
+            outFilename = 'Maintenance_Breakdown_History_' + dept.replace(/[^a-z0-9]/gi, '_') + '_' + todayStr + '.csv';
+            csvRows.push(['BREAKDOWN TICKETS & MAINTENANCE REPORT']);
+            csvRows.push(['Ticket No', 'Asset Tag', 'Asset Name', 'Department', 'Priority', 'Reported By', 'Reported At', 'Status', 'Assigned Engineer', 'Repair Cost']);
+            var breakdowns = DB.get('hod_breakdowns') || [];
             breakdowns.forEach(function(b) {
-                brkSheet.push([
-                    b.ticketNo || b.id || '',
-                    b.assetTag || '',
-                    b.assetName || '',
-                    b.department || dept,
-                    b.priority || 'Medium',
-                    b.reportedBy || '',
-                    b.reportedAt || '',
-                    b.status || 'Open',
-                    b.assignedTech || b.engineer || '',
-                    parseFloat(b.repairCost) || 0
-                ]);
+                csvRows.push([b.ticketNo||b.id||'', b.assetTag||'', b.assetName||'', b.department||dept, b.priority||'Medium', b.reportedBy||'', b.reportedAt||'', b.status||'Open', b.assignedTech||'', b.repairCost||0]);
             });
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(brkSheet), 'Breakdown Tickets');
-
-            // Sheet 2: PM Schedules
-            var pmSheet = [
-                ['Asset Tag', 'Asset Name', 'Department', 'Frequency', 'Last PM Date', 'Next PM Due', 'Service Agency', 'Status']
-            ];
-            pms.forEach(function(p) {
-                pmSheet.push([
-                    p.assetTag || '',
-                    p.assetName || '',
-                    p.department || dept,
-                    p.frequency || 'Quarterly',
-                    p.lastPmDate || '',
-                    p.nextPmDue || '',
-                    p.serviceAgency || '',
-                    p.status || 'Scheduled'
-                ]);
-            });
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pmSheet), 'PM Schedules');
-
-            // Sheet 3: Calibrations
-            var calSheet = [
-                ['Instrument Name', 'Asset Tag', 'Department', 'Lab / Vendor', 'Cert No', 'Cal Date', 'Expiry Date', 'Tolerance', 'Status']
-            ];
-            cals.forEach(function(c) {
-                calSheet.push([
-                    c.instrumentName || c.name || '',
-                    c.assetTag || '',
-                    c.department || dept,
-                    c.labVendor || '',
-                    c.certificateNo || '',
-                    c.calDate || '',
-                    c.expiryDate || '',
-                    c.tolerance || '',
-                    c.status || 'Valid'
-                ]);
-            });
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(calSheet), 'Calibrations');
-
-            var filename = 'Maintenance_Breakdown_History_' + dept.replace(/[^a-z0-9]/gi, '_') + '_' + todayStr + '.xlsx';
-            XLSX.writeFile(wb, filename);
-            APP.notify('Maintenance & Breakdown History report downloaded: ' + filename, 'success');
-
         } else if (type === 'nabh') {
+            outFilename = 'NABH_Statutory_Audit_Pack_' + dept.replace(/[^a-z0-9]/gi, '_') + '_' + todayStr + '.csv';
+            csvRows.push(['NABH STATUTORY AUDIT PACK COMPLIANCE REPORT']);
+            csvRows.push(['Instrument Name', 'Asset Tag', 'Department', 'Lab Vendor', 'Cert No', 'Cal Date', 'Expiry Date', 'Tolerance', 'Status']);
             var cals = DB.get('hod_calibrations') || [];
-            var pms = DB.get('hod_pm_schedules') || [];
-            var contracts = DB.get('hod_contracts') || [];
-
-            var validCals = cals.filter(function(c){ return c.status === 'Valid'; }).length;
-            var totalCals = cals.length || 1;
-            var calPct = Math.round((validCals / totalCals) * 100);
-
-            var donePM = pms.filter(function(p){ return p.status === 'completed'; }).length;
-            var totalPM = pms.length || 1;
-            var pmPct = Math.round((donePM / totalPM) * 100);
-
-            var nabhSummary = [
-                [dept.toUpperCase() + ' NABH STATUTORY AUDIT READINESS REPORT'],
-                ['Export Date', todayStr],
-                ['Department', dept],
-                ['Overall Audit Readiness', calPct >= 80 && pmPct >= 80 ? 'HIGH (NABH COMPLIANT)' : 'MODERATE'],
-                ['Calibration Compliance Rate', calPct + '% (' + validCals + '/' + totalCals + ')'],
-                ['PM Completion Rate', pmPct + '% (' + donePM + '/' + totalPM + ')'],
-                ['Active Maintenance Contracts (AMC/CMC)', contracts.length],
-                [],
-                ['SECTION 1: CALIBRATION COMPLIANCE REGISTER'],
-                ['Instrument Name', 'Asset Tag', 'Lab Vendor', 'Cert No', 'Cal Date', 'Expiry Date', 'Tolerance', 'Status']
-            ];
-
             cals.forEach(function(c) {
-                nabhSummary.push([
-                    c.instrumentName || '',
-                    c.assetTag || '',
-                    c.labVendor || '',
-                    c.certificateNo || '',
-                    c.calDate || '',
-                    c.expiryDate || '',
-                    c.tolerance || '',
-                    c.status || 'Valid'
-                ]);
+                csvRows.push([c.instrumentName||'', c.assetTag||'', c.department||dept, c.labVendor||'', c.certificateNo||'', c.calDate||'', c.expiryDate||'', c.tolerance||'', c.status||'Valid']);
             });
-
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(nabhSummary), 'NABH Audit Summary');
-
-            // Sheet 2: AMC / CMC Contracts
-            var contractSheet = [
-                ['Contract No', 'Vendor', 'Type', 'Start Date', 'Expiry Date', 'Annual Cost (₹)', 'Scope / Coverage', 'Status']
-            ];
-            contracts.forEach(function(ct) {
-                contractSheet.push([
-                    ct.contractNo || ct.id || '',
-                    ct.vendor || '',
-                    ct.type || 'AMC',
-                    ct.startDate || '',
-                    ct.expiryDate || '',
-                    parseFloat(ct.annualCost) || 0,
-                    ct.coverage || 'Full Parts & Service',
-                    ct.status || 'Active'
-                ]);
-            });
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(contractSheet), 'AMC CMC Contracts');
-
-            var filename = 'NABH_Statutory_Audit_Pack_' + dept.replace(/[^a-z0-9]/gi, '_') + '_' + todayStr + '.xlsx';
-            XLSX.writeFile(wb, filename);
-            APP.notify('NABH Statutory Audit Pack downloaded: ' + filename, 'success');
-        } else {
-            APP.notify('Exporting ' + type + ' report...', 'info');
         }
-    } catch (e) {
-        console.error('Excel Export Error:', e);
-        APP.notify('Report export failed: ' + (e.message || e), 'error');
+
+        var csvString = csvRows.map(function(r){
+            return r.map(function(cell){
+                var str = (cell === null || cell === undefined) ? '' : String(cell);
+                if (str.indexOf(',') !== -1 || str.indexOf('"') !== -1 || str.indexOf('\n') !== -1) {
+                    str = '"' + str.replace(/"/g, '""') + '"';
+                }
+                return str;
+            }).join(',');
+        }).join('\n');
+
+        var blob = new Blob(['\ufeff' + csvString], { type: 'text/csv;charset=utf-8;' });
+        var link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = outFilename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        if (typeof APP !== 'undefined' && APP.notify) APP.notify('Report downloaded: ' + outFilename, 'success');
+    } catch (err) {
+        console.error('CSV Export error:', err);
+        if (typeof APP !== 'undefined' && APP.notify) APP.notify('Report download failed: ' + (err.message || err), 'error');
     }
 }
 
 window.renderHodDashboard = renderHodDashboard;
+window.hodExportReport = hodExportReport;
 
 
 
