@@ -561,6 +561,8 @@ function renderBiomedicalInventory(container) {
                     ${bioInvTab === 'implants' ? `<button class="btn btn-primary btn-sm" onclick="showBioImplantForm()">➕ Add Implant Item</button><button class="btn btn-success btn-sm" onclick="showBioLogImplantationModal()">🦴 Log Patient Implantation</button>` : ''}
                     ${bioInvTab === 'purchases' ? `<button class="btn btn-primary btn-sm" onclick="showBioPurchaseForm()">➕ Add Purchase Entry</button>` : ''}
                     ${bioInvTab === 'consumables' ? `<button class="btn btn-primary btn-sm" onclick="showBioConsumableForm()">➕ Add Consumable / Disposable</button>` : ''}
+                    ${bioInvTab === 'condemnation' ? `<button class="btn btn-danger btn-sm" onclick="showBioCondemnForm()">❌ Condemn Item</button>` : ''}
+                    ${bioInvTab === 'training' ? `<button class="btn btn-primary btn-sm" onclick="showBioTrainingForm()">➕ Add Training Record</button>` : ''}
                     ${bioInvTab === 'meetings' ? `<button class="btn btn-primary btn-sm" onclick="showBioMeetingForm()">➕ Schedule Meeting</button>` : ''}
                     ${bioInvTab === 'todos' ? `<button class="btn btn-primary btn-sm" onclick="showBioTodoForm()">➕ Add Biomedical Task</button>` : ''}
                     <button class="btn btn-sm" style="background:#1e7e34;color:#fff;" onclick="bioInvDownloadExcel()">📥 Excel Export</button>
@@ -599,6 +601,12 @@ function renderBiomedicalInventory(container) {
                 </button>
                 <button class="tab-btn ${bioInvTab === 'checklists' ? 'active' : ''}" onclick="switchBioInvTab('checklists', this)">
                     📋 Safety Checklists
+                </button>
+                <button class="tab-btn ${bioInvTab === 'condemnation' ? 'active' : ''}" onclick="switchBioInvTab('condemnation', this)" style="color:#dc2626;">
+                    ❌ Condemnation
+                </button>
+                <button class="tab-btn ${bioInvTab === 'training' ? 'active' : ''}" onclick="switchBioInvTab('training', this)" style="color:#0369a1;">
+                    🎓 Training
                 </button>
             </div>
 
@@ -753,6 +761,8 @@ function renderBioInvTabContent() {
     else if (bioInvTab === 'meetings') content.innerHTML = renderBioMeetingsTab();
     else if (bioInvTab === 'todos') content.innerHTML = renderBioTodosTab();
     else if (bioInvTab === 'checklists') content.innerHTML = renderBioChecklistsTab();
+    else if (bioInvTab === 'condemnation') content.innerHTML = renderBioCondemnationTab();
+    else if (bioInvTab === 'training') content.innerHTML = renderBioTrainingTab();
 }
 
 /* ===========================================================================
@@ -2998,4 +3008,443 @@ window.bioInvDownloadExcel = bioInvDownloadExcel;
 window.bioInvDownloadPdf = bioInvDownloadPdf;
 window.showBioConsumableForm = showBioConsumableForm;
 window.deleteBioConsumable = deleteBioConsumable;
+window.showBioCondemnForm = showBioCondemnForm;
+window.deleteBioCondemn = deleteBioCondemn;
+window.showBioTrainingForm = showBioTrainingForm;
+window.deleteBioTraining = deleteBioTraining;
+window.toggleBioTrainingAttendance = toggleBioTrainingAttendance;
+
+/* ===========================================================================
+   CONDEMNATION SECTION
+   Write-off Equipment / Implants / Spare Parts / Consumables with committee approval
+   =========================================================================== */
+function renderBioCondemnationTab() {
+    const records = DB.get('bio_condemnation') || [];
+    const searchQ = (window._bioCondemnSearch || '').toLowerCase();
+    const typeF   = window._bioCondemnType || '';
+    const statusF = window._bioCondemnStatus || '';
+
+    const filtered = records.filter(r => {
+        const matchS = !searchQ || (r.itemName||'').toLowerCase().includes(searchQ) || (r.itemCode||'').toLowerCase().includes(searchQ);
+        const matchT = !typeF   || r.itemType === typeF;
+        const matchSt= !statusF || r.status === statusF;
+        return matchS && matchT && matchSt;
+    });
+
+    const total      = records.length;
+    const pending    = records.filter(r => r.status === 'Pending Approval').length;
+    const approved   = records.filter(r => r.status === 'Approved').length;
+    const disposed   = records.filter(r => r.status === 'Disposed').length;
+
+    const itemTypes  = ['Major Equipment','Minor Equipment','Instrument','Implant','Spare Part','Consumable','Disposable','Other'];
+    const statuses   = ['Pending Approval','Approved','Rejected','Disposed'];
+
+    const typeOpts   = itemTypes.map(t  => `<option value="${t}"  ${typeF   === t  ? 'selected':''} >${t}</option>`).join('');
+    const statusOpts = statuses.map(s   => `<option value="${s}"  ${statusF === s  ? 'selected':''} >${s}</option>`).join('');
+
+    const rows = filtered.length ? filtered.map(r => {
+        const statusColor = r.status === 'Approved' ? '#16a34a' : r.status === 'Rejected' ? '#dc2626' : r.status === 'Disposed' ? '#6b7280' : '#d97706';
+        return `<tr>
+            <td><span style="font-family:monospace;font-weight:700;color:#6366f1;font-size:12px;">${r.condemRef || r.id.slice(-6).toUpperCase()}</span></td>
+            <td>
+                <strong>${r.itemName}</strong>
+                <div style="font-size:11px;color:var(--gray);">${r.itemCode || ''} • ${r.itemType}</div>
+            </td>
+            <td><span class="badge badge-light">${r.itemType}</span></td>
+            <td style="font-size:12px;max-width:180px;">${r.reason || '-'}</td>
+            <td style="font-size:12px;">${r.condemDate || '-'}</td>
+            <td style="font-size:12px;">${r.committeeMembers || '-'}</td>
+            <td><span style="font-weight:700;color:${statusColor};font-size:12px;">${r.status}</span></td>
+            <td style="white-space:nowrap;">
+                <button class="btn btn-sm btn-primary" style="font-size:11px;padding:2px 8px;" onclick="showBioCondemnForm('${r.id}')">&#9998; Edit</button>
+                <button class="btn btn-sm btn-danger"  style="font-size:11px;padding:2px 8px;" onclick="deleteBioCondemn('${r.id}')">&#128465; Del</button>
+            </td>
+        </tr>`;
+    }).join('') : `<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--gray);">No condemnation records yet.<br><small>Click ❌ Condemn Item to record a write-off.</small></td></tr>`;
+
+    return `<div>
+        <div style="background:linear-gradient(135deg,#7f1d1d,#991b1b);border-radius:14px;padding:16px 20px;color:#fff;margin-bottom:16px;display:flex;align-items:center;gap:14px;">
+            <span style="font-size:32px;">❌</span>
+            <div>
+                <div style="font-size:17px;font-weight:800;">Condemnation Register</div>
+                <div style="font-size:12px;opacity:.85;">Official write-off records for Equipment, Implants, Spare Parts, Consumables &amp; Disposables with Committee Approval</div>
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;">
+            <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:22px;font-weight:800;color:#dc2626;">${total}</div>
+                <div style="font-size:11px;color:#b91c1c;font-weight:600;">Total Records</div>
+            </div>
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:22px;font-weight:800;color:#d97706;">${pending}</div>
+                <div style="font-size:11px;color:#92400e;font-weight:600;">Pending Approval</div>
+            </div>
+            <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:22px;font-weight:800;color:#16a34a;">${approved}</div>
+                <div style="font-size:11px;color:#15803d;font-weight:600;">Approved</div>
+            </div>
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:22px;font-weight:800;color:#475569;">${disposed}</div>
+                <div style="font-size:11px;color:#64748b;font-weight:600;">Disposed</div>
+            </div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+            <input type="text" class="form-control" placeholder="🔍 Search item name or code..." style="flex:1;min-width:200px;"
+                value="${window._bioCondemnSearch||''}" oninput="window._bioCondemnSearch=this.value;renderBioInvTabContent()">
+            <select class="form-control" style="width:180px;" onchange="window._bioCondemnType=this.value;renderBioInvTabContent()">
+                <option value="">All Types</option>${typeOpts}
+            </select>
+            <select class="form-control" style="width:180px;" onchange="window._bioCondemnStatus=this.value;renderBioInvTabContent()">
+                <option value="">All Statuses</option>${statusOpts}
+            </select>
+        </div>
+
+        <div style="overflow-x:auto;">
+            <table class="data-table" style="width:100%;">
+                <thead><tr style="background:#fef2f2;">
+                    <th>Ref No.</th><th>Item Details</th><th>Type</th><th>Reason</th>
+                    <th>Condemn Date</th><th>Committee</th><th>Status</th><th>Actions</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    </div>`;
+}
+
+function showBioCondemnForm(recId) {
+    const rec    = recId ? (DB.get('bio_condemnation') || []).find(r => r.id === recId) : null;
+    const isEdit = !!rec;
+    const itemTypes = ['Major Equipment','Minor Equipment','Instrument','Implant','Spare Part','Consumable','Disposable','Other'];
+    const statuses  = ['Pending Approval','Approved','Rejected','Disposed'];
+
+    const html = `<form id="bioCondemnForm">
+        <input type="hidden" name="id" value="${rec?.id||''}"><br>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group">
+                <label>Item Name *</label>
+                <input type="text" name="itemName" class="form-control" value="${rec?.itemName||''}" placeholder="e.g. Defibrillator Monitor" required>
+            </div>
+            <div class="form-group">
+                <label>Item Code / Asset Tag</label>
+                <input type="text" name="itemCode" class="form-control" value="${rec?.itemCode||''}" placeholder="e.g. BIO-EQ-1001">
+            </div>
+            <div class="form-group">
+                <label>Item Type *</label>
+                <select name="itemType" class="form-control" required>
+                    <option value="">-- Select Type --</option>
+                    ${itemTypes.map(t => `<option value="${t}" ${rec?.itemType===t?'selected':''}>${t}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Condemnation Date *</label>
+                <input type="date" name="condemDate" class="form-control" value="${rec?.condemDate||new Date().toISOString().slice(0,10)}" required>
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+                <label>Reason for Condemnation *</label>
+                <textarea name="reason" class="form-control" rows="2" placeholder="e.g. Beyond economical repair, Obsolete technology, Physical damage..." required>${rec?.reason||''}</textarea>
+            </div>
+            <div class="form-group">
+                <label>Committee Members</label>
+                <input type="text" name="committeeMembers" class="form-control" value="${rec?.committeeMembers||''}" placeholder="e.g. Dr. Sharma, Mr. Patel, HOD Bio">
+            </div>
+            <div class="form-group">
+                <label>Approved By (HOD / Admin)</label>
+                <input type="text" name="approvedBy" class="form-control" value="${rec?.approvedBy||''}" placeholder="e.g. HOD Biomedical">
+            </div>
+            <div class="form-group">
+                <label>Condemnation Reference No.</label>
+                <input type="text" name="condemRef" class="form-control" value="${rec?.condemRef||'COND-'+Date.now().toString().slice(-6)}">
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select name="status" class="form-control">
+                    ${statuses.map(s => `<option value="${s}" ${rec?.status===s?'selected':s==='Pending Approval'&&!rec?'selected':''}>${s}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Disposal Method</label>
+                <select name="disposalMethod" class="form-control">
+                    ${['Auction / Scrap Sale','Incineration','Return to Vendor','Donated','Written Off','Other'].map(m => `<option value="${m}" ${rec?.disposalMethod===m?'selected':''}>${m}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Scrap / Disposal Value (&#8377;)</label>
+                <input type="number" name="scrapValue" class="form-control" value="${rec?.scrapValue||''}" placeholder="e.g. 500" min="0">
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+                <label>Remarks</label>
+                <textarea name="remarks" class="form-control" rows="2" placeholder="Additional notes...">${rec?.remarks||''}</textarea>
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+            <button type="button" class="btn btn-secondary" onclick="APP.closeModal()">Cancel</button>
+            <button type="submit" class="btn btn-danger">💾 ${isEdit?'Update':'Submit'} Condemnation</button>
+        </div>
+    </form>`;
+
+    APP.openModal(`${isEdit?'Edit':'New'} Condemnation Record`, html, { width: '720px' });
+    setTimeout(() => {
+        const form = document.getElementById('bioCondemnForm');
+        if (!form) return;
+        form.addEventListener('submit', e => {
+            e.preventDefault();
+            const fd = new FormData(form);
+            const data = {};
+            fd.forEach((v,k) => { data[k] = v.trim(); });
+            if (!data.itemName || !data.itemType || !data.reason) { alert('Please fill required fields.'); return; }
+            const recs = DB.get('bio_condemnation') || [];
+            if (data.id) {
+                const idx = recs.findIndex(r => r.id === data.id);
+                if (idx !== -1) recs[idx] = Object.assign(recs[idx], data, { updatedAt: new Date().toISOString() });
+            } else {
+                data.id = 'cond_' + Date.now();
+                data.createdAt = new Date().toISOString();
+                recs.push(data);
+            }
+            DB.set('bio_condemnation', recs);
+            APP.closeModal();
+            APP.notify('Condemnation record saved!', 'success');
+            bioInvTab = 'condemnation';
+            renderBiomedicalInventory(document.getElementById('pageContent') || document.getElementById('bioHodInventoryContainer'));
+        });
+    }, 100);
+}
+
+function deleteBioCondemn(id) {
+    if (!confirm('Delete this condemnation record?')) return;
+    DB.set('bio_condemnation', (DB.get('bio_condemnation') || []).filter(r => r.id !== id));
+    APP.notify('Record deleted.', 'success');
+    renderBioInvTabContent();
+}
+
+/* ===========================================================================
+   TRAINING SECTION
+   HOD adds training records. Department employees can view.
+   Categories: Equipment, Instrument, DRN (Daily Record Notes), OBO (On-Bench Observation)
+   =========================================================================== */
+function renderBioTrainingTab() {
+    const records  = DB.get('bio_training') || [];
+    const searchQ  = (window._bioTrainSearch || '').toLowerCase();
+    const catF     = window._bioTrainCat || '';
+
+    const filtered = records.filter(r => {
+        const matchS = !searchQ || (r.topic||'').toLowerCase().includes(searchQ) || (r.trainer||'').toLowerCase().includes(searchQ);
+        const matchC = !catF || r.category === catF;
+        return matchS && matchC;
+    });
+
+    const total     = records.length;
+    const equipment = records.filter(r => r.category === 'Equipment').length;
+    const instrument= records.filter(r => r.category === 'Instrument').length;
+    const drn       = records.filter(r => r.category === 'DRN').length;
+    const obo       = records.filter(r => r.category === 'OBO').length;
+
+    const categories = ['Equipment','Instrument','DRN','OBO','Safety & Compliance','NABH Orientation','Other'];
+    const catOpts    = categories.map(c => `<option value="${c}" ${catF===c?'selected':''}>${c}</option>`).join('');
+
+    const catBadgeColor = { Equipment:'#3b82f6', Instrument:'#8b5cf6', DRN:'#f59e0b', OBO:'#10b981', 'Safety & Compliance':'#ef4444', 'NABH Orientation':'#06b6d4', Other:'#6b7280' };
+
+    const rows = filtered.length ? filtered.map(r => {
+        const bg = catBadgeColor[r.category] || '#6b7280';
+        const attendees = (r.attendees || '').split(',').filter(Boolean);
+        return `<tr>
+            <td>
+                <strong style="font-size:13px;">${r.topic}</strong>
+                <div style="font-size:11px;color:var(--gray);margin-top:2px;">${r.description||''}</div>
+            </td>
+            <td><span style="background:${bg}18;color:${bg};border:1px solid ${bg}40;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;">${r.category}</span></td>
+            <td style="font-size:12px;">${r.trainingDate || '-'}</td>
+            <td style="font-size:12px;">${r.trainer || '-'}</td>
+            <td style="font-size:12px;">
+                <span style="font-weight:700;">${attendees.length}</span> staff
+                ${attendees.length ? `<div style="font-size:10px;color:var(--gray);">${attendees.slice(0,2).join(', ')}${attendees.length>2?' +' + (attendees.length-2)+' more':''}</div>` : ''}
+            </td>
+            <td style="font-size:12px;">${r.venue || '-'}</td>
+            <td style="font-size:12px;">${r.duration || '-'}</td>
+            <td style="white-space:nowrap;">
+                <button class="btn btn-sm btn-primary" style="font-size:11px;padding:2px 8px;" onclick="showBioTrainingForm('${r.id}')">&#9998; Edit</button>
+                <button class="btn btn-sm btn-danger"  style="font-size:11px;padding:2px 8px;" onclick="deleteBioTraining('${r.id}')">&#128465; Del</button>
+            </td>
+        </tr>`;
+    }).join('') : `<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--gray);">No training records yet.<br><small>HOD can click ➕ Add Training Record to get started.</small></td></tr>`;
+
+    return `<div>
+        <div style="background:linear-gradient(135deg,#0c4a6e,#0369a1);border-radius:14px;padding:16px 20px;color:#fff;margin-bottom:16px;display:flex;align-items:center;gap:14px;">
+            <span style="font-size:32px;">🎓</span>
+            <div>
+                <div style="font-size:17px;font-weight:800;">Training &amp; Skill Development Register</div>
+                <div style="font-size:12px;opacity:.85;">Equipment | Instrument | DRN (Daily Record Notes) | OBO (On-Bench Observation) | NABH Compliance Training</div>
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px;">
+            <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:22px;font-weight:800;color:#0369a1;">${total}</div>
+                <div style="font-size:11px;color:#075985;font-weight:600;">Total Sessions</div>
+            </div>
+            <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:22px;font-weight:800;color:#3b82f6;">${equipment}</div>
+                <div style="font-size:11px;color:#1d4ed8;font-weight:600;">Equipment</div>
+            </div>
+            <div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:22px;font-weight:800;color:#8b5cf6;">${instrument}</div>
+                <div style="font-size:11px;color:#6d28d9;font-weight:600;">Instrument</div>
+            </div>
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:22px;font-weight:800;color:#f59e0b;">${drn}</div>
+                <div style="font-size:11px;color:#92400e;font-weight:600;">DRN</div>
+            </div>
+            <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:22px;font-weight:800;color:#10b981;">${obo}</div>
+                <div style="font-size:11px;color:#065f46;font-weight:600;">OBO</div>
+            </div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+            <input type="text" class="form-control" placeholder="🔍 Search topic or trainer..." style="flex:1;min-width:200px;"
+                value="${window._bioTrainSearch||''}" oninput="window._bioTrainSearch=this.value;renderBioInvTabContent()">
+            <select class="form-control" style="width:200px;" onchange="window._bioTrainCat=this.value;renderBioInvTabContent()">
+                <option value="">All Categories</option>${catOpts}
+            </select>
+        </div>
+
+        <div style="overflow-x:auto;">
+            <table class="data-table" style="width:100%;">
+                <thead><tr style="background:#f0f9ff;">
+                    <th>Topic / Description</th><th>Category</th><th>Date</th>
+                    <th>Trainer</th><th>Attendees</th><th>Venue</th><th>Duration</th><th>Actions</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    </div>`;
+}
+
+function showBioTrainingForm(recId) {
+    const rec    = recId ? (DB.get('bio_training') || []).find(r => r.id === recId) : null;
+    const isEdit = !!rec;
+    const user   = AUTH.currentUser();
+    const categories = ['Equipment','Instrument','DRN','OBO','Safety & Compliance','NABH Orientation','Other'];
+    const deptUsers  = (DB.get('users') || []).filter(u => (u.department||'').trim().toLowerCase() === 'biomedical' || (u.role === 'hod' && (u.department||'').trim().toLowerCase() === 'biomedical'));
+    const staffList  = deptUsers.map(u => u.fullName || u.username).filter(Boolean);
+    const attendeesSaved = (rec?.attendees || '').split(',').map(s => s.trim()).filter(Boolean);
+
+    const staffCheckboxes = staffList.length
+        ? staffList.map(name => `
+            <label style="display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;margin:2px;">
+                <input type="checkbox" name="attendee_cb" value="${name}" ${attendeesSaved.includes(name)?'checked':''}> ${name}
+            </label>`).join('')
+        : `<input type="text" name="attendees" class="form-control" value="${rec?.attendees||''}" placeholder="e.g. Rahul Kumar, Priya Singh">`;
+
+    const html = `<form id="bioTrainingForm">
+        <input type="hidden" name="id" value="${rec?.id||''}"><br>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group" style="grid-column:1/-1;">
+                <label>Training Topic *</label>
+                <input type="text" name="topic" class="form-control" value="${rec?.topic||''}" placeholder="e.g. Ventilator Operation &amp; Safety Protocol" required>
+            </div>
+            <div class="form-group">
+                <label>Category *</label>
+                <select name="category" class="form-control" required>
+                    <option value="">-- Select Category --</option>
+                    ${categories.map(c => `<option value="${c}" ${rec?.category===c?'selected':''}>${c}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Training Date *</label>
+                <input type="date" name="trainingDate" class="form-control" value="${rec?.trainingDate||new Date().toISOString().slice(0,10)}" required>
+            </div>
+            <div class="form-group">
+                <label>Trainer / Facilitator</label>
+                <input type="text" name="trainer" class="form-control" value="${rec?.trainer||user?.fullName||''}" placeholder="e.g. Biomedical HOD / Vendor Expert">
+            </div>
+            <div class="form-group">
+                <label>Duration</label>
+                <input type="text" name="duration" class="form-control" value="${rec?.duration||''}" placeholder="e.g. 2 Hours, Half Day">
+            </div>
+            <div class="form-group">
+                <label>Venue / Location</label>
+                <input type="text" name="venue" class="form-control" value="${rec?.venue||''}" placeholder="e.g. Conference Hall / Biomedical Dept">
+            </div>
+            <div class="form-group">
+                <label>Equipment / Instrument Covered</label>
+                <input type="text" name="equipmentCovered" class="form-control" value="${rec?.equipmentCovered||''}" placeholder="e.g. Ventilator, Defibrillator, BP Monitor">
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+                <label>Description / Agenda</label>
+                <textarea name="description" class="form-control" rows="2" placeholder="Training agenda, key points covered...">${rec?.description||''}</textarea>
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+                <label>Attendees (Department Staff)</label>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;padding:8px;border:1px solid var(--border);border-radius:6px;max-height:140px;overflow-y:auto;background:#fafafa;" id="bioTrainAttBox">
+                    ${staffCheckboxes}
+                </div>
+                ${!staffList.length ? '' : `<div style="font-size:11px;color:var(--gray);margin-top:4px;">Or type manually if staff not listed:</div><input type="text" name="attendeesManual" class="form-control" style="margin-top:4px;" value="${rec?.attendeesManual||''}" placeholder="Additional attendees (comma separated)">`}
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+                <label>Remarks / Outcome</label>
+                <textarea name="remarks" class="form-control" rows="2" placeholder="Training outcome, follow-up action items...">${rec?.remarks||''}</textarea>
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+            <button type="button" class="btn btn-secondary" onclick="APP.closeModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary">💾 ${isEdit?'Update':'Save'} Training Record</button>
+        </div>
+    </form>`;
+
+    APP.openModal(`${isEdit?'Edit':'Add'} Training Record`, html, { width: '720px' });
+    setTimeout(() => {
+        const form = document.getElementById('bioTrainingForm');
+        if (!form) return;
+        form.addEventListener('submit', e => {
+            e.preventDefault();
+            const fd = new FormData(form);
+            const data = {};
+            fd.forEach((v,k) => {
+                if (k === 'attendee_cb') return;
+                data[k] = (data[k] ? data[k] + ',' : '') + v.trim();
+            });
+            // Collect checked attendees
+            const checked = Array.from(form.querySelectorAll('[name="attendee_cb"]:checked')).map(cb => cb.value);
+            data.attendees = [...checked, ...(data.attendeesManual||'').split(',').map(s=>s.trim()).filter(Boolean)].join(', ');
+            if (!data.topic || !data.category) { alert('Please fill required fields.'); return; }
+            const recs = DB.get('bio_training') || [];
+            if (data.id) {
+                const idx = recs.findIndex(r => r.id === data.id);
+                if (idx !== -1) recs[idx] = Object.assign(recs[idx], data, { updatedAt: new Date().toISOString() });
+            } else {
+                data.id = 'train_' + Date.now();
+                data.createdAt = new Date().toISOString();
+                recs.push(data);
+            }
+            DB.set('bio_training', recs);
+            APP.closeModal();
+            APP.notify('Training record saved!', 'success');
+            bioInvTab = 'training';
+            renderBiomedicalInventory(document.getElementById('pageContent') || document.getElementById('bioHodInventoryContainer'));
+        });
+    }, 100);
+}
+
+function deleteBioTraining(id) {
+    if (!confirm('Delete this training record?')) return;
+    DB.set('bio_training', (DB.get('bio_training') || []).filter(r => r.id !== id));
+    APP.notify('Training record deleted.', 'success');
+    renderBioInvTabContent();
+}
+
+function toggleBioTrainingAttendance(recId, name) {
+    const recs = DB.get('bio_training') || [];
+    const rec  = recs.find(r => r.id === recId);
+    if (!rec) return;
+    const list = (rec.attendees || '').split(',').map(s => s.trim()).filter(Boolean);
+    const idx  = list.indexOf(name);
+    if (idx === -1) list.push(name); else list.splice(idx, 1);
+    rec.attendees = list.join(', ');
+    DB.set('bio_training', recs);
+    renderBioInvTabContent();
+}
+
 
