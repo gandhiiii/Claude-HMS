@@ -657,7 +657,16 @@ const AUTH = {
         if (['dashboard','users','departments','feature-rights','admin-checklists','budget','quarterly-priorities','hospital-settings','data-history'].indexOf(permission) !== -1) {
             return !!(user.isSuperAdmin || user.role === 'admin');
         }
-        if (permission === 'purchases') return user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || user.role === 'hod';
+        if (permission === 'purchases') {
+            if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
+            if (user.role === 'hod') {
+                // Biomedical HODs do not use Daily Purchases — hide it from their sidebar
+                var _purchDept = (user.department || '').trim().toLowerCase();
+                if (_purchDept === 'biomedical') return false;
+                return true;
+            }
+            return false;
+        }
         if (permission === 'biomedical-inventory' || permission === 'biomedical' || permission === 'biomedical-module') {
             if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
             var _bioDept = (user.department || '').trim().toLowerCase();
