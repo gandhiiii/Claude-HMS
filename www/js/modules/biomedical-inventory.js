@@ -27,8 +27,6 @@ const BIO_EQUIPMENT_TYPES = [
     'Major Equipment',
     'Minor Equipment',
     'Instrument',
-    'Consumable',
-    'Disposable',
     'Accessories',
     'Implant',
     'Spare Part',
@@ -56,12 +54,6 @@ const BIO_CATEGORIES = [
     'Surgical Instruments',
     'Diagnostic Instruments',
     'OT Instruments',
-    // ── Consumables & Disposables ──
-    'Consumable Supplies',
-    'Disposable Items',
-    'Sutures & Wound Care',
-    'IV & Infusion Supplies',
-    'Gloves & PPE',
     // ── Accessories ──
     'Equipment Accessories',
     'Cables & Sensors',
@@ -71,6 +63,22 @@ const BIO_CATEGORIES = [
     'Spare Parts & Components',
     'IT & Biomedical Software',
     'Other Biomedical'
+];
+
+// Categories specifically for the Consumables & Disposables section
+const BIO_CONSUMABLE_CATEGORIES = [
+    'Consumable Supplies',
+    'Disposable Items',
+    'Sutures & Wound Care',
+    'IV & Infusion Supplies',
+    'Gloves & PPE',
+    'Syringes & Needles',
+    'Bandages & Dressings',
+    'Catheters & Tubes',
+    'Surgical Drapes & Covers',
+    'Sterilization Pouches',
+    'Diagnostic Strips & Reagents',
+    'Other Consumable'
 ];
 
 const IMPLANT_CATEGORIES = [
@@ -552,6 +560,7 @@ function renderBiomedicalInventory(container) {
                     ${bioInvTab === 'items' ? `<button class="btn btn-primary btn-sm" onclick="showBioEquipForm()">➕ Add Equipment</button>` : ''}
                     ${bioInvTab === 'implants' ? `<button class="btn btn-primary btn-sm" onclick="showBioImplantForm()">➕ Add Implant Item</button><button class="btn btn-success btn-sm" onclick="showBioLogImplantationModal()">🦴 Log Patient Implantation</button>` : ''}
                     ${bioInvTab === 'purchases' ? `<button class="btn btn-primary btn-sm" onclick="showBioPurchaseForm()">➕ Add Purchase Entry</button>` : ''}
+                    ${bioInvTab === 'consumables' ? `<button class="btn btn-primary btn-sm" onclick="showBioConsumableForm()">➕ Add Consumable / Disposable</button>` : ''}
                     ${bioInvTab === 'meetings' ? `<button class="btn btn-primary btn-sm" onclick="showBioMeetingForm()">➕ Schedule Meeting</button>` : ''}
                     ${bioInvTab === 'todos' ? `<button class="btn btn-primary btn-sm" onclick="showBioTodoForm()">➕ Add Biomedical Task</button>` : ''}
                     <button class="btn btn-sm" style="background:#1e7e34;color:#fff;" onclick="bioInvDownloadExcel()">📥 Excel Export</button>
@@ -581,6 +590,9 @@ function renderBiomedicalInventory(container) {
                 </button>
                 <button class="tab-btn ${bioInvTab === 'meetings' ? 'active' : ''}" onclick="switchBioInvTab('meetings', this)">
                     📅 Staff Meetings
+                </button>
+                <button class="tab-btn ${bioInvTab === 'consumables' ? 'active' : ''}" onclick="switchBioInvTab('consumables', this)">
+                    🧴 Consumables & Disposables
                 </button>
                 <button class="tab-btn ${bioInvTab === 'todos' ? 'active' : ''}" onclick="switchBioInvTab('todos', this)">
                     ✅ Biomedical To-Do List
@@ -737,6 +749,7 @@ function renderBioInvTabContent() {
     else if (bioInvTab === 'purchases') content.innerHTML = renderBioPurchasesTab();
     else if (bioInvTab === 'contracts') content.innerHTML = renderBioContractsTab();
     else if (bioInvTab === 'history') content.innerHTML = renderBioHistoryTab();
+    else if (bioInvTab === 'consumables') content.innerHTML = renderBioConsumablesTab();
     else if (bioInvTab === 'meetings') content.innerHTML = renderBioMeetingsTab();
     else if (bioInvTab === 'todos') content.innerHTML = renderBioTodosTab();
     else if (bioInvTab === 'checklists') content.innerHTML = renderBioChecklistsTab();
@@ -2724,6 +2737,241 @@ function bioInvDownloadPdf() {
     doc.save('Biomedical_Department_Report.pdf');
 }
 
+/* ===========================================================================
+   CONSUMABLES & DISPOSABLES TAB
+   =========================================================================== */
+function renderBioConsumablesTab() {
+    const items = DB.get('bio_consumables') || [];
+    let catFilter = window._bioConsCatFilter || '';
+    let searchFilter = window._bioConsSearch || '';
+
+    const filtered = items.filter(i => {
+        const matchCat = !catFilter || i.category === catFilter;
+        const matchSearch = !searchFilter ||
+            (i.name || '').toLowerCase().includes(searchFilter.toLowerCase()) ||
+            (i.itemCode || '').toLowerCase().includes(searchFilter.toLowerCase()) ||
+            (i.vendor || '').toLowerCase().includes(searchFilter.toLowerCase());
+        return matchCat && matchSearch;
+    });
+
+    const catOpts = BIO_CONSUMABLE_CATEGORIES.map(c =>
+        `<option value="${c}" ${catFilter === c ? 'selected' : ''}>${c}</option>`
+    ).join('');
+
+    const totalItems = items.length;
+    const lowStock = items.filter(i => parseFloat(i.quantity) <= parseFloat(i.reorderLevel || 10)).length;
+    const totalValue = items.reduce((s, i) => s + (parseFloat(i.quantity) || 0) * (parseFloat(i.unitPrice) || 0), 0);
+    const expiringSoon = items.filter(i => {
+        if (!i.expiryDate) return false;
+        const d = new Date(i.expiryDate);
+        const diff = (d - new Date()) / (1000 * 60 * 60 * 24);
+        return diff >= 0 && diff <= 30;
+    }).length;
+
+    const rows = filtered.length ? filtered.map(i => {
+        const isLow = parseFloat(i.quantity) <= parseFloat(i.reorderLevel || 10);
+        const expiry = i.expiryDate ? new Date(i.expiryDate) : null;
+        const isExpired = expiry && expiry < new Date();
+        const expiringSoonFlag = expiry && !isExpired && ((expiry - new Date()) / 86400000) <= 30;
+        return `<tr>
+            <td><span style="font-weight:700;font-family:monospace;color:#6366f1;font-size:12px;">${i.itemCode || '-'}</span></td>
+            <td>
+                <strong>${i.name}</strong>
+                <div style="font-size:11px;color:var(--gray);">${i.category || 'General'} ${i.subType ? '• ' + i.subType : ''}</div>
+            </td>
+            <td><span class="badge badge-light">${i.unit || 'Nos'}</span></td>
+            <td>
+                <span style="font-weight:700;color:${isLow ? '#dc2626' : '#16a34a'};">${i.quantity || 0}</span>
+                ${isLow ? '<span class="badge" style="background:#fef2f2;color:#dc2626;font-size:10px;margin-left:4px;">Low Stock</span>' : ''}
+                <div style="font-size:10px;color:var(--gray);">Reorder @ ${i.reorderLevel || 10}</div>
+            </td>
+            <td>₹${parseFloat(i.unitPrice || 0).toLocaleString('en-IN')}</td>
+            <td>
+                ${expiry ? `<span style="font-size:12px;color:${isExpired ? '#dc2626' : expiringSoonFlag ? '#d97706' : '#16a34a'};font-weight:600;">
+                    ${isExpired ? '⚠️ Expired' : expiringSoonFlag ? '⏳ ' + i.expiryDate : '✅ ' + i.expiryDate}
+                </span>` : '<span style="color:var(--gray);">—</span>'}
+            </td>
+            <td>${i.vendor || '-'}</td>
+            <td>${i.location || '-'}</td>
+            <td style="white-space:nowrap;">
+                <button class="btn btn-sm btn-primary" style="font-size:11px;padding:2px 8px;" onclick="showBioConsumableForm('${i.id}')">✏️ Edit</button>
+                <button class="btn btn-sm btn-danger" style="font-size:11px;padding:2px 8px;" onclick="deleteBioConsumable('${i.id}')">🗑️ Del</button>
+            </td>
+        </tr>`;
+    }).join('') : `<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--gray);">No consumables / disposables recorded yet.<br><small>Click ➕ Add Consumable / Disposable to get started.</small></td></tr>`;
+
+    return `
+    <div>
+        <!-- KPI Cards -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px;">
+            <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:22px;font-weight:800;color:#1d4ed8;">${totalItems}</div>
+                <div style="font-size:11px;color:#1e40af;font-weight:600;">Total Items</div>
+            </div>
+            <div style="background:${lowStock > 0 ? '#fef2f2' : '#f0fdf4'};border:1px solid ${lowStock > 0 ? '#fca5a5' : '#bbf7d0'};border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:22px;font-weight:800;color:${lowStock > 0 ? '#dc2626' : '#16a34a'};">${lowStock}</div>
+                <div style="font-size:11px;color:${lowStock > 0 ? '#b91c1c' : '#15803d'};font-weight:600;">Low Stock Alerts</div>
+            </div>
+            <div style="background:${expiringSoon > 0 ? '#fffbeb' : '#f0fdf4'};border:1px solid ${expiringSoon > 0 ? '#fde68a' : '#bbf7d0'};border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:22px;font-weight:800;color:${expiringSoon > 0 ? '#d97706' : '#16a34a'};">${expiringSoon}</div>
+                <div style="font-size:11px;color:${expiringSoon > 0 ? '#92400e' : '#15803d'};font-weight:600;">Expiring in 30 Days</div>
+            </div>
+            <div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:22px;font-weight:800;color:#7c3aed;">₹${totalValue.toLocaleString('en-IN')}</div>
+                <div style="font-size:11px;color:#6d28d9;font-weight:600;">Stock Value</div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:center;">
+            <input type="text" class="form-control" placeholder="🔍 Search item, code, vendor..." style="flex:1;min-width:200px;"
+                value="${searchFilter}" oninput="window._bioConsSearch=this.value;renderBioInvTabContent()">
+            <select class="form-control" style="width:220px;" onchange="window._bioConsCatFilter=this.value;renderBioInvTabContent()">
+                <option value="">All Categories</option>
+                ${catOpts}
+            </select>
+        </div>
+
+        <!-- Table -->
+        <div style="overflow-x:auto;">
+            <table class="data-table" style="width:100%;">
+                <thead>
+                    <tr style="background:#f8fafc;">
+                        <th>Item Code</th>
+                        <th>Name & Category</th>
+                        <th>Unit</th>
+                        <th>Qty in Stock</th>
+                        <th>Unit Price</th>
+                        <th>Expiry Date</th>
+                        <th>Vendor / Supplier</th>
+                        <th>Storage Location</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
+    </div>`;
+}
+
+function showBioConsumableForm(itemId) {
+    const item = itemId ? (DB.get('bio_consumables') || []).find(i => i.id === itemId) : null;
+    const isEdit = !!item;
+    const catOpts = BIO_CONSUMABLE_CATEGORIES.map(c =>
+        `<option value="${c}" ${item?.category === c ? 'selected' : ''}>${c}</option>`
+    ).join('');
+
+    const html = `
+    <form id="bioConsumableForm">
+        <input type="hidden" name="id" value="${item?.id || ''}"><br>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="form-group">
+                <label>Item Name *</label>
+                <input type="text" name="name" class="form-control" value="${item?.name || ''}" placeholder="e.g. Surgical Gloves" required>
+            </div>
+            <div class="form-group">
+                <label>Item Code / SKU</label>
+                <input type="text" name="itemCode" class="form-control" value="${item?.itemCode || 'CONS-' + Math.floor(1000 + Math.random()*9000)}" placeholder="e.g. CONS-1001">
+            </div>
+            <div class="form-group">
+                <label>Category *</label>
+                <select name="category" class="form-control" required>
+                    <option value="">-- Select Category --</option>
+                    ${catOpts}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Type</label>
+                <select name="subType" class="form-control">
+                    <option value="Consumable" ${item?.subType === 'Consumable' ? 'selected' : ''}>Consumable</option>
+                    <option value="Disposable" ${item?.subType === 'Disposable' ? 'selected' : ''}>Disposable</option>
+                    <option value="Single Use" ${item?.subType === 'Single Use' ? 'selected' : ''}>Single Use</option>
+                    <option value="Reusable" ${item?.subType === 'Reusable' ? 'selected' : ''}>Reusable</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Quantity in Stock *</label>
+                <input type="number" name="quantity" class="form-control" value="${item?.quantity || ''}" placeholder="e.g. 500" required min="0">
+            </div>
+            <div class="form-group">
+                <label>Unit of Measure</label>
+                <select name="unit" class="form-control">
+                    ${['Nos','Box','Pairs','Rolls','Packets','Strips','Vials','Litres','Ml','Kg','Gm'].map(u =>
+                        `<option value="${u}" ${item?.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Unit Price (₹)</label>
+                <input type="number" name="unitPrice" class="form-control" value="${item?.unitPrice || ''}" placeholder="e.g. 25.50" min="0" step="0.01">
+            </div>
+            <div class="form-group">
+                <label>Reorder Level</label>
+                <input type="number" name="reorderLevel" class="form-control" value="${item?.reorderLevel || 10}" placeholder="e.g. 50" min="0">
+            </div>
+            <div class="form-group">
+                <label>Batch / Lot Number</label>
+                <input type="text" name="batchNo" class="form-control" value="${item?.batchNo || ''}" placeholder="e.g. BATCH-2024-01">
+            </div>
+            <div class="form-group">
+                <label>Expiry Date</label>
+                <input type="date" name="expiryDate" class="form-control" value="${item?.expiryDate || ''}">
+            </div>
+            <div class="form-group">
+                <label>Vendor / Supplier</label>
+                <input type="text" name="vendor" class="form-control" value="${item?.vendor || ''}" placeholder="e.g. Medline India">
+            </div>
+            <div class="form-group">
+                <label>Storage Location</label>
+                <input type="text" name="location" class="form-control" value="${item?.location || ''}" placeholder="e.g. Store Room B, Shelf 3">
+            </div>
+            <div class="form-group" style="grid-column:1/-1;">
+                <label>Remarks / Notes</label>
+                <textarea name="remarks" class="form-control" rows="2" placeholder="Any special storage conditions, notes...">${item?.remarks || ''}</textarea>
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+            <button type="button" class="btn btn-secondary" onclick="APP.closeModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary">💾 ${isEdit ? 'Update' : 'Save'} Item</button>
+        </div>
+    </form>`;
+
+    APP.openModal(`${isEdit ? 'Edit' : 'Add'} Consumable / Disposable Item`, html, { width: '700px' });
+
+    setTimeout(() => {
+        const form = document.getElementById('bioConsumableForm');
+        if (!form) return;
+        form.addEventListener('submit', e => {
+            e.preventDefault();
+            const fd = new FormData(form);
+            const data = {};
+            fd.forEach((v, k) => { data[k] = v.trim(); });
+            if (!data.name || !data.category) { alert('Please fill required fields.'); return; }
+            const items = DB.get('bio_consumables') || [];
+            if (data.id) {
+                const idx = items.findIndex(i => i.id === data.id);
+                if (idx !== -1) { items[idx] = Object.assign(items[idx], data, { updatedAt: new Date().toISOString() }); }
+            } else {
+                data.id = 'cons_' + Date.now();
+                data.createdAt = new Date().toISOString();
+                items.push(data);
+            }
+            DB.set('bio_consumables', items);
+            APP.closeModal();
+            APP.notify((data.id ? 'Updated' : 'Added') + ' consumable item successfully!', 'success');
+            bioInvTab = 'consumables';
+            renderBiomedicalInventory(document.getElementById('pageContent') || document.getElementById('bioHodInventoryContainer'));
+        });
+    }, 100);
+}
+
+function deleteBioConsumable(id) {
+    if (!confirm('Delete this consumable / disposable item?')) return;
+    const items = (DB.get('bio_consumables') || []).filter(i => i.id !== id);
+    DB.set('bio_consumables', items);
+    APP.notify('Item deleted.', 'success');
+    renderBioInvTabContent();
+}
+
 // Global window bindings
 window.renderBiomedicalInventory = renderBiomedicalInventory;
 window.renderBiomedical = renderBiomedicalInventory;
@@ -2748,4 +2996,6 @@ window.deleteBioMeeting = deleteBioMeeting;
 window.handleBioBarcodeScan = handleBioBarcodeScan;
 window.bioInvDownloadExcel = bioInvDownloadExcel;
 window.bioInvDownloadPdf = bioInvDownloadPdf;
+window.showBioConsumableForm = showBioConsumableForm;
+window.deleteBioConsumable = deleteBioConsumable;
 
