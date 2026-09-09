@@ -3222,7 +3222,7 @@ function deleteBioCondemn(id) {
 /* ===========================================================================
    TRAINING SECTION
    HOD adds training records. Department employees can view.
-   Categories: Equipment, Instrument, DRN (Daily Record Notes), OBO (On-Bench Observation)
+   Categories: Equipment, Instrument, DRM (Daily Record Maintenance), O&O (Operation & Observation)
    =========================================================================== */
 function renderBioTrainingTab() {
     const records  = DB.get('bio_training') || [];
@@ -3238,13 +3238,13 @@ function renderBioTrainingTab() {
     const total     = records.length;
     const equipment = records.filter(r => r.category === 'Equipment').length;
     const instrument= records.filter(r => r.category === 'Instrument').length;
-    const drn       = records.filter(r => r.category === 'DRN').length;
-    const obo       = records.filter(r => r.category === 'OBO').length;
+    const drn       = records.filter(r => r.category === 'DRM').length;
+    const obo       = records.filter(r => r.category === 'O&O').length;
 
-    const categories = ['Equipment','Instrument','DRN','OBO','Safety & Compliance','NABH Orientation','Other'];
+    const categories = ['Equipment','Instrument','DRM','O&O','Safety & Compliance','NABH Orientation','Other'];
     const catOpts    = categories.map(c => `<option value="${c}" ${catF===c?'selected':''}>${c}</option>`).join('');
 
-    const catBadgeColor = { Equipment:'#3b82f6', Instrument:'#8b5cf6', DRN:'#f59e0b', OBO:'#10b981', 'Safety & Compliance':'#ef4444', 'NABH Orientation':'#06b6d4', Other:'#6b7280' };
+    const catBadgeColor = { Equipment:'#3b82f6', Instrument:'#8b5cf6', DRM:'#f59e0b', 'O&O':'#10b981', 'Safety & Compliance':'#ef4444', 'NABH Orientation':'#06b6d4', Other:'#6b7280' };
 
     const rows = filtered.length ? filtered.map(r => {
         const bg = catBadgeColor[r.category] || '#6b7280';
@@ -3275,7 +3275,7 @@ function renderBioTrainingTab() {
             <span style="font-size:32px;">🎓</span>
             <div>
                 <div style="font-size:17px;font-weight:800;">Training &amp; Skill Development Register</div>
-                <div style="font-size:12px;opacity:.85;">Equipment | Instrument | DRN (Daily Record Notes) | OBO (On-Bench Observation) | NABH Compliance Training</div>
+                <div style="font-size:12px;opacity:.85;">Equipment | Instrument | DRM (Daily Record Maintenance) | O&O (Operation & Observation) | NABH Compliance Training</div>
             </div>
         </div>
 
@@ -3294,11 +3294,11 @@ function renderBioTrainingTab() {
             </div>
             <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px;text-align:center;">
                 <div style="font-size:22px;font-weight:800;color:#f59e0b;">${drn}</div>
-                <div style="font-size:11px;color:#92400e;font-weight:600;">DRN</div>
+                <div style="font-size:11px;color:#92400e;font-weight:600;">DRM</div>
             </div>
             <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:14px;text-align:center;">
                 <div style="font-size:22px;font-weight:800;color:#10b981;">${obo}</div>
-                <div style="font-size:11px;color:#065f46;font-weight:600;">OBO</div>
+                <div style="font-size:11px;color:#065f46;font-weight:600;">O&amp;O</div>
             </div>
         </div>
 
@@ -3326,7 +3326,7 @@ function showBioTrainingForm(recId) {
     const rec    = recId ? (DB.get('bio_training') || []).find(r => r.id === recId) : null;
     const isEdit = !!rec;
     const user   = AUTH.currentUser();
-    const categories = ['Equipment','Instrument','DRN','OBO','Safety & Compliance','NABH Orientation','Other'];
+    const categories = ['Equipment','Instrument','DRM','O&O','Safety & Compliance','NABH Orientation','Other'];
     const deptUsers  = (DB.get('users') || []).filter(u => (u.department||'').trim().toLowerCase() === 'biomedical' || (u.role === 'hod' && (u.department||'').trim().toLowerCase() === 'biomedical'));
     const staffList  = deptUsers.map(u => u.fullName || u.username).filter(Boolean);
     const attendeesSaved = (rec?.attendees || '').split(',').map(s => s.trim()).filter(Boolean);
