@@ -1,7 +1,7 @@
 // HMS — Background Service Worker for Notifications
 // Runs in OS background even when app/browser tabs are completely closed.
 
-const CACHE_NAME = 'hms-bg-cache-v204';
+const CACHE_NAME = 'hms-bg-cache-v205';
 const DEFAULT_ICON = 'assets/stavya-logo.png';
 const DEFAULT_BADGE = 'assets/stavya-logo.png';
 
