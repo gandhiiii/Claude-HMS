@@ -543,8 +543,10 @@ function _hodAdmissions(el) {
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">'
         + '<div><div style="font-weight:700;font-size:18px;">🏥 Hospital Admissions & Patient Records (' + allAdm.length + ' Total)</div>'
         + '<div style="font-size:13px;color:var(--gray);">Live real-time patient admissions, room assignments, and discharge queue.</div></div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="btn btn-sm" style="background:#25D366;color:#fff;font-weight:600;padding:6px 14px;" onclick="exportAdmWhatsApp()">💬 WhatsApp</button>'
         + '<button class="btn btn-primary" onclick="Router.navigate(\'admissions\')">Open Full Admissions Module →</button>'
-        + '</div>'
+        + '</div></div>'
 
         // KPI Summary Cards
         + '<div class="grid-4" style="gap:10px;margin-bottom:16px;">'

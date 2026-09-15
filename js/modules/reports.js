@@ -638,8 +638,17 @@ function _rAdmissions(el) {
     });
     var mKeys = Object.keys(byMonth).sort().slice(-12);
 
+    var canWa = typeof canSendAdmWhatsApp === 'function' ? canSendAdmWhatsApp(user) : false;
+    var waHeader = canWa 
+        ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
+            + '<div style="font-size:16px;font-weight:700;">🏥 Admissions Report</div>'
+            + '<button class="btn btn-sm" style="background:#25D366;color:#fff;font-weight:600;padding:6px 14px;" onclick="exportAdmWhatsApp()">💬 WhatsApp</button>'
+            + '</div>'
+        : '';
+
     el.innerHTML =
-        '<div class="grid-4 mb-4">'
+        waHeader
+        + '<div class="grid-4 mb-4">'
         + _rKpi(adms.length, 'Total Admissions', '#1a73e8', '📋', '')
         + _rKpi(admitted.length, 'Currently Admitted', '#00bcd4', '🏥', '')
         + _rKpi(discharged.length, 'Discharged', '#34a853', '✅', '')
