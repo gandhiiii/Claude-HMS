@@ -1551,6 +1551,19 @@ function exportAdmWhatsApp() {
     var typeF = document.getElementById('rptType') ? document.getElementById('rptType').value : '';
     var statusF = document.getElementById('rptStatus') ? document.getElementById('rptStatus').value : '';
 
+    var todayStr = new Date().toISOString().slice(0, 10);
+    var todayFormatted = new Date().toLocaleDateString('en-IN');
+
+    var dailyAdmissions = rows.filter(function(r) {
+        var d = r.admissionDate || r.createdAt || '';
+        return String(d).slice(0, 10) === todayStr;
+    }).length;
+
+    var dailyDischarges = rows.filter(function(r) {
+        var d = r.dischargeDate || r.dischargedAt || '';
+        return String(d).slice(0, 10) === todayStr;
+    }).length;
+
     var admitted = rows.filter(function(r) { return (r.status || 'admitted') === 'admitted'; }).length;
     var discharged = rows.filter(function(r) { return r.status === 'discharged'; }).length;
     var emergency = rows.filter(function(r) { return (r.type || '').toLowerCase() === 'emergency'; }).length;
@@ -1559,27 +1572,49 @@ function exportAdmWhatsApp() {
     var postOp = rows.filter(function(r) { return getAdmEffType(r) === 'post-op'; }).length;
     var totalBill = rows.reduce(function(s, r) { return s + (parseFloat(r.billAmount) || 0); }, 0);
 
-    var text = '🏥 *STAVYA HOSPITAL — ADMISSION REPORT SUMMARY*\n' +
+    var text = '🏥 *STAVYA HOSPITAL — DAILY ADMISSION REPORT*\n' +
         '═════════════════════════\n' +
-        '📅 *Period:* ' + (from || 'Start') + ' to ' + (to || 'Present') + '\n';
+        '📅 *Date:* ' + todayFormatted + ' (Period: ' + (from || 'Start') + ' to ' + (to || 'Present') + ')\n';
 
     if (typeF) text += '🏷️ *Type Filter:* ' + typeF.toUpperCase() + '\n';
     if (statusF) text += '📌 *Status Filter:* ' + statusF.toUpperCase() + '\n';
 
-    text += '\n📊 *SUMMARY KPIs:*' +
-        '\n• Total Records: *' + rows.length + '*' +
+    text += '\n📊 *SUMMARY KPIs & DAILY METRICS:*' +
+        '\n• Today\'s Admissions: *' + dailyAdmissions + '*' +
+        '\n• Today\'s Discharges: *' + dailyDischarges + '*' +
+        '\n• Total Period Records: *' + rows.length + '*' +
         '\n• Currently Admitted: *' + admitted + '*' +
         '\n• Total Discharged: *' + discharged + '*' +
-        '\n• Emergency Cases: *' + emergency + '*' +
-        '\n• ICU Cases: *' + icu + '*' +
+        '\n• Emergency: *' + emergency + '* | ICU: *' + icu + '*' +
         '\n• Pre-Op: *' + preOp + '* | Post-Op: *' + postOp + '*' +
-        '\n• Total Revenue: *₹' + totalBill.toLocaleString('en-IN') + '*\n' +
-        '\n═════════════════════════\n' +
+        '\n• Total Revenue: *₹' + totalBill.toLocaleString('en-IN') + '*\n';
+
+    // Latest entries with remarks/notes
+    var sorted = rows.slice().sort(function(a, b) {
+        return new Date(b.admissionDate || b.createdAt || 0) - new Date(a.admissionDate || a.createdAt || 0);
+    });
+
+    var recentWithNotes = sorted.slice(0, 5);
+    if (recentWithNotes.length > 0) {
+        text += '\n📋 *LATEST ENTRIES & REMARKS:*';
+        recentWithNotes.forEach(function(a, i) {
+            var bed = a.bedId ? ' (' + a.bedId + ')' : '';
+            var date = a.admissionDate ? APP.formatDate(a.admissionDate) : '—';
+            var remarkText = (a.notes || a.diagnosis || a.dischargeSummary || '').trim();
+            if (!remarkText) remarkText = 'No specific remarks recorded.';
+
+            text += '\n' + (i + 1) + '. *' + (a.patientName || 'Patient') + '* (Room ' + (a.roomNo || '-') + bed + ')' +
+                '\n   Type: ' + (a.type || 'regular').toUpperCase() + ' | Date: ' + date +
+                '\n   💬 *Remark:* ' + remarkText;
+        });
+    }
+
+    text += '\n═════════════════════════\n' +
         '🤖 _Generated via Stavya Intelligence HMS_';
 
     window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
     if (typeof APP !== 'undefined' && APP.notify) {
-        APP.notify('Opening WhatsApp with Admission Report...', 'success');
+        APP.notify('Opening WhatsApp with Daily Admission Report...', 'success');
     }
 }
 
