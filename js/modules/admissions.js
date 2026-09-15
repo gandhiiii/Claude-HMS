@@ -1588,50 +1588,13 @@ function exportAdmWhatsApp() {
         '\n• Total Discharged: *' + discharged + '*' +
         '\n• Emergency: *' + emergency + '* | ICU: *' + icu + '*' +
         '\n• Pre-Op: *' + preOp + '* | Post-Op: *' + postOp + '*' +
-        '\n• Total Revenue: *₹' + totalBill.toLocaleString('en-IN') + '*\n';
-
-    // Today's Admissions Section
-    text += '\n📥 *TODAY\'S ADMISSIONS (' + todayFormatted + '):*';
-    if (todayAdmissionsList.length === 0) {
-        text += '\n• No new patient admissions recorded today.';
-    } else {
-        todayAdmissionsList.forEach(function(a, i) {
-            var bed = a.bedId ? ' (' + a.bedId + ')' : '';
-            var rmk = (a.notes || a.diagnosis || 'No remarks recorded').trim();
-            var doc = a.doctorName ? ' | Dr: ' + a.doctorName : '';
-            text += '\n' + (i + 1) + '. *' + (a.patientName || 'Patient') + '* (Room ' + (a.roomNo || '-') + bed + ')' +
-                '\n   Type: ' + (a.type || 'regular').toUpperCase() + doc +
-                '\n   💬 *Remark:* ' + rmk;
-        });
-    }
-
-    // Recent Admissions List (if there are other recent records)
-    var sorted = rows.slice().sort(function(a, b) {
-        return new Date(b.admissionDate || b.createdAt || 0) - new Date(a.admissionDate || a.createdAt || 0);
-    });
-    var recentOther = sorted.filter(function(a) {
-        var d = a.admissionDate || a.createdAt || '';
-        return String(d).slice(0, 10) !== todayStr;
-    }).slice(0, 3);
-
-    if (recentOther.length > 0) {
-        text += '\n\n📋 *RECENT PAST ADMISSIONS & REMARKS:*';
-        recentOther.forEach(function(a, i) {
-            var bed = a.bedId ? ' (' + a.bedId + ')' : '';
-            var date = a.admissionDate ? APP.formatDate(a.admissionDate) : '—';
-            var rmk = (a.notes || a.diagnosis || a.dischargeSummary || 'No remarks recorded').trim();
-            text += '\n' + (i + 1) + '. *' + (a.patientName || 'Patient') + '* (Room ' + (a.roomNo || '-') + bed + ')' +
-                '\n   Date: ' + date + ' | Type: ' + (a.type || 'regular').toUpperCase() +
-                '\n   💬 *Remark:* ' + rmk;
-        });
-    }
-
-    text += '\n═════════════════════════\n' +
+        '\n• Total Revenue: *₹' + totalBill.toLocaleString('en-IN') + '*\n' +
+        '═════════════════════════\n' +
         '🤖 _Generated via Stavya Intelligence HMS_';
 
     window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
     if (typeof APP !== 'undefined' && APP.notify) {
-        APP.notify('Opening WhatsApp with Daily Admission Report...', 'success');
+        APP.notify('Opening WhatsApp with Admission Report...', 'success');
     }
 }
 
