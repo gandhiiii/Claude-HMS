@@ -675,11 +675,19 @@ const AUTH = {
             return false;
         }
         if (permission === 'equipment-health-core') {
-            if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin' || user.role === 'hod') return true;
+            if (!user) return false;
             var _ehDept = (user.department || '').trim().toLowerCase();
+            // Explicitly remove from Facility Department
+            if (_ehDept === 'facility' || _ehDept === 'facility management' || _ehDept.indexOf('facility') !== -1) return false;
+
+            if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
+            if (user.role === 'hod') {
+                if (_ehDept.indexOf('biomedical') !== -1 || _ehDept.indexOf('it') !== -1 || _ehDept.indexOf('maintenance') !== -1) return true;
+                return false;
+            }
             if (_ehDept.indexOf('biomedical') !== -1 || _ehDept.indexOf('it') !== -1 || _ehDept.indexOf('maintenance') !== -1) return true;
-            if (user.permissions && (user.permissions.includes('equipment-health-core') || user.permissions.includes('biomedical-inventory') || user.permissions.includes('biomedical'))) return true;
-            return true;
+            if (user.permissions && user.permissions.includes('equipment-health-core')) return true;
+            return false;
         }
         if (permission === 'scrap') {
             if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
