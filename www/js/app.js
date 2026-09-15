@@ -93,8 +93,6 @@ const Router = {
             { id: 'departments', label: _t('nav_departments'), icon: '🏢', permission: 'departments', adminOnly: true },
             { id: 'feature-rights', label: _t('nav_feature_rights'), icon: '🔐', permission: 'feature-rights', adminOnly: true },
             { id: 'inventory', label: _t('nav_inventory'), icon: '📦', permission: 'inventory' },
-            { id: 'biomedical-inventory', label: _t('nav_biomedical_inventory'), icon: '🧬', permission: 'biomedical-inventory' },
-            { id: 'equipment-health-core', label: '🌌 Equipment Health Core', icon: '🌌', permission: 'equipment-health-core' },
             { id: 'scrap', label: '🗑️ Scrap / Disposal', icon: '🗑️', permission: 'scrap' },
             { id: 'gate-security', label: _t('nav_gate_security'), icon: '🛡️', permission: 'gate-security' },
             { id: 'phase2', label: _t('nav_phase2'), icon: '🏗️', permission: 'projects' },

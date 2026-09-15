@@ -32,7 +32,6 @@ function renderInventory(container) {
             <button class="tab-btn active" onclick="switchInvView('items',this)">${T('invmod_tab_items')}</button>
             <button class="tab-btn" onclick="switchInvView('dept',this)">${T('invmod_tab_dept')}</button>
             <button class="tab-btn" onclick="switchInvView('movements',this)">${T('invmod_tab_movements')}</button>
-            ${canBio ? `<button class="btn btn-sm" style="background:#eef7ff;color:var(--primary);border:1px solid #b3d7ff;font-weight:600;" onclick="Router.navigate('biomedical-inventory')">🧬 Switch to Biomedical Inventory</button>` : ''}
         </div>
         <div id="invContent">
             ${renderInvItemsTab()}
