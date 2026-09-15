@@ -400,6 +400,44 @@ function initBiomedicalSeedData() {
         ];
         DB.set('biomedical_checklist_logs', chkLogs);
     }
+
+    // 9. Condemnation Register seed
+    let bioCondem = DB.get('bio_condemnation') || [];
+    if (!bioCondem.length) {
+        bioCondem = [
+            {
+                id: 'cond_101',
+                itemName: 'Biphasic Defibrillator (Model D2)',
+                itemCode: 'BIO-EQ-0899',
+                itemType: 'Major Equipment',
+                condemDate: '2026-08-15',
+                reason: 'Beyond economical repair, main PCB burned & obsolete parts',
+                committeeMembers: 'Dr. R. K. Sharma (HOD), Er. Anita Patel, Mr. V. Gupta (Admin)',
+                approvedBy: 'Dr. R. K. Sharma',
+                condemRef: 'COND-2026-001',
+                status: 'Approved',
+                disposalMethod: 'Auction / Scrap Sale',
+                scrapValue: '15000',
+                remarks: 'Committee approved condemnation on Aug 15, 2026.'
+            },
+            {
+                id: 'cond_102',
+                itemName: 'Patient Monitor Probe Assembly',
+                itemCode: 'BIO-PR-042',
+                itemType: 'Spare Part',
+                condemDate: '2026-09-01',
+                reason: 'Physical damage to optical fiber cable, inaccurate reading',
+                committeeMembers: 'Er. Anita Patel, HOD Bio',
+                approvedBy: 'HOD Biomedical',
+                condemRef: 'COND-2026-002',
+                status: 'Disposed',
+                disposalMethod: 'Written Off',
+                scrapValue: '0',
+                remarks: 'Scrapped as electrical waste.'
+            }
+        ];
+        DB.set('bio_condemnation', bioCondem);
+    }
 }
 
 /* ── Helper: Contract / Warranty status info ── */
@@ -638,8 +676,9 @@ function switchBioInvTab(tab, btn) {
     document.querySelectorAll('.biomedical-inventory-module .tabs .tab-btn').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
     
-    // Re-render header buttons & content
-    renderBiomedicalInventory(document.getElementById('pageContent'));
+    // Re-render header buttons & content across pageContent or HOD container
+    const cont = document.getElementById('pageContent') || document.getElementById('bioHodInventoryContainer') || document.querySelector('.biomedical-inventory-module')?.parentElement;
+    if (cont) renderBiomedicalInventory(cont);
 }
 
 /* ── Render KPI Stats Bar ── */
@@ -811,6 +850,7 @@ function renderBioItemsTab() {
                         <button class="btn btn-sm btn-outline" style="font-size:11px;padding:2px 6px;" onclick="showBioEquipDetailsModal('${equip.id}')">👁️ View</button>
                         <button class="btn btn-sm btn-primary" style="font-size:11px;padding:2px 6px;" onclick="showBioEquipForm('${equip.id}')">✏️ Edit</button>
                         <button class="btn btn-sm btn-warning" style="font-size:11px;padding:2px 6px;" onclick="showBioRenewContractModal('${equip.id}')">📜 Contract</button>
+                        <button class="btn btn-sm btn-outline-danger" style="font-size:11px;padding:2px 6px;color:#dc2626;border-color:#dc2626;" onclick="showBioCondemnForm(null, '${equip.id}')" title="Condemn this equipment">❌ Condemn</button>
                         <button class="btn btn-sm btn-danger" style="font-size:11px;padding:2px 6px;" onclick="deleteBioEquip('${equip.id}')">🗑️</button>
                     </div>
                 </td>
@@ -3025,7 +3065,7 @@ function renderBioCondemnationTab() {
     const statusF = window._bioCondemnStatus || '';
 
     const filtered = records.filter(r => {
-        const matchS = !searchQ || (r.itemName||'').toLowerCase().includes(searchQ) || (r.itemCode||'').toLowerCase().includes(searchQ);
+        const matchS = !searchQ || (r.itemName||'').toLowerCase().includes(searchQ) || (r.itemCode||'').toLowerCase().includes(searchQ) || (r.condemRef||'').toLowerCase().includes(searchQ);
         const matchT = !typeF   || r.itemType === typeF;
         const matchSt= !statusF || r.status === statusF;
         return matchS && matchT && matchSt;
@@ -3044,17 +3084,18 @@ function renderBioCondemnationTab() {
 
     const rows = filtered.length ? filtered.map(r => {
         const statusColor = r.status === 'Approved' ? '#16a34a' : r.status === 'Rejected' ? '#dc2626' : r.status === 'Disposed' ? '#6b7280' : '#d97706';
+        const refDisplay = r.condemRef || (r.id ? String(r.id).slice(-6).toUpperCase() : 'COND-REF');
         return `<tr>
-            <td><span style="font-family:monospace;font-weight:700;color:#6366f1;font-size:12px;">${r.condemRef || r.id.slice(-6).toUpperCase()}</span></td>
+            <td><span style="font-family:monospace;font-weight:700;color:#6366f1;font-size:12px;">${refDisplay}</span></td>
             <td>
-                <strong>${r.itemName}</strong>
-                <div style="font-size:11px;color:var(--gray);">${r.itemCode || ''} • ${r.itemType}</div>
+                <strong>${r.itemName || 'Unnamed Item'}</strong>
+                <div style="font-size:11px;color:var(--gray);">${r.itemCode || ''} • ${r.itemType || 'General'}</div>
             </td>
-            <td><span class="badge badge-light">${r.itemType}</span></td>
+            <td><span class="badge badge-light">${r.itemType || 'Item'}</span></td>
             <td style="font-size:12px;max-width:180px;">${r.reason || '-'}</td>
             <td style="font-size:12px;">${r.condemDate || '-'}</td>
             <td style="font-size:12px;">${r.committeeMembers || '-'}</td>
-            <td><span style="font-weight:700;color:${statusColor};font-size:12px;">${r.status}</span></td>
+            <td><span style="font-weight:700;color:${statusColor};font-size:12px;">${r.status || 'Pending Approval'}</span></td>
             <td style="white-space:nowrap;">
                 <button class="btn btn-sm btn-primary" style="font-size:11px;padding:2px 8px;" onclick="showBioCondemnForm('${r.id}')">&#9998; Edit</button>
                 <button class="btn btn-sm btn-danger"  style="font-size:11px;padding:2px 8px;" onclick="deleteBioCondemn('${r.id}')">&#128465; Del</button>
@@ -3113,28 +3154,51 @@ function renderBioCondemnationTab() {
     </div>`;
 }
 
-function showBioCondemnForm(recId) {
-    const rec    = recId ? (DB.get('bio_condemnation') || []).find(r => r.id === recId) : null;
+function showBioCondemnForm(recId, targetEquipId) {
+    const recs   = DB.get('bio_condemnation') || [];
+    const rec    = recId ? recs.find(r => r.id === recId) : null;
     const isEdit = !!rec;
+
+    const equips     = DB.get('biomedical_inventory') || [];
+    const targetEquip = targetEquipId ? equips.find(e => e.id === targetEquipId) : null;
+
     const itemTypes = ['Major Equipment','Minor Equipment','Instrument','Implant','Spare Part','Consumable','Disposable','Other'];
     const statuses  = ['Pending Approval','Approved','Rejected','Disposed'];
 
+    // Options for picker
+    const equipOpts = equips.map(e => `<option value="eq_${e.id}" ${rec?.linkedItemId === 'eq_' + e.id || targetEquipId === e.id ? 'selected' : ''}>📦 Equipment: ${e.name} (${e.assetTag || e.model || 'No Tag'})</option>`).join('');
+
+    const defaultName = rec?.itemName || targetEquip?.name || '';
+    const defaultCode = rec?.itemCode || targetEquip?.assetTag || targetEquip?.serialNo || '';
+    const defaultType = rec?.itemType || (targetEquip ? 'Major Equipment' : '');
+
     const html = `<form id="bioCondemnForm">
-        <input type="hidden" name="id" value="${rec?.id||''}"><br>
+        <input type="hidden" name="id" value="${rec?.id||''}">
+        <input type="hidden" name="linkedItemId" id="bioCondemnLinkedItemId" value="${rec?.linkedItemId || (targetEquip ? 'eq_' + targetEquip.id : '')}">
+        
+        <div class="form-group mb-3" style="background:#fff7ed;padding:10px 12px;border:1px solid #ffedd5;border-radius:8px;">
+            <label style="font-weight:700;color:#c2410c;">🔗 Select from Registered Equipment (Optional)</label>
+            <select id="bioCondemnItemPicker" class="form-control" onchange="onBioCondemnItemPick(this.value)">
+                <option value="">-- Manual Entry or Select Registered Item --</option>
+                ${equipOpts}
+            </select>
+            <small style="color:#9a3412;">Selecting an equipment auto-fills name, asset tag & type, and updates equipment status upon approval.</small>
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div class="form-group">
                 <label>Item Name *</label>
-                <input type="text" name="itemName" class="form-control" value="${rec?.itemName||''}" placeholder="e.g. Defibrillator Monitor" required>
+                <input type="text" id="bioCondemnItemName" name="itemName" class="form-control" value="${defaultName}" placeholder="e.g. Defibrillator Monitor" required>
             </div>
             <div class="form-group">
                 <label>Item Code / Asset Tag</label>
-                <input type="text" name="itemCode" class="form-control" value="${rec?.itemCode||''}" placeholder="e.g. BIO-EQ-1001">
+                <input type="text" id="bioCondemnItemCode" name="itemCode" class="form-control" value="${defaultCode}" placeholder="e.g. BIO-EQ-1001">
             </div>
             <div class="form-group">
                 <label>Item Type *</label>
-                <select name="itemType" class="form-control" required>
+                <select id="bioCondemnItemType" name="itemType" class="form-control" required>
                     <option value="">-- Select Type --</option>
-                    ${itemTypes.map(t => `<option value="${t}" ${rec?.itemType===t?'selected':''}>${t}</option>`).join('')}
+                    ${itemTypes.map(t => `<option value="${t}" ${defaultType===t?'selected':''}>${t}</option>`).join('')}
                 </select>
             </div>
             <div class="form-group">
@@ -3184,6 +3248,24 @@ function showBioCondemnForm(recId) {
         </div>
     </form>`;
 
+    window.onBioCondemnItemPick = function(val) {
+        if (!val) return;
+        if (val.startsWith('eq_')) {
+            const eqId = val.replace('eq_', '');
+            const eq = (DB.get('biomedical_inventory') || []).find(e => e.id === eqId);
+            if (eq) {
+                const nameEl = document.getElementById('bioCondemnItemName');
+                const codeEl = document.getElementById('bioCondemnItemCode');
+                const typeEl = document.getElementById('bioCondemnItemType');
+                const linkEl = document.getElementById('bioCondemnLinkedItemId');
+                if (nameEl) nameEl.value = eq.name || '';
+                if (codeEl) codeEl.value = eq.assetTag || eq.serialNo || '';
+                if (typeEl) typeEl.value = 'Major Equipment';
+                if (linkEl) linkEl.value = val;
+            }
+        }
+    };
+
     APP.openModal(`${isEdit?'Edit':'New'} Condemnation Record`, html, { width: '720px' });
     setTimeout(function() {
         var form = document.getElementById('bioCondemnForm');
@@ -3193,28 +3275,44 @@ function showBioCondemnForm(recId) {
             e.stopPropagation();
             try {
                 var data = {};
-                // Read all inputs, selects, textareas directly from DOM
                 form.querySelectorAll('input,select,textarea').forEach(function(el) {
                     if (el.name) data[el.name] = (el.value || '').trim();
                 });
                 if (!data.itemName) { alert('Item Name is required.'); return false; }
                 if (!data.itemType) { alert('Please select an Item Type.'); return false; }
                 if (!data.reason)   { alert('Reason for Condemnation is required.'); return false; }
-                var recs = DB.get('bio_condemnation') || [];
+
+                var allRecs = DB.get('bio_condemnation') || [];
                 if (data.id) {
                     var idx = -1;
-                    for (var i = 0; i < recs.length; i++) { if (recs[i].id === data.id) { idx = i; break; } }
-                    if (idx !== -1) Object.assign(recs[idx], data, { updatedAt: new Date().toISOString() });
+                    for (var i = 0; i < allRecs.length; i++) { if (allRecs[i].id === data.id) { idx = i; break; } }
+                    if (idx !== -1) Object.assign(allRecs[idx], data, { updatedAt: new Date().toISOString() });
                 } else {
                     data.id = 'cond_' + Date.now();
                     data.createdAt = new Date().toISOString();
-                    recs.push(data);
+                    allRecs.push(data);
                 }
-                DB.set('bio_condemnation', recs);
+                DB.set('bio_condemnation', allRecs);
+
+                // Auto-sync status with biomedical_inventory if linked
+                if (data.linkedItemId && data.linkedItemId.startsWith('eq_')) {
+                    var eqId = data.linkedItemId.replace('eq_', '');
+                    var equipsList = DB.get('biomedical_inventory') || [];
+                    var eqObj = equipsList.find(e => e.id === eqId);
+                    if (eqObj) {
+                        if (data.status === 'Approved' || data.status === 'Disposed') {
+                            eqObj.status = 'Condemned';
+                        } else if (data.status === 'Rejected') {
+                            eqObj.status = 'Working';
+                        }
+                        DB.set('biomedical_inventory', equipsList);
+                    }
+                }
+
                 APP.closeModal();
-                APP.notify('Condemnation record saved!', 'success');
+                APP.notify('Condemnation record saved successfully!', 'success');
                 bioInvTab = 'condemnation';
-                var cont = document.getElementById('pageContent') || document.getElementById('bioHodInventoryContainer');
+                var cont = document.getElementById('pageContent') || document.getElementById('bioHodInventoryContainer') || document.querySelector('.biomedical-inventory-module')?.parentElement;
                 if (cont) renderBiomedicalInventory(cont);
             } catch(err) {
                 console.error('Condemnation save error:', err);
@@ -3227,8 +3325,19 @@ function showBioCondemnForm(recId) {
 
 function deleteBioCondemn(id) {
     if (!confirm('Delete this condemnation record?')) return;
-    DB.set('bio_condemnation', (DB.get('bio_condemnation') || []).filter(r => r.id !== id));
-    APP.notify('Record deleted.', 'success');
+    const recs = DB.get('bio_condemnation') || [];
+    const target = recs.find(r => r.id === id);
+    if (target && target.linkedItemId && target.linkedItemId.startsWith('eq_')) {
+        const eqId = target.linkedItemId.replace('eq_', '');
+        const equipsList = DB.get('biomedical_inventory') || [];
+        const eqObj = equipsList.find(e => e.id === eqId);
+        if (eqObj && eqObj.status === 'Condemned') {
+            eqObj.status = 'Working';
+            DB.set('biomedical_inventory', equipsList);
+        }
+    }
+    DB.set('bio_condemnation', recs.filter(r => r.id !== id));
+    APP.notify('Condemnation record deleted.', 'success');
     renderBioInvTabContent();
 }
 

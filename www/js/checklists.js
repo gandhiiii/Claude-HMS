@@ -586,11 +586,20 @@
         return visible;
     }
 
-    /** The logged-in employee's own active assignments. */
+    /** The logged-in employee's own active assignments.
+     *  Matches by employeeId first; falls back to employeeName so that
+     *  employees whose session user-object has a stale id (e.g. after the
+     *  admin updated their record) can still see their assignments. */
     function myAssignments(user) {
         if (!user) return [];
+        var uid  = String(user.id || '');
+        var uname = String(user.fullName || user.username || '').trim().toLowerCase();
         return load(K_ASSIGNMENTS).filter(function (a) {
-            return a.active && a.employeeId === user.id;
+            if (!a.active) return false;
+            if (String(a.employeeId) === uid) return true;
+            // Fallback: match by stored employee name
+            var aname = String(a.employeeName || '').trim().toLowerCase();
+            return uname && aname && uname === aname;
         });
     }
 
@@ -623,7 +632,13 @@
         var a = getAssignment(assignmentId);
         if (!a) return err('ERR_NOT_FOUND', 'Assignment not found.');
         if (!a.active) return err('ERR_INACTIVE', 'This assignment has been revoked.');
-        if (!(isAdmin(user) || isHodOf(user, a.department) || (user && String(user.id) === String(a.employeeId)))) {
+        // Check by id; also fall back to name match for sessions with stale ids
+        var isAssignedEmployee = user && (
+            String(user.id) === String(a.employeeId) ||
+            (String(user.fullName || '').trim().toLowerCase() === String(a.employeeName || '').trim().toLowerCase() &&
+             (user.fullName || '').trim() !== '')
+        );
+        if (!(isAdmin(user) || isHodOf(user, a.department) || isAssignedEmployee)) {
             return err('ERR_PERMISSION', 'Only the assigned employee or HOD can fill this checklist.');
         }
         var items = resolveAssignmentItems(a);
@@ -661,7 +676,13 @@
         var a = getAssignment(entry.assignmentId);
         if (!a) return err('ERR_NOT_FOUND', 'Assignment not found.');
         if (!a.active) return err('ERR_INACTIVE', 'This assignment has been revoked.');
-        if (!(isAdmin(user) || isHodOf(user, a.department) || (user && String(user.id) === String(a.employeeId)))) {
+        // Check by id; also fall back to name match for sessions with stale ids
+        var isAssignedEmployee = user && (
+            String(user.id) === String(a.employeeId) ||
+            (String(user.fullName || '').trim().toLowerCase() === String(a.employeeName || '').trim().toLowerCase() &&
+             (user.fullName || '').trim() !== '')
+        );
+        if (!(isAdmin(user) || isHodOf(user, a.department) || isAssignedEmployee)) {
             return err('ERR_PERMISSION', 'Only the assigned employee or HOD can submit this checklist.');
         }
         if (hasAssignmentEntry(entry.assignmentId, entry.date)) {

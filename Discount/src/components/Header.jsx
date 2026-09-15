@@ -15,8 +15,7 @@ import {
   Smartphone,
   Globe,
   Link2,
-  Zap,
-  Activity
+  Zap
 } from 'lucide-react';
 
 export const Header = ({ 
@@ -73,18 +72,6 @@ export const Header = ({
             }`}
           >
             OPD Dashboard & Waivers
-          </button>
-
-          <button
-            onClick={() => setActiveTab('biomedical')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all duration-200 ${
-              activeTab === 'biomedical'
-                ? 'bg-gradient-to-r from-indigo-400 to-sky-300 text-slate-950 font-black shadow-md'
-                : 'text-indigo-300 hover:text-indigo-100 font-semibold'
-            }`}
-          >
-            <Activity className="w-3.5 h-3.5" />
-            <span>🧬 Biomedical Equipment</span>
           </button>
 
           <button

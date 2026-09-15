@@ -1397,7 +1397,13 @@ function empRemovePhoto(asgnId, itemId, photoIdx) {
 
 function empSubmitDeptAsgn(assignmentId) {
     if (!window.CHECKLISTS) return;
-    var user = AUTH.currentUser();
+    var sessionUser = AUTH.currentUser();
+    // Always use the fresh user record from DB so user.id is never stale
+    var dbUsers = (typeof DB !== 'undefined') ? (DB.get('users') || []) : [];
+    var user = (sessionUser && dbUsers.find(function(u) {
+        return u.id === sessionUser.id ||
+               (u.username && sessionUser.username && u.username.toLowerCase() === sessionUser.username.toLowerCase());
+    })) || sessionUser;
     var today = (typeof CHECKLISTS !== 'undefined' && CHECKLISTS.operDate) ? CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
     var asgn = CHECKLISTS.getAssignment(assignmentId);
     var items = asgn ? CHECKLISTS.resolveAssignmentItems(asgn) : [];

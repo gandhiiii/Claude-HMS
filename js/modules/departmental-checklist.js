@@ -688,7 +688,13 @@ function dchkRemovePhoto(key, itemId, photoIdx) {
 
 function dchkSubmitFill(assignmentId) {
     if (!window.CHECKLISTS) return;
-    const user = AUTH.currentUser();
+    var sessionUser = AUTH.currentUser();
+    // Always use the fresh user record from DB so user.id is never stale
+    var dbUsers = (typeof DB !== 'undefined') ? (DB.get('users') || []) : [];
+    var user = (sessionUser && dbUsers.find(function(u) {
+        return u.id === sessionUser.id ||
+               (u.username && sessionUser.username && u.username.toLowerCase() === sessionUser.username.toLowerCase());
+    })) || sessionUser;
     const dateStr = (typeof CHECKLISTS !== 'undefined' && CHECKLISTS.operDate) ? CHECKLISTS.operDate() : new Date().toISOString().slice(0, 10);
     const draftKey = 'hms_dchk_draft_' + assignmentId;
     let state = dchkFillState[assignmentId] || {};

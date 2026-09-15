@@ -1371,13 +1371,40 @@ function deleteAdm(id) {
 }
 
 /* ═══════════════════════════════════════
-   ADMISSION REPORT
+   ADMISSION REPORT & PERMISSIONS
    ═══════════════════════════════════════ */
+
+function canSendAdmWhatsApp(user) {
+    if (!user) {
+        if (typeof AUTH !== 'undefined' && AUTH.currentUser) {
+            user = AUTH.currentUser();
+        }
+    }
+    if (!user) return false;
+    var role = String(user.role || '').trim().toLowerCase();
+    
+    // Admin & Super Admin allowed
+    if (user.isSuperAdmin || role === 'admin' || role === 'super_admin') return true;
+    
+    // HOD allowed
+    if (user.isHod || role === 'hod' || role.indexOf('hod') !== -1 || role.indexOf('head') !== -1) return true;
+    
+    // Employee in Facility Department ONLY
+    var dept = String(user.department || '').trim().toLowerCase();
+    var isFacility = (dept === 'facility' || dept === 'facility management' || dept === 'facility & maintenance');
+    return isFacility;
+}
 
 function renderAdmReport(container) {
     var today = new Date();
     var firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
     var todayStr = today.toISOString().split('T')[0];
+    var user = typeof AUTH !== 'undefined' ? AUTH.currentUser() : null;
+    var showWa = canSendAdmWhatsApp(user);
+
+    var waButtonHtml = showWa
+        ? '<button class="btn" style="background:#25D366;color:#fff;font-weight:600;" onclick="exportAdmWhatsApp()">💬 Share via WhatsApp</button>'
+        : '';
 
     container.innerHTML =
         '<div class="card">' +
@@ -1396,9 +1423,10 @@ function renderAdmReport(container) {
         '<select id="rptStatus" class="form-control" onchange="refreshAdmReport()">' +
         '<option value="">All Status</option><option value="admitted">Admitted</option>' +
         '<option value="discharged">Discharged</option></select></div>' +
-        '<div style="display:flex;gap:8px;">' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
         '<button class="btn btn-danger" onclick="exportAdmPDF()">🖨️ Export PDF</button>' +
         '<button class="btn btn-success" onclick="exportAdmExcel()">📥 Export Excel</button>' +
+        waButtonHtml +
         '</div></div>' +
         '<div id="rptSummary" class="grid-4" style="margin-bottom:16px;"></div>' +
         '<div id="rptTable"></div>' +
@@ -1496,8 +1524,80 @@ function refreshAdmReport() {
     tblEl.innerHTML = html;
 }
 
-function esc(v) {
-    return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+/* ─── WhatsApp Export ─── */
+function exportAdmWhatsApp() {
+    var user = typeof AUTH !== 'undefined' ? AUTH.currentUser() : null;
+    if (!canSendAdmWhatsApp(user)) {
+        if (typeof APP !== 'undefined' && APP.notify) {
+            APP.notify('WhatsApp export is allowed for Admin, HOD, and Facility Department staff only.', 'error');
+        } else {
+            alert('WhatsApp export is allowed for Admin, HOD, and Facility Department staff only.');
+        }
+        return;
+    }
+
+    var rows = getAdmReportData();
+    if (!rows || rows.length === 0) {
+        if (typeof APP !== 'undefined' && APP.notify) {
+            APP.notify('No admission records found for the selected filters', 'warning');
+        } else {
+            alert('No admission records found for the selected filters');
+        }
+        return;
+    }
+
+    var from = document.getElementById('rptFrom') ? document.getElementById('rptFrom').value : '';
+    var to = document.getElementById('rptTo') ? document.getElementById('rptTo').value : '';
+    var typeF = document.getElementById('rptType') ? document.getElementById('rptType').value : '';
+    var statusF = document.getElementById('rptStatus') ? document.getElementById('rptStatus').value : '';
+
+    var admitted = rows.filter(function(r) { return (r.status || 'admitted') === 'admitted'; }).length;
+    var discharged = rows.filter(function(r) { return r.status === 'discharged'; }).length;
+    var emergency = rows.filter(function(r) { return (r.type || '').toLowerCase() === 'emergency'; }).length;
+    var icu = rows.filter(function(r) { return (r.type || '').toLowerCase() === 'icu'; }).length;
+    var preOp = rows.filter(function(r) { return getAdmEffType(r) === 'pre-op'; }).length;
+    var postOp = rows.filter(function(r) { return getAdmEffType(r) === 'post-op'; }).length;
+    var totalBill = rows.reduce(function(s, r) { return s + (parseFloat(r.billAmount) || 0); }, 0);
+
+    var text = '🏥 *STAVYA HOSPITAL — ADMISSION REPORT*\n' +
+        '═════════════════════════\n' +
+        '📅 *Period:* ' + (from || 'Start') + ' to ' + (to || 'Present') + '\n';
+
+    if (typeF) text += '🏷️ *Type Filter:* ' + typeF.toUpperCase() + '\n';
+    if (statusF) text += '📌 *Status Filter:* ' + statusF.toUpperCase() + '\n';
+
+    text += '\n📊 *SUMMARY KPIs:*' +
+        '\n• Total Records: *' + rows.length + '*' +
+        '\n• Currently Admitted: *' + admitted + '*' +
+        '\n• Total Discharged: *' + discharged + '*' +
+        '\n• Emergency Cases: *' + emergency + '*' +
+        '\n• ICU Cases: *' + icu + '*' +
+        '\n• Pre-Op: *' + preOp + '* | Post-Op: *' + postOp + '*' +
+        '\n• Total Revenue: *₹' + totalBill.toLocaleString('en-IN') + '*\n' +
+        '\n📋 *PATIENT LIST SUMMARY (Top 10):*\n';
+
+    var sorted = rows.slice().sort(function(a, b) {
+        return new Date(b.admissionDate || b.createdAt || 0) - new Date(a.admissionDate || a.createdAt || 0);
+    });
+
+    sorted.slice(0, 10).forEach(function(a, i) {
+        var bed = a.bedId ? ' (' + a.bedId + ')' : '';
+        var date = a.admissionDate ? APP.formatDate(a.admissionDate) : '—';
+        text += (i + 1) + '. *' + (a.patientName || 'Patient') + '* (Room ' + (a.roomNo || '-') + bed + ')\n' +
+            '   Type: ' + (a.type || 'regular').toUpperCase() + ' | Status: ' + (a.status || 'admitted') + ' | Date: ' + date + '\n';
+    });
+
+    if (rows.length > 10) {
+        text += '...and ' + (rows.length - 10) + ' more patient record(s).\n';
+    }
+
+    text += '\n═════════════════════════\n' +
+        '🤖 _Generated via Stavya Intelligence HMS_';
+
+    window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
+    if (typeof APP !== 'undefined' && APP.notify) {
+        APP.notify('Opening WhatsApp with Admission Report...', 'success');
+    }
 }
 
 /* ─── PDF Export ─── */
