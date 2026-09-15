@@ -1554,10 +1554,11 @@ function exportAdmWhatsApp() {
     var todayStr = new Date().toISOString().slice(0, 10);
     var todayFormatted = new Date().toLocaleDateString('en-IN');
 
-    var dailyAdmissions = rows.filter(function(r) {
+    var todayAdmissionsList = rows.filter(function(r) {
         var d = r.admissionDate || r.createdAt || '';
         return String(d).slice(0, 10) === todayStr;
-    }).length;
+    });
+    var dailyAdmissions = todayAdmissionsList.length;
 
     var dailyDischarges = rows.filter(function(r) {
         var d = r.dischargeDate || r.dischargedAt || '';
@@ -1589,23 +1590,39 @@ function exportAdmWhatsApp() {
         '\n• Pre-Op: *' + preOp + '* | Post-Op: *' + postOp + '*' +
         '\n• Total Revenue: *₹' + totalBill.toLocaleString('en-IN') + '*\n';
 
-    // Latest entries with remarks/notes
+    // Today's Admissions Section
+    text += '\n📥 *TODAY\'S ADMISSIONS (' + todayFormatted + '):*';
+    if (todayAdmissionsList.length === 0) {
+        text += '\n• No new patient admissions recorded today.';
+    } else {
+        todayAdmissionsList.forEach(function(a, i) {
+            var bed = a.bedId ? ' (' + a.bedId + ')' : '';
+            var rmk = (a.notes || a.diagnosis || 'No remarks recorded').trim();
+            var doc = a.doctorName ? ' | Dr: ' + a.doctorName : '';
+            text += '\n' + (i + 1) + '. *' + (a.patientName || 'Patient') + '* (Room ' + (a.roomNo || '-') + bed + ')' +
+                '\n   Type: ' + (a.type || 'regular').toUpperCase() + doc +
+                '\n   💬 *Remark:* ' + rmk;
+        });
+    }
+
+    // Recent Admissions List (if there are other recent records)
     var sorted = rows.slice().sort(function(a, b) {
         return new Date(b.admissionDate || b.createdAt || 0) - new Date(a.admissionDate || a.createdAt || 0);
     });
+    var recentOther = sorted.filter(function(a) {
+        var d = a.admissionDate || a.createdAt || '';
+        return String(d).slice(0, 10) !== todayStr;
+    }).slice(0, 3);
 
-    var recentWithNotes = sorted.slice(0, 5);
-    if (recentWithNotes.length > 0) {
-        text += '\n📋 *LATEST ENTRIES & REMARKS:*';
-        recentWithNotes.forEach(function(a, i) {
+    if (recentOther.length > 0) {
+        text += '\n\n📋 *RECENT PAST ADMISSIONS & REMARKS:*';
+        recentOther.forEach(function(a, i) {
             var bed = a.bedId ? ' (' + a.bedId + ')' : '';
             var date = a.admissionDate ? APP.formatDate(a.admissionDate) : '—';
-            var remarkText = (a.notes || a.diagnosis || a.dischargeSummary || '').trim();
-            if (!remarkText) remarkText = 'No specific remarks recorded.';
-
+            var rmk = (a.notes || a.diagnosis || a.dischargeSummary || 'No remarks recorded').trim();
             text += '\n' + (i + 1) + '. *' + (a.patientName || 'Patient') + '* (Room ' + (a.roomNo || '-') + bed + ')' +
-                '\n   Type: ' + (a.type || 'regular').toUpperCase() + ' | Date: ' + date +
-                '\n   💬 *Remark:* ' + remarkText;
+                '\n   Date: ' + date + ' | Type: ' + (a.type || 'regular').toUpperCase() +
+                '\n   💬 *Remark:* ' + rmk;
         });
     }
 
