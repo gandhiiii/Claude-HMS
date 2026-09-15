@@ -668,10 +668,11 @@ const AUTH = {
             return false;
         }
         if (permission === 'biomedical-inventory' || permission === 'biomedical' || permission === 'biomedical-module') {
+            if (!user) return false;
             if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
             var _bioDept = (user.department || '').trim().toLowerCase();
+            // Strictly for Biomedical Department ONLY
             if (_bioDept.indexOf('biomedical') !== -1 || _bioDept.indexOf('bio medical') !== -1 || _bioDept.indexOf('bio-medical') !== -1) return true;
-            if (user.permissions && (user.permissions.includes('biomedical-inventory') || user.permissions.includes('biomedical') || user.permissions.includes('biomedical-module'))) return true;
             return false;
         }
         if (permission === 'equipment-health-core') {

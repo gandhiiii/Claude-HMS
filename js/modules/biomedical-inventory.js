@@ -611,10 +611,16 @@ function renderBiomedicalInventory(container) {
             <!-- Stats Bar -->
             <div class="grid-4 mb-4" id="bioInvStats"></div>
 
-            <!-- Tab Navigation (8 Tabs) -->
+            <!-- Tab Navigation (13 Tabs) -->
             <div class="tabs mb-4" style="border-bottom:2px solid var(--border);display:flex;gap:4px;overflow-x:auto;padding-bottom:4px;">
                 <button class="tab-btn ${bioInvTab === 'items' ? 'active' : ''}" onclick="switchBioInvTab('items', this)">
                     📦 Equipment Master
+                </button>
+                <button class="tab-btn ${bioInvTab === 'dicom' ? 'active' : ''}" onclick="switchBioInvTab('dicom', this)" style="color:#0284c7;font-weight:600;">
+                    🩺 DICOM Viewer
+                </button>
+                <button class="tab-btn ${bioInvTab === 'telemetry' ? 'active' : ''}" onclick="switchBioInvTab('telemetry', this)" style="color:#16a34a;font-weight:600;">
+                    📈 Live Telemetry
                 </button>
                 <button class="tab-btn ${bioInvTab === 'implants' ? 'active' : ''}" onclick="switchBioInvTab('implants', this)">
                     🦴 Implant Inventory &amp; Usage
@@ -792,6 +798,8 @@ function renderBioInvTabContent() {
     if (!content) return;
 
     if (bioInvTab === 'items') content.innerHTML = renderBioItemsTab();
+    else if (bioInvTab === 'dicom') content.innerHTML = renderBioDicomTab();
+    else if (bioInvTab === 'telemetry') content.innerHTML = renderBioTelemetryTab();
     else if (bioInvTab === 'implants') content.innerHTML = renderBioImplantsTab();
     else if (bioInvTab === 'purchases') content.innerHTML = renderBioPurchasesTab();
     else if (bioInvTab === 'contracts') content.innerHTML = renderBioContractsTab();
@@ -3584,5 +3592,659 @@ function toggleBioTrainingAttendance(recId, name) {
     DB.set('bio_training', recs);
     renderBioInvTabContent();
 }
+
+/* ===========================================================================
+   DICOM Imaging Canvas Viewer Engine & Tab
+   =========================================================================== */
+class DicomViewer {
+    constructor() {
+        this.canvas = null;
+        this.ctx = null;
+        this.currentSeries = 'chest_ct';
+        this.brightness = 100; // Window Center (0-200%)
+        this.contrast = 100;   // Window Width (0-200%)
+        this.zoom = 1.0;
+        this.panX = 0;
+        this.panY = 0;
+        this.tool = 'windowing'; // windowing, zoom, measure
+
+        this.isMouseDown = false;
+        this.startMouseX = 0;
+        this.startMouseY = 0;
+
+        // Measurement line
+        this.measureStart = null;
+        this.measureEnd = null;
+    }
+
+    init() {
+        this.canvas = document.getElementById('dicom-canvas');
+        if (!this.canvas) return;
+
+        this.ctx = this.canvas.getContext('2d');
+        this.resizeCanvas();
+        this.bindEvents();
+        this.renderSlice();
+    }
+
+    resizeCanvas() {
+        if (!this.canvas || !this.canvas.parentElement) return;
+        this.canvas.width = this.canvas.parentElement.clientWidth;
+        this.canvas.height = 420;
+    }
+
+    bindEvents() {
+        if (!this.canvas || this._bound) return;
+        this._bound = true;
+
+        this.canvas.addEventListener('mousedown', (e) => {
+            this.isMouseDown = true;
+            const rect = this.canvas.getBoundingClientRect();
+            this.startMouseX = e.clientX - rect.left;
+            this.startMouseY = e.clientY - rect.top;
+
+            if (this.tool === 'measure') {
+                this.measureStart = { x: this.startMouseX, y: this.startMouseY };
+                this.measureEnd = { x: this.startMouseX, y: this.startMouseY };
+            }
+        });
+
+        this.canvas.addEventListener('mousemove', (e) => {
+            if (!this.isMouseDown) return;
+            const rect = this.canvas.getBoundingClientRect();
+            const currX = e.clientX - rect.left;
+            const currY = e.clientY - rect.top;
+
+            const deltaX = currX - this.startMouseX;
+            const deltaY = currY - this.startMouseY;
+
+            if (this.tool === 'windowing') {
+                this.brightness = Math.max(20, Math.min(200, this.brightness + deltaY * 0.5));
+                this.contrast = Math.max(20, Math.min(200, this.contrast + deltaX * 0.5));
+                this.updateSliders();
+            } else if (this.tool === 'zoom') {
+                this.panX += deltaX;
+                this.panY += deltaY;
+            } else if (this.tool === 'measure') {
+                this.measureEnd = { x: currX, y: currY };
+            }
+
+            this.startMouseX = currX;
+            this.startMouseY = currY;
+            this.renderSlice();
+        });
+
+        window.addEventListener('mouseup', () => {
+            this.isMouseDown = false;
+        });
+
+        window.addEventListener('resize', () => {
+            this.resizeCanvas();
+            this.renderSlice();
+        });
+    }
+
+    updateSliders() {
+        const bSlider = document.getElementById('dicom-brightness-slider');
+        const cSlider = document.getElementById('dicom-contrast-slider');
+        if (bSlider) bSlider.value = this.brightness;
+        if (cSlider) cSlider.value = this.contrast;
+    }
+
+    renderSlice() {
+        if (!this.ctx || !this.canvas) return;
+
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+
+        this.ctx.fillStyle = '#020509';
+        this.ctx.fillRect(0, 0, w, h);
+
+        this.ctx.save();
+        this.ctx.translate(w / 2 + this.panX, h / 2 + this.panY);
+        this.ctx.scale(this.zoom, this.zoom);
+
+        const size = Math.min(w, h) * 0.8;
+        const half = size / 2;
+
+        this.ctx.filter = `brightness(${this.brightness}%) contrast(${this.contrast}%)`;
+
+        if (this.currentSeries === 'mri_brain') {
+            this.ctx.fillStyle = '#1e293b';
+            this.ctx.beginPath();
+            this.ctx.ellipse(0, 0, half * 0.75, half * 0.9, 0, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            this.ctx.strokeStyle = '#f8fafc';
+            this.ctx.lineWidth = 14;
+            this.ctx.stroke();
+
+            this.ctx.fillStyle = '#64748b';
+            this.ctx.beginPath();
+            this.ctx.ellipse(-half * 0.18, 0, half * 0.12, half * 0.35, 0.2, 0, Math.PI * 2);
+            this.ctx.ellipse(half * 0.18, 0, half * 0.12, half * 0.35, -0.2, 0, Math.PI * 2);
+            this.ctx.fill();
+        } else {
+            this.ctx.fillStyle = '#111722';
+            this.ctx.beginPath();
+            this.ctx.ellipse(0, 0, half, half * 0.75, 0, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            this.ctx.strokeStyle = '#e0e6ed';
+            this.ctx.lineWidth = 12;
+            this.ctx.beginPath();
+            this.ctx.ellipse(0, 0, half * 0.9, half * 0.68, 0, 0, Math.PI * 2);
+            this.ctx.stroke();
+
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.beginPath();
+            this.ctx.arc(0, half * 0.55, 22, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            this.ctx.fillStyle = '#050a12';
+            this.ctx.beginPath();
+            this.ctx.ellipse(-half * 0.45, -half * 0.05, half * 0.35, half * 0.45, -0.2, 0, Math.PI * 2);
+            this.ctx.ellipse(half * 0.45, -half * 0.05, half * 0.35, half * 0.45, 0.2, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            this.ctx.fillStyle = '#3a4454';
+            this.ctx.beginPath();
+            this.ctx.ellipse(half * 0.08, -half * 0.08, half * 0.25, half * 0.32, 0.4, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
+
+        this.ctx.restore();
+
+        this.drawOverlayText();
+        this.drawMeasurement();
+    }
+
+    drawOverlayText() {
+        this.ctx.fillStyle = '#00f0ff';
+        this.ctx.font = '12px monospace';
+
+        const patName = this.currentSeries === 'mri_brain' ? 'PATIENT: SHAH, PRIYA [F/34]' : 'PATIENT: DOE, JOHN [M/48]';
+        const studyName = this.currentSeries === 'mri_brain' ? 'STUDY: BRAIN MRI T2-WEIGHTED' : 'STUDY: CHEST CT ANGIOGRAM W/ CONTRAST';
+        const accNo = this.currentSeries === 'mri_brain' ? 'ACC: #MRI-990114' : 'ACC: #CT-8894102';
+
+        this.ctx.fillText(patName, 15, 25);
+        this.ctx.fillText(studyName, 15, 42);
+        this.ctx.fillText(`${accNo} | SLICE: 42/120`, 15, 59);
+
+        this.ctx.fillText(`WW/WL: W:${Math.round(this.contrast * 4)} C:${Math.round(this.brightness * 2 - 100)}`, this.canvas.width - 200, 25);
+        this.ctx.fillText(`ZOOM: ${(this.zoom * 100).toFixed(0)}%`, this.canvas.width - 200, 42);
+        this.ctx.fillText('FOV: 350mm | THICK: 1.25mm', this.canvas.width - 200, 59);
+    }
+
+    drawMeasurement() {
+        if (!this.measureStart || !this.measureEnd) return;
+
+        this.ctx.strokeStyle = '#ff0055';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.moveTo(this.measureStart.x, this.measureStart.y);
+        this.ctx.lineTo(this.measureEnd.x, this.measureEnd.y);
+        this.ctx.stroke();
+
+        const drawTick = (pt) => {
+            this.ctx.beginPath();
+            this.ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+            this.ctx.fillStyle = '#ff0055';
+            this.ctx.fill();
+        };
+        drawTick(this.measureStart);
+        drawTick(this.measureEnd);
+
+        const dx = this.measureEnd.x - this.measureStart.x;
+        const dy = this.measureEnd.y - this.measureStart.y;
+        const pxDist = Math.sqrt(dx * dx + dy * dy);
+        const mmDist = (pxDist * 0.78).toFixed(1);
+
+        this.ctx.fillStyle = '#ff0055';
+        this.ctx.font = 'bold 13px sans-serif';
+        this.ctx.fillText(`${mmDist} mm`, (this.measureStart.x + this.measureEnd.x) / 2 + 10, (this.measureStart.y + this.measureEnd.y) / 2 - 10);
+    }
+
+    setTool(toolName) {
+        this.tool = toolName;
+    }
+
+    resetView() {
+        this.brightness = 100;
+        this.contrast = 100;
+        this.zoom = 1.0;
+        this.panX = 0;
+        this.panY = 0;
+        this.measureStart = null;
+        this.measureEnd = null;
+        this.updateSliders();
+        this.renderSlice();
+    }
+}
+
+function renderBioDicomTab() {
+    setTimeout(function() {
+        if (!window.dicomViewer) window.dicomViewer = new DicomViewer();
+        window.dicomViewer.init();
+    }, 100);
+
+    return `
+        <div class="card mb-4" style="padding:16px;background:#0b1329;color:#e2e8f0;border:1px solid #1e293b;">
+            <!-- Top Controls Toolbar -->
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;border-bottom:1px solid #1e293b;padding-bottom:12px;">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <span style="font-weight:700;color:#00f0ff;font-size:14px;display:flex;align-items:center;gap:6px;">
+                        🩺 High-Resolution DICOM PACS Viewer
+                    </span>
+                    <select class="form-control" style="width:220px;background:#1e293b;color:#f8fafc;border-color:#334155;font-size:12px;" onchange="if(window.dicomViewer){window.dicomViewer.currentSeries=this.value;window.dicomViewer.renderSlice();}">
+                        <option value="chest_ct">Chest CT Angiogram (Slice #42)</option>
+                        <option value="mri_brain">Brain MRI T2 Axial (Slice #18)</option>
+                    </select>
+                </div>
+
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <button class="btn btn-sm" style="background:#1e293b;color:#00f0ff;border:1px solid #334155;" onclick="if(window.dicomViewer){window.dicomViewer.setTool('windowing');APP.notify('Tool set to Window/Level (Drag canvas)','info');}">☀️ Window/Level</button>
+                    <button class="btn btn-sm" style="background:#1e293b;color:#00f0ff;border:1px solid #334155;" onclick="if(window.dicomViewer){window.dicomViewer.setTool('zoom');APP.notify('Tool set to Zoom & Pan','info');}">🔍 Zoom / Pan</button>
+                    <button class="btn btn-sm" style="background:#1e293b;color:#ff0055;border:1px solid #334155;" onclick="if(window.dicomViewer){window.dicomViewer.setTool('measure');APP.notify('Tool set to Distance Measurement Calliper','info');}">📏 Measure (mm)</button>
+                    <button class="btn btn-sm" style="background:#334155;color:#fff;" onclick="if(window.dicomViewer)window.dicomViewer.resetView()">🔄 Reset View</button>
+                </div>
+            </div>
+
+            <!-- Sliders for Brightness & Contrast -->
+            <div style="display:flex;gap:20px;align-items:center;margin-bottom:12px;background:#0f172a;padding:8px 12px;border-radius:6px;flex-wrap:wrap;font-size:12px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <label style="color:#94a3b8;margin:0;">Window Center (Brightness):</label>
+                    <input type="range" id="dicom-brightness-slider" min="20" max="200" value="100" style="width:120px;" oninput="if(window.dicomViewer){window.dicomViewer.brightness=parseFloat(this.value);window.dicomViewer.renderSlice();}">
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <label style="color:#94a3b8;margin:0;">Window Width (Contrast):</label>
+                    <input type="range" id="dicom-contrast-slider" min="20" max="200" value="100" style="width:120px;" oninput="if(window.dicomViewer){window.dicomViewer.contrast=parseFloat(this.value);window.dicomViewer.renderSlice();}">
+                </div>
+                <div style="color:#64748b;margin-left:auto;font-size:11px;">
+                    💡 Drag mouse vertically on canvas for WL, horizontally for WW.
+                </div>
+            </div>
+
+            <!-- DICOM Canvas -->
+            <div style="position:relative;width:100%;border-radius:8px;overflow:hidden;border:1px solid #1e293b;background:#020509;">
+                <canvas id="dicom-canvas" style="display:block;width:100%;cursor:crosshair;"></canvas>
+            </div>
+        </div>
+    `;
+}
+
+/* ===========================================================================
+   Live Telemetry Engine & Patient Monitor Simulator Tab
+   =========================================================================== */
+class TelemetryEngine {
+    constructor() {
+        this.ecgCanvas = null;
+        this.ecgCtx = null;
+        this.spo2Canvas = null;
+        this.spo2Ctx = null;
+        this.respCanvas = null;
+        this.respCtx = null;
+
+        this.animId = null;
+        this.xPos = 0;
+        this.speed = 2.5;
+
+        // Vitals values
+        this.hr = 75; // BPM
+        this.spo2 = 98; // %
+        this.nibpSystolic = 120;
+        this.nibpDiastolic = 80;
+        this.respRate = 16; // rpm
+        this.temp = 36.8; // °C
+        this.arrhythmia = false;
+        this.audioBeepEnabled = false;
+
+        this.audioCtx = null;
+        this.lastBeatTime = 0;
+        this.lastEcgY = null;
+        this.lastSpo2Y = null;
+        this.lastRespY = null;
+    }
+
+    init() {
+        this.ecgCanvas = document.getElementById('telemetry-ecg-canvas');
+        this.spo2Canvas = document.getElementById('telemetry-spo2-canvas');
+        this.respCanvas = document.getElementById('telemetry-resp-canvas');
+
+        if (!this.ecgCanvas || !this.spo2Canvas || !this.respCanvas) return;
+
+        this.ecgCtx = this.ecgCanvas.getContext('2d');
+        this.spo2Ctx = this.spo2Canvas.getContext('2d');
+        this.respCtx = this.respCanvas.getContext('2d');
+
+        this.resizeCanvases();
+        this.clearAll();
+    }
+
+    resizeCanvases() {
+        [this.ecgCanvas, this.spo2Canvas, this.respCanvas].forEach(c => {
+            if (c && c.parentElement) {
+                c.width = c.parentElement.clientWidth || 800;
+            }
+        });
+        if (this.ecgCanvas) this.ecgCanvas.height = 140;
+        if (this.spo2Canvas) this.spo2Canvas.height = 90;
+        if (this.respCanvas) this.respCanvas.height = 90;
+    }
+
+    clearAll() {
+        [
+            { ctx: this.ecgCtx, canvas: this.ecgCanvas },
+            { ctx: this.spo2Ctx, canvas: this.spo2Canvas },
+            { ctx: this.respCtx, canvas: this.respCanvas }
+        ].forEach(({ ctx, canvas }) => {
+            if (!ctx || !canvas) return;
+            ctx.fillStyle = '#060b13';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            this.drawGrid(ctx, canvas);
+        });
+    }
+
+    drawGrid(ctx, canvas) {
+        ctx.strokeStyle = 'rgba(0, 240, 255, 0.05)';
+        ctx.lineWidth = 1;
+        const gridSize = 15;
+        ctx.beginPath();
+        for (let x = 0; x < canvas.width; x += gridSize) {
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+        }
+        for (let y = 0; y < canvas.height; y += gridSize) {
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
+    }
+
+    startLoop() {
+        if (this.animId) cancelAnimationFrame(this.animId);
+
+        let lastTime = performance.now();
+        const render = (now) => {
+            if (!document.getElementById('telemetry-ecg-canvas')) {
+                return; // Stop loop if tab switched
+            }
+            this.updateSignals(now);
+            this.animId = requestAnimationFrame(render);
+        };
+        this.animId = requestAnimationFrame(render);
+    }
+
+    updateSignals(now) {
+        if (!this.ecgCanvas || !this.ecgCtx) return;
+
+        const width = this.ecgCanvas.width;
+        const ecgHeight = this.ecgCanvas.height;
+        const spo2Height = this.spo2Canvas.height;
+        const respHeight = this.respCanvas.height;
+
+        const sweepWidth = 12;
+
+        this.ecgCtx.fillStyle = '#060b13';
+        this.ecgCtx.fillRect(this.xPos, 0, sweepWidth, ecgHeight);
+        this.drawGridSegment(this.ecgCtx, this.xPos, sweepWidth, ecgHeight);
+
+        this.spo2Ctx.fillStyle = '#060b13';
+        this.spo2Ctx.fillRect(this.xPos, 0, sweepWidth, spo2Height);
+        this.drawGridSegment(this.spo2Ctx, this.xPos, sweepWidth, spo2Height);
+
+        this.respCtx.fillStyle = '#060b13';
+        this.respCtx.fillRect(this.xPos, 0, sweepWidth, respHeight);
+        this.drawGridSegment(this.respCtx, this.xPos, sweepWidth, respHeight);
+
+        const beatIntervalMs = (60 / this.hr) * 1000;
+        const phase = ((now % beatIntervalMs) / beatIntervalMs);
+
+        let ecgY = ecgHeight / 2;
+        if (phase < 0.1) {
+            ecgY -= Math.sin(phase * Math.PI / 0.1) * 8;
+        } else if (phase > 0.15 && phase < 0.18) {
+            ecgY += 6;
+        } else if (phase >= 0.18 && phase < 0.24) {
+            const rPhase = (phase - 0.18) / 0.06;
+            ecgY -= Math.sin(rPhase * Math.PI) * 48;
+
+            if (rPhase > 0.4 && rPhase < 0.6 && (now - this.lastBeatTime > 400)) {
+                this.lastBeatTime = now;
+                this.playBeep();
+                this.flashQRSIndicator();
+            }
+        } else if (phase >= 0.24 && phase < 0.28) {
+            ecgY += 12;
+        } else if (phase > 0.35 && phase < 0.55) {
+            const tPhase = (phase - 0.35) / 0.20;
+            ecgY -= Math.sin(tPhase * Math.PI) * 14;
+        }
+
+        if (this.arrhythmia && Math.random() < 0.05) {
+            ecgY += (Math.random() - 0.5) * 30;
+        } else {
+            ecgY += (Math.random() - 0.5) * 2;
+        }
+
+        let spo2Y = spo2Height / 2;
+        if (phase > 0.2 && phase < 0.7) {
+            const plethPhase = (phase - 0.2) / 0.5;
+            spo2Y -= Math.sin(plethPhase * Math.PI) * 28 * (this.spo2 / 100);
+            if (plethPhase > 0.6 && plethPhase < 0.75) {
+                spo2Y += 5;
+            }
+        }
+
+        const respPeriodMs = (60 / this.respRate) * 1000;
+        const respPhase = ((now % respPeriodMs) / respPeriodMs);
+        let respY = respHeight / 2 - Math.sin(respPhase * 2 * Math.PI) * 22;
+
+        const prevX = (this.xPos - this.speed + width) % width;
+
+        // ECG Line
+        this.ecgCtx.strokeStyle = '#00ff88';
+        this.ecgCtx.lineWidth = 2.2;
+        this.ecgCtx.beginPath();
+        this.ecgCtx.moveTo(prevX, this.lastEcgY || ecgHeight / 2);
+        this.ecgCtx.lineTo(this.xPos, ecgY);
+        this.ecgCtx.stroke();
+        this.lastEcgY = ecgY;
+
+        // SpO2 Line
+        this.spo2Ctx.strokeStyle = '#00f0ff';
+        this.spo2Ctx.lineWidth = 2.0;
+        this.spo2Ctx.beginPath();
+        this.spo2Ctx.moveTo(prevX, this.lastSpo2Y || spo2Height / 2);
+        this.spo2Ctx.lineTo(this.xPos, spo2Y);
+        this.spo2Ctx.stroke();
+        this.lastSpo2Y = spo2Y;
+
+        // Resp Line
+        this.respCtx.strokeStyle = '#ffb700';
+        this.respCtx.lineWidth = 2.0;
+        this.respCtx.beginPath();
+        this.respCtx.moveTo(prevX, this.lastRespY || respHeight / 2);
+        this.respCtx.lineTo(this.xPos, respY);
+        this.respCtx.stroke();
+        this.lastRespY = respY;
+
+        this.xPos = (this.xPos + this.speed) % width;
+    }
+
+    drawGridSegment(ctx, x, w, h) {
+        ctx.strokeStyle = 'rgba(0, 240, 255, 0.05)';
+        ctx.lineWidth = 1;
+        const gridSize = 15;
+
+        ctx.beginPath();
+        for (let gx = Math.floor(x / gridSize) * gridSize; gx < x + w; gx += gridSize) {
+            ctx.moveTo(gx, 0);
+            ctx.lineTo(gx, h);
+        }
+        for (let gy = 0; gy < h; gy += gridSize) {
+            ctx.moveTo(x, gy);
+            ctx.lineTo(x + w, gy);
+        }
+        ctx.stroke();
+    }
+
+    flashQRSIndicator() {
+        const heartElem = document.getElementById('qrs-heart-icon');
+        if (heartElem) {
+            heartElem.style.transform = 'scale(1.4)';
+            heartElem.style.color = '#ff0055';
+            setTimeout(() => {
+                heartElem.style.transform = 'scale(1)';
+                heartElem.style.color = '#00ff88';
+            }, 120);
+        }
+    }
+
+    playBeep() {
+        if (!this.audioBeepEnabled) return;
+        try {
+            if (!this.audioCtx) {
+                this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (this.audioCtx.state === 'suspended') {
+                this.audioCtx.resume();
+            }
+            const osc = this.audioCtx.createOscillator();
+            const gain = this.audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, this.audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.08, this.audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + 0.08);
+
+            osc.connect(gain);
+            gain.connect(this.audioCtx.destination);
+            osc.start();
+            osc.stop(this.audioCtx.currentTime + 0.08);
+        } catch (e) {}
+    }
+
+    setVitals(hr, spo2, sys, dia, resp) {
+        if (hr) this.hr = parseInt(hr);
+        if (spo2) this.spo2 = parseInt(spo2);
+        if (sys) this.nibpSystolic = parseInt(sys);
+        if (dia) this.nibpDiastolic = parseInt(dia);
+        if (resp) this.respRate = parseInt(resp);
+        this.updateVitalsDisplay();
+    }
+
+    updateVitalsDisplay() {
+        const hrEl = document.getElementById('vitals-hr');
+        const spo2El = document.getElementById('vitals-spo2');
+        const nibpEl = document.getElementById('vitals-nibp');
+        const respEl = document.getElementById('vitals-resp');
+
+        if (hrEl) hrEl.textContent = this.hr;
+        if (spo2El) spo2El.textContent = this.spo2 + '%';
+        if (nibpEl) nibpEl.textContent = `${this.nibpSystolic}/${this.nibpDiastolic}`;
+        if (respEl) respEl.textContent = this.respRate;
+    }
+}
+
+function renderBioTelemetryTab() {
+    setTimeout(function() {
+        if (!window.telemetryEngine) window.telemetryEngine = new TelemetryEngine();
+        window.telemetryEngine.init();
+        window.telemetryEngine.startLoop();
+    }, 100);
+
+    return `
+        <div class="card mb-4" style="padding:16px;background:#060b13;color:#e2e8f0;border:1px solid #1e293b;">
+            <!-- Header Controls -->
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;border-bottom:1px solid #1e293b;padding-bottom:12px;">
+                <div>
+                    <h3 style="margin:0;color:#00ff88;display:flex;align-items:center;gap:8px;font-size:16px;">
+                        📈 Real-Time Multi-Parameter Patient Telemetry Monitor
+                    </h3>
+                    <span style="font-size:12px;color:#94a3b8;">High-Frequency Waveform Sweep &bull; Real-Time Signal Generator</span>
+                </div>
+
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <select class="form-control" style="width:160px;background:#1e293b;color:#f8fafc;border-color:#334155;font-size:12px;" onchange="
+                        if(window.telemetryEngine){
+                            if(this.value==='icu1'){window.telemetryEngine.setVitals(75,98,120,80,16);}
+                            else if(this.value==='nicu'){window.telemetryEngine.setVitals(135,99,70,45,38);}
+                            else if(this.value==='ot2'){window.telemetryEngine.setVitals(62,97,110,70,14);}
+                        }
+                    ">
+                        <option value="icu1">Bed 102 (ICU Adult)</option>
+                        <option value="nicu">Bed 04 (NICU Infant)</option>
+                        <option value="ot2">OT Bed 2 (Surgical)</option>
+                    </select>
+
+                    <button class="btn btn-sm" id="bioBeepBtn" style="background:#1e293b;color:#00f0ff;border:1px solid #334155;" onclick="
+                        if(window.telemetryEngine){
+                            window.telemetryEngine.audioBeepEnabled = !window.telemetryEngine.audioBeepEnabled;
+                            this.innerHTML = window.telemetryEngine.audioBeepEnabled ? '🔊 Beep ON' : '🔇 Beep OFF';
+                            APP.notify(window.telemetryEngine.audioBeepEnabled ? 'QRS Audio Pitch Beep Enabled' : 'Audio Beep Muted', 'info');
+                        }
+                    ">🔇 Beep OFF</button>
+
+                    <button class="btn btn-sm" style="background:#1e293b;color:#ff0055;border:1px solid #334155;" onclick="
+                        if(window.telemetryEngine){
+                            window.telemetryEngine.arrhythmia = !window.telemetryEngine.arrhythmia;
+                            APP.notify(window.telemetryEngine.arrhythmia ? 'PVC Arrhythmia Simulation Enabled' : 'Normal Sinus Rhythm Restored', 'warning');
+                        }
+                    ">⚡ Toggle Arrhythmia</button>
+                </div>
+            </div>
+
+            <!-- Vitals KPI Cards -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:12px;margin-bottom:16px;">
+                <div style="background:#0f172a;border:1px solid #10b981;border-radius:8px;padding:12px;text-align:center;">
+                    <div style="font-size:11px;color:#10b981;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;">
+                        <span id="qrs-heart-icon" style="transition:transform 0.1s ease;display:inline-block;">❤️</span> HR (BPM)
+                    </div>
+                    <div style="font-size:28px;font-weight:800;color:#00ff88;margin-top:2px;" id="vitals-hr">75</div>
+                </div>
+
+                <div style="background:#0f172a;border:1px solid #06b6d4;border-radius:8px;padding:12px;text-align:center;">
+                    <div style="font-size:11px;color:#06b6d4;font-weight:700;">💧 SpO2 (%)</div>
+                    <div style="font-size:28px;font-weight:800;color:#00f0ff;margin-top:2px;" id="vitals-spo2">98%</div>
+                </div>
+
+                <div style="background:#0f172a;border:1px solid #f59e0b;border-radius:8px;padding:12px;text-align:center;">
+                    <div style="font-size:11px;color:#f59e0b;font-weight:700;">🫁 RESP (RPM)</div>
+                    <div style="font-size:28px;font-weight:800;color:#ffb700;margin-top:2px;" id="vitals-resp">16</div>
+                </div>
+
+                <div style="background:#0f172a;border:1px solid #6366f1;border-radius:8px;padding:12px;text-align:center;">
+                    <div style="font-size:11px;color:#6366f1;font-weight:700;">🩸 NIBP (mmHg)</div>
+                    <div style="font-size:24px;font-weight:800;color:#818cf8;margin-top:6px;" id="vitals-nibp">120/80</div>
+                </div>
+            </div>
+
+            <!-- Live Waveform Canvases -->
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                <div style="position:relative;">
+                    <div style="position:absolute;top:6px;left:10px;font-size:11px;font-weight:700;color:#00ff88;z-index:2;background:rgba(6,11,19,0.7);padding:2px 6px;border-radius:4px;">
+                        ECG Lead II (0.5mV/mm - 25mm/s)
+                    </div>
+                    <canvas id="telemetry-ecg-canvas" style="display:block;width:100%;height:140px;background:#060b13;border-radius:6px;border:1px solid #1e293b;"></canvas>
+                </div>
+
+                <div style="position:relative;">
+                    <div style="position:absolute;top:6px;left:10px;font-size:11px;font-weight:700;color:#00f0ff;z-index:2;background:rgba(6,11,19,0.7);padding:2px 6px;border-radius:4px;">
+                        SpO2 Plethysmogram (IR / Red Ratio)
+                    </div>
+                    <canvas id="telemetry-spo2-canvas" style="display:block;width:100%;height:90px;background:#060b13;border-radius:6px;border:1px solid #1e293b;"></canvas>
+                </div>
+
+                <div style="position:relative;">
+                    <div style="position:absolute;top:6px;left:10px;font-size:11px;font-weight:700;color:#ffb700;z-index:2;background:rgba(6,11,19,0.7);padding:2px 6px;border-radius:4px;">
+                        Respiration Impedance Pneumography
+                    </div>
+                    <canvas id="telemetry-resp-canvas" style="display:block;width:100%;height:90px;background:#060b13;border-radius:6px;border:1px solid #1e293b;"></canvas>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
 
 
