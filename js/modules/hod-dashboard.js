@@ -288,7 +288,7 @@ function renderHodDashboard(container) {
             { id: 'tasks',           label: 'Tasks', badge: _hodData.overdueTasks.length, bc: 'badge-danger' },
             { id: 'team',            label: '👥 My Team', badge: team.length, bc: 'badge-success' },
             { id: 'checklists',      label: 'Checklist', badge: pendingCl, bc: 'badge-info' },
-            { id: 'inventory',       label: '🧬 Biomedical Inventory', badge: (DB.get('inventory') || []).filter(function(i){ return (i.department||'').trim().toLowerCase() === 'biomedical'; }).length, bc: 'badge-info' },
+            { id: 'inventory',       label: '📦 Department Inventory', badge: (DB.get('inventory') || []).filter(function(i){ return (i.department||'').trim().toLowerCase() === 'biomedical'; }).length, bc: 'badge-info' },
             { id: 'dept-assets',     label: '🏥 Biomedical Asset & Equipment Operational Hub', badge: openBreakdownCount > 0 ? openBreakdownCount : (deptAssetsCount || 0), bc: openBreakdownCount > 0 ? 'badge-danger' : 'badge-info' },
             { id: 'requests',        label: '🔧 Problem and Request', badge: pendingReq + openProblems, bc: 'badge-danger' },
             { id: 'performance',     label: '📊 Department Performance — Biomedical' },
@@ -8521,7 +8521,7 @@ function _renderBiomedicalHodDashboard(container, user, dept, u, team) {
         + '<div style="background:#fff;border:1px solid #cbd5e1;border-radius:14px;padding:20px;box-shadow:0 2px 4px rgba(0,0,0,0.02);">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #f1f5f9;">'
         + '<div><h3 style="margin:0;font-size:18px;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px;">'
-        + '<span>🧬</span> Biomedical Inventory & Implant Store</h3>'
+        + '<span>📦</span> Department Inventory</h3>'
         + '<div style="font-size:12px;color:#64748b;margin-top:2px;">Equipment Stock, OT Prosthesis Register, Gate Entries & Safety Checklists</div></div></div>'
         + '<div id="bioHodInventoryContainer"></div></div></div>'
         + '</div>';
