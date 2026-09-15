@@ -1559,7 +1559,7 @@ function exportAdmWhatsApp() {
     var postOp = rows.filter(function(r) { return getAdmEffType(r) === 'post-op'; }).length;
     var totalBill = rows.reduce(function(s, r) { return s + (parseFloat(r.billAmount) || 0); }, 0);
 
-    var text = '🏥 *STAVYA HOSPITAL — ADMISSION REPORT*\n' +
+    var text = '🏥 *STAVYA HOSPITAL — ADMISSION REPORT SUMMARY*\n' +
         '═════════════════════════\n' +
         '📅 *Period:* ' + (from || 'Start') + ' to ' + (to || 'Present') + '\n';
 
@@ -1574,24 +1574,7 @@ function exportAdmWhatsApp() {
         '\n• ICU Cases: *' + icu + '*' +
         '\n• Pre-Op: *' + preOp + '* | Post-Op: *' + postOp + '*' +
         '\n• Total Revenue: *₹' + totalBill.toLocaleString('en-IN') + '*\n' +
-        '\n📋 *PATIENT LIST SUMMARY (Top 10):*\n';
-
-    var sorted = rows.slice().sort(function(a, b) {
-        return new Date(b.admissionDate || b.createdAt || 0) - new Date(a.admissionDate || a.createdAt || 0);
-    });
-
-    sorted.slice(0, 10).forEach(function(a, i) {
-        var bed = a.bedId ? ' (' + a.bedId + ')' : '';
-        var date = a.admissionDate ? APP.formatDate(a.admissionDate) : '—';
-        text += (i + 1) + '. *' + (a.patientName || 'Patient') + '* (Room ' + (a.roomNo || '-') + bed + ')\n' +
-            '   Type: ' + (a.type || 'regular').toUpperCase() + ' | Status: ' + (a.status || 'admitted') + ' | Date: ' + date + '\n';
-    });
-
-    if (rows.length > 10) {
-        text += '...and ' + (rows.length - 10) + ' more patient record(s).\n';
-    }
-
-    text += '\n═════════════════════════\n' +
+        '\n═════════════════════════\n' +
         '🤖 _Generated via Stavya Intelligence HMS_';
 
     window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
