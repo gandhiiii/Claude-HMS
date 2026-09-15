@@ -668,26 +668,9 @@ const AUTH = {
             return false;
         }
         if (permission === 'biomedical-inventory' || permission === 'biomedical' || permission === 'biomedical-module') {
-            if (!user) return false;
-            if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
-            var _bioDept = (user.department || '').trim().toLowerCase();
-            // Strictly for Biomedical Department ONLY
-            if (_bioDept.indexOf('biomedical') !== -1 || _bioDept.indexOf('bio medical') !== -1 || _bioDept.indexOf('bio-medical') !== -1) return true;
             return false;
         }
         if (permission === 'equipment-health-core') {
-            if (!user) return false;
-            var _ehDept = (user.department || '').trim().toLowerCase();
-            // Explicitly remove from Facility Department
-            if (_ehDept === 'facility' || _ehDept === 'facility management' || _ehDept.indexOf('facility') !== -1) return false;
-
-            if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
-            if (user.role === 'hod') {
-                if (_ehDept.indexOf('biomedical') !== -1 || _ehDept.indexOf('it') !== -1 || _ehDept.indexOf('maintenance') !== -1) return true;
-                return false;
-            }
-            if (_ehDept.indexOf('biomedical') !== -1 || _ehDept.indexOf('it') !== -1 || _ehDept.indexOf('maintenance') !== -1) return true;
-            if (user.permissions && user.permissions.includes('equipment-health-core')) return true;
             return false;
         }
         if (permission === 'scrap') {
@@ -1254,7 +1237,7 @@ const APP = {
                 DB.set('departmentMeetings', []);
             }
             if (!Array.isArray(existingRights) || existingRights.length === 0) {
-                const defaultRights = ['dashboard','users','departments','inventory','biomedical-inventory','gate-security',
+                const defaultRights = ['dashboard','users','departments','inventory','gate-security',
                     'projects','ambulance','problems','tasks','complaints',
                     'room-checklist','rooms','admissions','lost-found','checklists','admin-checklists',
                     'material-requests','suggestions','reports','employee-dashboard',
@@ -1262,9 +1245,6 @@ const APP = {
                     'scrap','handover','cleaning','equipbackdown','staff-deployment',
                     'security-deployment','patient-shifting'];
                 DB.set('featureRights', defaultRights);
-            } else if (!existingRights.includes('biomedical-inventory')) {
-                existingRights.push('biomedical-inventory');
-                DB.set('featureRights', existingRights);
             }
             if (!Array.isArray(DB.get('biomedical_inventory')) || DB.get('biomedical_inventory').length === 0) {
                 const sampleBioItems = [
