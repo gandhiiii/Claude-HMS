@@ -226,13 +226,16 @@ var StaffDeployment = (function () {
     }
 
     function _exportWhatsApp(fromDate, toDate, type) {
-        var rows = _filter(fromDate, toDate, type);
+        var today = _dateStr();
+        var fDate = fromDate || today;
+        var tDate = toDate || today;
+        var rows = _filter(fDate, tDate, type);
         if (rows.length === 0) {
-            if (typeof APP !== 'undefined' && APP.notify) APP.notify('No staff deployment data to share', 'info');
+            if (typeof APP !== 'undefined' && APP.notify) APP.notify('No staff deployment data to share for ' + (fDate === tDate ? fDate : fDate + ' to ' + tDate), 'info');
             return;
         }
         var sm = _summary(rows);
-        var dateLabel = (fromDate && toDate && fromDate === toDate) ? (fromDate || 'Today') : ((fromDate || 'Start') + ' to ' + (toDate || 'End'));
+        var dateLabel = (fDate === tDate) ? fDate : (fDate + ' to ' + tDate);
 
         var text = '🧹 *STAFF DEPLOYMENT REPORT*\n';
         text += '📅 *Period:* ' + dateLabel + '\n';
@@ -357,10 +360,7 @@ var StaffDeployment = (function () {
         var user = AUTH.currentUser();
         _mode = 'module';
         var today = _dateStr();
-        var lastWeek = new Date();
-        lastWeek.setDate(lastWeek.getDate() - 6);
-        var lastWeekStr = _dateStr(lastWeek);
-        _state.from = _state.from || lastWeekStr;
+        _state.from = _state.from || today;
         _state.to   = _state.to || today;
         _state.type = _state.type || 'all';
 
