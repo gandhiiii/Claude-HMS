@@ -141,12 +141,14 @@ var SecurityDeployment = (function () {
         var cards = periods.map(function (p) {
             var rows = _periodRows(p, _state.type);
             var sm = _summary(rows);
-            return '<div class="card" style="flex:1;min-width:150px;border-top:3px solid #b71c1c;padding:14px;">'
+            return '<div class="card" style="flex:1;min-width:160px;border-top:3px solid #b71c1c;padding:14px;">'
                 + '<div style="font-size:13px;font-weight:700;color:#b71c1c;">📅 ' + _periodLabel(p) + '</div>'
                 + '<div style="font-size:11px;color:var(--gray);margin:2px 0 10px;">' + rows.length + ' entries · '
                 + '🛡️ ' + sm.guards + ' · 👮 ' + sm.supervisors + '</div>'
-                + '<button class="btn btn-sm btn-success" style="width:100%;font-size:12px;" '
-                + 'onclick="SecurityDeployment.exportPeriod(\'' + p + '\')">📊 Excel</button></div>';
+                + '<div style="display:flex;gap:4px;">'
+                + '<button class="btn btn-sm" style="flex:1;font-size:11px;background:#25D366;color:#fff;border:none;font-weight:600;" onclick="SecurityDeployment.exportPeriodWhatsApp(\'' + p + '\')">💬 WhatsApp</button>'
+                + '<button class="btn btn-sm btn-success" style="flex:1;font-size:11px;" onclick="SecurityDeployment.exportPeriod(\'' + p + '\')">📊 Excel</button>'
+                + '</div></div>';
         }).join('');
         return '<div class="card" style="padding:16px;margin-bottom:16px;border-top:3px solid #ef5350;">'
             + '<div style="font-size:14px;font-weight:700;margin-bottom:12px;">📊 Today · Weekly · Monthly Report</div>'
@@ -233,6 +235,40 @@ var SecurityDeployment = (function () {
         var range = (fromDate || 'all') + '_to_' + (toDate || 'all');
         XLSX.writeFile(wb, 'Security_Deployment_' + range + '.xlsx');
         APP.notify('Excel report downloaded ✓', 'success');
+    }
+
+    function _exportWhatsApp(fromDate, toDate, type) {
+        var today = _dateStr();
+        var fDate = fromDate || today;
+        var tDate = toDate || today;
+        var rows = _filter(fDate, tDate, type);
+        if (rows.length === 0) {
+            if (typeof APP !== 'undefined' && APP.notify) APP.notify('No security deployment data to share for ' + (fDate === tDate ? fDate : fDate + ' to ' + tDate), 'info');
+            return;
+        }
+        var sm = _summary(rows);
+        var dateLabel = (fDate === tDate) ? fDate : (fDate + ' to ' + tDate);
+
+        var text = '🛡️ *SECURITY DEPLOYMENT REPORT*\n';
+        text += '📅 *Period:* ' + dateLabel + '\n';
+        text += '📊 *Total Entries:* ' + rows.length + '\n';
+        text += '• 🛡️ Security Guards: ' + sm.guards + '\n';
+        text += '• 👮 Security Supervisors: ' + sm.supervisors + '\n\n';
+
+        var floorKeys = Object.keys(sm.floors);
+        if (floorKeys.length > 0) {
+            text += '🏢 *ALL POST-WISE SUMMARY*\n';
+            floorKeys.sort().forEach(function (f) {
+                var fl = sm.floors[f];
+                text += '• *' + f + '*: ' + fl.total + ' (🛡️ ' + fl.guards + ', 👮 ' + fl.supervisors + ')\n';
+            });
+            text += '\n';
+        }
+
+        text += '_Generated via Stavya Intelligence HMS_';
+
+        window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
+        if (typeof APP !== 'undefined' && APP.notify) APP.notify('Opening WhatsApp with Security Deployment Report...', 'success');
     }
 
     /* ── Shared add-entry form ── */
@@ -376,10 +412,7 @@ var SecurityDeployment = (function () {
         var user = AUTH.currentUser();
         _mode = 'module';
         var today = _dateStr();
-        var lastWeek = new Date();
-        lastWeek.setDate(lastWeek.getDate() - 6);
-        var lastWeekStr = _dateStr(lastWeek);
-        _state.from = _state.from || lastWeekStr;
+        _state.from = _state.from || today;
         _state.to   = _state.to || today;
         _state.type = _state.type || 'all';
 
@@ -387,6 +420,7 @@ var SecurityDeployment = (function () {
             + '<h2 style="font-size:18px;font-weight:700;">🛡️ Security Deployment</h2>'
             + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
             + '<button class="btn btn-sm btn-primary" onclick="SecurityDeployment.toggleAdd()">➕ Add Entry</button>'
+            + '<button class="btn btn-sm" style="background:#25D366;color:#fff;font-weight:600;border:none;" onclick="SecurityDeployment.exportWhatsApp()">💬 Share WhatsApp</button>'
             + '<button class="btn btn-sm btn-success" onclick="SecurityDeployment.exportCurrent()">📊 Download Excel</button>'
             + '</div></div>'
 
@@ -456,6 +490,7 @@ var SecurityDeployment = (function () {
             + '<div style="font-weight:700;font-size:16px;">🛡️ Security Deployment</div>'
             + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
             + '<button class="btn btn-sm btn-primary" onclick="SecurityDeployment.toggleAdd()">➕ Add Entry</button>'
+            + '<button class="btn btn-sm" style="background:#25D366;color:#fff;font-weight:600;border:none;" onclick="SecurityDeployment.exportTabWhatsApp()">💬 Share WhatsApp</button>'
             + '<button class="btn btn-sm btn-success" onclick="SecurityDeployment.exportTab()">📊 Export Excel</button>'
             + '</div></div>'
 
@@ -623,6 +658,16 @@ var SecurityDeployment = (function () {
         exportPeriod: function (period) {
             var r = _periodRange(period);
             _export(r.from, r.to, _state.type);
+        },
+        exportWhatsApp: function () {
+            _exportWhatsApp(_dateStr(), _dateStr(), _state.type);
+        },
+        exportTabWhatsApp: function () {
+            _exportWhatsApp(_dateStr(), _dateStr(), _tabState.type || 'all');
+        },
+        exportPeriodWhatsApp: function (period) {
+            var r = _periodRange(period);
+            _exportWhatsApp(r.from, r.to, _state.type);
         }
     };
 })();
