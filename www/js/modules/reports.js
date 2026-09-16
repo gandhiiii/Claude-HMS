@@ -642,7 +642,7 @@ function _rAdmissions(el) {
     var waHeader = canWa 
         ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">'
             + '<div style="font-size:16px;font-weight:700;">🏥 Admissions Report</div>'
-            + '<button class="btn btn-sm" style="background:#25D366;color:#fff;font-weight:600;padding:6px 14px;" onclick="exportAdmWhatsApp()">💬 Share via WhatsApp</button>'
+            + '<button class="btn btn-sm" style="background:#25D366;color:#fff;font-weight:600;padding:6px 14px;" onclick="exportAdmWhatsApp()">💬 WhatsApp</button>'
             + '</div>'
         : '';
 

@@ -393,7 +393,8 @@ function onRoleChange(selectEl) {
     const adminPerms = ['dashboard', 'users', 'departments', 'feature-rights', 'admin-checklists', 'budget', 'quarterly-priorities', 'hospital-settings', 'data-history'];
 
     const rolePerms = {
-        hod: ['employee-dashboard','material-requests','suggestions','tasks','checklists','complaints','problems','reports'],
+        hod: ['hod-dashboard','employee-dashboard','material-requests','suggestions','tasks','checklists','complaints','problems','reports','md-report','scrap','purchases','handover'],
+        facility_hod: ['hod-dashboard','employee-dashboard','material-requests','suggestions','tasks','checklists','complaints','problems','reports','md-report','scrap','purchases','handover'],
         employee: ['employee-dashboard','material-requests','suggestions','checklists'],
         storekeeper: ['inventory','material-requests','employee-dashboard','scrap'],
         ambulance_employee: ['ambulance'],

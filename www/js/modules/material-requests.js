@@ -85,9 +85,10 @@ function renderMatList() {
         if (!user) return;
         var isAdmin = user.isSuperAdmin || user.role === 'admin';
         var isStorekeeper = user.role === 'storekeeper';
-        var procDept = _matProcurementDept();
-        var isFacilityHod = user.role === 'hod' && user.department === procDept;
-        var isRegularHod = user.role === 'hod' && !isFacilityHod;
+        var uRoleLow = (user.role || '').trim().toLowerCase();
+        var isHodRole = uRoleLow === 'hod' || uRoleLow.indexOf('hod') !== -1;
+        var isFacilityHod = isHodRole && (user.department || '').trim().toLowerCase() === (procDept || '').trim().toLowerCase();
+        var isRegularHod = isHodRole && !isFacilityHod;
 
         var all = DB.get('material_requests') || [];
         var search = (document.getElementById('matSearch') ? document.getElementById('matSearch').value : '').toLowerCase();

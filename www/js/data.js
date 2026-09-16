@@ -675,17 +675,19 @@ const AUTH = {
         }
         if (permission === 'scrap') {
             if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
-            if (user.role === 'hod') {
+            var uRoleLow = (user.role || '').trim().toLowerCase();
+            if (uRoleLow === 'hod' || uRoleLow.indexOf('hod') !== -1) {
                 var _scrapDept = (user.department || '').trim().toLowerCase();
-                if (_scrapDept === 'facility' || _scrapDept === 'it' || _scrapDept === 'maintenance') return true;
+                if (_scrapDept === 'facility' || _scrapDept === 'facilities' || _scrapDept === 'it' || _scrapDept === 'maintenance') return true;
             }
             return false;
         }
         if (permission === 'md-report') {
             if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
-            if (user.role === 'hod') {
+            var uRoleLow = (user.role || '').trim().toLowerCase();
+            if (uRoleLow === 'hod' || uRoleLow.indexOf('hod') !== -1) {
                 var _mdrDept = (user.department || '').trim().toLowerCase();
-                if (_mdrDept === 'facility' || _mdrDept === 'it' || _mdrDept === 'maintenance') return true;
+                if (_mdrDept === 'facility' || _mdrDept === 'facilities' || _mdrDept === 'it' || _mdrDept === 'maintenance') return true;
             }
             return false;
         }
@@ -703,7 +705,13 @@ const AUTH = {
         if (permission === 'dashboard') return user.isSuperAdmin || user.role === 'admin';
         if (user.isSuperAdmin || user.role === 'admin' || user.role === 'super_admin') return true;
 
-        // 1. Explicit user permissions assigned by Admin take precedence for specific employees
+        // Role-based primary dashboard auto-grants (must be checked BEFORE explicit granular user.permissions array)
+        var uRoleLow = (user.role || '').trim().toLowerCase();
+        if (permission === 'hod-dashboard' && (uRoleLow === 'hod' || uRoleLow.indexOf('hod') !== -1)) return true;
+        if (permission === 'employee-dashboard' && !(user.isSuperAdmin || user.role === 'admin')) return true;
+        if (permission === 'storekeeper-dashboard' && (uRoleLow === 'storekeeper' || uRoleLow === 'store_keeper')) return true;
+
+        // 1. Explicit user permissions assigned by Admin take precedence for specific feature rights
         if (user.permissions && Array.isArray(user.permissions) && user.permissions.length > 0) {
             if (user.permissions.includes('all')) return true;
             return user.permissions.includes(permission);
@@ -728,9 +736,9 @@ const AUTH = {
             return dNorm.indexOf(x) !== -1;
         });
 
-        if (permission === 'hod-dashboard' && user.role === 'hod') return true;
+        if (permission === 'hod-dashboard' && (uRoleLow === 'hod' || uRoleLow.indexOf('hod') !== -1)) return true;
         if (permission === 'employee-dashboard' && !(user.isSuperAdmin || user.role === 'admin')) return true;
-        if (permission === 'storekeeper-dashboard' && user.role === 'storekeeper') return true;
+        if (permission === 'storekeeper-dashboard' && (uRoleLow === 'storekeeper' || uRoleLow === 'store_keeper')) return true;
 
         // Facility / Maintenance / Housekeeping auto-grants
         if (isFacilityDept) {

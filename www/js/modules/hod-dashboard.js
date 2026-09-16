@@ -61,8 +61,9 @@ function _hodInDeptList(dept, feature) {
 ═══════════════════════════════════════════════ */
 function _getHodTeam(user) {
     var allUsers = DB.get('users') || [];
+    var uDept = (user.department || '').trim().toLowerCase();
     return allUsers.filter(function (m) {
-        return m.department === user.department &&
+        return (m.department || '').trim().toLowerCase() === uDept &&
                m.role !== 'admin' && m.role !== 'super_admin' &&
                m.username !== user.username;
     });
@@ -149,7 +150,7 @@ function renderHodDashboard(container) {
     var myReqs      = allReqs.filter(function (r) { return r.department === dept; });
 
     // Material requests from material_requests that need this HOD's approval
-    var isFacHod = typeof _matProcurementDept === 'function' && dept === _matProcurementDept();
+    var isFacHod = typeof _matProcurementDept === 'function' && (dept || '').trim().toLowerCase() === (_matProcurementDept() || '').trim().toLowerCase();
     var pendingMatApprovals = (DB.get('material_requests') || []).filter(function (r) {
         if (isFacHod) return r.status === 'hod_approved';
         return r.status === 'pending' && (r.department || '').trim().toLowerCase() === (dept || '').trim().toLowerCase();
@@ -1193,7 +1194,7 @@ function _hodRefreshCl() {
 function _hodRequests(el) {
     var d    = _hodData;
     var dept = d.dept;
-    var isFacHod = typeof _matProcurementDept === 'function' && dept === _matProcurementDept();
+    var isFacHod = typeof _matProcurementDept === 'function' && (dept || '').trim().toLowerCase() === (_matProcurementDept() || '').trim().toLowerCase();
 
     // Always re-read fresh from DB so requests submitted after page load are visible
     var deptLow = (dept || '').trim().toLowerCase();
@@ -1250,7 +1251,7 @@ function _hodRequests(el) {
             + '<div style="font-weight:700;font-size:14px;color:#e65100;margin-bottom:10px;">&#9888; ' + matApprovals.length + ' Material Request(s) Awaiting Your Approval</div>';
         matApprovals.forEach(function (r) {
             var items = (r.items || []).map(function (i) { return i.name + ' \xd7' + i.qty; }).join(', ');
-            var isFacHod = d.isFacHod || (typeof _matProcurementDept === 'function' && d.dept === _matProcurementDept());
+            var isFacHod = d.isFacHod || (typeof _matProcurementDept === 'function' && (d.dept || '').trim().toLowerCase() === (_matProcurementDept() || '').trim().toLowerCase());
             html += '<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px;">'
                 + '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">'
                 + '<div>'
@@ -1665,7 +1666,7 @@ function _hodRefreshAndShow() {
     if (!user) return;
     var dept = _hodData.dept;
     var deptLow = (dept || '').trim().toLowerCase();
-    var isFacHod = typeof _matProcurementDept === 'function' && dept === _matProcurementDept();
+    var isFacHod = typeof _matProcurementDept === 'function' && (dept || '').trim().toLowerCase() === (_matProcurementDept() || '').trim().toLowerCase();
     _hodData.pendingMatApprovals = (DB.get('material_requests') || []).filter(function (r) {
         if (isFacHod) return r.status === 'hod_approved';
         return r.status === 'pending' && (r.department || '').trim().toLowerCase() === deptLow;

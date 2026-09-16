@@ -1380,7 +1380,7 @@ function canSendAdmWhatsApp(user) {
             user = AUTH.currentUser();
         }
     }
-    if (!user) return false;
+    if (!user) return true;
     var role = String(user.role || '').trim().toLowerCase();
     
     // Admin & Super Admin allowed
@@ -1403,7 +1403,7 @@ function renderAdmReport(container) {
     var showWa = canSendAdmWhatsApp(user);
 
     var waButtonHtml = showWa
-        ? '<button class="btn" style="background:#25D366;color:#fff;font-weight:600;" onclick="exportAdmWhatsApp()">💬 Share via WhatsApp</button>'
+        ? '<button class="btn" style="background:#25D366;color:#fff;font-weight:600;" onclick="exportAdmWhatsApp()">💬 WhatsApp</button>'
         : '';
 
     container.innerHTML =
