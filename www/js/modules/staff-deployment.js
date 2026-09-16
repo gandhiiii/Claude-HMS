@@ -232,7 +232,7 @@ var StaffDeployment = (function () {
             return;
         }
         var sm = _summary(rows);
-        var dateLabel = (fromDate === toDate) ? (fromDate || 'Today') : ((fromDate || 'Start') + ' to ' + (toDate || 'End'));
+        var dateLabel = (fromDate && toDate && fromDate === toDate) ? (fromDate || 'Today') : ((fromDate || 'Start') + ' to ' + (toDate || 'End'));
 
         var text = '🧹 *STAFF DEPLOYMENT REPORT*\n';
         text += '📅 *Period:* ' + dateLabel + '\n';
@@ -242,7 +242,7 @@ var StaffDeployment = (function () {
 
         var floorKeys = Object.keys(sm.floors);
         if (floorKeys.length > 0) {
-            text += '🏢 *FLOOR-WISE SUMMARY*\n';
+            text += '🏢 *ALL FLOOR-WISE SUMMARY*\n';
             floorKeys.sort().forEach(function (f) {
                 var fl = sm.floors[f];
                 text += '• *' + f + '*: ' + fl.total + ' (🧹 ' + fl.housekeeping + ', 🤝 ' + fl.pca + ')\n';
@@ -250,20 +250,7 @@ var StaffDeployment = (function () {
             text += '\n';
         }
 
-        text += '📋 *DEPLOYMENT DETAILS (' + Math.min(rows.length, 25) + ' Shown)*\n';
-        rows.slice(0, 25).forEach(function (e, i) {
-            var icon = e.staffType === 'pca' ? '🤝' : '🧹';
-            var loc = (e.floor || '') + (e.place ? ' (' + e.place + ')' : '');
-            text += (i + 1) + '. ' + icon + ' *' + (e.staffName || 'Staff') + '* (' + _labelType(e) + ')\n';
-            text += '   📍 ' + loc + ' | Shift: ' + (e.shift || 'Day') + (e.time ? ' @ ' + e.time : '') + '\n';
-            if (e.duty) text += '   📝 Duty: ' + e.duty + '\n';
-        });
-
-        if (rows.length > 25) {
-            text += '\n...and ' + (rows.length - 25) + ' more deployment records.\n';
-        }
-
-        text += '\n_Generated via Stavya Intelligence HMS_';
+        text += '_Generated via Stavya Intelligence HMS_';
 
         window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
         if (typeof APP !== 'undefined' && APP.notify) APP.notify('Opening WhatsApp with Staff Deployment Report...', 'success');
