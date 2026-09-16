@@ -59,6 +59,11 @@ function _hodInDeptList(dept, feature) {
 /* ═══════════════════════════════════════════════
    HELPERS
 ═══════════════════════════════════════════════ */
+function _esc(v) {
+    if (v === null || v === undefined) return '';
+    return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function _getHodTeam(user) {
     var allUsers = DB.get('users') || [];
     var uDept = (user.department || '').trim().toLowerCase();
