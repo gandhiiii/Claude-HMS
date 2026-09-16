@@ -132,12 +132,14 @@ var StaffDeployment = (function () {
         var cards = periods.map(function (p) {
             var rows = _periodRows(p, _state.type);
             var sm = _summary(rows);
-            return '<div class="card" style="flex:1;min-width:150px;border-top:3px solid #00695c;padding:14px;">'
+            return '<div class="card" style="flex:1;min-width:160px;border-top:3px solid #00695c;padding:14px;">'
                 + '<div style="font-size:13px;font-weight:700;color:#00695c;">📅 ' + _periodLabel(p) + '</div>'
                 + '<div style="font-size:11px;color:var(--gray);margin:2px 0 10px;">' + rows.length + ' entries · '
                 + '🧹 ' + sm.housekeeping + ' · 🤝 ' + sm.pca + '</div>'
-                + '<button class="btn btn-sm btn-success" style="width:100%;font-size:12px;" '
-                + 'onclick="StaffDeployment.exportPeriod(\'' + p + '\')">📊 Excel</button></div>';
+                + '<div style="display:flex;gap:4px;">'
+                + '<button class="btn btn-sm" style="flex:1;font-size:11px;background:#25D366;color:#fff;border:none;font-weight:600;" onclick="StaffDeployment.exportPeriodWhatsApp(\'' + p + '\')">💬 WhatsApp</button>'
+                + '<button class="btn btn-sm btn-success" style="flex:1;font-size:11px;" onclick="StaffDeployment.exportPeriod(\'' + p + '\')">📊 Excel</button>'
+                + '</div></div>';
         }).join('');
         return '<div class="card" style="padding:16px;margin-bottom:16px;border-top:3px solid #0097a7;">'
             + '<div style="font-size:14px;font-weight:700;margin-bottom:12px;">📊 Today · Weekly · Monthly Report</div>'
@@ -221,6 +223,50 @@ var StaffDeployment = (function () {
         var range = (fromDate || 'all') + '_to_' + (toDate || 'all');
         XLSX.writeFile(wb, 'Staff_Deployment_' + range + '.xlsx');
         APP.notify('Excel report downloaded ✓', 'success');
+    }
+
+    function _exportWhatsApp(fromDate, toDate, type) {
+        var rows = _filter(fromDate, toDate, type);
+        if (rows.length === 0) {
+            if (typeof APP !== 'undefined' && APP.notify) APP.notify('No staff deployment data to share', 'info');
+            return;
+        }
+        var sm = _summary(rows);
+        var dateLabel = (fromDate === toDate) ? (fromDate || 'Today') : ((fromDate || 'Start') + ' to ' + (toDate || 'End'));
+
+        var text = '🧹 *STAFF DEPLOYMENT REPORT*\n';
+        text += '📅 *Period:* ' + dateLabel + '\n';
+        text += '📊 *Total Entries:* ' + rows.length + '\n';
+        text += '• 🧹 Housekeeping: ' + sm.housekeeping + '\n';
+        text += '• 🤝 PCA Staff: ' + sm.pca + '\n\n';
+
+        var floorKeys = Object.keys(sm.floors);
+        if (floorKeys.length > 0) {
+            text += '🏢 *FLOOR-WISE SUMMARY*\n';
+            floorKeys.sort().forEach(function (f) {
+                var fl = sm.floors[f];
+                text += '• *' + f + '*: ' + fl.total + ' (🧹 ' + fl.housekeeping + ', 🤝 ' + fl.pca + ')\n';
+            });
+            text += '\n';
+        }
+
+        text += '📋 *DEPLOYMENT DETAILS (' + Math.min(rows.length, 25) + ' Shown)*\n';
+        rows.slice(0, 25).forEach(function (e, i) {
+            var icon = e.staffType === 'pca' ? '🤝' : '🧹';
+            var loc = (e.floor || '') + (e.place ? ' (' + e.place + ')' : '');
+            text += (i + 1) + '. ' + icon + ' *' + (e.staffName || 'Staff') + '* (' + _labelType(e) + ')\n';
+            text += '   📍 ' + loc + ' | Shift: ' + (e.shift || 'Day') + (e.time ? ' @ ' + e.time : '') + '\n';
+            if (e.duty) text += '   📝 Duty: ' + e.duty + '\n';
+        });
+
+        if (rows.length > 25) {
+            text += '\n...and ' + (rows.length - 25) + ' more deployment records.\n';
+        }
+
+        text += '\n_Generated via Stavya Intelligence HMS_';
+
+        window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(text), '_blank');
+        if (typeof APP !== 'undefined' && APP.notify) APP.notify('Opening WhatsApp with Staff Deployment Report...', 'success');
     }
 
     /* ── Shared add-entry form ── */
@@ -335,6 +381,7 @@ var StaffDeployment = (function () {
             + '<h2 style="font-size:18px;font-weight:700;">🧹 Staff Deployment — Housekeeping &amp; PCA</h2>'
             + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
             + '<button class="btn btn-sm btn-primary" onclick="StaffDeployment.toggleAdd()">➕ Add Entry</button>'
+            + '<button class="btn btn-sm" style="background:#25D366;color:#fff;font-weight:600;border:none;" onclick="StaffDeployment.exportWhatsApp()">💬 Share WhatsApp</button>'
             + '<button class="btn btn-sm btn-success" onclick="StaffDeployment.exportCurrent()">📊 Download Excel</button>'
             + '</div></div>'
 
@@ -404,6 +451,7 @@ var StaffDeployment = (function () {
             + '<div style="font-weight:700;font-size:16px;">🧹 Staff Deployment</div>'
             + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
             + '<button class="btn btn-sm btn-primary" onclick="StaffDeployment.toggleAdd()">➕ Add Entry</button>'
+            + '<button class="btn btn-sm" style="background:#25D366;color:#fff;font-weight:600;border:none;" onclick="StaffDeployment.exportTabWhatsApp()">💬 Share WhatsApp</button>'
             + '<button class="btn btn-sm btn-success" onclick="StaffDeployment.exportTab()">📊 Export Excel</button>'
             + '</div></div>'
 
@@ -547,6 +595,16 @@ var StaffDeployment = (function () {
         exportPeriod: function (period) {
             var r = _periodRange(period);
             _export(r.from, r.to, _state.type);
+        },
+        exportWhatsApp: function () {
+            _exportWhatsApp(_state.from, _state.to, _state.type);
+        },
+        exportTabWhatsApp: function () {
+            _exportWhatsApp(_tabState.from, _tabState.to, _tabState.type || 'all');
+        },
+        exportPeriodWhatsApp: function (period) {
+            var r = _periodRange(period);
+            _exportWhatsApp(r.from, r.to, _state.type);
         }
     };
 })();
