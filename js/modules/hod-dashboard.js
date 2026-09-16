@@ -199,6 +199,10 @@ function renderHodDashboard(container) {
     });
     var pendingPurchases = deptPurchases.filter(function (p) { return p.status === 'pending'; }).length;
 
+    var canPurchases = _hodInDeptList(dept, 'purchases');
+    var canService = _hodInDeptList(dept, 'equipment-service');
+    var canBreakdown = _hodInDeptList(dept, 'equipment-breakdown');
+
     _hodData = {
         user: user, dept: dept, u: u,
         team: team, teamNames: teamNames,
@@ -222,7 +226,10 @@ function renderHodDashboard(container) {
         deptPurchases: deptPurchases,
         pendingPurchases: pendingPurchases,
         hodTodosList: hodTodosList,
-        hodPendingTodos: hodPendingTodos
+        hodPendingTodos: hodPendingTodos,
+        canPurchases: canPurchases,
+        canService: canService,
+        canBreakdown: canBreakdown
     };
 
     var pendingReq = myReqs.filter(function (r) { return r.status === 'pending'; }).length + pendingMatApprovals.length + pendingGateApprovals.length;
@@ -234,10 +241,6 @@ function renderHodDashboard(container) {
     var invTotalValue = deptInventory.reduce(function (sum, i) {
         return sum + (parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0);
     }, 0);
-
-    var canPurchases = _hodInDeptList(dept, 'purchases');
-    var canService = _hodInDeptList(dept, 'equipment-service');
-    var canBreakdown = _hodInDeptList(dept, 'equipment-breakdown');
     var equipServices = canService ? (DB.get('hodEquipmentServices') || []) : [];
     var dueServices = equipServices.filter(function(e){ return e.status !== 'done' && e.nextServiceDue && new Date(e.nextServiceDue) <= new Date(); });
     var upcomingServices = equipServices.filter(function(e){ return e.status !== 'done' && e.nextServiceDue && new Date(e.nextServiceDue) > new Date(); });
@@ -411,6 +414,7 @@ function _renderHodTab(tab) {
 ═══════════════════════════════════════════════ */
 function _hodOverview(el) {
     var d = _hodData;
+    var canPurchases = d && d.canPurchases !== undefined ? d.canPurchases : _hodInDeptList(d ? d.dept : '', 'purchases');
 
     // Reminder banners for HOD's own work (tasks assigned to HOD + own checklists)
     var hodOwnCl    = (d.myCl || []).filter(function (c) { return c.assignedTo === d.u || c.assignedTo === 'common'; });
