@@ -95,6 +95,19 @@ const INITIAL_USERS = [
     phone: '+91 98765 11003',
     active: true,
     avatar: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&w=150&q=80'
+  },
+  {
+    id: 'USR-FACILITY-HOD',
+    username: 'facility_hod',
+    password: 'Pass@123',
+    name: 'Facility Head (HOD)',
+    role: 'FACILITY_HOD',
+    designation: 'Facility & Maintenance HOD',
+    department: 'Facility',
+    email: 'facility.hod@stavya.org',
+    phone: '+91 98765 11009',
+    active: true,
+    avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=150&q=80'
   }
 ];
 

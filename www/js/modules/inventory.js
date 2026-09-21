@@ -372,7 +372,13 @@ function saveReceiveStock(id) {
     });
 
     APP.notify(`${T('invmod_msg_received_prefix')}${qty} ${item.unit || 'pcs'}${T('invmod_msg_received_of')}${item.name} (₹${(qty * price).toFixed(2)})`, 'success');
-    renderInvList();
+    if (typeof renderInvList === 'function' && document.getElementById('invTableBody')) {
+        renderInvList();
+    }
+    var hodContainer = document.getElementById('hodInvSubContent') || document.getElementById('hodTabContent');
+    if (hodContainer && typeof _hodInventoryReport === 'function') {
+        _hodInventoryReport(hodContainer);
+    }
     document.querySelector('.modal.active')?.remove();
 }
 
@@ -423,7 +429,13 @@ function saveIssueStock(id) {
         notes: notes, date: new Date().toISOString()
     });
     APP.notify(`${T('invmod_msg_issued_prefix')}${qty} ${item.unit || 'pcs'}${T('invmod_msg_issued_of')}${item.name}` + (dept ? `${T('invmod_msg_issued_to')}${dept}` : ''), 'success');
-    renderInvList();
+    if (typeof renderInvList === 'function' && document.getElementById('invTableBody')) {
+        renderInvList();
+    }
+    var hodContainer = document.getElementById('hodInvSubContent') || document.getElementById('hodTabContent');
+    if (hodContainer && typeof _hodInventoryReport === 'function') {
+        _hodInventoryReport(hodContainer);
+    }
     document.querySelector('.modal.active')?.remove();
 }
 
@@ -683,7 +695,13 @@ function saveInv() {
         DB.add('inventory', data);
         APP.notify(T('invmod_msg_item_added_barcode_prefix') + data.barcode, 'success');
     }
-    renderInvList();
+    if (typeof renderInvList === 'function' && document.getElementById('invTableBody')) {
+        renderInvList();
+    }
+    var hodContainer = document.getElementById('hodInvSubContent') || document.getElementById('hodTabContent');
+    if (hodContainer && typeof _hodInventoryReport === 'function') {
+        _hodInventoryReport(hodContainer);
+    }
 }
 
 function editInv(id) {
@@ -695,7 +713,13 @@ function deleteInv(id) {
     confirmAction(T('invmod_confirm_delete_item'), () => {
         DB.delete('inventory', id);
         APP.notify(T('invmod_msg_item_deleted'), 'success');
-        renderInvList();
+        if (typeof renderInvList === 'function' && document.getElementById('invTableBody')) {
+            renderInvList();
+        }
+        var hodContainer = document.getElementById('hodInvSubContent') || document.getElementById('hodTabContent');
+        if (hodContainer && typeof _hodInventoryReport === 'function') {
+            _hodInventoryReport(hodContainer);
+        }
     });
 }
 
