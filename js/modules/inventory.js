@@ -125,7 +125,7 @@ function renderInventory(container) {
     container.innerHTML = `
         <div class="tabs" style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
             <button class="tab-btn active" onclick="switchInvView('items',this)">${T('invmod_tab_items')}</button>
-            <button class="tab-btn" style="background:#ea580c;color:#fff;font-weight:700;" onclick="switchInvView('stockout',this)">${T('invmod_tab_stock_out')}</button>
+            <button class="tab-btn" onclick="switchInvView('stockout',this)">${T('invmod_tab_stock_out')}</button>
             <button class="tab-btn" onclick="switchInvView('dept',this)">${T('invmod_tab_dept')}</button>
             <button class="tab-btn" onclick="switchInvView('movements',this)">${T('invmod_tab_movements')}</button>
         </div>
@@ -143,9 +143,8 @@ function switchInvView(view, btn) {
     invView = view;
     document.querySelectorAll('#pageContent .tabs .tab-btn').forEach(b => {
         b.classList.remove('active');
-        if (!b.style.background.includes('ea580c')) {
-            b.style.background = '';
-        }
+        b.style.background = '';
+        b.style.color = '';
     });
     btn.classList.add('active');
     const content = document.getElementById('invContent');
