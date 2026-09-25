@@ -528,13 +528,7 @@ var WS_NOTIFY = (function () {
                     installingWorker.onstatechange = function () {
                         if (installingWorker.state === 'installed') {
                             if (navigator.serviceWorker.controller) {
-                                console.log('[WS_NOTIFY] New app update installed! Refreshing...');
-                                try {
-                                    if (typeof APP !== 'undefined' && APP.notify) {
-                                        APP.notify('🚀 New App Update Ready! Refreshing...', 'info');
-                                    }
-                                } catch (e) {}
-                                setTimeout(function () { window.location.reload(true); }, 800);
+                                console.log('[WS_NOTIFY] New app update installed in background.');
                             }
                         }
                     };
@@ -543,13 +537,9 @@ var WS_NOTIFY = (function () {
                 console.warn('[WS_NOTIFY] SW registration notice:', err);
             });
 
-            // Auto-reload when new controller takes over
-            var _refreshing = false;
+            // Log when controller changes without forcing page refresh
             navigator.serviceWorker.addEventListener('controllerchange', function () {
-                if (_refreshing) return;
-                _refreshing = true;
-                console.log('[WS_NOTIFY] Controller changed — reloading for latest version');
-                window.location.reload(true);
+                console.log('[WS_NOTIFY] Service worker controller updated.');
             });
         } catch (e) {}
     }

@@ -391,7 +391,7 @@ function hodTabSwitch(tab) {
 function hodSwitchDept(dept) {
     window._hodActiveDept = dept;
     try { localStorage.setItem('hodActiveDept', dept); } catch(e) {}
-    location.reload();
+    _renderHodTab(window._hodActiveTab || 'overview');
 }
 
 function _renderHodTab(tab) {
