@@ -1,4 +1,4 @@
-let gateSection = 'goods';
+let gateSection = 'scanner';
 
 function isUserHodOfDept(deptName) {
     const user = AUTH.currentUser();
@@ -19,9 +19,10 @@ function renderGateSecurity(container) {
     const user = AUTH.currentUser();
     container.innerHTML = `
         <div class="flex-between mb-4">
-            <h3 style="margin:0;">Gate Security</h3>
+            <h3 style="margin:0;">Gate Security System</h3>
         </div>
-        <div class="tabs" style="margin-bottom:16px;">
+        <div class="tabs" style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button class="tab-btn ${gateSection === 'scanner' ? 'active' : ''}" onclick="switchGateSection('scanner',this)">⚡ Quick Gate Scanner (TVS 2D)</button>
             <button class="tab-btn ${gateSection === 'goods' ? 'active' : ''}" onclick="switchGateSection('goods',this)">🚚 Goods</button>
             <button class="tab-btn ${gateSection === 'patients' ? 'active' : ''}" onclick="switchGateSection('patients',this)">🧑 Patients</button>
             <button class="tab-btn ${gateSection === 'doctors' ? 'active' : ''}" onclick="switchGateSection('doctors',this)">🩺 Doctors</button>
@@ -30,6 +31,7 @@ function renderGateSecurity(container) {
         </div>
         <div id="gateContent"></div>
     `;
+    initGateBarcodeScanner();
     renderGateSection();
 }
 
@@ -41,11 +43,539 @@ function switchGateSection(section, btn) {
 }
 
 function renderGateSection() {
-    if (gateSection === 'goods') renderGoodsSection();
+    if (gateSection === 'scanner') renderGateScannerSection();
+    else if (gateSection === 'goods') renderGoodsSection();
     else if (gateSection === 'patients') renderPatientsSection();
     else if (gateSection === 'doctors') renderDoctorsSection();
     else if (gateSection === 'approvals') renderApprovalsSection();
     else renderPassGenerator();
+}
+
+/* ═══════════════════════════════════════════
+   TVS 2D BARCODE / QR SCANNER SYSTEM FOR GATE SECURITY
+   ═══════════════════════════════════════════ */
+
+let gateScannerBuffer = '';
+let gateScannerLastKeyTime = 0;
+let gateScanLogs = [];
+
+function initGateBarcodeScanner() {
+    if (window._gateScannerInitialized) return;
+    window._gateScannerInitialized = true;
+
+    window.addEventListener('keydown', (e) => {
+        const activeEl = document.activeElement;
+        const activeTag = activeEl ? activeEl.tagName.toLowerCase() : '';
+        const isScanInput = activeEl && (activeEl.id === 'gateScanInput' || activeEl.id === 'scanCodeInput' || activeEl.id === 'drScanInput');
+
+        if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+            if (!isScanInput) return;
+        }
+
+        const now = Date.now();
+        if (now - gateScannerLastKeyTime > 150) {
+            gateScannerBuffer = '';
+        }
+        gateScannerLastKeyTime = now;
+
+        if (e.key === 'Enter') {
+            if (gateScannerBuffer.length >= 3) {
+                const code = gateScannerBuffer.trim();
+                gateScannerBuffer = '';
+                e.preventDefault();
+                executeGateScan(code);
+            }
+        } else if (e.key.length === 1) {
+            gateScannerBuffer += e.key;
+        }
+    });
+}
+
+function playGateAudioFeedback(success = true, isOut = false) {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        if (success) {
+            if (isOut) {
+                osc.frequency.setValueAtTime(1046, ctx.currentTime);
+                osc.frequency.setValueAtTime(784, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.25);
+            } else {
+                osc.frequency.setValueAtTime(880, ctx.currentTime);
+                osc.frequency.setValueAtTime(1174, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.25);
+            }
+        } else {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(300, ctx.currentTime);
+            osc.frequency.setValueAtTime(200, ctx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.4, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.35);
+        }
+    } catch (e) {}
+}
+
+function renderGateScannerSection() {
+    const el = document.getElementById('gateContent');
+    if (!el) return;
+    el.innerHTML = `
+        <div class="card p-4" style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%);color:#fff;border-radius:14px;box-shadow:0 10px 25px rgba(0,0,0,0.2);margin-bottom:20px;">
+            <div class="flex-between" style="align-items:center;margin-bottom:16px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div style="width:44px;height:44px;border-radius:12px;background:rgba(59,130,246,0.25);display:flex;align-items:center;justify-content:center;font-size:24px;border:1px solid rgba(59,130,246,0.4);">📷</div>
+                    <div>
+                        <h3 style="margin:0;color:#fff;font-size:18px;font-weight:700;">TVS 2D Scanner — Gate IN / OUT Verification</h3>
+                        <span style="font-size:12px;color:#94a3b8;">Instant barcode & QR pass scanning system for TVS/BS-i201g Lite & 2D hardware scanners</span>
+                    </div>
+                </div>
+                <div>
+                    <span class="badge" style="background:#22c55e;color:#fff;font-weight:700;padding:6px 14px;font-size:12px;border-radius:20px;display:inline-flex;align-items:center;gap:6px;">
+                        <span style="width:8px;height:8px;border-radius:50%;background:#fff;animation:pulse 1.5s infinite;"></span> TVS 2D Scanner Active
+                    </span>
+                </div>
+            </div>
+
+            <div style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);padding:16px;border-radius:12px;margin-bottom:16px;">
+                <div style="display:flex;gap:10px;align-items:center;">
+                    <div style="flex:1;position:relative;">
+                        <input type="text" id="gateScanInput" class="form-control" style="font-family:monospace;font-size:18px;letter-spacing:2px;background:#0f172a;color:#38bdf8;border:2px solid #3b82f6;border-radius:10px;padding:12px 16px;height:52px;" placeholder="📷 Scan QR Code or Barcode (PT-XXXX, DR-XXXX, GP-XXXX)..." autofocus>
+                    </div>
+                    <button class="btn btn-primary" style="height:52px;padding:0 24px;font-weight:700;font-size:15px;border-radius:10px;display:flex;align-items:center;gap:8px;" onclick="triggerManualGateScan()">
+                        ⚡ Scan Code
+                    </button>
+                </div>
+                <div style="font-size:12px;color:#94a3b8;margin-top:8px;display:flex;justify-content:space-between;align-items:center;">
+                    <span>💡 <strong>Hardware Scanner Ready:</strong> Point TVS 2D scanner directly at printed sticker or phone screen QR pass.</span>
+                    <span style="color:#38bdf8;font-weight:600;">Auto Gate IN/OUT Switch Enabled</span>
+                </div>
+            </div>
+
+            <div id="gateScanResultBox" style="display:none;"></div>
+        </div>
+
+        <div class="card">
+            <div class="flex-between mb-3" style="padding:12px 16px;border-bottom:1px solid var(--border-color);">
+                <div>
+                    <h4 style="margin:0;font-size:15px;font-weight:700;">📋 Recent Gate Scan Logs</h4>
+                    <span style="font-size:12px;color:var(--gray);">Real-time IN and OUT verification history</span>
+                </div>
+                <button class="btn btn-sm btn-outline" onclick="clearGateScanLogs()">🗑️ Clear Logs</button>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Scan Time</th>
+                            <th>Scanned Code</th>
+                            <th>Name / Details</th>
+                            <th>Pass Type</th>
+                            <th>Gate Action</th>
+                            <th>Processed By</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gateScanLogsBody"></tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    setTimeout(() => {
+        const input = document.getElementById('gateScanInput');
+        if (input) {
+            input.focus();
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    triggerManualGateScan();
+                }
+            };
+        }
+        renderGateScanLogsTable();
+    }, 50);
+}
+
+function triggerManualGateScan() {
+    const input = document.getElementById('gateScanInput');
+    const code = input ? input.value.trim() : '';
+    if (!code) {
+        APP.notify('Please scan or enter a pass code', 'error');
+        return;
+    }
+    executeGateScan(code);
+}
+
+function executeGateScan(scannedCode) {
+    if (!scannedCode) return;
+    const cleanCode = scannedCode.trim().toUpperCase();
+
+    // 1. Search Patient Visits (Visitors)
+    const patientVisits = DB.get('patientVisits') || [];
+    const ptVisit = patientVisits.find(v => (v.uniqueCode || '').toUpperCase() === cleanCode || (v.id || '').toUpperCase() === cleanCode);
+
+    if (ptVisit) {
+        if (ptVisit.status === 'active') {
+            const now = new Date().toISOString();
+            DB.update('patientVisits', ptVisit.id, { status: 'completed', exitTime: now });
+            playGateAudioFeedback(true, true);
+            const logEntry = {
+                id: 'SCAN-' + Date.now(),
+                code: cleanCode,
+                name: ptVisit.patientName + (ptVisit.age ? ' (' + ptVisit.age + 'y)' : ''),
+                type: 'Visitor Pass',
+                action: 'GATE OUT',
+                direction: 'out',
+                timestamp: now,
+                details: 'Purpose: ' + (ptVisit.purpose || '-'),
+                user: AUTH.currentUser()?.fullName || 'Gate Security'
+            };
+            gateScanLogs.unshift(logEntry);
+            displayGateScanResult({
+                status: 'success',
+                action: 'GATE OUT',
+                direction: 'out',
+                title: '📤 GATE EXIT ALLOWED (OUT)',
+                name: ptVisit.patientName,
+                code: cleanCode,
+                subText: 'Visitor Checked Out Successfully',
+                details: [
+                    { label: 'Patient Name', val: ptVisit.patientName + ' (' + ptVisit.age + 'y, ' + ptVisit.gender + ')' },
+                    { label: 'Phone', val: ptVisit.phone },
+                    { label: 'Purpose', val: ptVisit.purpose || '-' },
+                    { label: 'Department', val: ptVisit.department || '-' },
+                    { label: 'Check-IN Time', val: APP.formatDateTime(ptVisit.entryTime) },
+                    { label: 'Check-OUT Time', val: APP.formatDateTime(now) }
+                ]
+            });
+            renderPatientList();
+            if (document.getElementById('genPassBody')) renderGenPassList();
+            renderGateScanLogsTable();
+            return;
+        } else {
+            const now = new Date().toISOString();
+            DB.update('patientVisits', ptVisit.id, { status: 'active', entryTime: now, exitTime: '' });
+            playGateAudioFeedback(true, false);
+            const logEntry = {
+                id: 'SCAN-' + Date.now(),
+                code: cleanCode,
+                name: ptVisit.patientName,
+                type: 'Visitor Pass',
+                action: 'GATE IN',
+                direction: 'in',
+                timestamp: now,
+                details: 'Purpose: ' + (ptVisit.purpose || '-'),
+                user: AUTH.currentUser()?.fullName || 'Gate Security'
+            };
+            gateScanLogs.unshift(logEntry);
+            displayGateScanResult({
+                status: 'success',
+                action: 'GATE IN',
+                direction: 'in',
+                title: '✅ GATE ENTRY ALLOWED (IN)',
+                name: ptVisit.patientName,
+                code: cleanCode,
+                subText: 'Visitor Verified & Entered (Gate IN)',
+                details: [
+                    { label: 'Patient Name', val: ptVisit.patientName + ' (' + ptVisit.age + 'y)' },
+                    { label: 'Phone', val: ptVisit.phone },
+                    { label: 'Purpose', val: ptVisit.purpose || '-' },
+                    { label: 'Department', val: ptVisit.department || '-' },
+                    { label: 'Check-IN Time', val: APP.formatDateTime(now) }
+                ]
+            });
+            renderPatientList();
+            if (document.getElementById('genPassBody')) renderGenPassList();
+            renderGateScanLogsTable();
+            return;
+        }
+    }
+
+    // 2. Search Doctor Visits
+    const doctorVisits = DB.get('doctorVisits') || [];
+    const drVisit = doctorVisits.find(v => (v.uniqueCode || '').toUpperCase() === cleanCode || (v.id || '').toUpperCase() === cleanCode);
+
+    if (drVisit) {
+        if (drVisit.status === 'pending') {
+            playGateAudioFeedback(false);
+            displayGateScanResult({
+                status: 'warning',
+                title: '⏳ DOCTOR ENTRY PENDING APPROVAL',
+                name: 'Dr. ' + drVisit.doctorName,
+                code: cleanCode,
+                subText: 'Waiting for HOD approval of ' + (drVisit.department || 'department'),
+                details: [
+                    { label: 'Doctor', val: drVisit.doctorName + ' (' + drVisit.specialization + ')' },
+                    { label: 'Phone', val: drVisit.phone },
+                    { label: 'Hospital', val: drVisit.hospital || '-' },
+                    { label: 'Status', val: 'PENDING APPROVAL' }
+                ]
+            });
+            return;
+        } else if (drVisit.status === 'rejected') {
+            playGateAudioFeedback(false);
+            displayGateScanResult({
+                status: 'error',
+                title: '⛔ DOCTOR ENTRY REJECTED',
+                name: 'Dr. ' + drVisit.doctorName,
+                code: cleanCode,
+                subText: 'Reason: ' + (drVisit.rejectionReason || 'Rejected by HOD'),
+                details: [
+                    { label: 'Doctor', val: drVisit.doctorName },
+                    { label: 'Rejected By', val: drVisit.rejectedBy || 'HOD' },
+                    { label: 'Status', val: 'REJECTED' }
+                ]
+            });
+            return;
+        } else if (drVisit.status === 'active') {
+            const now = new Date().toISOString();
+            DB.update('doctorVisits', drVisit.id, { status: 'completed', exitTime: now });
+            playGateAudioFeedback(true, true);
+            const logEntry = {
+                id: 'SCAN-' + Date.now(),
+                code: cleanCode,
+                name: 'Dr. ' + drVisit.doctorName,
+                type: 'Doctor Pass',
+                action: 'GATE OUT',
+                direction: 'out',
+                timestamp: now,
+                details: 'Doctor Checked Out',
+                user: AUTH.currentUser()?.fullName || 'Gate Security'
+            };
+            gateScanLogs.unshift(logEntry);
+            displayGateScanResult({
+                status: 'success',
+                action: 'GATE OUT',
+                direction: 'out',
+                title: '📤 DOCTOR GATE EXIT (OUT)',
+                name: 'Dr. ' + drVisit.doctorName,
+                code: cleanCode,
+                subText: 'Doctor Checked Out Successfully',
+                details: [
+                    { label: 'Doctor Name', val: drVisit.doctorName + ' (' + drVisit.specialization + ')' },
+                    { label: 'Hospital', val: drVisit.hospital || '-' },
+                    { label: 'Phone', val: drVisit.phone },
+                    { label: 'Check-OUT Time', val: APP.formatDateTime(now) }
+                ]
+            });
+            renderDoctorList();
+            if (document.getElementById('genPassBody')) renderGenPassList();
+            renderGateScanLogsTable();
+            return;
+        } else {
+            const now = new Date().toISOString();
+            DB.update('doctorVisits', drVisit.id, { status: 'active', entryTime: now, exitTime: '' });
+            playGateAudioFeedback(true, false);
+            const logEntry = {
+                id: 'SCAN-' + Date.now(),
+                code: cleanCode,
+                name: 'Dr. ' + drVisit.doctorName,
+                type: 'Doctor Pass',
+                action: 'GATE IN',
+                direction: 'in',
+                timestamp: now,
+                details: 'Doctor Gate IN Approved',
+                user: AUTH.currentUser()?.fullName || 'Gate Security'
+            };
+            gateScanLogs.unshift(logEntry);
+            displayGateScanResult({
+                status: 'success',
+                action: 'GATE IN',
+                direction: 'in',
+                title: '✅ DOCTOR GATE ENTRY (IN)',
+                name: 'Dr. ' + drVisit.doctorName,
+                code: cleanCode,
+                subText: 'Doctor Entry Approved (Gate IN)',
+                details: [
+                    { label: 'Doctor Name', val: drVisit.doctorName + ' (' + drVisit.specialization + ')' },
+                    { label: 'Hospital', val: drVisit.hospital || '-' },
+                    { label: 'Check-IN Time', val: APP.formatDateTime(now) }
+                ]
+            });
+            renderDoctorList();
+            if (document.getElementById('genPassBody')) renderGenPassList();
+            renderGateScanLogsTable();
+            return;
+        }
+    }
+
+    // 3. Search Goods Gate Passes (`gatesecurity`)
+    const goodsEntries = DB.get('gatesecurity') || [];
+    const goodsEntry = goodsEntries.find(g => (g.gatePassNo || '').toUpperCase() === cleanCode || (g.id || '').toUpperCase() === cleanCode);
+
+    if (goodsEntry) {
+        if (goodsEntry.status === 'pending') {
+            playGateAudioFeedback(false);
+            displayGateScanResult({
+                status: 'warning',
+                title: '⏳ GOODS GATE PASS PENDING APPROVAL',
+                name: goodsEntry.itemName,
+                code: cleanCode,
+                subText: 'Waiting for HOD approval of ' + (goodsEntry.department || 'department'),
+                details: [
+                    { label: 'Item Name', val: goodsEntry.itemName },
+                    { label: 'Vehicle No', val: goodsEntry.vehicleNo || '-' },
+                    { label: 'Direction', val: goodsEntry.direction.toUpperCase() }
+                ]
+            });
+            return;
+        } else if (goodsEntry.status === 'rejected') {
+            playGateAudioFeedback(false);
+            displayGateScanResult({
+                status: 'error',
+                title: '⛔ GOODS GATE PASS REJECTED',
+                name: goodsEntry.itemName,
+                code: cleanCode,
+                subText: 'Reason: ' + (goodsEntry.rejectionReason || 'Rejected by HOD'),
+                details: [
+                    { label: 'Item Name', val: goodsEntry.itemName },
+                    { label: 'Vehicle No', val: goodsEntry.vehicleNo || '-' }
+                ]
+            });
+            return;
+        } else {
+            const now = new Date().toISOString();
+            const actionDirection = goodsEntry.direction === 'in' ? 'in' : 'out';
+            DB.update('gatesecurity', goodsEntry.id, { status: 'completed', checkInTime: now, checkOutTime: now });
+            playGateAudioFeedback(true, actionDirection === 'out');
+
+            const logEntry = {
+                id: 'SCAN-' + Date.now(),
+                code: cleanCode,
+                name: goodsEntry.itemName + ' (' + (goodsEntry.vehicleNo || 'No Vehicle') + ')',
+                type: 'Goods Gate Pass',
+                action: actionDirection === 'in' ? 'GOODS IN' : 'GOODS OUT',
+                direction: actionDirection,
+                timestamp: now,
+                details: 'Vendor: ' + (goodsEntry.vendor || '-') + ', Driver: ' + (goodsEntry.driverName || '-'),
+                user: AUTH.currentUser()?.fullName || 'Gate Security'
+            };
+            gateScanLogs.unshift(logEntry);
+
+            displayGateScanResult({
+                status: 'success',
+                action: actionDirection === 'in' ? 'GOODS IN' : 'GOODS OUT',
+                direction: actionDirection,
+                title: actionDirection === 'in' ? '✅ GOODS INWARD VERIFIED (IN)' : '📤 GOODS OUTWARD VERIFIED (OUT)',
+                name: goodsEntry.itemName,
+                code: cleanCode,
+                subText: 'Vehicle ' + (goodsEntry.vehicleNo || '') + ' — Pass Verified',
+                details: [
+                    { label: 'Item Name', val: goodsEntry.itemName },
+                    { label: 'Vehicle No', val: goodsEntry.vehicleNo || '-' },
+                    { label: 'Driver', val: (goodsEntry.driverName || '-') + ' ' + (goodsEntry.driverPhone || '') },
+                    { label: 'Vendor', val: goodsEntry.vendor || '-' },
+                    { label: 'Department', val: goodsEntry.department || '-' },
+                    { label: 'Approved By', val: goodsEntry.approvedBy || '-' },
+                    { label: 'Scan Time', val: APP.formatDateTime(now) }
+                ]
+            });
+            renderGateList();
+            renderGateScanLogsTable();
+            return;
+        }
+    }
+
+    // 4. Code not found
+    playGateAudioFeedback(false);
+    displayGateScanResult({
+        status: 'error',
+        title: '⛔ UNKNOWN OR INVALID GATE PASS CODE',
+        name: cleanCode,
+        code: cleanCode,
+        subText: 'No matching Visitor, Doctor, or Goods Gate Pass found in system.',
+        details: [
+            { label: 'Scanned Code', val: cleanCode },
+            { label: 'Scan Time', val: APP.formatDateTime(new Date().toISOString()) },
+            { label: 'Action Required', val: 'Please verify code or issue a new pass.' }
+        ]
+    });
+}
+
+function displayGateScanResult(res) {
+    const box = document.getElementById('gateScanResultBox');
+    if (!box) return;
+    box.style.display = 'block';
+
+    let bg = 'rgba(34, 197, 94, 0.15)';
+    let border = '#22c55e';
+    let textColor = '#4ade80';
+
+    if (res.status === 'warning') {
+        bg = 'rgba(234, 179, 8, 0.15)';
+        border = '#eab308';
+        textColor = '#fde047';
+    } else if (res.status === 'error') {
+        bg = 'rgba(239, 68, 68, 0.15)';
+        border = '#ef4444';
+        textColor = '#fca5a5';
+    }
+
+    const detailsHtml = (res.details || []).map(d => `
+        <div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.08);padding:6px 0;font-size:13px;">
+            <span style="color:#94a3b8;">${d.label}:</span>
+            <strong style="color:#f8fafc;">${d.val}</strong>
+        </div>
+    `).join('');
+
+    box.innerHTML = `
+        <div style="background:${bg};border:2px solid ${border};border-radius:12px;padding:16px;animation:fadeIn 0.2s ease-in-out;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+                <div>
+                    <h3 style="margin:0;color:${textColor};font-size:18px;font-weight:700;">${res.title}</h3>
+                    <div style="font-size:13px;color:#cbd5e1;margin-top:2px;">${res.subText}</div>
+                </div>
+                ${res.direction ? `<span style="padding:6px 14px;border-radius:20px;font-weight:800;font-size:13px;background:${res.direction === 'in' ? '#22c55e' : '#f59e0b'};color:#fff;">${res.action}</span>` : ''}
+            </div>
+            <div style="background:rgba(0,0,0,0.35);border-radius:8px;padding:12px;margin-top:10px;">
+                ${detailsHtml}
+            </div>
+        </div>
+    `;
+
+    const input = document.getElementById('gateScanInput');
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+}
+
+function renderGateScanLogsTable() {
+    const tbody = document.getElementById('gateScanLogsBody');
+    if (!tbody) return;
+
+    if (!gateScanLogs.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No scans recorded today yet. Point TVS 2D scanner to scan.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = gateScanLogs.map(l => `
+        <tr>
+            <td style="font-size:12px;white-space:nowrap;">${APP.formatDateTime(l.timestamp)}</td>
+            <td><strong style="font-family:monospace;font-size:13px;">${l.code}</strong></td>
+            <td><strong>${l.name}</strong><br><span style="font-size:11px;color:var(--gray);">${l.details || ''}</span></td>
+            <td><span class="badge badge-info">${l.type}</span></td>
+            <td><span class="badge ${l.direction === 'in' ? 'badge-success' : 'badge-warning'}">${l.action}</span></td>
+            <td style="font-size:12px;">${l.user}</td>
+        </tr>
+    `).join('');
+}
+
+function clearGateScanLogs() {
+    gateScanLogs = [];
+    renderGateScanLogsTable();
+    const box = document.getElementById('gateScanResultBox');
+    if (box) box.style.display = 'none';
+    APP.notify('Gate scan logs cleared', 'info');
 }
 
 /* ==================== GOODS (existing) ==================== */
@@ -226,21 +756,26 @@ function printGoodsPass(id) {
     const e = DB.getById('gatesecurity', id);
     if (!e) return;
     if (e.status !== 'approved') { APP.notify('Entry is not approved yet', 'error'); return; }
+    const code = e.gatePassNo || e.id;
     const win = window.open('', '_blank', 'width=500,height=700');
     win.document.write('<html><head><title>Gate Pass - ' + e.itemName + '</title>' +
+        '<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>' +
         '<style>body{font-family:Arial;margin:0;padding:20px;text-align:center;}' +
         '.pass{border:2px dashed #333;border-radius:12px;padding:20px;max-width:380px;margin:0 auto;}' +
         '.header{font-size:11px;color:#666;margin-bottom:4px;}' +
         '.title{font-size:20px;font-weight:700;margin-bottom:12px;}' +
+        '.code{font-family:monospace;font-size:20px;font-weight:700;letter-spacing:2px;margin:8px 0;}' +
         '.info{border-top:1px solid #ddd;padding-top:8px;font-size:13px;text-align:left;}' +
         '.info div{margin-bottom:3px;}' +
-        '.stamp{color:green;font-size:28px;font-weight:700;border:3px solid green;border-radius:8px;padding:8px 16px;display:inline-block;margin:8px 0;transform:rotate(-5deg);}' +
+        '.stamp{color:green;font-size:24px;font-weight:700;border:3px solid green;border-radius:8px;padding:6px 14px;display:inline-block;margin:6px 0;transform:rotate(-5deg);}' +
         '@media print{body{padding:10px;}.pass{border-color:#999;}}' +
         '<\/style></head><body>' +
         '<div class="pass">' +
         '<div class="header">HOSPITAL MANAGEMENT SYSTEM</div>' +
-        '<div class="title">GATE PASS</div>' +
+        '<div class="title">GOODS GATE PASS</div>' +
         '<div class="stamp">APPROVED</div>' +
+        '<div id="qrPrintGoods" style="display:flex;justify-content:center;margin:10px 0;"></div>' +
+        '<div class="code">' + code + '</div>' +
         '<div style="font-size:14px;font-weight:700;margin:8px 0;">' + e.itemName + '</div>' +
         '<div class="info">' +
         '<div><strong>Direction:</strong> ' + e.direction.toUpperCase() + '</div>' +
@@ -254,7 +789,15 @@ function printGoodsPass(id) {
         '<div><strong>Approved By:</strong> ' + (e.approvedBy || '-') + '</div>' +
         '<div style="font-size:11px;color:#666;margin-top:4px;">Date: ' + APP.formatDateTime(e.createdAt) + '</div>' +
         '</div></div>' +
-        '<script>setTimeout(function(){window.print();window.close();},200);<\/script></body></html>');
+        '<script>' +
+        'setTimeout(function(){' +
+        'var c=document.getElementById("qrPrintGoods");' +
+        'if(c && typeof QRCode!=="undefined"){' +
+        'new QRCode(c,{text:"' + code + '",width:130,height:130,colorDark:"#000",colorLight:"#fff",correctLevel:QRCode.CorrectLevel.H});' +
+        'setTimeout(function(){window.print();window.close();},500);' +
+        '} else { setTimeout(function(){window.print();window.close();},300); }' +
+        '},200);' +
+        '<\/script></body></html>');
     win.document.close();
 }
 
