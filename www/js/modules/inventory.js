@@ -1,5 +1,100 @@
 let invView = 'items';
 
+const INV_ITEM_NAME_MAP = {
+    'surgical gloves': { hi: 'सर्जिकल ग्लव्स', gu: 'સર્જિકલ ગ્લોવ્સ' },
+    'examination gloves': { hi: 'एग्जामिनेशन ग्लव्स', gu: 'એક્ઝામિનેશન ગ્લોવ્સ' },
+    'sterile gloves': { hi: 'स्टेरिल ग्लव्स', gu: 'સ્ટેરાઈલ ગ્લોવ્સ' },
+    'paracetamol': { hi: 'पैरासिटामोल', gu: 'પેરાસિટામોલ' },
+    'paracetamol 500mg': { hi: 'पैरासिटामोल 500mg', gu: 'પેરાસિટામોલ 500mg' },
+    'paracetamol 650mg': { hi: 'पैरासिटामोल 650mg', gu: 'પેરાસિટામોલ 650mg' },
+    'syringe 5ml': { hi: 'सिरिंज 5ml', gu: 'સિરિંજ 5ml' },
+    'syringe 10ml': { hi: 'सिरिंज 10ml', gu: 'સિરિંજ 10ml' },
+    'syringe 2ml': { hi: 'सिरिंज 2ml', gu: 'સિરિંજ 2ml' },
+    'syringe': { hi: 'सिरिंज', gu: 'સિરિંજ' },
+    'n95 mask': { hi: 'N95 मास्क', gu: 'N95 માસ્ક' },
+    'surgical mask': { hi: 'सर्जिकल मास्क', gu: 'સર્જિકલ માસ્ક' },
+    'mask': { hi: 'मास्क', gu: 'માસ્ક' },
+    'cotton roll': { hi: 'कॉटन रोल (रूई)', gu: 'કોટન રોલ (રૂ)' },
+    'bandage': { hi: 'पट्टी (बैंडेज)', gu: 'પટ્ટી (બેન્ડેજ)' },
+    'bandage 4 inch': { hi: 'पट्टी 4 इंच', gu: 'પટ્ટી 4 ઈંચ' },
+    'oxygen cylinder': { hi: 'ऑक्सीजन सिलेंडर', gu: 'ઓક્સિજન સિલિન્ડર' },
+    'stethoscope': { hi: 'स्टेथोस्कोप (आला)', gu: 'સ્ટેથોસ્કોપ' },
+    'wheelchair': { hi: 'व्हीलचेयर', gu: 'વ્હીલચેર' },
+    'icu bed sheet': { hi: 'ICU बेड शीट', gu: 'ICU બેડ શીટ' },
+    'bed sheet': { hi: 'बेड शीट (चादर)', gu: 'બેડ શીટ (ચાદર)' },
+    'hand sanitizer': { hi: 'हैंड सैनिटाइज़र', gu: 'હેન્ડ સેનિટાઈઝર' },
+    'hand sanitizer 500ml': { hi: 'हैंड सैनिटाइज़र 500ml', gu: 'હેન્ડ સેનિટાઈઝર 500ml' },
+    'iv set': { hi: 'IV सेट (ड्रिप)', gu: 'IV સેટ (ડ્રિપ)' },
+    'thermometer': { hi: 'थर्मामीटर (तापमापी)', gu: 'થર્મોમીટર' },
+    'digital thermometer': { hi: 'डिजिटल थर्मामीटर', gu: 'ડિજિટલ થર્મોમીટર' },
+    'ecg paper roll': { hi: 'ECG पेपर रोल', gu: 'ECG પેપર રોલ' },
+    'face shield': { hi: 'फेस शील्ड', gu: 'ફેસ શીલ્ડ' },
+    'surgical blade': { hi: 'सर्जिकल ब्लेड', gu: 'સર્જિકલ બ્લેડ' },
+    'catheter': { hi: 'कैथेटर', gu: 'કેથેટર' },
+    'gauze swab': { hi: 'गौज स्वैब (पट्टी)', gu: 'ગોઝ સ્વેબ' },
+    'adhesive tape': { hi: 'मेडिकल टेप', gu: 'મેડિકલ ટેપ' },
+    'bp monitor': { hi: 'बीपी मॉनिटर', gu: 'BP મોનિટર' },
+    'pulse oximeter': { hi: 'पल्स ऑक्सीमीटर', gu: 'પલ્સ ઓક્સિમીટર' },
+    'disinfectant fluid': { hi: 'कीटाणुनाशक तरल', gu: 'જીવાણુનાશક પ્રવાહી' },
+    'office paper a4': { hi: 'ऑफिस पेपर A4', gu: 'ઓફિસ પેપર A4' },
+    'surgical scissors': { hi: 'सर्जिकल कैंची', gu: 'સર્જિકલ કાતર' },
+    'saline water': { hi: 'सलाइन वाटर 500ml', gu: 'સેલાઈન વોટર 500ml' },
+    'nebulizer kit': { hi: 'नेबुलाइजर किट', gu: 'નેબ્યુલાઈઝર કિટ' },
+    'suction tube': { hi: 'सक्शन ट्यूब', gu: 'સક્શન ટ્યુબ' }
+};
+
+function getInvItemName(itemOrName, langOverride) {
+    if (!itemOrName) return '';
+    const lang = langOverride || (typeof I18N !== 'undefined' && typeof I18N.getLang === 'function' ? I18N.getLang() : 'en');
+    
+    let rawName = typeof itemOrName === 'object' ? (itemOrName.name || '') : String(itemOrName);
+    if (!rawName) return '';
+
+    if (lang === 'en') return rawName;
+
+    if (typeof itemOrName === 'object') {
+        if (lang === 'hi' && itemOrName.name_hi) return itemOrName.name_hi;
+        if (lang === 'gu' && itemOrName.name_gu) return itemOrName.name_gu;
+    }
+
+    const key = rawName.trim().toLowerCase();
+    if (INV_ITEM_NAME_MAP[key] && INV_ITEM_NAME_MAP[key][lang]) {
+        return INV_ITEM_NAME_MAP[key][lang];
+    }
+
+    let translated = rawName;
+    const words = [
+        { en: 'surgical', hi: 'सर्जिकल', gu: 'સર્જિકલ' },
+        { en: 'gloves', hi: 'ग्लव्स', gu: 'ગ્લોવ્સ' },
+        { en: 'syringe', hi: 'सिरिंज', gu: 'સિરિંજ' },
+        { en: 'mask', hi: 'मास्क', gu: 'માસ્ક' },
+        { en: 'bandage', hi: 'बैंडेज', gu: 'બેન્ડેજ' },
+        { en: 'cotton', hi: 'रूई (कॉटन)', gu: 'રૂ (કોટન)' },
+        { en: 'needle', hi: 'सुई (नीडल)', gu: 'સોય (નીડલ)' },
+        { en: 'paper', hi: 'पेपर', gu: 'પેપર' },
+        { en: 'roll', hi: 'रोल', gu: 'રોલ' },
+        { en: 'medicine', hi: 'दवा', gu: 'દવા' },
+        { en: 'tablet', hi: 'टैबलेट', gu: 'ટેબ્લેટ' },
+        { en: 'capsule', hi: 'कैप्सूल', gu: 'કેપ્સ્યુલ' },
+        { en: 'injection', hi: 'इंजेक्शन', gu: 'ઇન્જેક્શન' },
+        { en: 'sheet', hi: 'शीट', gu: 'શીટ' },
+        { en: 'sanitizer', hi: 'सैनिटाइज़र', gu: 'સેનિટાઈઝર' }
+    ];
+
+    words.forEach(w => {
+        const regex = new RegExp('\\b' + w.en + '\\b', 'gi');
+        if (regex.test(translated) && w[lang]) {
+            translated = translated.replace(regex, w[lang]);
+        }
+    });
+
+    return translated;
+}
+
+if (typeof window !== 'undefined') {
+    window.getInvItemName = getInvItemName;
+}
+
 function invStatusLabel(status) {
     if (status === 'in-stock') return T('invmod_status_in_stock');
     if (status === 'low-stock') return T('invmod_status_low_stock');
@@ -221,7 +316,7 @@ function renderInvList() {
                     ${inCode ? `<div style="font-size:8px;color:#64748b;text-align:center;font-family:monospace;">IN: ${inCode}</div>` : ''}
                 </div>
             </td>
-            <td><strong>${i.name}</strong></td>
+            <td><strong>${getInvItemName(i)}</strong></td>
             <td>${i.category}</td>
             <td><span class="badge badge-info">${i.department || T('invmod_opt_all')}</span></td>
             <td>${qty} ${i.unit || 'pcs'}</td>
@@ -320,7 +415,7 @@ function renderInvDeptView() {
                         const value = qty * price;
                         const status = qty === 0 ? 'out-of-stock' : (qty < 10 ? 'low-stock' : 'in-stock');
                         return `<tr>
-                            <td><strong>${i.name}</strong></td>
+                            <td><strong>${getInvItemName(i)}</strong></td>
                             <td>${i.category}</td>
                             <td>${qty} ${i.unit || 'pcs'}</td>
                             <td>${price ? '₹' + price.toFixed(2) : '-'}</td>
@@ -340,7 +435,7 @@ function receiveInvStock(id) {
     if (!item) return;
     const modal = showModal(`
         <div class="modal-header">
-            <h3>${T('invmod_receive_stock_prefix')}${item.name}</h3>
+            <h3>${T('invmod_receive_stock_prefix')}${getInvItemName(item)}</h3>
             <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
         </div>
         <div style="display:flex;gap:16px;margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px;">
@@ -413,7 +508,7 @@ function issueInvStock(id) {
     const depts = DB.get('departments') || [];
     const deptOpts = depts.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
     showModal(`
-        <div class="modal-header"><h3>${T('invmod_issue_stock_prefix')}${item.name}</h3></div>
+        <div class="modal-header"><h3>${T('invmod_issue_stock_prefix')}${getInvItemName(item)}</h3></div>
         <div class="modal-body">
             <p style="font-size:13px;color:var(--gray);margin-bottom:12px;">${T('invmod_label_current_stock_issue')}<strong>${item.quantity || 0} ${item.unit || 'pcs'}</strong>${T('invmod_mid_unit_price')}<strong>₹${parseFloat(item.price || 0).toFixed(2)}</strong></p>
             <div class="form-group">
@@ -526,7 +621,7 @@ function renderInvMovementsView() {
         html += `<tr>
             <td style="white-space:nowrap;">${APP.formatDate(m.date)}</td>
             <td><span class="badge ${isIn ? 'badge-success' : 'badge-warning'}" style="${isIn ? '' : 'color:#fff;background:#e65100;'}">${isIn ? T('invmod_badge_in') : T('invmod_badge_out')}</span></td>
-            <td style="font-weight:600;">${m.itemName || '-'}</td>
+            <td style="font-weight:600;">${getInvItemName(m.itemName) || '-'}</td>
             <td>${m.qty || 0} ${m.unit || ''}</td>
             <td>₹${parseFloat(m.unitPrice || 0).toFixed(2)}</td>
             <td style="font-weight:600;color:${isIn ? '#2e7d32' : '#e65100'};">${isIn ? '+' : '-'}₹${parseFloat(m.totalValue || 0).toFixed(2)}</td>
@@ -736,7 +831,7 @@ function executeQuickStockOut(scannedCode) {
     if (currentQty < issueQty) {
         if (banner) {
             banner.style.display = 'block';
-            banner.innerHTML = `<div class="alert alert-warning" style="margin:0;padding:10px 14px;font-weight:600;">⚠️ Cannot issue stock for "${item.name}": Only ${currentQty} ${item.unit || 'pcs'} available in inventory!</div>`;
+            banner.innerHTML = `<div class="alert alert-warning" style="margin:0;padding:10px 14px;font-weight:600;">⚠️ Cannot issue stock for "${getInvItemName(item)}": Only ${currentQty} ${item.unit || 'pcs'} available in inventory!</div>`;
         }
         playAudioFeedback(false);
         if (input) input.value = '';
@@ -770,6 +865,8 @@ function executeQuickStockOut(scannedCode) {
         time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         id: item.id,
         name: item.name,
+        name_hi: item.name_hi,
+        name_gu: item.name_gu,
         barcode: item.outBarcode || item.barcode || item.id.slice(-10),
         qty: issueQty,
         unit: item.unit || 'pcs',
@@ -784,7 +881,7 @@ function executeQuickStockOut(scannedCode) {
     if (banner) {
         banner.style.display = 'block';
         banner.innerHTML = `<div class="alert alert-success" style="margin:0;padding:10px 14px;font-size:14px;font-weight:700;background:#dcfce7;color:#15803d;border:1px solid #86efac;">
-            🎉 ${T('invmod_msg_out_success')} <strong>${issueQty} ${item.unit || 'pcs'}</strong> of <strong>${item.name}</strong> issued ${dept ? 'to ' + dept : ''}! (${newQty} ${item.unit || 'pcs'} ${T('invmod_msg_out_rem_stock')})
+            🎉 ${T('invmod_msg_out_success')} <strong>${issueQty} ${item.unit || 'pcs'}</strong> of <strong>${getInvItemName(item)}</strong> issued ${dept ? 'to ' + dept : ''}! (${newQty} ${item.unit || 'pcs'} ${T('invmod_msg_out_rem_stock')})
         </div>`;
     }
 
@@ -809,7 +906,7 @@ function renderInvStockOutView() {
     tbody.innerHTML = stockOutSessionLogs.map((log, idx) => `
         <tr style="${idx === 0 ? 'background:#f0fdf4;' : ''}">
             <td style="font-size:12px;color:#64748b;">${log.time}</td>
-            <td><strong>${log.name}</strong></td>
+            <td><strong>${getInvItemName(log)}</strong></td>
             <td><span style="font-family:monospace;font-size:11px;background:#e2e8f0;padding:2px 6px;border-radius:4px;font-weight:bold;">${log.barcode}</span></td>
             <td><span class="badge badge-warning" style="font-size:12px;font-weight:bold;">-${log.qty} ${log.unit}</span></td>
             <td><span class="badge badge-info">${log.dept}</span></td>
@@ -929,8 +1026,16 @@ function showInvForm(item) {
 
             <div class="grid-2">
                 <div class="form-group">
-                    <label>${T('invmod_label_item_name')}</label>
-                    <input type="text" name="name" class="form-control" value="${item?.name || ''}" required>
+                    <label>${T('invmod_label_item_name')} (English) *</label>
+                    <input type="text" name="name" class="form-control" value="${item?.name || ''}" placeholder="e.g. Surgical Gloves" required>
+                </div>
+                <div class="form-group">
+                    <label>Item Name (हिन्दी - Hindi)</label>
+                    <input type="text" name="name_hi" class="form-control" value="${item?.name_hi || ''}" placeholder="उदा. सर्जिकल ग्लव्स (ऑटो/वैकल्पिक)">
+                </div>
+                <div class="form-group">
+                    <label>Item Name (ગુજરાતી - Gujarati)</label>
+                    <input type="text" name="name_gu" class="form-control" value="${item?.name_gu || ''}" placeholder="ઉદા. સર્જિકલ ગ્લોવ્સ (ઓટો/વૈકલ્પિક)">
                 </div>
                 <div class="form-group">
                     <label>${T('invmod_label_category')}</label>
@@ -1122,7 +1227,7 @@ function printBarcodeSticker(id, copies = 1) {
     win.document.write(`
         <!DOCTYPE html>
         <html><head>
-        <title>Sticker Print - ${item.name}</title>
+        <title>Sticker Print - ${getInvItemName(item)}</title>
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
         <style>
             @page { size: 50mm 25mm; margin: 0; }
@@ -1157,7 +1262,7 @@ function printBarcodeSticker(id, copies = 1) {
             ${Array.from({length: copies}).map(() => `
                 <div class="sticker-card">
                     <div class="header">STAVYA HMS · INVENTORY STICKER</div>
-                    <div class="item-name">${item.name}</div>
+                    <div class="item-name">${getInvItemName(item)}</div>
                     <svg class="bcStickerSvg"></svg>
                     <div class="code-str">${outCode}</div>
                     <div class="sub-info">

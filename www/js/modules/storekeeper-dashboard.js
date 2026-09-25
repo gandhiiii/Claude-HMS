@@ -209,11 +209,11 @@ function skStoreFulfill(id) {
     // Build per-item rows with dropdown to pick the matching inventory item
     var allOpts = '<option value="">-- Skip (no stock deduction) --</option>'
         + inventory.map(function(inv) {
-            return '<option value="' + inv.id + '">' + inv.name + ' (Stock: ' + (inv.quantity || 0) + ' ' + (inv.unit || 'pcs') + ')</option>';
+            var itemName = typeof getInvItemName === 'function' ? getInvItemName(inv) : inv.name;
+            return '<option value="' + inv.id + '">' + itemName + ' (Stock: ' + (inv.quantity || 0) + ' ' + (inv.unit || 'pcs') + ')</option>';
         }).join('');
 
     var itemRows = (r.items || []).map(function(item, i) {
-        // Try to pre-select matching inventory item
         var nameLow = (item.name || '').trim().toLowerCase();
         var matched = inventory.find(function(inv) {
             return (inv.name || '').trim().toLowerCase() === nameLow;
@@ -222,16 +222,18 @@ function skStoreFulfill(id) {
         var opts = '<option value="">-- Skip (no stock deduction) --</option>'
             + inventory.map(function(inv) {
                 var sel = (matched && inv.id === matched.id) ? ' selected' : '';
-                return '<option value="' + inv.id + '"' + sel + '>' + inv.name + ' (Stock: ' + (inv.quantity || 0) + ' ' + (inv.unit || 'pcs') + ')</option>';
+                var itemName = typeof getInvItemName === 'function' ? getInvItemName(inv) : inv.name;
+                return '<option value="' + inv.id + '"' + sel + '>' + itemName + ' (Stock: ' + (inv.quantity || 0) + ' ' + (inv.unit || 'pcs') + ')</option>';
             }).join('');
 
         var matchBadge = matched
             ? '<span style="background:#e8f5e9;color:#2e7d32;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:6px;">✓ matched</span>'
             : '<span style="background:#fff3e0;color:#e65100;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:6px;">⚠ no auto-match — select below</span>';
 
+        var reqItemName = typeof getInvItemName === 'function' ? getInvItemName(item.name) : item.name;
         return '<div style="background:var(--light-gray);border-radius:8px;padding:12px;margin-bottom:8px;">'
             + '<div style="font-size:13px;font-weight:700;margin-bottom:8px;">'
-            + item.name + ' ×' + item.qty + (item.unit ? ' ' + item.unit : '') + matchBadge + '</div>'
+            + reqItemName + ' ×' + item.qty + (item.unit ? ' ' + item.unit : '') + matchBadge + '</div>'
             + '<div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;">'
             + '<select class="form-control sk-fulfill-inv" data-idx="' + i + '" data-req-name="' + (item.name || '').replace(/"/g, '') + '" data-req-qty="' + item.qty + '" data-req-unit="' + (item.unit || 'pcs') + '">'
             + opts + '</select>'
@@ -425,8 +427,9 @@ function _skInventory(el) {
                 daysText  = p.days + ' day' + (p.days !== 1 ? 's' : '') + ' remaining (≈' + p.rate.toFixed(1) + '/day)';
                 daysColor = p.days <= 3 ? 'var(--danger)' : p.days <= 7 ? '#e65100' : '#f59e0b';
             }
+            var displayItemName = typeof getInvItemName === 'function' ? getInvItemName(i) : i.name;
             html += '<div style="background:var(--card);border:1px solid ' + (qty===0 ? 'var(--danger)' : '#f59e0b') + ';border-left:4px solid ' + daysColor + ';border-radius:8px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
-                + '<div><div style="font-size:13px;font-weight:700;">' + i.name + '</div>'
+                + '<div><div style="font-size:13px;font-weight:700;">' + displayItemName + '</div>'
                 + '<div style="font-size:11px;color:var(--gray);">' + (i.department || '-') + ' · ' + qty + ' ' + (i.unit || 'pcs') + ' in stock</div>'
                 + '<div style="font-size:12px;font-weight:600;color:' + daysColor + ';margin-top:2px;">' + daysText + '</div>'
                 + '</div>'
@@ -444,7 +447,8 @@ function _skInventory(el) {
 function skCreateRequest() {
     var inventory = DB.get('inventory') || [];
     var itemOpts = inventory.map(function(inv) {
-        return '<option value="' + (inv.name || '').replace(/"/g, '&quot;') + '">' + inv.name + ' (Stock: ' + (inv.quantity || 0) + ' ' + (inv.unit || 'pcs') + ')</option>';
+        var itemName = typeof getInvItemName === 'function' ? getInvItemName(inv) : inv.name;
+        return '<option value="' + (inv.name || '').replace(/"/g, '&quot;') + '">' + itemName + ' (Stock: ' + (inv.quantity || 0) + ' ' + (inv.unit || 'pcs') + ')</option>';
     }).join('');
     if (!itemOpts) itemOpts = '<option value="">No inventory items yet</option>';
 
