@@ -30,6 +30,7 @@ function renderInventory(container) {
     container.innerHTML = `
         <div class="tabs" style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
             <button class="tab-btn active" onclick="switchInvView('items',this)">${T('invmod_tab_items')}</button>
+            <button class="tab-btn" style="background:#ea580c;color:#fff;font-weight:700;" onclick="switchInvView('stockout',this)">${T('invmod_tab_stock_out')}</button>
             <button class="tab-btn" onclick="switchInvView('dept',this)">${T('invmod_tab_dept')}</button>
             <button class="tab-btn" onclick="switchInvView('movements',this)">${T('invmod_tab_movements')}</button>
         </div>
@@ -37,18 +38,37 @@ function renderInventory(container) {
             ${renderInvItemsTab()}
         </div>
     `;
-    setTimeout(() => renderInvList(), 50);
+    setTimeout(() => {
+        renderInvList();
+        initGlobalBarcodeScanner();
+    }, 50);
 }
 
 function switchInvView(view, btn) {
     invView = view;
-    document.querySelectorAll('#pageContent .tabs .tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#pageContent .tabs .tab-btn').forEach(b => {
+        b.classList.remove('active');
+        if (!b.style.background.includes('ea580c')) {
+            b.style.background = '';
+        }
+    });
     btn.classList.add('active');
     const content = document.getElementById('invContent');
     if (!content) return;
     if (view === 'items') {
         content.innerHTML = renderInvItemsTab();
-        setTimeout(() => renderInvList(), 50);
+        setTimeout(() => {
+            renderInvList();
+            initGlobalBarcodeScanner();
+        }, 50);
+    } else if (view === 'stockout') {
+        content.innerHTML = renderInvStockOutTab();
+        setTimeout(() => {
+            renderInvStockOutView();
+            initGlobalBarcodeScanner();
+            const input = document.getElementById('quickStockOutScanInput');
+            if (input) input.focus();
+        }, 50);
     } else if (view === 'dept') {
         content.innerHTML = renderInvDeptTab();
         setTimeout(() => renderInvDeptView(), 50);
@@ -76,12 +96,20 @@ function renderInvItemsTab() {
             </div>
         </div>
 
-        <div class="card" style="padding:12px 16px;margin-bottom:16px;background:#f0f6ff;border:1px solid #c2d7f8;">
-            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-                <span style="font-weight:600;font-size:14px;">${T('invmod_label_scan_barcode')}</span>
-                <input type="text" id="barcodeScanInput" class="form-control" placeholder="${T('invmod_placeholder_scan_barcode')}" style="flex:1;min-width:180px;"
+        <div class="card" style="padding:14px 18px;margin-bottom:16px;background:linear-gradient(135deg, #f0f7ff 0%, #e6f0fa 100%);border:1px solid #b8d5f3;box-shadow:0 2px 8px rgba(0,0,0,0.04);border-radius:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-weight:700;font-size:15px;color:#1e40af;">${T('invmod_label_scan_barcode')}</span>
+                    <span class="badge badge-success" style="font-size:11px;padding:3px 8px;border-radius:12px;">${T('invmod_scanner_status')}</span>
+                </div>
+                <div style="font-size:12px;color:#475569;font-weight:500;">
+                    ${T('invmod_dual_barcode_hint')}
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <input type="text" id="barcodeScanInput" class="form-control" placeholder="${T('invmod_placeholder_scan_barcode')}" style="flex:1;min-width:220px;font-family:monospace;font-size:14px;border:1px solid #93c5fd;"
                     onkeydown="if(event.key==='Enter')handleBarcodeScan()">
-                <button class="btn btn-primary btn-sm" onclick="handleBarcodeScan()">${T('invmod_btn_find')}</button>
+                <button class="btn btn-primary btn-sm" style="padding:7px 16px;font-weight:600;" onclick="handleBarcodeScan()">${T('invmod_btn_find')}</button>
                 <span id="barcodeScanResult" style="font-size:13px;color:var(--gray);"></span>
             </div>
         </div>
@@ -182,13 +210,15 @@ function renderInvList() {
         const lifecyclePct = (i.purchaseDate && i.expiryDate) ? APP.lifecyclePercent(i.purchaseDate, i.expiryDate) : 0;
         const lifecycleColor = APP.lifecycleColor(lifecyclePct);
         const status = qty === 0 ? 'out-of-stock' : (qty < 10 ? 'low-stock' : 'in-stock');
-        const barcode = i.barcode || i.id.slice(-10);
+        const outCode = i.outBarcode || i.barcode || i.id.slice(-10);
+        const inCode = i.inBarcode || '';
 
         return `<tr>
             <td>
-                <div class="barcode-cell" style="cursor:pointer;" onclick="printBarcode('${i.id}')" title="Click to print barcode">
-                    <svg class="barcode-svg" id="barcode_${i.id}" style="width:100px;height:28px;"></svg>
-                    <div style="font-size:9px;color:var(--gray);text-align:center;">${barcode}</div>
+                <div class="barcode-cell" style="cursor:pointer;" onclick="printBarcodeSticker('${i.id}')" title="${T('invmod_btn_print_sticker')}">
+                    <svg class="barcode-svg" id="barcode_${i.id}" style="width:100px;height:26px;"></svg>
+                    <div style="font-size:10px;font-weight:700;color:#1e3a8a;text-align:center;font-family:monospace;">${outCode}</div>
+                    ${inCode ? `<div style="font-size:8px;color:#64748b;text-align:center;font-family:monospace;">IN: ${inCode}</div>` : ''}
                 </div>
             </td>
             <td><strong>${i.name}</strong></td>
@@ -212,7 +242,7 @@ function renderInvList() {
                 <button class="btn btn-sm btn-success" onclick="receiveInvStock('${i.id}')">${T('invmod_btn_in')}</button>
                 <button class="btn btn-sm btn-warning" onclick="issueInvStock('${i.id}')" style="color:#fff;">${T('invmod_btn_out')}</button>
                 <button class="btn btn-sm btn-primary" onclick="editInv('${i.id}')">${T('invmod_btn_edit')}</button>
-                <button class="btn btn-sm btn-info" onclick="printBarcode('${i.id}')">🏷️</button>
+                <button class="btn btn-sm btn-info" onclick="printBarcodeSticker('${i.id}')" title="${T('invmod_btn_print_sticker')}">🖨️ Sticker</button>
                 <button class="btn btn-sm btn-danger" onclick="deleteInv('${i.id}')">${T('invmod_btn_del')}</button>
             </td>
         </tr>`;
@@ -372,13 +402,7 @@ function saveReceiveStock(id) {
     });
 
     APP.notify(`${T('invmod_msg_received_prefix')}${qty} ${item.unit || 'pcs'}${T('invmod_msg_received_of')}${item.name} (₹${(qty * price).toFixed(2)})`, 'success');
-    if (typeof renderInvList === 'function' && document.getElementById('invTableBody')) {
-        renderInvList();
-    }
-    var hodContainer = document.getElementById('hodInvSubContent') || document.getElementById('hodTabContent');
-    if (hodContainer && typeof _hodInventoryReport === 'function') {
-        _hodInventoryReport(hodContainer);
-    }
+    renderInvList();
     document.querySelector('.modal.active')?.remove();
 }
 
@@ -429,13 +453,7 @@ function saveIssueStock(id) {
         notes: notes, date: new Date().toISOString()
     });
     APP.notify(`${T('invmod_msg_issued_prefix')}${qty} ${item.unit || 'pcs'}${T('invmod_msg_issued_of')}${item.name}` + (dept ? `${T('invmod_msg_issued_to')}${dept}` : ''), 'success');
-    if (typeof renderInvList === 'function' && document.getElementById('invTableBody')) {
-        renderInvList();
-    }
-    var hodContainer = document.getElementById('hodInvSubContent') || document.getElementById('hodTabContent');
-    if (hodContainer && typeof _hodInventoryReport === 'function') {
-        _hodInventoryReport(hodContainer);
-    }
+    renderInvList();
     document.querySelector('.modal.active')?.remove();
 }
 
@@ -550,31 +568,365 @@ function generateBarcodeSvgs() {
     });
 }
 
-function handleBarcodeScan() {
+let scannerBuffer = '';
+let scannerLastKeyTime = 0;
+let stockOutSessionLogs = [];
+
+function initGlobalBarcodeScanner() {
+    if (window._inventoryScannerInitialized) return;
+    window._inventoryScannerInitialized = true;
+
+    window.addEventListener('keydown', (e) => {
+        if (!document.getElementById('barcodeScanInput') && !document.getElementById('quickStockOutScanInput')) return;
+        const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+        if (activeTag === 'input' && 
+            document.activeElement.id !== 'barcodeScanInput' && 
+            document.activeElement.id !== 'quickStockOutScanInput' && 
+            document.activeElement.name !== 'inBarcode' && 
+            document.activeElement.name !== 'outBarcode') {
+            return;
+        }
+
+        const now = Date.now();
+        if (now - scannerLastKeyTime > 150) {
+            scannerBuffer = '';
+        }
+        scannerLastKeyTime = now;
+
+        if (e.key === 'Enter') {
+            if (scannerBuffer.length >= 3) {
+                const code = scannerBuffer;
+                scannerBuffer = '';
+                e.preventDefault();
+                if (invView === 'stockout') {
+                    executeQuickStockOut(code);
+                } else {
+                    handleBarcodeScan(code);
+                }
+            }
+        } else if (e.key.length === 1) {
+            scannerBuffer += e.key;
+        }
+    });
+}
+
+function playAudioFeedback(success = true) {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        if (success) {
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.15);
+        } else {
+            osc.frequency.setValueAtTime(220, ctx.currentTime);
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.3);
+        }
+    } catch(e) {}
+}
+
+function renderInvStockOutTab() {
+    const depts = DB.get('departments') || [];
+    const deptOpts = depts.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
+
+    return `
+        <div class="card" style="padding:20px;margin-bottom:20px;background:linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);border:1px solid #fed7aa;border-radius:10px;box-shadow:0 4px 12px rgba(234, 88, 12, 0.08);">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+                <div>
+                    <div style="font-weight:800;font-size:18px;color:#c2410c;display:flex;align-items:center;gap:8px;">
+                        ${T('invmod_title_stock_out_tab')}
+                        <span class="badge badge-warning" style="font-size:11px;padding:3px 8px;border-radius:12px;">${T('invmod_scanner_status')}</span>
+                    </div>
+                    <div style="font-size:13px;color:#7c2d12;margin-top:2px;">${T('invmod_subtitle_stock_out_tab')}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:rgba(255,255,255,0.7);padding:8px 14px;border-radius:8px;border:1px solid #ffedd5;">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:12px;font-weight:700;color:#9a3412;">${T('invmod_label_default_dept')}</span>
+                        <select id="quickOutDept" class="form-control form-control-sm" style="width:140px;background:#fff;border-color:#fdba74;font-size:12px;">
+                            <option value="">${T('invmod_opt_all')}</option>
+                            ${deptOpts}
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:12px;font-weight:700;color:#9a3412;">${T('invmod_label_qty_per_scan')}</span>
+                        <input type="number" id="quickOutQty" class="form-control form-control-sm" value="1" min="1" style="width:60px;background:#fff;border-color:#fdba74;text-align:center;font-weight:bold;">
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:10px;align-items:center;margin-top:14px;">
+                <div style="position:relative;flex:1;">
+                    <input type="text" id="quickStockOutScanInput" class="form-control form-control-lg" 
+                        placeholder="${T('invmod_placeholder_scan_out')}" 
+                        style="width:100%;font-family:monospace;font-size:16px;font-weight:bold;padding:12px 16px;border:2px solid #f97316;border-radius:8px;box-shadow:0 0 0 3px rgba(249,115,22,0.15);"
+                        onkeydown="if(event.key==='Enter')executeQuickStockOut()">
+                </div>
+                <button class="btn btn-warning btn-lg" style="padding:10px 24px;font-weight:700;color:#fff;background:#ea580c;border:none;" onclick="executeQuickStockOut()">
+                    📤 Auto-OUT
+                </button>
+            </div>
+
+            <div id="quickOutBanner" style="margin-top:12px;display:none;"></div>
+        </div>
+
+        <div class="card" style="padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+                <div style="font-weight:700;font-size:15px;color:#1e293b;">${T('invmod_recent_out_log')}</div>
+                <button class="btn btn-sm btn-outline" onclick="clearStockOutSessionLog()">Clear Log</button>
+            </div>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Item Name</th>
+                            <th>OUT Barcode</th>
+                            <th>Qty Issued</th>
+                            <th>Issued To (Dept)</th>
+                            <th>Issued By</th>
+                            <th>Remaining Stock</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="quickOutLogBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+function executeQuickStockOut(scannedCode) {
+    const input = document.getElementById('quickStockOutScanInput');
+    const banner = document.getElementById('quickOutBanner');
+    const code = (scannedCode || input?.value || '').trim();
+    if (!code) return;
+
+    const dept = document.getElementById('quickOutDept')?.value || '';
+    const issueQty = parseInt(document.getElementById('quickOutQty')?.value || '1') || 1;
+
+    const items = DB.get('inventory') || [];
+    const lowerCode = code.toLowerCase();
+
+    // Match item by outBarcode, barcode, inBarcode, or id slice
+    const item = items.find(i => 
+        (i.outBarcode && i.outBarcode.toLowerCase() === lowerCode) || 
+        (i.barcode && i.barcode.toLowerCase() === lowerCode) ||
+        (i.inBarcode && i.inBarcode.toLowerCase() === lowerCode) ||
+        (i.id && i.id.slice(-10).toLowerCase() === lowerCode)
+    );
+
+    if (!item) {
+        if (banner) {
+            banner.style.display = 'block';
+            banner.innerHTML = `<div class="alert alert-danger" style="margin:0;padding:10px 14px;font-weight:600;">❌ No inventory item found with barcode "${code}". Scan a valid barcode.</div>`;
+        }
+        playAudioFeedback(false);
+        if (input) input.value = '';
+        return;
+    }
+
+    const currentQty = parseInt(item.quantity) || 0;
+    if (currentQty < issueQty) {
+        if (banner) {
+            banner.style.display = 'block';
+            banner.innerHTML = `<div class="alert alert-warning" style="margin:0;padding:10px 14px;font-weight:600;">⚠️ Cannot issue stock for "${item.name}": Only ${currentQty} ${item.unit || 'pcs'} available in inventory!</div>`;
+        }
+        playAudioFeedback(false);
+        if (input) input.value = '';
+        return;
+    }
+
+    // Process Stock OUT!
+    const newQty = currentQty - issueQty;
+    const user = AUTH.currentUser();
+    const unitPrice = parseFloat(item.price) || 0;
+
+    DB.update('inventory', item.id, { quantity: newQty });
+
+    // Record movement
+    const movement = DB.add('inventory_movements', {
+        itemId: item.id,
+        itemName: item.name,
+        type: 'out',
+        qty: issueQty,
+        unit: item.unit || 'pcs',
+        unitPrice: unitPrice,
+        totalValue: issueQty * unitPrice,
+        dept: dept || item.department || '',
+        by: user ? user.fullName : 'Admin',
+        notes: 'Quick Barcode Scan OUT',
+        date: new Date().toISOString()
+    });
+
+    // Save session log
+    const logEntry = {
+        time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        id: item.id,
+        name: item.name,
+        barcode: item.outBarcode || item.barcode || item.id.slice(-10),
+        qty: issueQty,
+        unit: item.unit || 'pcs',
+        dept: dept || item.department || 'General',
+        by: user ? user.fullName : 'Admin',
+        remQty: newQty,
+        movementId: movement ? movement.id : null
+    };
+    stockOutSessionLogs.unshift(logEntry);
+
+    // Banner notification
+    if (banner) {
+        banner.style.display = 'block';
+        banner.innerHTML = `<div class="alert alert-success" style="margin:0;padding:10px 14px;font-size:14px;font-weight:700;background:#dcfce7;color:#15803d;border:1px solid #86efac;">
+            🎉 ${T('invmod_msg_out_success')} <strong>${issueQty} ${item.unit || 'pcs'}</strong> of <strong>${item.name}</strong> issued ${dept ? 'to ' + dept : ''}! (${newQty} ${item.unit || 'pcs'} ${T('invmod_msg_out_rem_stock')})
+        </div>`;
+    }
+
+    playAudioFeedback(true);
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+
+    renderInvStockOutView();
+}
+
+function renderInvStockOutView() {
+    const tbody = document.getElementById('quickOutLogBody');
+    if (!tbody) return;
+
+    if (stockOutSessionLogs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--gray);">No stock issued out in this session. Scan any OUT barcode above to issue stock instantly.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = stockOutSessionLogs.map((log, idx) => `
+        <tr style="${idx === 0 ? 'background:#f0fdf4;' : ''}">
+            <td style="font-size:12px;color:#64748b;">${log.time}</td>
+            <td><strong>${log.name}</strong></td>
+            <td><span style="font-family:monospace;font-size:11px;background:#e2e8f0;padding:2px 6px;border-radius:4px;font-weight:bold;">${log.barcode}</span></td>
+            <td><span class="badge badge-warning" style="font-size:12px;font-weight:bold;">-${log.qty} ${log.unit}</span></td>
+            <td><span class="badge badge-info">${log.dept}</span></td>
+            <td style="font-size:12px;">${log.by}</td>
+            <td><span class="badge ${log.remQty > 10 ? 'badge-success' : log.remQty > 0 ? 'badge-warning' : 'badge-danger'}">${log.remQty} ${log.unit}</span></td>
+            <td>
+                <button class="btn btn-sm btn-outline" style="font-size:11px;padding:2px 6px;" onclick="undoQuickStockOut(${idx})">↩️ Undo</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function clearStockOutSessionLog() {
+    stockOutSessionLogs = [];
+    renderInvStockOutView();
+}
+
+function undoQuickStockOut(index) {
+    const log = stockOutSessionLogs[index];
+    if (!log) return;
+    const item = DB.getById('inventory', log.id);
+    if (item) {
+        const currentQty = parseInt(item.quantity) || 0;
+        DB.update('inventory', item.id, { quantity: currentQty + log.qty });
+        if (log.movementId) {
+            DB.delete('inventory_movements', log.movementId);
+        }
+        APP.notify(`Restored +${log.qty} ${log.unit} to ${log.name}`, 'info');
+    }
+    stockOutSessionLogs.splice(index, 1);
+    renderInvStockOutView();
+}
+
+function handleBarcodeScan(scannedCode) {
     const input = document.getElementById('barcodeScanInput');
     const result = document.getElementById('barcodeScanResult');
-    const code = (input?.value || '').trim();
-    if (!code) { result.textContent = T('invmod_msg_enter_scan_barcode'); return; }
-
-    const items = DB.get('inventory');
-    const item = items.find(i => (i.barcode || i.id.slice(-10)) === code);
-    if (item) {
-        result.innerHTML = `${T('invmod_found_prefix')}<strong>${item.name}</strong>${T('invmod_qty_prefix')}${item.quantity}) <button class="btn btn-sm btn-primary" onclick="editInv('${item.id}');document.getElementById('barcodeScanResult').textContent=''">${T('invmod_btn_edit')}</button>`;
-        input.value = '';
-    } else {
-        result.innerHTML = `${T('invmod_not_found_prefix')}${code}${T('invmod_not_found_suffix')}`;
+    const code = (scannedCode || input?.value || '').trim();
+    if (!code) {
+        if (result) result.textContent = T('invmod_msg_enter_scan_barcode');
+        return;
     }
+
+    const items = DB.get('inventory') || [];
+    const lowerCode = code.toLowerCase();
+
+    // 1. Check OUT Barcode match (2nd scan -> Issue / Stock OUT)
+    const outItem = items.find(i => 
+        (i.outBarcode && i.outBarcode.toLowerCase() === lowerCode) || 
+        (i.barcode && i.barcode.toLowerCase() === lowerCode) ||
+        (i.id && i.id.slice(-10).toLowerCase() === lowerCode)
+    );
+
+    if (outItem) {
+        if (result) result.innerHTML = `📤 <strong>${T('invmod_label_out_barcode')}:</strong> ${outItem.name} (${outItem.quantity} ${outItem.unit || 'pcs'})`;
+        if (input) input.value = '';
+        APP.notify(`📤 OUT Barcode Matched: ${outItem.name}. Opening Stock OUT dialog...`, 'info');
+        issueInvStock(outItem.id);
+        return;
+    }
+
+    // 2. Check IN Barcode match (Existing item incoming shipment)
+    const inItem = items.find(i => i.inBarcode && i.inBarcode.toLowerCase() === lowerCode);
+
+    if (inItem) {
+        if (result) result.innerHTML = `📥 <strong>${T('invmod_label_in_barcode')}:</strong> ${inItem.name} (${inItem.quantity} ${inItem.unit || 'pcs'})`;
+        if (input) input.value = '';
+        APP.notify(`📥 Incoming IN Barcode Matched: ${inItem.name}. Record received stock & print OUT sticker.`, 'info');
+        receiveInvStock(inItem.id);
+        return;
+    }
+
+    // 3. New Barcode Scanned for the 1st time! Open Add Item modal with IN barcode pre-filled
+    if (result) result.innerHTML = `🆕 <strong>New Barcode:</strong> "${code}" — Opening Add Item Form...`;
+    if (input) input.value = '';
+    APP.notify(`🆕 New Material Barcode Scanned: "${code}". Fill item details & save to print OUT sticker!`, 'success');
+    showInvForm({ inBarcode: code });
 }
 
 function showInvForm(item) {
-    const depts = DB.get('departments');
+    const depts = DB.get('departments') || [];
     const categories = ['Medical Equipment', 'Medicine', 'Surgical', 'Laboratory', 'Office Supplies', 'Cleaning', 'Bedding', 'Food', 'Other'];
-    const barcode = item?.barcode || item?.id?.slice(-10) || '';
-    const isNew = !item;
+    const isEdit = item && item.id;
+    const inBarcodeVal = item?.inBarcode || (!isEdit && item?.inBarcode ? item.inBarcode : '');
+    const outBarcodeVal = item?.outBarcode || item?.barcode || ('HMS-OUT-' + Date.now().toString(36).slice(-6).toUpperCase());
 
     const form = `
         <form id="invForm">
             <input type="hidden" name="id" value="${item?.id || ''}">
+            
+            <div class="card mb-3" style="background:#f8fafc;padding:12px;border:1px solid #cbd5e1;border-radius:6px;">
+                <div style="font-weight:700;font-size:13px;color:#1e293b;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                    🏷️ Barcode Dual-Tracking System (TVS Scanner Ready)
+                </div>
+                <div class="grid-2" style="gap:10px;">
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:12px;font-weight:600;color:#334155;">${T('invmod_label_in_barcode')}</label>
+                        <input type="text" name="inBarcode" class="form-control" value="${inBarcodeVal}" placeholder="Scanned incoming supplier barcode" style="font-family:monospace;background:#ffffff;">
+                        <div style="font-size:10px;color:#64748b;margin-top:2px;">Scanned 1st time when new material arrives</div>
+                    </div>
+                    <div class="form-group" style="margin:0;">
+                        <label style="font-size:12px;font-weight:600;color:#334155;">${T('invmod_label_out_barcode')}</label>
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <input type="text" name="outBarcode" class="form-control" value="${outBarcodeVal}" placeholder="Auto-generated OUT sticker barcode" style="font-family:monospace;">
+                            <button type="button" class="btn btn-sm btn-primary" onclick="generateBarcodeInput()">${T('invmod_btn_generate')}</button>
+                        </div>
+                        <div style="font-size:10px;color:#64748b;margin-top:2px;">Printed on sticker & scanned for Stock OUT</div>
+                    </div>
+                </div>
+                <div id="barcodePreview" style="margin-top:8px;text-align:center;"></div>
+                <div style="margin-top:8px;display:flex;align-items:center;gap:6px;">
+                    <input type="checkbox" id="autoPrintSticker" ${!isEdit ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;">
+                    <label for="autoPrintSticker" style="font-size:13px;font-weight:600;color:#15803d;cursor:pointer;margin:0;">
+                        🖨️ ${T('invmod_chk_auto_print_sticker')}
+                    </label>
+                </div>
+            </div>
+
             <div class="grid-2">
                 <div class="form-group">
                     <label>${T('invmod_label_item_name')}</label>
@@ -586,14 +938,6 @@ function showInvForm(item) {
                         <option value="">${T('invmod_opt_select')}</option>
                         ${categories.map(c => `<option value="${c}" ${item?.category === c ? 'selected' : ''}>${invCategoryLabel(c)}</option>`).join('')}
                     </select>
-                </div>
-                <div class="form-group">
-                    <label>${T('invmod_label_barcode_sku')}</label>
-                    <div style="display:flex;gap:6px;align-items:center;">
-                        <input type="text" name="barcode" class="form-control" value="${barcode}" placeholder="${T('invmod_placeholder_auto_generated')}" style="font-family:monospace;">
-                        <button type="button" class="btn btn-sm btn-primary" onclick="generateBarcodeInput()">${T('invmod_btn_generate')}</button>
-                    </div>
-                    <div id="barcodePreview" style="margin-top:4px;"></div>
                 </div>
                 <div class="form-group">
                     <label>${T('invmod_label_quantity')}</label>
@@ -647,30 +991,30 @@ function showInvForm(item) {
             </div>
         </form>
     `;
-    openFormModal(item ? T('invmod_modal_edit_item') : T('invmod_modal_add_item'), form, `saveInv()`, true);
+    openFormModal(isEdit ? T('invmod_modal_edit_item') : T('invmod_modal_add_item'), form, `saveInv()`, true);
     setTimeout(() => {
-        const bcInput = document.querySelector('[name="barcode"]');
+        const bcInput = document.querySelector('[name="outBarcode"]');
         if (bcInput) { bcInput.oninput = () => previewBarcode(); previewBarcode(); }
     }, 200);
 }
 
 function generateBarcodeInput() {
-    const input = document.querySelector('[name="barcode"]');
+    const input = document.querySelector('[name="outBarcode"]');
     if (!input) return;
-    const code = 'HMS' + Date.now().toString(36).slice(-6).toUpperCase();
+    const code = 'HMS-OUT-' + Date.now().toString(36).slice(-6).toUpperCase();
     input.value = code;
     previewBarcode();
 }
 
 function previewBarcode() {
-    const input = document.querySelector('[name="barcode"]');
+    const input = document.querySelector('[name="outBarcode"]');
     const preview = document.getElementById('barcodePreview');
     if (!input || !preview) return;
     const code = input.value.trim();
     preview.innerHTML = '';
     if (code && typeof JsBarcode !== 'undefined') {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.style.width = '160px'; svg.style.height = '36px';
+        svg.style.width = '180px'; svg.style.height = '36px';
         preview.appendChild(svg);
         try { JsBarcode(svg, code, { format: 'CODE128', width: 1.5, height: 30, displayValue: false, margin: 0 }); }
         catch(e) {}
@@ -680,27 +1024,34 @@ function previewBarcode() {
 
 function saveInv() {
     const form = document.getElementById('invForm');
+    if (!form) return;
     const data = {};
     form.querySelectorAll('[name]').forEach(el => { data[el.name] = el.value; });
     if (!data.name || !data.category) { APP.notify(T('invmod_msg_name_category_required'), 'error'); return; }
 
-    if (!data.barcode) {
-        data.barcode = 'HMS' + Date.now().toString(36).slice(-6).toUpperCase();
+    if (!data.outBarcode) {
+        data.outBarcode = 'HMS-OUT-' + Date.now().toString(36).slice(-6).toUpperCase();
     }
+    data.barcode = data.outBarcode;
+
+    const autoPrint = document.getElementById('autoPrintSticker')?.checked;
+    let savedId = data.id;
 
     if (data.id) {
         DB.update('inventory', data.id, data);
-        APP.notify(T('invmod_msg_item_updated_barcode_prefix') + data.barcode, 'success');
+        APP.notify(T('invmod_msg_item_updated_barcode_prefix') + data.outBarcode, 'success');
     } else {
-        DB.add('inventory', data);
-        APP.notify(T('invmod_msg_item_added_barcode_prefix') + data.barcode, 'success');
+        const newItem = DB.add('inventory', data);
+        savedId = newItem ? newItem.id : data.id;
+        APP.notify(T('invmod_msg_item_added_barcode_prefix') + data.outBarcode, 'success');
     }
-    if (typeof renderInvList === 'function' && document.getElementById('invTableBody')) {
-        renderInvList();
-    }
-    var hodContainer = document.getElementById('hodInvSubContent') || document.getElementById('hodTabContent');
-    if (hodContainer && typeof _hodInventoryReport === 'function') {
-        _hodInventoryReport(hodContainer);
+
+    renderInvList();
+
+    if (autoPrint && savedId) {
+        setTimeout(() => {
+            printBarcodeSticker(savedId);
+        }, 300);
     }
 }
 
@@ -713,13 +1064,7 @@ function deleteInv(id) {
     confirmAction(T('invmod_confirm_delete_item'), () => {
         DB.delete('inventory', id);
         APP.notify(T('invmod_msg_item_deleted'), 'success');
-        if (typeof renderInvList === 'function' && document.getElementById('invTableBody')) {
-            renderInvList();
-        }
-        var hodContainer = document.getElementById('hodInvSubContent') || document.getElementById('hodTabContent');
-        if (hodContainer && typeof _hodInventoryReport === 'function') {
-            _hodInventoryReport(hodContainer);
-        }
+        renderInvList();
     });
 }
 
@@ -728,11 +1073,11 @@ function invDownloadExcel() {
     const items = DB.get('inventory');
     if (!items || items.length === 0) { APP.notify('No inventory data', 'info'); return; }
     if (typeof XLSX === 'undefined') { APP.notify('Excel library not loaded', 'error'); return; }
-    const headers = ['Barcode', 'Item Name', 'Category', 'Department', 'Quantity', 'Unit', 'Price/Unit', 'Total Value', 'Expiry', 'Status'];
+    const headers = ['OUT Barcode', 'IN Barcode', 'Item Name', 'Category', 'Department', 'Quantity', 'Unit', 'Price/Unit', 'Total Value', 'Expiry', 'Status'];
     const rows = items.map(function (i) {
         var qty = parseFloat(i.quantity) || 0;
         var price = parseFloat(i.price) || 0;
-        return [i.barcode || '', i.name || '', i.category || '', i.department || '', qty, i.unit || 'pcs', price, (qty * price).toFixed(2), i.expiry ? new Date(i.expiry).toLocaleDateString('en-IN') : '-', i.status || 'in-stock'];
+        return [i.outBarcode || i.barcode || '', i.inBarcode || '', i.name || '', i.category || '', i.department || '', qty, i.unit || 'pcs', price, (qty * price).toFixed(2), i.expiryDate ? new Date(i.expiryDate).toLocaleDateString('en-IN') : '-', i.status || 'in-stock'];
     });
     var title = 'Inventory_Report_' + new Date().toISOString().slice(0, 10);
     var wb = XLSX.utils.book_new();
@@ -756,43 +1101,85 @@ function invDownloadPdf() {
     doc.text('Inventory Report', 14, 15);
     doc.setFontSize(9);
     doc.text('Generated: ' + new Date().toLocaleDateString('en-IN'), 14, 22);
-    var headers = [['Barcode', 'Item Name', 'Category', 'Department', 'Qty', 'Unit', 'Price', 'Value', 'Expiry', 'Status']];
+    var headers = [['OUT Barcode', 'IN Barcode', 'Item Name', 'Category', 'Department', 'Qty', 'Unit', 'Price', 'Value', 'Expiry', 'Status']];
     var rows = items.map(function (i) {
         var qty = parseFloat(i.quantity) || 0;
         var price = parseFloat(i.price) || 0;
-        return [i.barcode || '', i.name || '', i.category || '', i.department || '', qty, i.unit || 'pcs', '₹' + price, '₹' + (qty * price).toFixed(2), i.expiry ? new Date(i.expiry).toLocaleDateString('en-IN') : '-', i.status || 'in-stock'];
+        return [i.outBarcode || i.barcode || '', i.inBarcode || '', i.name || '', i.category || '', i.department || '', qty, i.unit || 'pcs', '₹' + price, '₹' + (qty * price).toFixed(2), i.expiryDate ? new Date(i.expiryDate).toLocaleDateString('en-IN') : '-', i.status || 'in-stock'];
     });
     doc.autoTable({ head: headers, body: rows, startY: 27, styles: { fontSize: 7 }, headStyles: { fillColor: [30, 126, 52] } });
     doc.save('Inventory_Report_' + new Date().toISOString().slice(0, 10) + '.pdf');
     APP.notify('Inventory PDF downloaded!', 'success');
 }
 
-function printBarcode(id) {
+function printBarcodeSticker(id, copies = 1) {
     const item = DB.getById('inventory', id);
     if (!item) return;
-    const code = item.barcode || item.id.slice(-10);
+    const outCode = item.outBarcode || item.barcode || item.id.slice(-10);
+    const inCode = item.inBarcode || '';
 
-    const win = window.open('', '_blank', 'width=300,height=200');
+    const win = window.open('', '_blank', 'width=450,height=340');
     win.document.write(`
+        <!DOCTYPE html>
         <html><head>
+        <title>Sticker Print - ${item.name}</title>
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-        <style>body{text-align:center;padding:20px;font-family:Arial;margin:0;}
-        .label{border:1px dashed #999;padding:12px;display:inline-block;margin:10px;}
-        .name{font-size:13px;margin-bottom:4px;font-weight:600;}
-        .code{font-size:10px;color:#666;font-family:monospace;margin-top:2px;}
-        @media print{body{padding:0;}.label{border:none;}}
-        <\/style></head><body>
-        <div class="label">
-            <div class="name">${item.name}</div>
-            <svg id="bcPrint" style="width:200px;height:40px;"></svg>
-            <div class="code">${code}</div>
-            <div style="font-size:10px;color:#999;">${item.category} | ${item.location || ''}</div>
-        </div>
-        <script>
-            try { JsBarcode(document.getElementById('bcPrint'), '${code}', {format:'CODE128',width:1.8,height:35,displayValue:false,margin:0}); } catch(e){}
-            setTimeout(() => { window.print(); window.close(); }, 500);
-        <\/script>
-        </body></html>
+        <style>
+            @page { size: 50mm 25mm; margin: 0; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 6px; text-align: center; background: #fff; color: #000; }
+            .sticker-card {
+                border: 1px dashed #64748b;
+                padding: 6px 8px;
+                border-radius: 4px;
+                display: inline-block;
+                width: 220px;
+                box-sizing: border-box;
+                margin: 6px auto;
+                background: #fff;
+            }
+            .header { font-size: 8px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #334155; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; margin-bottom: 4px; }
+            .item-name { font-size: 12px; font-weight: 700; line-height: 1.2; max-height: 28px; overflow: hidden; margin-bottom: 4px; word-break: break-word; color: #0f172a; }
+            .bcStickerSvg { width: 190px; height: 36px; margin: 2px 0; }
+            .code-str { font-size: 11px; font-weight: bold; font-family: monospace; letter-spacing: 1px; color: #1e3a8a; }
+            .sub-info { font-size: 8px; color: #475569; margin-top: 3px; display: flex; justify-content: space-between; font-weight: 500; }
+            @media print {
+                body { padding: 0; }
+                .sticker-card { border: none; width: 100%; margin: 0; padding: 2mm; page-break-after: always; }
+                .no-print { display: none !important; }
+            }
+        </style>
+        </head>
+        <body>
+            <div class="no-print" style="margin-bottom:12px;padding:8px;background:#f1f5f9;border-bottom:1px solid #cbd5e1;display:flex;align-items:center;justify-content:center;gap:10px;">
+                <button onclick="window.print()" style="padding:6px 16px;background:#15803d;color:#fff;border:none;border-radius:4px;font-weight:bold;cursor:pointer;">🖨️ Print Label (${copies} Copy)</button>
+                <button onclick="window.close()" style="padding:6px 12px;background:#64748b;color:#fff;border:none;border-radius:4px;cursor:pointer;">Close</button>
+            </div>
+            ${Array.from({length: copies}).map(() => `
+                <div class="sticker-card">
+                    <div class="header">STAVYA HMS · INVENTORY STICKER</div>
+                    <div class="item-name">${item.name}</div>
+                    <svg class="bcStickerSvg"></svg>
+                    <div class="code-str">${outCode}</div>
+                    <div class="sub-info">
+                        <span>${inCode ? 'IN Ref: ' + inCode : item.category || ''}</span>
+                        <span>${item.price ? '₹' + parseFloat(item.price).toFixed(2) : ''}</span>
+                    </div>
+                </div>
+            `).join('')}
+            <script>
+                document.querySelectorAll('.bcStickerSvg').forEach(svg => {
+                    try {
+                        JsBarcode(svg, '${outCode}', { format: 'CODE128', width: 1.6, height: 32, displayValue: false, margin: 0 });
+                    } catch(e) {}
+                });
+                setTimeout(() => { window.print(); }, 400);
+            <\/script>
+        </body>
+        </html>
     `);
     win.document.close();
+}
+
+function printBarcode(id) {
+    printBarcodeSticker(id, 1);
 }

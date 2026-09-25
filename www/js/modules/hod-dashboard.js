@@ -6033,15 +6033,12 @@ function _hodInvGeneral(el) {
         ? globalTotalItems + ' items across ' + allDeptNames.length + ' departments'
         : items.length + ' items in ' + activeDept;
 
-    var canManageInv = user && (user.role === 'admin' || user.role === 'super_admin' || user.role === 'facility_hod' || (user.role === 'hod' && ['facility','it','maintenance','biomedical'].indexOf(myDept) !== -1) || AUTH.hasPermission(user, 'inventory'));
-
     var html = ''
         // ═══════════ DASHBOARD HEADER ═══════════
         + '<div style="background:linear-gradient(135deg,#004d40,#00695c);border-radius:14px;padding:18px 22px;color:#fff;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">'
         + '<div><div style="font-size:18px;font-weight:700;">📦 Inventory Dashboard</div>'
         + '<div style="font-size:12px;opacity:.85;margin-top:2px;">' + displayDeptName + ' · ' + displaySubtitle + ' · ' + new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + '</div></div>'
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
-        + (canManageInv ? '<button class="btn btn-sm" style="background:#2e7d32;color:#fff;border:none;padding:6px 14px;font-size:12px;font-weight:600;" onclick="showInvForm()">➕ Add Item</button>' : '')
         + '<select id="hodInvDeptSelect" class="form-control" style="padding:6px 10px;font-size:12px;border-radius:6px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.15);color:#fff;min-width:160px;" onchange="hodInvDeptChanged(this.value)">'
         + deptOpts
         + '</select>'
@@ -6150,13 +6147,9 @@ function _hodInvGeneral(el) {
             }).join(''))
         + '</tbody></table></div></div>';
 
-    // ═══════════ ITEM DETAILS TABLE (color-coded with Actions) ═══════════
-    html += '<div class="card" style="margin-bottom:16px;">'
-        + '<div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">'
-        + '<h3>📋 Item Details — Color-Coded</h3>'
-        + (canManageInv ? '<button class="btn btn-sm btn-primary" onclick="showInvForm()">➕ Add New Item</button>' : '')
-        + '</div>'
-        + '<div style="margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:0 12px;">'
+    // ═══════════ ITEM DETAILS TABLE (color-coded) ═══════════
+    html += '<div class="card" style="margin-bottom:16px;"><div class="card-header"><h3>📋 Item Details — Color-Coded</h3></div>'
+        + '<div style="margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
         + '<input type="text" id="hodInvSearch" class="form-control" placeholder="🔍 Search items..." style="max-width:250px;padding:6px 10px;font-size:13px;" oninput="_hodInvFilter(this.value)">'
         + '<span class="inv-badge" style="background:#e8f5e9;color:#2e7d32;font-size:11px;padding:4px 10px;">IN STOCK</span>'
         + '<span class="inv-badge" style="background:#fff3e0;color:#e65100;font-size:11px;padding:4px 10px;">LOW STOCK</span>'
@@ -6164,9 +6157,9 @@ function _hodInvGeneral(el) {
         + '<span class="inv-badge" style="background:#fff8e1;color:#e65100;font-size:11px;padding:4px 10px;">NEAR EXPIRE</span>'
         + '<span class="inv-badge" style="background:#ffebee;color:#c62828;font-size:11px;padding:4px 10px;">EXPIRED</span>'
         + '</div>'
-        + '<div class="table-responsive"><table id="hodInvTable"><thead><tr><th>#</th><th>Barcode</th><th>Item Name</th><th>Category</th><th>Dept</th><th>Qty</th><th>Unit</th><th>Price</th><th>Value</th><th>Stock</th><th>Expiry</th>' + (canManageInv ? '<th style="text-align:center;">Actions</th>' : '') + '</tr></thead><tbody>'
+        + '<div class="table-responsive"><table id="hodInvTable"><thead><tr><th>#</th><th>Barcode</th><th>Item Name</th><th>Category</th><th>Dept</th><th>Qty</th><th>Unit</th><th>Price</th><th>Value</th><th>Stock</th><th>Expiry</th></tr></thead><tbody>'
         + (items.length === 0
-            ? '<tr><td colspan="' + (canManageInv ? '12' : '11') + '" style="text-align:center;color:var(--gray);padding:20px;">No inventory items found for this department.</td></tr>'
+            ? '<tr><td colspan="11" style="text-align:center;color:var(--gray);padding:20px;">No inventory items found for this department.</td></tr>'
             : items.map(function (i, idx) {
                 var qty = parseInt(i.quantity) || 0;
                 var price = parseFloat(i.price) || 0;
@@ -6176,12 +6169,6 @@ function _hodInvGeneral(el) {
                 if (es && es.label === 'EXPIRED') rowBg = '#ffebee';
                 else if (es && es.label === 'NEAR EXPIRE' && rowBg !== '#fff3e0') rowBg = '#fff8e1';
                 var expBadge = es ? '<span class="inv-badge" style="background:' + es.bg + ';color:' + es.color + ';">' + es.label + '</span>' : '<span style="font-size:11px;color:var(--gray);">—</span>';
-                var actionBtns = canManageInv ? '<td style="white-space:nowrap;text-align:center;">'
-                    + '<button class="btn btn-sm btn-success" style="padding:2px 6px;font-size:11px;margin-right:2px;" onclick="receiveInvStock(\'' + i.id + '\')" title="Receive Stock In">📥 In</button>'
-                    + '<button class="btn btn-sm btn-warning" style="padding:2px 6px;font-size:11px;color:#fff;margin-right:2px;" onclick="issueInvStock(\'' + i.id + '\')" title="Issue Stock Out">📤 Out</button>'
-                    + '<button class="btn btn-sm btn-primary" style="padding:2px 6px;font-size:11px;margin-right:2px;" onclick="editInv(\'' + i.id + '\')" title="Edit Item">✏️ Edit</button>'
-                    + '<button class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:11px;" onclick="deleteInv(\'' + i.id + '\')" title="Delete Item">🗑️ Del</button>'
-                    + '</td>' : '';
                 return '<tr style="background:' + rowBg + ';">'
                     + '<td>' + (idx + 1) + '</td>'
                     + '<td style="font-size:10px;font-family:monospace;color:var(--gray);">' + (i.barcode || i.id.slice(-10)) + '</td>'
@@ -6193,8 +6180,7 @@ function _hodInvGeneral(el) {
                     + '<td>₹' + price.toFixed(2) + '</td>'
                     + '<td>₹' + (qty * price).toFixed(2) + '</td>'
                     + '<td><span class="inv-badge" style="background:' + ss.bg + ';color:' + ss.color + ';border:1px solid ' + ss.color + ';">' + ss.label + '</span></td>'
-                    + '<td>' + expBadge + '</td>'
-                    + actionBtns + '</tr>';
+                    + '<td>' + expBadge + '</td></tr>';
             }).join(''))
         + '</tbody></table></div></div>';
 
