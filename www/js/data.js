@@ -1208,14 +1208,40 @@ const APP = {
     seedData() {
         try {
             if (!Array.isArray(DB.get('departments')) || DB.get('departments').length === 0) {
-                DB.set('departments', []);
+                DB.set('departments', [
+                    { id: 'dept_nursing', name: 'Nursing', code: 'NURSING', active: true },
+                    { id: 'dept_biomedical', name: 'Biomedical', code: 'BIOMEDICAL', active: true },
+                    { id: 'dept_facility', name: 'Facility', code: 'FACILITY', active: true },
+                    { id: 'dept_ot', name: 'OT', code: 'OT', active: true },
+                    { id: 'dept_it', name: 'IT', code: 'IT', active: true },
+                    { id: 'dept_linen', name: 'Linen', code: 'LINEN', active: true }
+                ]);
+            } else {
+                const depts = DB.get('departments');
+                if (!depts.some(d => (d.name || '').toLowerCase() === 'linen')) {
+                    depts.push({ id: 'dept_linen', name: 'Linen', code: 'LINEN', active: true, head: 'Linen Incharge' });
+                    DB.set('departments', depts);
+                }
             }
             const existingRights = DB.get('featureRights');
             if (!Array.isArray(DB.get('tasks')) || DB.get('tasks').length === 0) {
                 DB.set('tasks', []);
             }
+            const sampleLinenItems = [
+                { id: 'inv_linen_1', barcode: 'LIN-1001', name: 'Cotton Bed Sheet (White)', category: 'Bedding', department: 'Linen', quantity: 150, unit: 'pcs', price: 450, expiryDate: '', purchaseDate: '2025-01-10' },
+                { id: 'inv_linen_2', barcode: 'LIN-1002', name: 'Pillow Cover (Hospital Grade)', category: 'Bedding', department: 'Linen', quantity: 300, unit: 'pcs', price: 120, expiryDate: '', purchaseDate: '2025-01-10' },
+                { id: 'inv_linen_3', barcode: 'LIN-1003', name: 'Surgical Gown (Sterile Blue)', category: 'Surgical', department: 'Linen', quantity: 85, unit: 'pcs', price: 680, expiryDate: '', purchaseDate: '2025-02-01' },
+                { id: 'inv_linen_4', barcode: 'LIN-1004', name: 'ICU Blanket (Heavy Woolen)', category: 'Bedding', department: 'Linen', quantity: 60, unit: 'pcs', price: 1250, expiryDate: '', purchaseDate: '2025-01-15' },
+                { id: 'inv_linen_5', barcode: 'LIN-1005', name: 'Doctor Apron / Lab Coat', category: 'Apparel', department: 'Linen', quantity: 40, unit: 'pcs', price: 850, expiryDate: '', purchaseDate: '2025-02-10' }
+            ];
             if (!Array.isArray(DB.get('inventory')) || DB.get('inventory').length === 0) {
-                DB.set('inventory', []);
+                DB.set('inventory', sampleLinenItems);
+            } else {
+                const inv = DB.get('inventory');
+                if (!inv.some(i => (i.department || '').toLowerCase() === 'linen')) {
+                    inv.push(...sampleLinenItems);
+                    DB.set('inventory', inv);
+                }
             }
             if (!Array.isArray(DB.get('inventory_receipts')) || DB.get('inventory_receipts').length === 0) {
                 DB.set('inventory_receipts', []);

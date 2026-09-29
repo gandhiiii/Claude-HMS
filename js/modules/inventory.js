@@ -124,16 +124,20 @@ function renderInventory(container) {
 
     container.innerHTML = `
         <div class="tabs" style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-            <button class="tab-btn active" onclick="switchInvView('items',this)">${T('invmod_tab_items')}</button>
-            <button class="tab-btn" onclick="switchInvView('stockout',this)">${T('invmod_tab_stock_out')}</button>
-            <button class="tab-btn" onclick="switchInvView('dept',this)">${T('invmod_tab_dept')}</button>
-            <button class="tab-btn" onclick="switchInvView('movements',this)">${T('invmod_tab_movements')}</button>
+            <button class="tab-btn ${invView === 'items' ? 'active' : ''}" onclick="switchInvView('items',this)">${T('invmod_tab_items')}</button>
+            <button class="tab-btn ${invView === 'stockout' ? 'active' : ''}" onclick="switchInvView('stockout',this)">${T('invmod_tab_stock_out')}</button>
+            <button class="tab-btn ${invView === 'dept' ? 'active' : ''}" onclick="switchInvView('dept',this)">${T('invmod_tab_dept')}</button>
+            <button class="tab-btn ${invView === 'movements' ? 'active' : ''}" onclick="switchInvView('movements',this)">${T('invmod_tab_movements')}</button>
+            <button class="tab-btn ${invView === 'linen' ? 'active' : ''}" onclick="switchInvView('linen',this)">🛏️ Linen</button>
         </div>
         <div id="invContent">
             ${renderInvItemsTab()}
         </div>
     `;
     setTimeout(() => {
+        if (invView === 'linen') {
+            invDeptFilter = 'Linen';
+        }
         renderInvList();
         initGlobalBarcodeScanner();
     }, 50);
@@ -169,6 +173,13 @@ function switchInvView(view, btn) {
     } else if (view === 'movements') {
         content.innerHTML = renderInvMovementsTab();
         setTimeout(() => renderInvMovementsView(), 50);
+    } else if (view === 'linen') {
+        invDeptFilter = 'Linen';
+        content.innerHTML = renderInvItemsTab();
+        setTimeout(() => {
+            renderInvList();
+            initGlobalBarcodeScanner();
+        }, 50);
     }
 }
 
@@ -231,13 +242,23 @@ function renderInvItemsTab() {
 let invDeptFilter = '';
 
 function renderInvDeptFilters() {
-    const items = DB.get('inventory');
-    const depts = [...new Set(items.map(i => i.department).filter(Boolean))];
+    const items = DB.get('inventory') || [];
+    const dbDepts = (DB.get('departments') || []).map(d => d.name).filter(Boolean);
+    const itemDepts = items.map(i => i.department).filter(Boolean);
+    const stdDepts = ['Nursing', 'Biomedical', 'Facility', 'OT', 'IT', 'Linen'];
+
+    const deptsSet = new Set();
+    stdDepts.forEach(d => deptsSet.add(d));
+    dbDepts.forEach(d => deptsSet.add(d));
+    itemDepts.forEach(d => deptsSet.add(d));
+    const depts = Array.from(deptsSet);
+
     const el = document.getElementById('invDeptFilters');
     if (!el) return;
-    let html = `<button class="btn btn-sm ${!invDeptFilter ? 'btn-primary' : 'btn-outline'}" onclick="setInvDeptFilter('')">${T('invmod_btn_all')}</button>`;
+    let html = `<button class="btn btn-sm ${!invDeptFilter ? 'btn-primary' : 'btn-outline'}" onclick="setInvDeptFilter('')" style="${!invDeptFilter ? 'background:#1d4ed8;color:#fff;border-color:#1d4ed8;' : 'background:#f1f5f9;color:#334155;border-color:#cbd5e1;'} font-weight:600;padding:6px 16px;border-radius:20px;transition:all 0.2s ease;">${T('invmod_btn_all') || 'All'}</button>`;
     depts.forEach(d => {
-        html += `<button class="btn btn-sm ${invDeptFilter === d ? 'btn-primary' : 'btn-outline'}" onclick="setInvDeptFilter('${d}')">${d}</button>`;
+        const isActive = invDeptFilter.toLowerCase() === d.toLowerCase();
+        html += `<button class="btn btn-sm ${isActive ? 'btn-primary' : 'btn-outline'}" onclick="setInvDeptFilter('${d}')" style="${isActive ? 'background:#1d4ed8;color:#fff;border-color:#1d4ed8;' : 'background:#f1f5f9;color:#334155;border-color:#cbd5e1;'} font-weight:600;padding:6px 16px;border-radius:20px;transition:all 0.2s ease;">${d}</button>`;
     });
     el.innerHTML = html;
 }
