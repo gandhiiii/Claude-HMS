@@ -45,17 +45,13 @@ var WS_NOTIFY = (function () {
             if (window.WS_SERVER_URL && window.WS_SERVER_URL.startsWith('ws')) {
                 return window.WS_SERVER_URL;
             }
-            // On HTTPS origins (such as GitHub Pages), unencrypted ws:// connections are blocked
-            // by browser Mixed Content Security. Return null to rely on Supabase Realtime WSS.
-            if (window.location && window.location.protocol === 'https:') {
-                return null;
+            if (window.location && window.location.host && window.location.protocol !== 'file:') {
+                var proto = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+                return proto + window.location.host;
             }
-            var host = (window.location && window.location.hostname && window.location.hostname !== '' && window.location.hostname !== 'file:')
-                ? window.location.hostname
-                : 'localhost';
-            return 'ws://' + host + ':8765';
+            return 'ws://localhost:3000';
         } catch (e) {
-            return 'ws://localhost:8765';
+            return null;
         }
     }
 

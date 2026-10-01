@@ -1,0 +1,8 @@
+{
+  "name": "Stavya Intelligence HMS",
+  "description": "Comprehensive Hospital Management System (HMS) featuring patient admissions, departmental checklists, biomedical inventory, discount permissions, tasks, and real-time operations management.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
