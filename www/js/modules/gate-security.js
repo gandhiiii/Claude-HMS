@@ -233,10 +233,10 @@ function executeGateScan(scannedCode) {
                 code: cleanCode,
                 name: ptVisit.patientName + (ptVisit.age ? ' (' + ptVisit.age + 'y)' : ''),
                 type: 'Visitor Pass',
-                action: 'GATE OUT',
+                action: 'GATE OUT (DEACTIVATED)',
                 direction: 'out',
                 timestamp: now,
-                details: 'Purpose: ' + (ptVisit.purpose || '-'),
+                details: 'Pass Automatically Deactivated',
                 user: AUTH.currentUser()?.fullName || 'Gate Security'
             };
             gateScanLogs.unshift(logEntry);
@@ -244,21 +244,53 @@ function executeGateScan(scannedCode) {
                 status: 'success',
                 action: 'GATE OUT',
                 direction: 'out',
-                title: '📤 GATE EXIT ALLOWED (OUT)',
+                title: '📤 GATE EXIT ALLOWED & PASS DEACTIVATED',
                 name: ptVisit.patientName,
                 code: cleanCode,
-                subText: 'Visitor Checked Out Successfully',
+                subText: 'Visitor Checked Out — QR Code Pass Permanently Deactivated',
                 details: [
                     { label: 'Patient Name', val: ptVisit.patientName + ' (' + ptVisit.age + 'y, ' + ptVisit.gender + ')' },
                     { label: 'Phone', val: ptVisit.phone },
                     { label: 'Purpose', val: ptVisit.purpose || '-' },
                     { label: 'Department', val: ptVisit.department || '-' },
                     { label: 'Check-IN Time', val: APP.formatDateTime(ptVisit.entryTime) },
-                    { label: 'Check-OUT Time', val: APP.formatDateTime(now) }
+                    { label: 'Check-OUT Time', val: APP.formatDateTime(now) },
+                    { label: 'Pass Status', val: '⛔ PERMANENTLY DEACTIVATED' }
                 ]
             });
             renderPatientList();
             if (document.getElementById('genPassBody')) renderGenPassList();
+            renderGateScanLogsTable();
+            return;
+        } else if (ptVisit.status === 'completed') {
+            playGateAudioFeedback(false);
+            const logEntry = {
+                id: 'SCAN-' + Date.now(),
+                code: cleanCode,
+                name: ptVisit.patientName + (ptVisit.age ? ' (' + ptVisit.age + 'y)' : ''),
+                type: 'Visitor Pass',
+                action: 'DENIED (DEACTIVATED)',
+                direction: 'out',
+                timestamp: new Date().toISOString(),
+                details: 'Attempted to use deactivated pass (Checked OUT: ' + APP.formatDateTime(ptVisit.exitTime) + ')',
+                user: AUTH.currentUser()?.fullName || 'Gate Security'
+            };
+            gateScanLogs.unshift(logEntry);
+            displayGateScanResult({
+                status: 'error',
+                action: 'DEACTIVATED',
+                title: '⛔ QR CODE DEACTIVATED & EXPIRED',
+                name: ptVisit.patientName,
+                code: cleanCode,
+                subText: 'This Visitor Pass was already scanned for OUT at ' + APP.formatDateTime(ptVisit.exitTime) + ' and is permanently DEACTIVATED. Access Denied!',
+                details: [
+                    { label: 'Patient Name', val: ptVisit.patientName + ' (' + ptVisit.age + 'y, ' + ptVisit.gender + ')' },
+                    { label: 'Phone', val: ptVisit.phone },
+                    { label: 'Checked Out At', val: APP.formatDateTime(ptVisit.exitTime) },
+                    { label: 'Pass Status', val: 'DEACTIVATED (CHECKED OUT)' },
+                    { label: 'Gate Access', val: '❌ ACCESS DENIED (PASS EXPIRED)' }
+                ]
+            });
             renderGateScanLogsTable();
             return;
         } else {
@@ -336,6 +368,36 @@ function executeGateScan(scannedCode) {
                 ]
             });
             return;
+        } else if (drVisit.status === 'completed') {
+            playGateAudioFeedback(false);
+            const logEntry = {
+                id: 'SCAN-' + Date.now(),
+                code: cleanCode,
+                name: 'Dr. ' + drVisit.doctorName,
+                type: 'Doctor Pass',
+                action: 'DENIED (DEACTIVATED)',
+                direction: 'out',
+                timestamp: new Date().toISOString(),
+                details: 'Doctor pass already deactivated at ' + APP.formatDateTime(drVisit.exitTime),
+                user: AUTH.currentUser()?.fullName || 'Gate Security'
+            };
+            gateScanLogs.unshift(logEntry);
+            displayGateScanResult({
+                status: 'error',
+                action: 'DEACTIVATED',
+                title: '⛔ DOCTOR PASS DEACTIVATED & EXPIRED',
+                name: 'Dr. ' + drVisit.doctorName,
+                code: cleanCode,
+                subText: 'This Doctor Pass was already checked out at ' + APP.formatDateTime(drVisit.exitTime) + ' and is permanently DEACTIVATED. Access Denied!',
+                details: [
+                    { label: 'Doctor Name', val: drVisit.doctorName + ' (' + drVisit.specialization + ')' },
+                    { label: 'Phone', val: drVisit.phone },
+                    { label: 'Checked Out At', val: APP.formatDateTime(drVisit.exitTime) },
+                    { label: 'Status', val: 'DEACTIVATED (CHECKED OUT)' }
+                ]
+            });
+            renderGateScanLogsTable();
+            return;
         } else if (drVisit.status === 'active') {
             const now = new Date().toISOString();
             DB.update('doctorVisits', drVisit.id, { status: 'completed', exitTime: now });
@@ -345,10 +407,10 @@ function executeGateScan(scannedCode) {
                 code: cleanCode,
                 name: 'Dr. ' + drVisit.doctorName,
                 type: 'Doctor Pass',
-                action: 'GATE OUT',
+                action: 'GATE OUT (DEACTIVATED)',
                 direction: 'out',
                 timestamp: now,
-                details: 'Doctor Checked Out',
+                details: 'Doctor Checked Out — Pass Deactivated',
                 user: AUTH.currentUser()?.fullName || 'Gate Security'
             };
             gateScanLogs.unshift(logEntry);
@@ -356,15 +418,16 @@ function executeGateScan(scannedCode) {
                 status: 'success',
                 action: 'GATE OUT',
                 direction: 'out',
-                title: '📤 DOCTOR GATE EXIT (OUT)',
+                title: '📤 DOCTOR GATE EXIT & PASS DEACTIVATED',
                 name: 'Dr. ' + drVisit.doctorName,
                 code: cleanCode,
-                subText: 'Doctor Checked Out Successfully',
+                subText: 'Doctor Checked Out — QR Pass Permanently Deactivated',
                 details: [
                     { label: 'Doctor Name', val: drVisit.doctorName + ' (' + drVisit.specialization + ')' },
                     { label: 'Hospital', val: drVisit.hospital || '-' },
                     { label: 'Phone', val: drVisit.phone },
-                    { label: 'Check-OUT Time', val: APP.formatDateTime(now) }
+                    { label: 'Check-OUT Time', val: APP.formatDateTime(now) },
+                    { label: 'Pass Status', val: '⛔ PERMANENTLY DEACTIVATED' }
                 ]
             });
             renderDoctorList();
@@ -441,6 +504,35 @@ function executeGateScan(scannedCode) {
                     { label: 'Vehicle No', val: goodsEntry.vehicleNo || '-' }
                 ]
             });
+            return;
+        } else if (goodsEntry.status === 'completed') {
+            playGateAudioFeedback(false);
+            const logEntry = {
+                id: 'SCAN-' + Date.now(),
+                code: cleanCode,
+                name: goodsEntry.itemName + ' (' + (goodsEntry.vehicleNo || 'No Vehicle') + ')',
+                type: 'Goods Gate Pass',
+                action: 'DENIED (DEACTIVATED)',
+                direction: 'out',
+                timestamp: new Date().toISOString(),
+                details: 'Goods pass already completed/deactivated',
+                user: AUTH.currentUser()?.fullName || 'Gate Security'
+            };
+            gateScanLogs.unshift(logEntry);
+            displayGateScanResult({
+                status: 'error',
+                action: 'DEACTIVATED',
+                title: '⛔ GOODS GATE PASS DEACTIVATED',
+                name: goodsEntry.itemName,
+                code: cleanCode,
+                subText: 'This Goods Pass was already processed at ' + APP.formatDateTime(goodsEntry.checkOutTime || goodsEntry.checkInTime) + ' and is permanently DEACTIVATED.',
+                details: [
+                    { label: 'Item Name', val: goodsEntry.itemName },
+                    { label: 'Vehicle No', val: goodsEntry.vehicleNo || '-' },
+                    { label: 'Status', val: 'DEACTIVATED (COMPLETED)' }
+                ]
+            });
+            renderGateScanLogsTable();
             return;
         } else {
             const now = new Date().toISOString();
@@ -757,44 +849,44 @@ function printGoodsPass(id) {
     if (!e) return;
     if (e.status !== 'approved') { APP.notify('Entry is not approved yet', 'error'); return; }
     const code = e.gatePassNo || e.id;
-    const win = window.open('', '_blank', 'width=500,height=700');
+    const win = window.open('', '_blank', 'width=380,height=550');
     win.document.write('<html><head><title>Gate Pass - ' + e.itemName + '</title>' +
         '<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>' +
-        '<style>body{font-family:Arial;margin:0;padding:20px;text-align:center;}' +
-        '.pass{border:2px dashed #333;border-radius:12px;padding:20px;max-width:380px;margin:0 auto;}' +
-        '.header{font-size:11px;color:#666;margin-bottom:4px;}' +
-        '.title{font-size:20px;font-weight:700;margin-bottom:12px;}' +
-        '.code{font-family:monospace;font-size:20px;font-weight:700;letter-spacing:2px;margin:8px 0;}' +
-        '.info{border-top:1px solid #ddd;padding-top:8px;font-size:13px;text-align:left;}' +
-        '.info div{margin-bottom:3px;}' +
-        '.stamp{color:green;font-size:24px;font-weight:700;border:3px solid green;border-radius:8px;padding:6px 14px;display:inline-block;margin:6px 0;transform:rotate(-5deg);}' +
-        '@media print{body{padding:10px;}.pass{border-color:#999;}}' +
+        '<style>' +
+        '@page { size: auto; margin: 0mm; } ' +
+        'html, body { font-family: Arial, sans-serif; margin: 0 !important; padding: 0 !important; text-align: center; background: #fff; color: #000; width: 100%; } ' +
+        '.pass { border: 2px dashed #000; border-radius: 8px; padding: 8px; max-width: 280px; margin: 4px auto; box-sizing: border-box; page-break-inside: avoid; break-inside: avoid; } ' +
+        '.header { font-size: 10px; font-weight: 700; color: #333; margin-bottom: 2px; letter-spacing: 0.5px; } ' +
+        '.title { font-size: 16px; font-weight: 800; margin-bottom: 4px; text-transform: uppercase; } ' +
+        '.code { font-family: monospace; font-size: 18px; font-weight: 800; letter-spacing: 2px; margin: 4px 0; } ' +
+        '.info { border-top: 1px dashed #000; padding-top: 6px; font-size: 11px; text-align: left; line-height: 1.3; } ' +
+        '.info div { margin-bottom: 2px; } ' +
+        '.stamp { color: green; font-size: 14px; font-weight: 800; border: 2px solid green; border-radius: 6px; padding: 2px 8px; display: inline-block; margin: 4px 0; } ' +
+        '@media print { html, body { margin: 0 !important; padding: 0 !important; } .pass { border: 1px dashed #000 !important; } * { page-break-inside: avoid !important; break-inside: avoid !important; } }' +
         '<\/style></head><body>' +
         '<div class="pass">' +
         '<div class="header">HOSPITAL MANAGEMENT SYSTEM</div>' +
         '<div class="title">GOODS GATE PASS</div>' +
         '<div class="stamp">APPROVED</div>' +
-        '<div id="qrPrintGoods" style="display:flex;justify-content:center;margin:10px 0;"></div>' +
+        '<div id="qrPrintGoods" style="display:flex;justify-content:center;margin:4px 0;"></div>' +
         '<div class="code">' + code + '</div>' +
-        '<div style="font-size:14px;font-weight:700;margin:8px 0;">' + e.itemName + '</div>' +
+        '<div style="font-size:13px;font-weight:700;margin:4px 0;">' + e.itemName + '</div>' +
         '<div class="info">' +
-        '<div><strong>Direction:</strong> ' + e.direction.toUpperCase() + '</div>' +
+        '<div><strong>Direction:</strong> ' + (e.direction||'').toUpperCase() + '</div>' +
         '<div><strong>Department:</strong> ' + (e.department || '-') + '</div>' +
         '<div><strong>Vehicle:</strong> ' + (e.vehicleNo || '-') + '</div>' +
         '<div><strong>Driver:</strong> ' + (e.driverName || '-') + ' ' + (e.driverPhone || '') + '</div>' +
-        '<div><strong>Quantity:</strong> ' + (e.quantity || '-') + '</div>' +
         '<div><strong>Vendor:</strong> ' + (e.vendor || '-') + '</div>' +
         '<div><strong>Gate Pass No:</strong> ' + (e.gatePassNo || '-') + '</div>' +
-        '<div><strong>Purpose:</strong> ' + (e.purpose || '-') + '</div>' +
         '<div><strong>Approved By:</strong> ' + (e.approvedBy || '-') + '</div>' +
-        '<div style="font-size:11px;color:#666;margin-top:4px;">Date: ' + APP.formatDateTime(e.createdAt) + '</div>' +
+        '<div><strong>Date:</strong> ' + APP.formatDateTime(e.createdAt) + '</div>' +
         '</div></div>' +
         '<script>' +
         'setTimeout(function(){' +
         'var c=document.getElementById("qrPrintGoods");' +
         'if(c && typeof QRCode!=="undefined"){' +
-        'new QRCode(c,{text:"' + code + '",width:130,height:130,colorDark:"#000",colorLight:"#fff",correctLevel:QRCode.CorrectLevel.H});' +
-        'setTimeout(function(){window.print();window.close();},500);' +
+        'new QRCode(c,{text:"' + code + '",width:110,height:110,colorDark:"#000",colorLight:"#fff",correctLevel:QRCode.CorrectLevel.H});' +
+        'setTimeout(function(){window.print();window.close();},400);' +
         '} else { setTimeout(function(){window.print();window.close();},300); }' +
         '},200);' +
         '<\/script></body></html>');
@@ -1182,17 +1274,22 @@ function savePatientVisit() {
 function viewPatientPass(id) {
     const v = DB.getById('patientVisits', id);
     if (!v) return;
+    const isDeactivated = v.status === 'completed';
     showModal(`
         <div class="modal-header">
-            <h3>Visitor Pass</h3>
+            <h3>Visitor Pass ${isDeactivated ? '(Deactivated)' : ''}</h3>
             <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
         </div>
         <div style="text-align:center;padding:16px;">
-            <div style="background:#f0f6ff;border:2px dashed var(--primary);border-radius:12px;padding:20px;display:inline-block;max-width:350px;">
+            <div style="background:${isDeactivated ? '#fff0f0' : '#f0f6ff'};border:2px dashed ${isDeactivated ? '#ef4444' : 'var(--primary)'};border-radius:12px;padding:20px;display:inline-block;max-width:350px;position:relative;overflow:hidden;">
+                ${isDeactivated ? '<div style="position:absolute;top:15px;right:-35px;background:#ef4444;color:#fff;font-size:10px;font-weight:800;padding:4px 35px;transform:rotate(45deg);box-shadow:0 2px 4px rgba(0,0,0,0.2);letter-spacing:1px;z-index:10;">DEACTIVATED</div>' : ''}
                 <div style="font-size:12px;color:var(--gray);margin-bottom:4px;">HOSPITAL MANAGEMENT SYSTEM</div>
                 <div style="font-size:18px;font-weight:700;margin-bottom:12px;">VISITOR PASS</div>
-                <div id="qrPassView" style="display:flex;justify-content:center;margin-bottom:8px;"></div>
-                <div style="font-family:monospace;font-size:22px;font-weight:700;letter-spacing:3px;margin-bottom:8px;">${v.uniqueCode}</div>
+                <div style="position:relative;display:inline-block;">
+                    <div id="qrPassView" style="display:flex;justify-content:center;margin-bottom:8px;${isDeactivated ? 'opacity:0.35;filter:grayscale(100%);' : ''}"></div>
+                    ${isDeactivated ? '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(220,38,38,0.9);color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:800;letter-spacing:1px;white-space:nowrap;box-shadow:0 4px 6px rgba(0,0,0,0.3);">⛔ DEACTIVATED</div>' : ''}
+                </div>
+                <div style="font-family:monospace;font-size:22px;font-weight:700;letter-spacing:3px;margin-bottom:8px;${isDeactivated ? 'text-decoration:line-through;color:#94a3b8;' : ''}">${v.uniqueCode}</div>
                 ${v.photo ? '<div style="margin:8px auto;width:80px;height:80px;border-radius:50%;overflow:hidden;border:2px solid #ddd;"><img src="'+v.photo+'" style="width:100%;height:100%;object-fit:cover;"></div>' : ''}
                 <div style="border-top:1px solid #ddd;padding-top:8px;font-size:13px;text-align:left;">
                     <div><strong>Patient:</strong> ${v.patientName} (${v.age}y, ${v.gender})</div>
@@ -1202,8 +1299,8 @@ function viewPatientPass(id) {
                     ${v.doctorName ? '<div><strong>Doctor:</strong> '+v.doctorName+'</div>' : ''}
                     ${v.attendantName ? '<div><strong>Attendant:</strong> '+v.attendantName+' '+(v.attendantPhone||'')+'</div>' : ''}
                     <div style="font-size:11px;color:var(--gray);margin-top:4px;">Entry: ${APP.formatDateTime(v.entryTime)}</div>
-                    ${v.exitTime ? '<div style="font-size:11px;color:var(--gray);">Exit: '+APP.formatDateTime(v.exitTime)+'</div>' : ''}
-                    <div style="margin-top:6px;"><span class="badge ${v.status === 'active' ? 'badge-success' : 'badge-secondary'}">${v.status === 'active' ? 'ACTIVE - Inside' : 'CHECKED OUT'}</span></div>
+                    ${v.exitTime ? '<div style="font-size:11px;color:var(--danger);font-weight:600;">Exit: '+APP.formatDateTime(v.exitTime)+'</div>' : ''}
+                    <div style="margin-top:6px;"><span class="badge ${v.status === 'active' ? 'badge-success' : 'badge-danger'}">${v.status === 'active' ? 'ACTIVE - Inside' : 'CHECKED OUT (DEACTIVATED)'}</span></div>
                 </div>
             </div>
             <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
@@ -1225,41 +1322,46 @@ function viewPatientPass(id) {
 function printPatientPass(id) {
     const v = DB.getById('patientVisits', id);
     if (!v) return;
-    const win = window.open('', '_blank', 'width=400,height=600');
-    win.document.write('<html><head><title>Visitor Pass</title>' +
+    const isDeactivated = v.status === 'completed';
+    const win = window.open('', '_blank', 'width=380,height=550');
+    win.document.write('<html><head><title>Visitor Pass - ' + v.uniqueCode + '</title>' +
         '<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>' +
-        '<style>body{font-family:Arial;margin:0;padding:20px;text-align:center;} ' +
-        '.pass{border:2px dashed #333;border-radius:12px;padding:20px;max-width:320px;margin:0 auto;} ' +
-        '.header{font-size:11px;color:#666;margin-bottom:4px;} ' +
-        '.title{font-size:20px;font-weight:700;margin-bottom:12px;} ' +
-        '.code{font-family:monospace;font-size:24px;font-weight:700;letter-spacing:3px;margin:8px 0;} ' +
-        '.info{border-top:1px solid #ddd;padding-top:8px;font-size:13px;text-align:left;} ' +
-        '.info div{margin-bottom:3px;} ' +
-        '@media print{body{padding:10px;}.pass{border-color:#999;}}' +
+        '<style>' +
+        '@page { size: auto; margin: 0mm; } ' +
+        'html, body { font-family: Arial, sans-serif; margin: 0 !important; padding: 0 !important; text-align: center; background: #fff; color: #000; width: 100%; } ' +
+        '.pass { border: 2px dashed #000; border-radius: 8px; padding: 8px; max-width: 280px; margin: 4px auto; box-sizing: border-box; page-break-inside: avoid; break-inside: avoid; } ' +
+        '.header { font-size: 10px; font-weight: 700; color: #333; margin-bottom: 2px; letter-spacing: 0.5px; } ' +
+        '.title { font-size: 16px; font-weight: 800; margin-bottom: 4px; text-transform: uppercase; } ' +
+        '.code { font-family: monospace; font-size: 18px; font-weight: 800; letter-spacing: 2px; margin: 4px 0; } ' +
+        '.info { border-top: 1px dashed #000; padding-top: 6px; font-size: 11px; text-align: left; line-height: 1.3; } ' +
+        '.info div { margin-bottom: 2px; } ' +
+        '.status-badge { display: inline-block; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px; border: 1px solid #000; margin-top: 4px; } ' +
+        '@media print { html, body { margin: 0 !important; padding: 0 !important; } .pass { border: 1px dashed #000 !important; } * { page-break-inside: avoid !important; break-inside: avoid !important; } }' +
         '<\/style></head><body>' +
         '<div class="pass">' +
         '<div class="header">HOSPITAL MANAGEMENT SYSTEM</div>' +
         '<div class="title">VISITOR PASS</div>' +
-        '<div id="qrPrint" style="display:flex;justify-content:center;margin-bottom:8px;"></div>' +
+        '<div id="qrPrint" style="display:flex;justify-content:center;margin:4px 0;"></div>' +
         '<div class="code">' + v.uniqueCode + '</div>' +
-        (v.photo ? '<div style="margin:8px auto;width:80px;height:80px;border-radius:50%;overflow:hidden;border:2px solid #ddd;"><img src="' + v.photo + '" style="width:100%;height:100%;object-fit:cover;"></div>' : '') +
+        (v.photo ? '<div style="margin:4px auto;width:60px;height:60px;border-radius:50%;overflow:hidden;border:1px solid #333;"><img src="' + v.photo + '" style="width:100%;height:100%;object-fit:cover;"></div>' : '') +
         '<div class="info">' +
-        '<div><strong>Patient:</strong> ' + v.patientName + ' (' + v.age + 'y, ' + v.gender + ')</div>' +
+        '<div><strong>Patient:</strong> ' + v.patientName + (v.age ? ' (' + v.age + 'y, ' + (v.gender||'') + ')' : '') + '</div>' +
         '<div><strong>Phone:</strong> ' + v.phone + '</div>' +
         '<div><strong>Purpose:</strong> ' + (v.purpose || '-') + '</div>' +
         (v.department ? '<div><strong>Dept:</strong> ' + v.department + '</div>' : '') +
         (v.doctorName ? '<div><strong>Doctor:</strong> ' + v.doctorName + '</div>' : '') +
         (v.attendantName ? '<div><strong>Attendant:</strong> ' + v.attendantName + ' ' + (v.attendantPhone || '') + '</div>' : '') +
-        '<div style="font-size:11px;color:#666;margin-top:4px;">Entry: ' + APP.formatDateTime(v.entryTime) + '</div>' +
-        (v.exitTime ? '<div style="font-size:11px;color:#666;">Exit: ' + APP.formatDateTime(v.exitTime) + '</div>' : '') +
+        '<div><strong>Entry:</strong> ' + APP.formatDateTime(v.entryTime) + '</div>' +
+        (v.exitTime ? '<div><strong>Exit:</strong> ' + APP.formatDateTime(v.exitTime) + '</div>' : '') +
+        (isDeactivated ? '<div class="status-badge">STATUS: CHECKED OUT (DEACTIVATED)</div>' : '') +
         '</div></div>' +
         '<script>' +
         'setTimeout(function(){' +
         'var c=document.getElementById("qrPrint");' +
         'if(c && typeof QRCode!=="undefined"){' +
-        'new QRCode(c,{text:"' + v.uniqueCode + '",width:130,height:130,colorDark:"#000",colorLight:"#fff",correctLevel:QRCode.CorrectLevel.H});' +
-        'setTimeout(function(){window.print();window.close();},500);' +
-        '}' +
+        'new QRCode(c,{text:"' + v.uniqueCode + '",width:110,height:110,colorDark:"#000",colorLight:"#fff",correctLevel:QRCode.CorrectLevel.H});' +
+        'setTimeout(function(){window.print();window.close();},400);' +
+        '} else { setTimeout(function(){window.print();window.close();},300); }' +
         '},200);' +
         '<\/script></body></html>');
     win.document.close();
@@ -1304,12 +1406,61 @@ function processScanCode() {
     const code = (document.getElementById('scanCodeInput')?.value || '').trim().toUpperCase();
     const result = document.getElementById('scanResult');
     if (!code) { result.innerHTML = '<span style="color:red;">Please enter a code</span>'; return; }
-    const visits = DB.get('patientVisits');
-    const visit = visits.find(v => v.uniqueCode.toUpperCase() === code);
-    if (!visit) { result.innerHTML = '<span style="color:red;">❌ No visit found with code "' + code + '"</span>'; return; }
-    if (visit.status === 'completed') { result.innerHTML = '<span style="color:orange;">⚠️ This pass was already used. Patient checked out at ' + APP.formatDateTime(visit.exitTime) + '.</span>'; return; }
-    result.innerHTML = '<span style="color:green;">✅ Found: ' + visit.patientName + ' (entered ' + APP.formatDateTime(visit.entryTime) + ')</span>' +
-        '<div style="margin-top:8px;"><button class="btn btn-danger" onclick="checkOutPatient(\'' + visit.id + '\');document.getElementById(\'scanCodeInput\').value=\'\';document.getElementById(\'scanResult\').innerHTML=\'<span style=color:green;>✓ Checked out</span>\';">Confirm Check Out</button></div>';
+    
+    // Check patientVisits
+    const visits = DB.get('patientVisits') || [];
+    const visit = visits.find(v => (v.uniqueCode || '').toUpperCase() === code);
+    
+    if (visit) {
+        if (visit.status === 'completed') {
+            playGateAudioFeedback(false);
+            result.innerHTML = '<div style="background:#fee2e2;border:1px solid #ef4444;border-radius:8px;padding:12px;color:#991b1b;margin-top:8px;">' +
+                '<strong>⛔ QR CODE DEACTIVATED & EXPIRED</strong><br>' +
+                'Patient: ' + visit.patientName + '<br>' +
+                'Already checked out at: ' + APP.formatDateTime(visit.exitTime) + '<br>' +
+                '<span style="font-size:12px;color:#dc2626;">This pass cannot be used again.</span></div>';
+            return;
+        }
+        
+        const now = new Date().toISOString();
+        DB.update('patientVisits', visit.id, { status: 'completed', exitTime: now });
+        playGateAudioFeedback(true, true);
+        result.innerHTML = '<div style="background:#dcfce7;border:1px solid #22c55e;border-radius:8px;padding:12px;color:#166534;margin-top:8px;">' +
+            '<strong>✅ CHECKED OUT & QR CODE DEACTIVATED</strong><br>' +
+            'Patient: ' + visit.patientName + '<br>' +
+            'Check-OUT Time: ' + APP.formatDateTime(now) + '<br>' +
+            '<span style="font-size:12px;color:#15803d;">Pass permanently deactivated.</span></div>';
+        renderPatientList();
+        if (document.getElementById('genPassBody')) renderGenPassList();
+        return;
+    }
+    
+    // Check doctorVisits
+    const drVisits = DB.get('doctorVisits') || [];
+    const drVisit = drVisits.find(v => (v.uniqueCode || '').toUpperCase() === code);
+    if (drVisit) {
+        if (drVisit.status === 'completed') {
+            playGateAudioFeedback(false);
+            result.innerHTML = '<div style="background:#fee2e2;border:1px solid #ef4444;border-radius:8px;padding:12px;color:#991b1b;margin-top:8px;">' +
+                '<strong>⛔ DOCTOR QR CODE DEACTIVATED</strong><br>' +
+                'Doctor: Dr. ' + drVisit.doctorName + '<br>' +
+                'Already checked out at: ' + APP.formatDateTime(drVisit.exitTime) + '</div>';
+            return;
+        }
+        
+        const now = new Date().toISOString();
+        DB.update('doctorVisits', drVisit.id, { status: 'completed', exitTime: now });
+        playGateAudioFeedback(true, true);
+        result.innerHTML = '<div style="background:#dcfce7;border:1px solid #22c55e;border-radius:8px;padding:12px;color:#166534;margin-top:8px;">' +
+            '<strong>✅ DOCTOR CHECKED OUT & DEACTIVATED</strong><br>' +
+            'Doctor: Dr. ' + drVisit.doctorName + '<br>' +
+            'Check-OUT Time: ' + APP.formatDateTime(now) + '</div>';
+        renderDoctorList();
+        if (document.getElementById('genPassBody')) renderGenPassList();
+        return;
+    }
+
+    result.innerHTML = '<span style="color:red;">❌ No active pass found with code "' + code + '"</span>';
 }
 
 /* ==================== DOCTOR VISITS ==================== */
@@ -1600,42 +1751,44 @@ function viewDoctorPass(id) {
 function printDoctorPass(id) {
     const v = DB.getById('doctorVisits', id);
     if (!v) return;
-    if (v.status !== 'active') { APP.notify('Pass is not yet approved. Cannot print.', 'error'); return; }
-    const win = window.open('', '_blank', 'width=400,height=600');
-    win.document.write('<html><head><title>Doctor Pass</title>' +
+    if (v.status !== 'active') { APP.notify('Pass is not active/approved. Cannot print.', 'error'); return; }
+    const win = window.open('', '_blank', 'width=380,height=550');
+    win.document.write('<html><head><title>Doctor Pass - ' + v.uniqueCode + '</title>' +
         '<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>' +
-        '<style>body{font-family:Arial;margin:0;padding:20px;text-align:center;} ' +
-        '.pass{border:2px dashed #333;border-radius:12px;padding:20px;max-width:320px;margin:0 auto;} ' +
-        '.header{font-size:11px;color:#666;margin-bottom:4px;} ' +
-        '.title{font-size:20px;font-weight:700;margin-bottom:12px;} ' +
-        '.code{font-family:monospace;font-size:24px;font-weight:700;letter-spacing:3px;margin:8px 0;} ' +
-        '.info{border-top:1px solid #ddd;padding-top:8px;font-size:13px;text-align:left;} ' +
-        '.info div{margin-bottom:3px;} ' +
-        '@media print{body{padding:10px;}.pass{border-color:#999;}}' +
+        '<style>' +
+        '@page { size: auto; margin: 0mm; } ' +
+        'html, body { font-family: Arial, sans-serif; margin: 0 !important; padding: 0 !important; text-align: center; background: #fff; color: #000; width: 100%; } ' +
+        '.pass { border: 2px dashed #000; border-radius: 8px; padding: 8px; max-width: 280px; margin: 4px auto; box-sizing: border-box; page-break-inside: avoid; break-inside: avoid; } ' +
+        '.header { font-size: 10px; font-weight: 700; color: #333; margin-bottom: 2px; letter-spacing: 0.5px; } ' +
+        '.title { font-size: 16px; font-weight: 800; margin-bottom: 4px; text-transform: uppercase; } ' +
+        '.code { font-family: monospace; font-size: 18px; font-weight: 800; letter-spacing: 2px; margin: 4px 0; } ' +
+        '.info { border-top: 1px dashed #000; padding-top: 6px; font-size: 11px; text-align: left; line-height: 1.3; } ' +
+        '.info div { margin-bottom: 2px; } ' +
+        '@media print { html, body { margin: 0 !important; padding: 0 !important; } .pass { border: 1px dashed #000 !important; } * { page-break-inside: avoid !important; break-inside: avoid !important; } }' +
         '<\/style></head><body>' +
         '<div class="pass">' +
         '<div class="header">HOSPITAL MANAGEMENT SYSTEM</div>' +
         '<div class="title">DOCTOR PASS</div>' +
-        '<div id="qrPrint" style="display:flex;justify-content:center;margin-bottom:8px;"></div>' +
+        '<div id="qrPrint" style="display:flex;justify-content:center;margin:4px 0;"></div>' +
         '<div class="code">' + v.uniqueCode + '</div>' +
-        (v.photo ? '<div style="margin:8px auto;width:80px;height:80px;border-radius:50%;overflow:hidden;border:2px solid #ddd;"><img src="' + v.photo + '" style="width:100%;height:100%;object-fit:cover;"></div>' : '') +
+        (v.photo ? '<div style="margin:4px auto;width:60px;height:60px;border-radius:50%;overflow:hidden;border:1px solid #333;"><img src="' + v.photo + '" style="width:100%;height:100%;object-fit:cover;"></div>' : '') +
         '<div class="info">' +
-        '<div><strong>Doctor:</strong> ' + v.doctorName + ' (' + v.specialization + ')</div>' +
+        '<div><strong>Doctor:</strong> ' + v.doctorName + ' (' + (v.specialization||'') + ')</div>' +
         '<div><strong>Phone:</strong> ' + v.phone + '</div>' +
         '<div><strong>Hospital:</strong> ' + (v.hospital || '-') + '</div>' +
         '<div><strong>Purpose:</strong> ' + (v.purpose || '-') + '</div>' +
         (v.department ? '<div><strong>Dept:</strong> ' + v.department + '</div>' : '') +
         (v.vehicleNo ? '<div><strong>Vehicle:</strong> ' + v.vehicleNo + '</div>' : '') +
-        '<div style="font-size:11px;color:#666;margin-top:4px;">Entry: ' + APP.formatDateTime(v.entryTime) + '</div>' +
-        (v.exitTime ? '<div style="font-size:11px;color:#666;">Exit: ' + APP.formatDateTime(v.exitTime) + '</div>' : '') +
+        '<div><strong>Entry:</strong> ' + APP.formatDateTime(v.entryTime) + '</div>' +
+        (v.exitTime ? '<div><strong>Exit:</strong> ' + APP.formatDateTime(v.exitTime) + '</div>' : '') +
         '</div></div>' +
         '<script>' +
         'setTimeout(function(){' +
         'var c=document.getElementById("qrPrint");' +
         'if(c && typeof QRCode!=="undefined"){' +
-        'new QRCode(c,{text:"' + v.uniqueCode + '",width:130,height:130,colorDark:"#000",colorLight:"#fff",correctLevel:QRCode.CorrectLevel.H});' +
-        'setTimeout(function(){window.print();window.close();},500);' +
-        '}' +
+        'new QRCode(c,{text:"' + v.uniqueCode + '",width:110,height:110,colorDark:"#000",colorLight:"#fff",correctLevel:QRCode.CorrectLevel.H});' +
+        'setTimeout(function(){window.print();window.close();},400);' +
+        '} else { setTimeout(function(){window.print();window.close();},300); }' +
         '},200);' +
         '<\/script></body></html>');
     win.document.close();
