@@ -9,6 +9,7 @@ const http      = require('http');
 const path      = require('path');
 const os        = require('os');
 const WebSocket = require('ws');
+const { Pool }  = require('pg');
 
 const app        = express();
 const httpServer = http.createServer(app);
@@ -17,8 +18,27 @@ const wss        = new WebSocket.Server({ server: httpServer });
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
+/* ── Cloud SQL Connection Pool (Object Method) ── */
+let pool = null;
+function getPool() {
+    if (!pool && process.env.SQL_HOST) {
+        pool = new Pool({
+            host: process.env.SQL_HOST,
+            user: process.env.SQL_USER,
+            password: process.env.SQL_PASSWORD,
+            database: process.env.SQL_DB_NAME,
+            max: 10,
+            connectionTimeoutMillis: 15000,
+        });
+        pool.on('error', (err) => {
+            console.error('Unexpected error on idle SQL pool client:', err);
+        });
+    }
+    return pool;
+}
+
 /* ── Middleware ── */
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 
 /* ── Health check endpoint ── */
 app.get('/health', (req, res) => {
@@ -26,8 +46,74 @@ app.get('/health', (req, res) => {
         status: 'ok',
         service: 'Stavya Intelligence HMS Server',
         clients: wss ? wss.clients.size : 0,
-        uptime: Math.floor(process.uptime()) + 's'
+        uptime: Math.floor(process.uptime()) + 's',
+        cloudSqlConfigured: !!process.env.SQL_HOST
     });
+});
+
+/* ── Cloud SQL Database Sync API ── */
+app.get('/api/db/status', async (req, res) => {
+    const p = getPool();
+    if (!p) {
+        return res.json({ configured: false, provider: 'None (Local / Standby)' });
+    }
+    try {
+        const result = await p.query('SELECT count(*) as count FROM hms_store');
+        res.json({
+            configured: true,
+            provider: 'Google Cloud SQL (PostgreSQL)',
+            database: process.env.SQL_DB_NAME,
+            storedKeys: parseInt(result.rows[0].count, 10)
+        });
+    } catch (e) {
+        res.status(500).json({ configured: true, error: e.message });
+    }
+});
+
+app.get('/api/db/sync', async (req, res) => {
+    const p = getPool();
+    if (!p) return res.json({ connected: false, data: [] });
+    try {
+        const result = await p.query('SELECT key, data, updated_at FROM hms_store');
+        res.json({ connected: true, data: result.rows });
+    } catch (e) {
+        console.error('Cloud SQL sync read error:', e.message);
+        res.status(500).json({ error: 'Failed to fetch from Cloud SQL' });
+    }
+});
+
+app.post('/api/db/sync', async (req, res) => {
+    const p = getPool();
+    if (!p) return res.status(503).json({ error: 'Cloud SQL not configured' });
+    try {
+        const { key, data, items } = req.body;
+        if (items && Array.isArray(items)) {
+            for (const item of items) {
+                if (item.key) {
+                    await p.query(
+                        `INSERT INTO hms_store (key, data, updated_at)
+                         VALUES ($1, $2, NOW())
+                         ON CONFLICT (key) DO UPDATE
+                         SET data = EXCLUDED.data, updated_at = NOW()`,
+                        [item.key, JSON.stringify(item.data)]
+                    );
+                }
+            }
+            return res.json({ success: true, count: items.length });
+        }
+        if (!key) return res.status(400).json({ error: 'Missing key' });
+        await p.query(
+            `INSERT INTO hms_store (key, data, updated_at)
+             VALUES ($1, $2, NOW())
+             ON CONFLICT (key) DO UPDATE
+             SET data = EXCLUDED.data, updated_at = NOW()`,
+            [key, JSON.stringify(data)]
+        );
+        res.json({ success: true, key });
+    } catch (e) {
+        console.error('Cloud SQL sync write error:', e.message);
+        res.status(500).json({ error: 'Failed to write to Cloud SQL' });
+    }
 });
 
 /* ── Serve static files ── */

@@ -1242,67 +1242,414 @@ function printBarcodeSticker(id, copies = 1) {
     if (!item) return;
     const outCode = item.outBarcode || item.barcode || item.id.slice(-10);
     const inCode = item.inBarcode || '';
+    const hs = (typeof getHospitalSettings === 'function') ? getHospitalSettings() : { name: 'STAVYA HMS' };
+    const hospName = (hs && hs.name) ? hs.name.toUpperCase() : 'STAVYA HMS';
+    const itemName = getInvItemName(item);
 
-    const win = window.open('', '_blank', 'width=450,height=340');
-    win.document.write(`
+    const generateHTML = (numCopies, pitchMode = 'standard') => `
         <!DOCTYPE html>
         <html><head>
-        <title>Sticker Print - ${getInvItemName(item)}</title>
+        <meta charset="UTF-8">
+        <title>Barcode Label 50x25mm - ${itemName}</title>
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-        <style>
-            @page { size: 50mm 25mm; margin: 0; }
-            body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 6px; text-align: center; background: #fff; color: #000; }
-            .sticker-card {
-                border: 1px dashed #64748b;
-                padding: 6px 8px;
-                border-radius: 4px;
-                display: inline-block;
-                width: 220px;
-                box-sizing: border-box;
-                margin: 6px auto;
-                background: #fff;
+        <style id="printStyle">
+            @page {
+                size: 50mm 25mm;
+                margin: 0mm !important;
             }
-            .header { font-size: 8px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #334155; border-bottom: 1px solid #cbd5e1; padding-bottom: 2px; margin-bottom: 4px; }
-            .item-name { font-size: 12px; font-weight: 700; line-height: 1.2; max-height: 28px; overflow: hidden; margin-bottom: 4px; word-break: break-word; color: #0f172a; }
-            .bcStickerSvg { width: 190px; height: 36px; margin: 2px 0; }
-            .code-str { font-size: 11px; font-weight: bold; font-family: monospace; letter-spacing: 1px; color: #1e3a8a; }
-            .sub-info { font-size: 8px; color: #475569; margin-top: 3px; display: flex; justify-content: space-between; font-weight: 500; }
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            html, body {
+                font-family: 'Segoe UI', Arial, -apple-system, sans-serif;
+                margin: 0;
+                padding: 0;
+                background: #f1f5f9;
+                color: #000;
+                text-align: center;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .no-print {
+                background: #0f172a;
+                color: #fff;
+                padding: 10px 14px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                font-size: 13px;
+                position: sticky;
+                top: 0;
+                z-index: 100;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            }
+            .no-print-row {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                justify-content: center;
+                gap: 12px;
+            }
+            .no-print button {
+                padding: 6px 14px;
+                border-radius: 4px;
+                border: none;
+                font-weight: 600;
+                cursor: pointer;
+                font-size: 13px;
+                transition: opacity 0.15s;
+            }
+            .btn-print { background: #16a34a; color: #fff; }
+            .btn-close { background: #475569; color: #fff; }
+            .size-badge {
+                background: rgba(255,255,255,0.15);
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: 600;
+                letter-spacing: 0.3px;
+            }
+            .labels-container {
+                padding: 16px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            .sticker-wrapper {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                margin: 0 auto;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            .sticker-card {
+                width: 50mm;
+                height: 25mm;
+                max-height: 25mm;
+                min-height: 25mm;
+                border: 1px dashed #64748b;
+                border-radius: 2px;
+                padding: 1mm 1.8mm 0.8mm 1.8mm;
+                background: #fff;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                align-items: center;
+                box-sizing: border-box;
+                overflow: hidden;
+                position: relative;
+            }
+            .header {
+                font-size: 7px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.4px;
+                color: #000;
+                border-bottom: 0.6px solid #000;
+                width: 100%;
+                line-height: 1.1;
+                padding-bottom: 0.8px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .item-name {
+                font-size: 9.5px;
+                font-weight: 700;
+                line-height: 1.25;
+                width: 100%;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                color: #000000;
+                margin: 0.5px 0 1px 0;
+                padding: 0 1mm;
+                letter-spacing: 0.2px;
+                text-align: center;
+                -webkit-font-smoothing: antialiased;
+                text-rendering: geometricPrecision;
+            }
+            .barcode-container {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                width: 100%;
+                height: 8.5mm;
+                max-height: 8.5mm;
+                overflow: hidden;
+                margin: 0.5px 0;
+            }
+            .bcStickerSvg {
+                max-width: 46mm;
+                height: 8.5mm;
+                display: block;
+                margin: 0 auto;
+                shape-rendering: crispEdges;
+            }
+            .code-str {
+                font-size: 8px;
+                font-weight: 700;
+                font-family: 'Consolas', 'Courier New', monospace;
+                letter-spacing: 1.2px;
+                color: #000000;
+                line-height: 1;
+                margin: 0.5px 0;
+            }
+            .sub-info {
+                font-size: 6.8px;
+                color: #000000;
+                display: flex;
+                justify-content: space-between;
+                width: 100%;
+                font-weight: 600;
+                line-height: 1;
+                border-top: 0.6px solid #000000;
+                padding-top: 0.8px;
+            }
+            .sticker-gap {
+                height: 8mm;
+                min-height: 8mm;
+                max-height: 8mm;
+                width: 50mm;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 8px;
+                color: #64748b;
+                background: repeating-linear-gradient(45deg, #f8fafc, #f8fafc 4px, #e2e8f0 4px, #e2e8f0 8px);
+                border-left: 1px dashed #cbd5e1;
+                border-right: 1px dashed #cbd5e1;
+                box-sizing: border-box;
+                font-weight: 600;
+                letter-spacing: 0.4px;
+            }
+            .sticker-wrapper:last-child .sticker-gap {
+                display: none !important;
+            }
+
             @media print {
-                body { padding: 0; }
-                .sticker-card { border: none; width: 100%; margin: 0; padding: 2mm; page-break-after: always; }
-                .no-print { display: none !important; }
+                @page {
+                    size: 50mm 25mm !important;
+                    margin: 0mm !important;
+                }
+                *, *::before, *::after {
+                    box-sizing: border-box !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+                html, body {
+                    background: #fff !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    width: 50mm !important;
+                    height: auto !important;
+                    min-height: 0 !important;
+                    overflow: hidden !important;
+                }
+                .no-print {
+                    display: none !important;
+                    height: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                }
+                .labels-container {
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    width: 50mm !important;
+                    display: block !important;
+                }
+                .sticker-wrapper {
+                    display: block !important;
+                    page-break-after: always !important;
+                    break-after: page !important;
+                    page-break-inside: avoid !important;
+                    break-inside: avoid !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    width: 50mm !important;
+                    height: 25mm !important;
+                    max-height: 25mm !important;
+                    overflow: hidden !important;
+                }
+                /* Do NOT break page after the last sticker - avoids extra blank labels */
+                .sticker-wrapper:last-child {
+                    page-break-after: avoid !important;
+                    break-after: avoid !important;
+                    page-break-after: auto !important;
+                    break-after: auto !important;
+                }
+                .sticker-card {
+                    border: none !important;
+                    width: 50mm !important;
+                    height: 25mm !important;
+                    max-height: 25mm !important;
+                    min-height: 25mm !important;
+                    padding: 1mm 2mm !important;
+                    box-shadow: none !important;
+                    margin: 0 auto !important;
+                    overflow: hidden !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    justify-content: space-between !important;
+                }
+                .code-str, .header, .item-name, .sub-info {
+                    color: #000000 !important;
+                }
+                .sticker-gap {
+                    display: none !important;
+                    height: 0 !important;
+                    width: 0 !important;
+                    min-height: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    border: none !important;
+                    overflow: hidden !important;
+                }
+                body.mode-continuous .sticker-wrapper {
+                    height: 33mm !important;
+                    max-height: 33mm !important;
+                }
+                body.mode-continuous .sticker-gap {
+                    display: block !important;
+                    height: 8mm !important;
+                    min-height: 8mm !important;
+                    max-height: 8mm !important;
+                    background: transparent !important;
+                    border: none !important;
+                    color: transparent !important;
+                }
             }
         </style>
         </head>
-        <body>
-            <div class="no-print" style="margin-bottom:12px;padding:8px;background:#f1f5f9;border-bottom:1px solid #cbd5e1;display:flex;align-items:center;justify-content:center;gap:10px;">
-                <button onclick="window.print()" style="padding:6px 16px;background:#15803d;color:#fff;border:none;border-radius:4px;font-weight:bold;cursor:pointer;">🖨️ Print Label (${copies} Copy)</button>
-                <button onclick="window.close()" style="padding:6px 12px;background:#64748b;color:#fff;border:none;border-radius:4px;cursor:pointer;">Close</button>
-            </div>
-            ${Array.from({length: copies}).map(() => `
-                <div class="sticker-card">
-                    <div class="header">STAVYA HMS · INVENTORY STICKER</div>
-                    <div class="item-name">${getInvItemName(item)}</div>
-                    <svg class="bcStickerSvg"></svg>
-                    <div class="code-str">${outCode}</div>
-                    <div class="sub-info">
-                        <span>${inCode ? 'IN Ref: ' + inCode : item.category || ''}</span>
-                        <span>${item.price ? '₹' + parseFloat(item.price).toFixed(2) : ''}</span>
-                    </div>
+        <body class="${pitchMode === 'continuous' ? 'mode-continuous' : 'mode-standard'}">
+            <div class="no-print">
+                <div class="no-print-row">
+                    <span class="size-badge">🏷️ 50mm Length × 25mm Height (8mm Gap between stickers)</span>
+                    <label style="display:flex;align-items:center;gap:6px;">
+                        Copies:
+                        <input type="number" id="copiesInput" value="${numCopies}" min="1" max="200" style="width:55px;padding:3px 6px;border-radius:4px;border:none;text-align:center;font-weight:bold;" onchange="updateCopies(this.value)">
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;">
+                        Gap Mode:
+                        <select id="pitchSelect" onchange="updatePitch(this.value)" style="padding:4px 8px;border-radius:4px;border:none;font-size:12px;color:#0f172a;background:#fff;font-weight:600;">
+                            <option value="standard" ${pitchMode === 'standard' ? 'selected' : ''}>Standard 50×25mm (Printer sensor stops at 8mm gap)</option>
+                            <option value="continuous" ${pitchMode === 'continuous' ? 'selected' : ''}>Continuous Roll 50×33mm (25mm Label + 8mm Gap Feed)</option>
+                        </select>
+                    </label>
+                    <button class="btn-print" onclick="window.print()">🖨️ Print (${numCopies} Label)</button>
+                    <button class="btn-close" onclick="window.close()">Close</button>
                 </div>
-            `).join('')}
+                <div style="font-size:11px;color:#fde047;background:rgba(255,255,255,0.1);padding:3px 10px;border-radius:4px;">
+                    💡 Size: <strong>50mm × 25mm</strong> with <strong>8mm gap between stickers</strong>. In printer settings, choose <strong>Margins: None</strong>.
+                </div>
+            </div>
+            <div class="labels-container" id="labelsContainer">
+                ${Array.from({length: numCopies}).map((_, idx) => `
+                    <div class="sticker-wrapper" data-idx="${idx + 1}">
+                        <div class="sticker-card">
+                            <div class="header">${hospName} · INVENTORY</div>
+                            <div class="item-name" title="${itemName}" ${itemName.length > 24 ? 'style="font-size:7.8px;"' : (itemName.length > 18 ? 'style="font-size:8.6px;"' : '')}>${itemName}</div>
+                            <div class="barcode-container">
+                                <svg class="bcStickerSvg"></svg>
+                            </div>
+                            <div class="code-str">${outCode}</div>
+                            <div class="sub-info">
+                                <span>${inCode ? 'IN: ' + inCode : (item.category || '')}</span>
+                                <span>${item.department || item.category || ''}</span>
+                            </div>
+                        </div>
+                        <div class="sticker-gap">8mm Gap between stickers</div>
+                    </div>
+                `).join('')}
+            </div>
             <script>
-                document.querySelectorAll('.bcStickerSvg').forEach(svg => {
-                    try {
-                        JsBarcode(svg, '${outCode}', { format: 'CODE128', width: 1.6, height: 32, displayValue: false, margin: 0 });
-                    } catch(e) {}
-                });
-                setTimeout(() => { window.print(); }, 400);
+                function renderBarcodes() {
+                    document.querySelectorAll('.bcStickerSvg').forEach(svg => {
+                        try {
+                            JsBarcode(svg, '${outCode}', {
+                                format: 'CODE128',
+                                width: 1.3,
+                                height: 27,
+                                displayValue: false,
+                                lineColor: '#000000',
+                                background: 'transparent',
+                                margin: 0
+                            });
+                        } catch(e) {}
+                    });
+                }
+                function updateCopies(val) {
+                    val = parseInt(val) || 1;
+                    if (val < 1) val = 1;
+                    const container = document.getElementById('labelsContainer');
+                    const nameLen = ${itemName.length};
+                    const nameStyle = nameLen > 24 ? 'style="font-size:7.8px;"' : (nameLen > 18 ? 'style="font-size:8.6px;"' : '');
+                    let html = '';
+                    for (let i = 0; i < val; i++) {
+                        html += \`
+                            <div class="sticker-wrapper" data-idx="\${i + 1}">
+                                <div class="sticker-card">
+                                    <div class="header">${hospName} · INVENTORY</div>
+                                    <div class="item-name" title="${itemName}" \${nameStyle}>${itemName}</div>
+                                    <div class="barcode-container">
+                                        <svg class="bcStickerSvg"></svg>
+                                    </div>
+                                    <div class="code-str">${outCode}</div>
+                                    <div class="sub-info">
+                                        <span>${inCode ? 'IN: ' + inCode : (item.category || '')}</span>
+                                        <span>${item.department || item.category || ''}</span>
+                                    </div>
+                                </div>
+                                <div class="sticker-gap">8mm Gap between stickers</div>
+                            </div>
+                        \`;
+                    }
+                    container.innerHTML = html;
+                    renderBarcodes();
+                }
+                function updatePitch(mode) {
+                    const style = document.getElementById('printStyle');
+                    if (mode === 'continuous') {
+                        document.body.classList.add('mode-continuous');
+                        document.body.classList.remove('mode-standard');
+                        style.textContent = style.textContent.replace(/@page\\s*\\{[^}]*\\}/g, '@page { size: 50mm 33mm !important; margin: 0mm !important; }');
+                    } else {
+                        document.body.classList.add('mode-standard');
+                        document.body.classList.remove('mode-continuous');
+                        style.textContent = style.textContent.replace(/@page\\s*\\{[^}]*\\}/g, '@page { size: 50mm 25mm !important; margin: 0mm !important; }');
+                    }
+                }
+                renderBarcodes();
+                setTimeout(() => { window.print(); }, 450);
             <\/script>
         </body>
         </html>
-    `);
-    win.document.close();
+    `;
+
+    const htmlContent = generateHTML(copies);
+    const win = window.open('', '_blank', 'width=580,height=520');
+    if (win && win.document) {
+        win.document.open();
+        win.document.write(htmlContent);
+        win.document.close();
+    } else {
+        let iframe = document.getElementById('hmsStickerPrintFrame');
+        if (iframe) iframe.remove();
+        iframe = document.createElement('iframe');
+        iframe.id = 'hmsStickerPrintFrame';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        document.body.appendChild(iframe);
+        const doc = iframe.contentWindow.document;
+        doc.open();
+        doc.write(htmlContent);
+        doc.close();
+    }
 }
 
 function printBarcode(id) {

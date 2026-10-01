@@ -34,9 +34,93 @@ var SYNC = (function () {
     var _pushedKeys = {};  // key -> timestamp of last local push (per-key echo prevention)
     var _inited     = false;
     var _channel    = null;
+    var _syncState  = 'synced'; // 'synced' | 'syncing' | 'offline'
+    var _syncTimer  = null;
+
+    function updateSyncBadge(state, customLabel) {
+        if (state) _syncState = state;
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            _syncState = 'offline';
+        }
+        var el = document.getElementById('dbSyncBadge');
+        if (!el) return;
+
+        el.className = 'db-sync-badge sync-' + _syncState;
+
+        if (_syncState === 'syncing') {
+            el.innerHTML = '<span class="sync-spinner"></span> ' + (customLabel || 'Syncing');
+            el.setAttribute('title', 'Database sync in progress...');
+        } else if (_syncState === 'offline') {
+            el.innerHTML = '<span class="sync-dot sync-dot-offline"></span> ' + (customLabel || 'Offline');
+            el.setAttribute('title', 'Offline: Local changes saved and will sync automatically when online.');
+        } else {
+            el.innerHTML = '<span class="sync-dot sync-dot-synced"></span> ' + (customLabel || 'Synced');
+            var timeStr = (typeof SYNC !== 'undefined' && SYNC._lastSyncTs) ? (' (' + new Date(SYNC._lastSyncTs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ')') : '';
+            el.setAttribute('title', 'Database is up to date' + timeStr + '. Click to refresh.');
+        }
+    }
+
+    /* ── Cloud SQL (PostgreSQL Sync) ── */
+    function cloudSqlPush(key, data) {
+        if (typeof window === 'undefined' || !window.location || window.location.protocol === 'file:') return;
+        if (SHARED_KEYS.indexOf(key) === -1) return;
+        updateSyncBadge('syncing', 'Syncing');
+        try {
+            fetch('/api/db/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key: key, data: data })
+            }).then(function (res) {
+                if (res.ok) {
+                    clearTimeout(_syncTimer);
+                    _syncTimer = setTimeout(function () { updateSyncBadge('synced', 'Synced'); }, 500);
+                } else if (!navigator.onLine) {
+                    updateSyncBadge('offline', 'Offline');
+                }
+            }).catch(function () {
+                if (!navigator.onLine) updateSyncBadge('offline', 'Offline');
+            });
+        } catch (e) {}
+    }
+
+    function cloudSqlPull(cb) {
+        if (typeof window === 'undefined' || !window.location || window.location.protocol === 'file:') {
+            if (cb) cb(false);
+            return;
+        }
+        updateSyncBadge('syncing', 'Syncing');
+        fetch('/api/db/sync')
+            .then(function (res) { return res.json(); })
+            .then(function (json) {
+                if (json && json.connected && Array.isArray(json.data) && json.data.length > 0) {
+                    json.data.forEach(function (row) {
+                        if (row && row.key && row.data !== undefined) {
+                            _mergeIntoLocal(row.key, row.data);
+                        }
+                    });
+                    _recordSyncTs();
+                    clearTimeout(_syncTimer);
+                    _syncTimer = setTimeout(function () { updateSyncBadge('synced', 'Synced'); }, 400);
+                    if (cb) cb(true);
+                } else {
+                    clearTimeout(_syncTimer);
+                    _syncTimer = setTimeout(function () { updateSyncBadge('synced', 'Synced'); }, 400);
+                    if (cb) cb(false);
+                }
+            })
+            .catch(function () {
+                if (!navigator.onLine) {
+                    updateSyncBadge('offline', 'Offline');
+                } else {
+                    updateSyncBadge('synced', 'Synced');
+                }
+                if (cb) cb(false);
+            });
+    }
 
     /* ── Queue-based push — never drops a write even when multiple saves fire quickly ── */
     function sbPush(key, data) {
+        cloudSqlPush(key, data);
         if (!window.SB_DB) return;
         if (SHARED_KEYS.indexOf(key) === -1) return;
         _pushedKeys[key] = Date.now();      // per-key echo prevention timestamp
@@ -363,6 +447,12 @@ var SYNC = (function () {
 
             hookDBSet();
 
+            cloudSqlPull(function (pulled) {
+                if (pulled) {
+                    try { if (typeof APP !== 'undefined') APP.refreshCurrent(); } catch (e) {}
+                }
+            });
+
             if (window.SB_DB) {
                 // Pull latest data first (with merge), THEN start listening for live changes
                 sbPullAll(function () {
@@ -378,6 +468,7 @@ var SYNC = (function () {
             // Periodic catch-up polling every 30 seconds to guarantee multi-device updates even if WS drops
             if (!this._pollInterval) {
                 this._pollInterval = setInterval(function () {
+                    cloudSqlPull();
                     if (window.SB_DB && document.visibilityState === 'visible') {
                         sbPullAll(function () { _recordSyncTs(); });
                     }
@@ -388,6 +479,7 @@ var SYNC = (function () {
             if (!this._listenersAttached) {
                 this._listenersAttached = true;
                 window.addEventListener('focus', function () {
+                    cloudSqlPull();
                     if (window.SB_DB) {
                         sbPullAll(function () {
                             _recordSyncTs();
@@ -396,6 +488,10 @@ var SYNC = (function () {
                     }
                 });
                 window.addEventListener('online', function () {
+                    updateSyncBadge('syncing', 'Reconnecting...');
+                    cloudSqlPull(function () {
+                        updateSyncBadge('synced', 'Synced');
+                    });
                     if (window.SB_DB) {
                         sbPullAll(function () {
                             _recordSyncTs();
@@ -403,43 +499,84 @@ var SYNC = (function () {
                         });
                     }
                 });
+                window.addEventListener('offline', function () {
+                    updateSyncBadge('offline', 'Offline');
+                });
             }
+
+            // Initial badge update
+            updateSyncBadge();
 
             // Also wire up same-browser BroadcastChannel sync
             try { if (typeof APP_SYNC !== 'undefined') APP_SYNC.init(); } catch (e) {}
         },
 
-        /* Push ALL current localStorage data to Supabase */
+        /* Push ALL current localStorage data to Cloud SQL / Supabase */
         pushAll: function () {
-            if (!window.SB_DB) { if (typeof APP !== 'undefined') APP.notify('Cloud database not configured', 'error'); return; }
+            updateSyncBadge('syncing', 'Syncing...');
+            var items = [];
             SHARED_KEYS.forEach(function (key) {
                 try {
                     var raw = localStorage.getItem('hms_' + key);
-                    if (raw) sbPush(key, JSON.parse(raw));
+                    if (raw) {
+                        var parsed = JSON.parse(raw);
+                        sbPush(key, parsed);
+                        items.push({ key: key, data: parsed });
+                    }
                 } catch (e) {}
             });
+            if (items.length > 0) {
+                fetch('/api/db/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items: items })
+                }).then(function () {
+                    setTimeout(function () { updateSyncBadge('synced', 'Synced'); }, 500);
+                }).catch(function () {
+                    if (!navigator.onLine) updateSyncBadge('offline', 'Offline');
+                });
+            } else {
+                setTimeout(function () { updateSyncBadge('synced', 'Synced'); }, 300);
+            }
             _recordSyncTs();
-            if (typeof APP !== 'undefined') APP.notify('All data pushed to cloud', 'success');
+            if (typeof APP !== 'undefined') APP.notify('All data synced to Cloud SQL (PostgreSQL)', 'success');
         },
 
         /* Pull ALL data from the cloud into localStorage right now */
         pullNow: function (cb) {
-            if (!window.SB_DB) {
-                if (typeof APP !== 'undefined') APP.notify('Cloud database not configured', 'error');
-                if (cb) cb(false);
-                return;
-            }
-            sbPullAll(function () {
-                _recordSyncTs();
-                if (typeof APP !== 'undefined') APP.notify('Data pulled from cloud', 'success');
-                if (cb) cb(true);
+            updateSyncBadge('syncing', 'Syncing...');
+            cloudSqlPull(function (ok) {
+                if (window.SB_DB) {
+                    sbPullAll(function () {
+                        _recordSyncTs();
+                        updateSyncBadge('synced', 'Synced');
+                        if (typeof APP !== 'undefined') APP.notify('Data pulled from cloud database', 'success');
+                        if (cb) cb(true);
+                    });
+                } else {
+                    _recordSyncTs();
+                    updateSyncBadge('synced', 'Synced');
+                    if (typeof APP !== 'undefined') APP.notify(ok ? 'Data pulled from Cloud SQL PostgreSQL' : 'Local data is up to date', 'success');
+                    if (cb) cb(ok);
+                }
             });
+        },
+
+        /* Expose badge update function */
+        updateBadge: function (state, label) {
+            updateSyncBadge(state, label);
+        },
+
+        /* Return current sync state ('synced' | 'syncing' | 'offline') */
+        getSyncState: function () {
+            return _syncState;
         },
 
         /* Return connection + last-sync status */
         status: function () {
             return {
                 connected: !!window.SB_DB,
+                state:     _syncState,
                 projectId: window.SB_URL || null,
                 lastSync:  this._lastSyncTs
             };

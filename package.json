@@ -38,12 +38,19 @@
     "@capacitor/push-notifications": "^7.0.7",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.2",
+    "dotenv": "^18.0.5",
+    "drizzle-kit": "^0.31.11",
+    "drizzle-orm": "^0.45.3",
     "express": "^5.2.1",
+    "firebase": "^12.19.0",
+    "firebase-admin": "^14.5.0",
+    "pg": "^8.23.1",
     "ws": "^8.21.1"
   },
   "devDependencies": {
     "@capacitor/android": "^7.0.0",
     "@capacitor/cli": "^7.0.0",
-    "@capacitor/core": "^7.0.0"
+    "@capacitor/core": "^7.0.0",
+    "@types/pg": "^8.23.1"
   }
 }
