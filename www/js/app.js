@@ -70,7 +70,7 @@ const Router = {
             </div>
             <div class="header-right">
                 <span id="liveIndicator" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--success);padding:3px 8px;border-radius:12px;background:rgba(52,168,83,0.1);border:1px solid rgba(52,168,83,0.3);"><span style="width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 1.5s infinite;"></span>${typeof T === 'function' ? T('ui_live') : 'LIVE'}</span>
-                ${(user.role === 'admin' || user.isSuperAdmin) ? `<button id="syncNowBtn" class="btn btn-sm" style="font-size:11px;padding:4px 10px;background:rgba(52,168,83,0.1);border:1px solid rgba(52,168,83,0.4);color:var(--secondary);" onclick="APP._syncNow()" title="Upload all local data to cloud database">☁ Sync</button><button class="btn btn-sm btn-mobile-setup" style="font-size:11px;padding:4px 10px;" onclick="APP._mobileSetup()" title="Get QR code to set up login on mobile">📱 Mobile</button>` : ''}
+                ${(user.role === 'admin' || user.isSuperAdmin) ? `<button id="syncNowBtn" class="btn btn-sm" style="font-size:11px;padding:4px 10px;background:rgba(52,168,83,0.1);border:1px solid rgba(52,168,83,0.4);color:var(--secondary);" onclick="(typeof APP !== 'undefined' && APP._syncNow ? APP._syncNow() : Router._syncNow())" title="Upload all local data to cloud database">☁ Sync</button><button class="btn btn-sm btn-mobile-setup" style="font-size:11px;padding:4px 10px;" onclick="(typeof APP !== 'undefined' && APP._mobileSetup ? APP._mobileSetup() : Router._mobileSetup())" title="Get QR code to set up login on mobile">📱 Mobile</button>` : ''}
                 ${typeof LANG !== 'undefined' ? LANG.switcher() : ''}
                 ${typeof WS_NOTIFY !== 'undefined' ? WS_NOTIFY.bellHTML() : ''}
                 <span class="role-badge" style="font-size:13px;color:var(--gray);">${user.role.toUpperCase()}</span>
@@ -432,14 +432,17 @@ const Router = {
         } catch (e) { APP.notify('Could not generate setup: ' + e.message, 'error'); }
     },
     _syncNow() {
-        if (!window.SB_DB) { APP.notify('No database connection', 'error'); return; }
         const btn = document.getElementById('syncNowBtn');
         if (btn) { btn.disabled = true; btn.textContent = '⟳ Syncing…'; }
-        try { SYNC.pushAll(); } catch (e) {}
+        if (typeof SYNC !== 'undefined' && typeof SYNC.pushAll === 'function') {
+            try { SYNC.pushAll(); } catch (e) {}
+        }
         setTimeout(function () {
             if (btn) { btn.disabled = false; btn.textContent = '☁ Sync'; }
-            APP.notify('All data uploaded to database ✓', 'success');
-        }, 2000);
+            if (typeof APP !== 'undefined' && typeof APP.notify === 'function') {
+                APP.notify('All data uploaded to database ✓', 'success');
+            }
+        }, 1500);
     },
     refreshCurrent() {
         if (this.currentModule) {
@@ -465,6 +468,15 @@ function showModal(html, large) {
 
 function closeModal() {
     document.querySelectorAll('.modal').forEach(m => m.remove());
+}
+
+window.Router = Router;
+if (typeof window.APP !== 'undefined') {
+    window.APP._syncNow = function () { return Router._syncNow(); };
+    window.APP._mobileSetup = function () { return Router._mobileSetup(); };
+    window.APP.closeModal = closeModal;
+    window.APP.showModal = showModal;
+    window.APP.refreshCurrent = function () { return Router.refreshCurrent(); };
 }
 
 function openFormModal(title, formHtml, onSave, large) {

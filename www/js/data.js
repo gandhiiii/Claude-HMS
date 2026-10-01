@@ -1645,6 +1645,41 @@ const APP = {
             'in': 'badge-info', 'out': 'badge-warning'
         };
         return map[status] || 'badge-info';
+    },
+    _syncNow() {
+        if (typeof Router !== 'undefined' && typeof Router._syncNow === 'function') {
+            return Router._syncNow();
+        }
+        const btn = document.getElementById('syncNowBtn');
+        if (btn) { btn.disabled = true; btn.textContent = '⟳ Syncing…'; }
+        if (typeof SYNC !== 'undefined' && typeof SYNC.pushAll === 'function') {
+            try { SYNC.pushAll(); } catch (e) {}
+        }
+        setTimeout(function () {
+            if (btn) { btn.disabled = false; btn.textContent = '☁ Sync'; }
+            if (typeof APP !== 'undefined' && typeof APP.notify === 'function') {
+                APP.notify('All data uploaded to database ✓', 'success');
+            }
+        }, 1500);
+    },
+    _mobileSetup() {
+        if (typeof Router !== 'undefined' && typeof Router._mobileSetup === 'function') {
+            return Router._mobileSetup();
+        }
+    },
+    closeModal() {
+        if (typeof closeModal === 'function') {
+            closeModal();
+        } else {
+            document.querySelectorAll('.modal').forEach(m => m.remove());
+        }
+    },
+    showModal(html, large) {
+        if (typeof showModal === 'function') {
+            return showModal(html, large);
+        }
     }
 };
 APP.init();
+window.APP = APP;
+

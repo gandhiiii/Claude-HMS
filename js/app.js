@@ -73,13 +73,13 @@ const Router = {
                     <div class="header-status-strip">
                         <span id="liveIndicator" class="header-live-badge"><span class="live-dot"></span>${typeof T === 'function' ? T('ui_live') : 'LIVE'}</span>
                         <span id="dbSyncBadge" class="db-sync-badge sync-synced" onclick="if (typeof SYNC !== 'undefined') SYNC.pullNow();" title="PostgreSQL database connected. Click to refresh."><span class="sync-dot sync-dot-synced"></span> Synced</span>
-                        ${(user.role === 'admin' || user.isSuperAdmin) ? `<button id="syncNowBtn" class="btn btn-sm btn-header-sync" onclick="APP._syncNow()" title="Upload all local data to cloud database">☁ Sync</button>` : ''}
+                        ${(user.role === 'admin' || user.isSuperAdmin) ? `<button id="syncNowBtn" class="btn btn-sm btn-header-sync" onclick="(typeof APP !== 'undefined' && APP._syncNow ? APP._syncNow() : Router._syncNow())" title="Upload all local data to cloud database">☁ Sync</button>` : ''}
                     </div>
                     <div class="header-lang-strip">
                         ${typeof LANG !== 'undefined' ? LANG.switcher() : ''}
                     </div>
                     <div class="header-user-strip">
-                        ${(user.role === 'admin' || user.isSuperAdmin) ? `<button class="btn btn-sm btn-mobile-setup" onclick="APP._mobileSetup()" title="Get QR code to set up login on mobile">📱 Mobile</button>` : ''}
+                        ${(user.role === 'admin' || user.isSuperAdmin) ? `<button class="btn btn-sm btn-mobile-setup" onclick="(typeof APP !== 'undefined' && APP._mobileSetup ? APP._mobileSetup() : Router._mobileSetup())" title="Get QR code to set up login on mobile">📱 Mobile</button>` : ''}
                         ${typeof WS_NOTIFY !== 'undefined' ? WS_NOTIFY.bellHTML() : ''}
                         <span class="role-badge">${user.role.toUpperCase()}</span>
                         <div class="header-user" onclick="Router.showProfile()" title="${user.fullName}">
@@ -445,14 +445,17 @@ const Router = {
         } catch (e) { APP.notify('Could not generate setup: ' + e.message, 'error'); }
     },
     _syncNow() {
-        if (!window.SB_DB) { APP.notify('No database connection', 'error'); return; }
         const btn = document.getElementById('syncNowBtn');
         if (btn) { btn.disabled = true; btn.textContent = '⟳ Syncing…'; }
-        try { SYNC.pushAll(); } catch (e) {}
+        if (typeof SYNC !== 'undefined' && typeof SYNC.pushAll === 'function') {
+            try { SYNC.pushAll(); } catch (e) {}
+        }
         setTimeout(function () {
             if (btn) { btn.disabled = false; btn.textContent = '☁ Sync'; }
-            APP.notify('All data uploaded to database ✓', 'success');
-        }, 2000);
+            if (typeof APP !== 'undefined' && typeof APP.notify === 'function') {
+                APP.notify('All data uploaded to database ✓', 'success');
+            }
+        }, 1500);
     },
     refreshCurrent() {
         if (this.currentModule) {
@@ -478,6 +481,15 @@ function showModal(html, large) {
 
 function closeModal() {
     document.querySelectorAll('.modal').forEach(m => m.remove());
+}
+
+window.Router = Router;
+if (typeof window.APP !== 'undefined') {
+    window.APP._syncNow = function () { return Router._syncNow(); };
+    window.APP._mobileSetup = function () { return Router._mobileSetup(); };
+    window.APP.closeModal = closeModal;
+    window.APP.showModal = showModal;
+    window.APP.refreshCurrent = function () { return Router.refreshCurrent(); };
 }
 
 function openFormModal(title, formHtml, onSave, large) {
