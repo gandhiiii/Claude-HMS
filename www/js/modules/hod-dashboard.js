@@ -3322,8 +3322,6 @@ function hodAddUniform() {
     var dept = window._hodActiveDept || user.department || '';
     var types = ['Shirt','Trouser','Scrub','Kurta & Pajama Set','Dupatta','Apron','Coat / Jacket','Shoes','Cap','Gloves','Other'];
     var typeOpts = types.map(function(t){ return '<option value="' + t + '">' + t + '</option>'; }).join('');
-    var sizes = ['S','M','L','XL','XXL','Other'];
-    var sizeOpts = sizes.map(function(s){ return '<option value="' + s + '">' + s + '</option>'; }).join('');
 
     var form = '<form id="hodUniformForm">'
         + '<div class="form-group"><label>Department *</label>'
@@ -3335,7 +3333,7 @@ function hodAddUniform() {
         + '<div class="form-group"><label>Uniform Type *</label><select name="uniformType" class="form-control" required>' + typeOpts + '</select></div>'
         + '</div>'
         + '<div class="grid-2" style="gap:10px;">'
-        + '<div class="form-group"><label>Size *</label><select name="size" class="form-control" required>' + sizeOpts + '</select></div>'
+        + '<div class="form-group"><label style="display:flex;justify-content:space-between;align-items:center;"><span>Size *</span><button type="button" class="btn btn-xs btn-outline" style="font-size:10px;padding:1px 6px;" onclick="document.getElementById(\'hodUniformCustomSizeBox\').style.display=\'block\';var sel=document.querySelector(\'#hodUniformForm select[name=size]\');if(sel)sel.value=\'__custom__\';">+ Custom Size</button></label><select name="size" class="form-control" required onchange="hodToggleCustomSizeInput(this,\'hodUniformCustomSizeBox\')">' + _hodUniformSizeOptions('') + '</select><div id="hodUniformCustomSizeBox" style="display:none;margin-top:6px;"><input type="text" name="customSize" class="form-control" placeholder="Type custom size (e.g. 38R, 40-Tall, 34x32)..."></div></div>'
         + '<div class="form-group"><label>Quantity *</label><input type="number" name="quantity" class="form-control" min="1" value="1" required></div>'
         + '</div>'
         + '<div class="form-group"><label>Status</label>'
@@ -3350,15 +3348,21 @@ function hodSaveUniform() {
     if (!user) return false;
     var data = getFormData('hodUniformForm');
     var staffName = (data.staffName || '').trim();
-    if (!staffName || !data.uniformType || !data.size || !data.quantity) {
+    var rawSize = (data.size || '').trim();
+    var customVal = (data.customSize || '').trim();
+    var finalSize = (rawSize === '__custom__' || rawSize === 'Other' || customVal) ? (customVal || (rawSize !== '__custom__' && rawSize !== 'Other' ? rawSize : '')) : rawSize;
+    if (!staffName || !data.uniformType || !finalSize || !data.quantity) {
         APP.notify('Staff name, uniform type, size and quantity are required', 'error'); return false;
+    }
+    if (finalSize && finalSize !== '__custom__' && finalSize !== 'Other') {
+        _hodSaveCustomUniformSize(finalSize);
     }
     var status = data.status || 'pending';
     DB.add('hodUniforms', {
         staffName: staffName,
         employeeId: data.employeeId || '',
         uniformType: data.uniformType,
-        size: data.size,
+        size: finalSize,
         quantity: parseInt(data.quantity) || 1,
         department: data.department || user.department || '',
         status: status,
@@ -3413,8 +3417,8 @@ function hodEditUniform(id) {
     var esc = function(v){ return String(v||'').replace(/"/g,'&quot;'); };
     var types = ['Shirt','Trouser','Scrub','Kurta & Pajama Set','Dupatta','Apron','Coat / Jacket','Shoes','Cap','Gloves','Other'];
     var typeOpts = types.map(function(t){ return '<option value="' + t + '" ' + (u.uniformType===t?'selected':'') + '>' + t + '</option>'; }).join('');
-    var sizes = ['S','M','L','XL','XXL','Other'];
-    var sizeOpts = sizes.map(function(s){ return '<option value="' + s + '" ' + (u.size===s?'selected':'') + '>' + s + '</option>'; }).join('');
+    var isCustomSize = u.size && _HOD_UNIFORM_DEFAULT_SIZES.indexOf(u.size) === -1 && _hodGetCustomUniformSizes().indexOf(u.size) === -1;
+
     var form = '<form id="hodUniformEditForm">'
         + '<div class="form-group"><label>Department *</label>'
         + '<input type="text" name="department" class="form-control" required value="' + esc(u.department) + '" placeholder="Type department name"></div>'
@@ -3424,7 +3428,7 @@ function hodEditUniform(id) {
         + '<div class="form-group"><label>Uniform Type *</label><select name="uniformType" class="form-control" required>' + typeOpts + '</select></div>'
         + '</div>'
         + '<div class="grid-2" style="gap:10px;">'
-        + '<div class="form-group"><label>Size *</label><select name="size" class="form-control" required>' + sizeOpts + '</select></div>'
+        + '<div class="form-group"><label style="display:flex;justify-content:space-between;align-items:center;"><span>Size *</span><button type="button" class="btn btn-xs btn-outline" style="font-size:10px;padding:1px 6px;" onclick="document.getElementById(\'hodUniformEditCustomSizeBox\').style.display=\'block\';var sel=document.querySelector(\'#hodUniformEditForm select[name=size]\');if(sel)sel.value=\'__custom__\';">+ Custom Size</button></label><select name="size" class="form-control" required onchange="hodToggleCustomSizeInput(this,\'hodUniformEditCustomSizeBox\')">' + _hodUniformSizeOptions(u.size || '') + '</select><div id="hodUniformEditCustomSizeBox" style="display:' + (isCustomSize ? 'block' : 'none') + ';margin-top:6px;"><input type="text" name="customSize" class="form-control" value="' + esc(u.size) + '" placeholder="Type custom size (e.g. 38R, 40-Tall, 34x32)..."></div></div>'
         + '<div class="form-group"><label>Quantity *</label><input type="number" name="quantity" class="form-control" min="1" value="' + (u.quantity||1) + '" required></div>'
         + '</div>'
         + '<div class="form-group"><label>Status</label>'
@@ -3440,14 +3444,20 @@ function hodUpdateUniform() {
     var user = AUTH.currentUser();
     if (!user) return false;
     var data = getFormData('hodUniformEditForm');
-    if (!data.staffName || !data.uniformType || !data.size || !data.quantity) {
+    var rawSize = (data.size || '').trim();
+    var customVal = (data.customSize || '').trim();
+    var finalSize = (rawSize === '__custom__' || rawSize === 'Other' || customVal) ? (customVal || (rawSize !== '__custom__' && rawSize !== 'Other' ? rawSize : '')) : rawSize;
+    if (!data.staffName || !data.uniformType || !finalSize || !data.quantity) {
         APP.notify('Staff name, uniform type, size and quantity are required', 'error'); return false;
+    }
+    if (finalSize && finalSize !== '__custom__' && finalSize !== 'Other') {
+        _hodSaveCustomUniformSize(finalSize);
     }
     var upd = {
         staffName: data.staffName,
         employeeId: data.employeeId || '',
         uniformType: data.uniformType,
-        size: data.size,
+        size: finalSize,
         quantity: parseInt(data.quantity) || 1,
         department: data.department || '',
         status: data.status || 'pending',
@@ -4095,7 +4105,7 @@ function hodAddUniformReturn() {
         + '<input type="text" name="staffName" class="form-control" required placeholder="Type staff name returning uniform"></div>'
         + '<div class="grid-2" style="gap:10px;">'
         + '<div class="form-group"><label>Uniform Type *</label><select name="uniformType" class="form-control" required>' + typeOpts + '</select></div>'
-        + '<div class="form-group"><label>Size</label><select name="size" class="form-control"><option value="">-</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option>Other</option></select></div>'
+        + '<div class="form-group"><label style="display:flex;justify-content:space-between;align-items:center;"><span>Size</span><button type="button" class="btn btn-xs btn-outline" style="font-size:10px;padding:1px 6px;" onclick="document.getElementById(\'hodUniformReturnCustomSizeBox\').style.display=\'block\';var sel=document.querySelector(\'#hodUniformReturnForm select[name=size]\');if(sel)sel.value=\'__custom__\';">+ Custom Size</button></label><select name="size" class="form-control" onchange="hodToggleCustomSizeInput(this,\'hodUniformReturnCustomSizeBox\')">' + _hodUniformSizeOptions('') + '</select><div id="hodUniformReturnCustomSizeBox" style="display:none;margin-top:6px;"><input type="text" name="customSize" class="form-control" placeholder="Type custom size (e.g. 38R, 40-Tall, 34x32)..."></div></div>'
         + '</div>'
         + '<div class="form-group"><label>Department</label>'
         + '<input type="text" name="department" class="form-control" value="' + dept.replace(/"/g,'&quot;') + '"></div>'
@@ -4110,11 +4120,17 @@ function hodSaveUniformReturn() {
     var data = getFormData('hodUniformReturnForm');
     var staffName = (data.staffName || '').trim();
     if (!staffName) { APP.notify('Staff name is required', 'error'); return false; }
+    var rawSize = (data.size || '').trim();
+    var customVal = (data.customSize || '').trim();
+    var finalSize = (rawSize === '__custom__' || rawSize === 'Other' || customVal) ? (customVal || (rawSize !== '__custom__' && rawSize !== 'Other' ? rawSize : '')) : rawSize;
+    if (finalSize && finalSize !== '__custom__' && finalSize !== 'Other') {
+        _hodSaveCustomUniformSize(finalSize);
+    }
     DB.add('hodUniforms', {
         staffName: staffName,
         employeeId: '',
         uniformType: data.uniformType || 'Other',
-        size: data.size || '',
+        size: finalSize,
         quantity: 1,
         department: data.department || user.department || '',
         status: 'returned',
@@ -6432,11 +6448,75 @@ function _hodHousekeepingInventory(el) { _hodSpecialInv(el, 'housekeeping'); }
 
 var _HOD_LINEN_SIZES = ['6-20', '8-20', '10-20', '12-20', '14-20', '16-20', '18-20', '22-10', '30-10', '34-10', 'Small', 'Medium', 'Large', 'XL', 'XXL', 'XXXL', 'XXXXL'];
 
+function hodToggleCustomSizeInput(selectEl, boxId) {
+    var box = document.getElementById(boxId);
+    if (!box) return;
+    if (selectEl.value === '__custom__' || selectEl.value === 'Other') {
+        box.style.display = 'block';
+        var inp = box.querySelector('input');
+        if (inp) inp.focus();
+    } else {
+        box.style.display = 'none';
+    }
+}
+
+function _hodGetCustomLinenSizes() {
+    return DB.get('customLinenSizes') || [];
+}
+
+function _hodSaveCustomLinenSize(newSize) {
+    if (!newSize || typeof newSize !== 'string') return;
+    newSize = newSize.trim();
+    if (!newSize || newSize === '__custom__') return;
+    var custom = DB.get('customLinenSizes') || [];
+    if (_HOD_LINEN_SIZES.indexOf(newSize) === -1 && custom.indexOf(newSize) === -1) {
+        custom.push(newSize);
+        DB.set('customLinenSizes', custom);
+    }
+}
+
 function _hodLinenSizeOptions(selected) {
+    var custom = _hodGetCustomLinenSizes();
+    var allSizes = _HOD_LINEN_SIZES.concat(custom);
     var html = '<option value="">Select size</option>';
-    _HOD_LINEN_SIZES.forEach(function (s) {
+    allSizes.forEach(function (s) {
         html += '<option value="' + s + '"' + (s === selected ? ' selected' : '') + '>' + s + '</option>';
     });
+    if (selected && allSizes.indexOf(selected) === -1 && selected !== '__custom__') {
+        html += '<option value="' + selected + '" selected>' + selected + '</option>';
+    }
+    html += '<option value="__custom__" style="font-weight:bold;color:var(--primary,#0284c7);">' + '+ Add Custom Size...' + '</option>';
+    return html;
+}
+
+var _HOD_UNIFORM_DEFAULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'XXXXL', '28', '30', '32', '34', '36', '38', '40', '42', '44'];
+
+function _hodGetCustomUniformSizes() {
+    return DB.get('customUniformSizes') || [];
+}
+
+function _hodSaveCustomUniformSize(newSize) {
+    if (!newSize || typeof newSize !== 'string') return;
+    newSize = newSize.trim();
+    if (!newSize || newSize === '__custom__' || newSize === 'Other') return;
+    var custom = DB.get('customUniformSizes') || [];
+    if (_HOD_UNIFORM_DEFAULT_SIZES.indexOf(newSize) === -1 && custom.indexOf(newSize) === -1) {
+        custom.push(newSize);
+        DB.set('customUniformSizes', custom);
+    }
+}
+
+function _hodUniformSizeOptions(selected) {
+    var custom = _hodGetCustomUniformSizes();
+    var allSizes = _HOD_UNIFORM_DEFAULT_SIZES.concat(custom);
+    var html = '<option value="">Select size</option>';
+    allSizes.forEach(function (s) {
+        html += '<option value="' + s + '"' + (s === selected ? ' selected' : '') + '>' + s + '</option>';
+    });
+    if (selected && allSizes.indexOf(selected) === -1 && selected !== '__custom__' && selected !== 'Other') {
+        html += '<option value="' + selected + '" selected>' + selected + '</option>';
+    }
+    html += '<option value="__custom__" style="font-weight:bold;color:var(--primary,#0284c7);">' + '+ Add Custom Size...' + '</option>';
     return html;
 }
 
@@ -6556,7 +6636,7 @@ function hodSpecialInvAdd(type) {
         + '</div>'
         + '<div class="grid-2" style="gap:10px;">'
         + (type === 'linen'
-            ? '<div class="form-group"><label>Size</label><select name="size" class="form-control">' + _hodLinenSizeOptions('') + '</select></div>'
+            ? '<div class="form-group"><label style="display:flex;justify-content:space-between;align-items:center;"><span>Size</span><button type="button" class="btn btn-xs btn-outline" style="font-size:10px;padding:1px 6px;" onclick="document.getElementById(\'hodLinenCustomSizeBox\').style.display=\'block\';var sel=document.querySelector(\'#hodSpecialInvForm select[name=size]\');if(sel)sel.value=\'__custom__\';">+ Custom Size</button></label><select name="size" class="form-control" onchange="hodToggleCustomSizeInput(this,\'hodLinenCustomSizeBox\')">' + _hodLinenSizeOptions('') + '</select><div id="hodLinenCustomSizeBox" style="display:none;margin-top:6px;"><input type="text" name="customSize" class="form-control" placeholder="Type custom size (e.g. 36-12, 60x90cm, King)..."></div></div>'
             + '<div class="form-group"><label>Purchase Date</label><input type="date" name="purchaseDate" class="form-control"></div>'
             : '<div class="form-group"><label>Expiry Date</label><input type="date" name="expiryDate" class="form-control"></div>')
         + '<div class="form-group"><label>Location</label><input type="text" name="location" class="form-control" placeholder="e.g. Store Room A"></div>'
@@ -6575,10 +6655,19 @@ function hodSpecialInvSave() {
     var cfg = _HOD_SPECIAL_INV[_hodSpecialInvType];
     if (!cfg) return false;
     var isLinen = _hodSpecialInvType === 'linen';
+    var finalSize = undefined;
+    if (isLinen) {
+        var rawSize = (data.size || '').trim();
+        var customVal = (data.customSize || '').trim();
+        finalSize = (rawSize === '__custom__' || customVal) ? (customVal || (rawSize !== '__custom__' ? rawSize : '')) : rawSize;
+        if (finalSize && finalSize !== '__custom__') {
+            _hodSaveCustomLinenSize(finalSize);
+        }
+    }
     DB.add(cfg.store, {
         name: data.name.trim(),
         category: data.category || '',
-        size: isLinen ? (data.size || '') : undefined,
+        size: isLinen ? finalSize : undefined,
         quantity: parseInt(data.quantity) || 0,
         unit: data.unit || 'pcs',
         price: parseFloat(data.price) || 0,
@@ -6618,7 +6707,7 @@ function hodSpecialInvEdit(type, id) {
         + '</div>'
         + '<div class="grid-2" style="gap:10px;">'
         + (type === 'linen'
-            ? '<div class="form-group"><label>Size</label><select name="size" class="form-control">' + _hodLinenSizeOptions(item.size || '') + '</select></div>'
+            ? '<div class="form-group"><label style="display:flex;justify-content:space-between;align-items:center;"><span>Size</span><button type="button" class="btn btn-xs btn-outline" style="font-size:10px;padding:1px 6px;" onclick="document.getElementById(\'hodLinenCustomSizeBox\').style.display=\'block\';var sel=document.querySelector(\'#hodSpecialInvForm select[name=size]\');if(sel)sel.value=\'__custom__\';">+ Custom Size</button></label><select name="size" class="form-control" onchange="hodToggleCustomSizeInput(this,\'hodLinenCustomSizeBox\')">' + _hodLinenSizeOptions(item.size || '') + '</select><div id="hodLinenCustomSizeBox" style="display:' + (item.size && _HOD_LINEN_SIZES.indexOf(item.size) === -1 && _hodGetCustomLinenSizes().indexOf(item.size) === -1 ? 'block' : 'none') + ';margin-top:6px;"><input type="text" name="customSize" class="form-control" value="' + esc(item.size) + '" placeholder="Type custom size (e.g. 36-12, 60x90cm, King)..."></div></div>'
             + '<div class="form-group"><label>Purchase Date</label><input type="date" name="purchaseDate" class="form-control" value="' + esc(item.purchaseDate) + '"></div>'
             : '<div class="form-group"><label>Expiry Date</label><input type="date" name="expiryDate" class="form-control" value="' + esc(item.expiryDate) + '"></div>')
         + '<div class="form-group"><label>Location</label><input type="text" name="location" class="form-control" value="' + esc(item.location) + '"></div>'
@@ -6639,10 +6728,19 @@ function hodSpecialInvUpdate() {
     var data = getFormData('hodSpecialInvForm');
     if (!data.name) { APP.notify('Item name is required', 'error'); return false; }
     var isLinen = _hodSpecialInvType === 'linen';
+    var finalSize = undefined;
+    if (isLinen) {
+        var rawSize = (data.size || '').trim();
+        var customVal = (data.customSize || '').trim();
+        finalSize = (rawSize === '__custom__' || customVal) ? (customVal || (rawSize !== '__custom__' ? rawSize : '')) : rawSize;
+        if (finalSize && finalSize !== '__custom__') {
+            _hodSaveCustomLinenSize(finalSize);
+        }
+    }
     DB.update(cfg.store, id, {
         name: data.name.trim(),
         category: data.category || '',
-        size: isLinen ? (data.size || '') : undefined,
+        size: isLinen ? finalSize : undefined,
         quantity: parseInt(data.quantity) || 0,
         unit: data.unit || 'pcs',
         price: parseFloat(data.price) || 0,

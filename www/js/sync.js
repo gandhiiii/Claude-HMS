@@ -18,7 +18,7 @@ var SYNC = (function () {
         'hodTasks', 'hodRequests', 'hodPurchases',
         'hodTodos', 'hodUniforms', 'hodLockers',
         'hodEquipmentServices', 'hodEquipmentBackdowns',
-        'hodLinenInv', 'hodHousekeepingInv',
+        'hodLinenInv', 'hodHousekeepingInv', 'customLinenSizes', 'customUniformSizes',
         'employeeTodos',
         'budgets', 'budget_expenses',
         'quarterly_priorities', 'pwResetRequests',
