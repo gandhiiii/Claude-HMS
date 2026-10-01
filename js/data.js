@@ -92,6 +92,9 @@ const DB = {
         return [];
     },
     set(key, data) {
+        if (key && key.indexOf('bk_') !== 0 && key !== '_deleted_ids' && key !== 'last_cloud_sync' && key !== 'last_change_ts' && key !== 'resetTokens') {
+            this._autoSnapBeforeChange(key, 'set');
+        }
         var json = JSON.stringify(data);
         try { localStorage.setItem('hms_' + key, json); } catch (e) { console.warn('localStorage set error:', e); }
         try { sessionStorage.setItem('hms_' + key, json); } catch (e) { console.warn('sessionStorage set error:', e); }
@@ -159,26 +162,26 @@ const DB = {
     _ALL_KEYS: [
         'users', 'departments', 'featureRights',
         'inventory', 'biomedical_inventory', 'biomedical_implants', 'biomedical_implantation_logs', 'biomedical_purchases', 'biomedical_meetings', 'biomedical_todos', 'biomedical_checklists', 'biomedical_checklist_logs', 'inventory_receipts', 'scraps', 'scrapConfig',
-        'gatesecurity', 'phase2Tasks',
+        'gatesecurity', 'doctorVisits', 'patientVisits', 'patients', 'phase2', 'phase2Tasks',
         'projects', 'ambulance', 'ambulance_trips',
-        'problems', 'tasks', 'hodTasks', 'hodRequests', 'hodPurchases',
-        'hodTodos', 'hodUniforms', 'hodLockers',
-        'hodEquipmentServices', 'hodEquipmentBackdowns',
-        'hodLinenInv', 'hodHousekeepingInv',
-        'employeeTodos',
-        'complaints', 'roomchecklists', 'admissions', 'rooms', 'roomStatus',
+        'problems', 'tasks', 'complaints',
+        'roomchecklists', 'admissions', 'rooms', 'roomStatus',
         'lostfound', 'adminChecklist', 'adminAudits', 'checklists',
         'material_requests', 'suggestions', 'reports',
-        'roomCleaningTasks', 'floorItems', 'handovers',
-        'budgets', 'budget_expenses', 'quarterly_priorities',
+        'discountRequests',
+        'roomCleaningTasks', 'floorItems', 'resetTokens', 'pwResetRequests', 'handovers',
+        'hodTasks', 'hodRequests', 'hodPurchases',
+        'hodTodos', 'hodUniforms', 'hodLockers',
+        'hodEquipmentServices', 'hodEquipmentBackdowns',
+        'hodLinenInv', 'hodHousekeepingInv', 'customLinenSizes', 'customUniformSizes',
+        'employeeTodos',
+        'budgets', 'budget_expenses',
+        'quarterly_priorities',
         'inventory_movements', 'material_returns', 'sk_reports',
-        'security_incidents',
-        'staffDeployment',
-        'securityDeployment',
-        'patientShiftings',
-        'hospital_settings',
-        'hospitalUnits', 'hospitalFloors', 'checklistTemplates', 'checklistEntries', 'checklistAssignments',
-        '_deleted_ids'
+        'security_incidents', 'staffDeployment', 'securityDeployment', 'patientShiftings',
+        'hospital_settings', 'hospitalUnits', 'hospitalFloors', 'floors',
+        'checklistTemplates', 'checklistEntries', 'checklistAssignments',
+        'dept_meetings', '_deleted_ids'
     ],
 
     /* Export all app data as a downloadable JSON file */
@@ -476,6 +479,29 @@ const DB = {
 };
 
 try { DB.recoverAllFromBackups(); } catch(e) {}
+
+// Initial startup backup if none taken in the last 15 minutes
+try {
+    var _lastBkTs = localStorage.getItem('hms_backup_ts');
+    if (!_lastBkTs || (Date.now() - new Date(_lastBkTs).getTime() > 15 * 60 * 1000)) {
+        DB.autoBackup('startup-auto');
+    }
+} catch(e) {}
+
+// Periodic auto-backup every 30 minutes
+if (typeof window !== 'undefined' && !window._hmsAutoBkInterval) {
+    window._hmsAutoBkInterval = setInterval(function() {
+        try { DB.autoBackup('periodic-auto'); } catch(e) {}
+    }, 30 * 60 * 1000);
+}
+
+// Backup before closing/refreshing browser tab
+if (typeof window !== 'undefined' && !window._hmsUnloadBkAttached) {
+    window._hmsUnloadBkAttached = true;
+    window.addEventListener('beforeunload', function() {
+        try { DB.autoBackup('session-close'); } catch(e) {}
+    });
+}
 
 const AUTH = {
     _sid() {
