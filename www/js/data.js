@@ -347,17 +347,40 @@ const DB = {
         return [];
     },
 
-    /* Return the backup index (newest-first) */
+    /* Return the backup index (newest-first), including legacy slots if present */
     getBackupIndex() {
         try {
             var idx = JSON.parse(localStorage.getItem('hms_bk_idx') || '[]');
+            
+            // Include legacy backup slots if present and not already listed
+            var legacyMap = { 'hms_backup_1': -1, 'hms_backup_2': -2, 'hms_backup_3': -3 };
+            Object.keys(legacyMap).forEach(function(slotKey) {
+                var raw = localStorage.getItem(slotKey);
+                if (raw) {
+                    try {
+                        var snap = JSON.parse(raw);
+                        var meta = snap._meta || {};
+                        var ts   = meta.exportedAt || new Date().toISOString();
+                        var lbl  = 'legacy-' + Math.abs(legacyMap[slotKey]) + ' (' + (meta.label || 'auto') + ')';
+                        if (!idx.some(function(e){ return e.slotKey === slotKey; })) {
+                            idx.push({ n: legacyMap[slotKey], ts: ts, label: lbl, slotKey: slotKey });
+                        }
+                    } catch(e) {}
+                }
+            });
+
             return idx.sort(function(a,b){ return new Date(b.ts) - new Date(a.ts); });
         } catch(e) { return []; }
     },
 
     /* Restore all data from slot n (full replace) */
     restoreFromSlot(n) {
-        var raw = localStorage.getItem('hms_bk_' + n);
+        var raw = null;
+        if (n < 0) {
+            raw = localStorage.getItem('hms_backup_' + Math.abs(n));
+        } else {
+            raw = localStorage.getItem('hms_bk_' + n);
+        }
         if (!raw) return { success: false, error: 'Backup slot not found' };
         return this.importAll(raw, true);
     },
@@ -365,7 +388,12 @@ const DB = {
     /* Download slot n as a JSON file */
     downloadBackupSlot(n) {
         try {
-            var raw = localStorage.getItem('hms_bk_' + n);
+            var raw = null;
+            if (n < 0) {
+                raw = localStorage.getItem('hms_backup_' + Math.abs(n));
+            } else {
+                raw = localStorage.getItem('hms_bk_' + n);
+            }
             if (!raw) { if (typeof APP !== 'undefined') APP.notify('Backup not found', 'error'); return; }
             var meta = JSON.parse(raw)._meta || {};
             var ts   = (meta.exportedAt || new Date().toISOString()).slice(0, 16).replace(/[:T]/g, '-');
@@ -388,34 +416,69 @@ const DB = {
         return this.importAll(raw, false);
     },
 
-    /* Auto-recover lost data across all keys from local backups if local storage was overwritten */
+    /* Auto-recover lost/stale data across all keys from all available local backup slots */
     recoverAllFromBackups() {
         try {
             var bkIndex = this.getBackupIndex ? this.getBackupIndex() : [];
-            // Older backups first, so newer backups overwrite older ones
-            var sortedSlots = bkIndex.slice().sort(function(a,b){ return new Date(a.ts) - new Date(b.ts); });
-            var slotNames = sortedSlots.map(function(s){ return 'hms_bk_' + s.n; });
-            ['hms_backup_3', 'hms_backup_2', 'hms_backup_1'].forEach(function(s){
-                if (slotNames.indexOf(s) === -1) slotNames.unshift(s);
+            
+            // Build list of all available backup slot keys with their creation timestamp
+            var allSlots = [];
+            bkIndex.forEach(function(s) {
+                if (s && s.n !== undefined) {
+                    var sKey = s.slotKey || (s.n < 0 ? 'hms_backup_' + Math.abs(s.n) : 'hms_bk_' + s.n);
+                    allSlots.push({ key: sKey, ts: new Date(s.ts || 0).getTime() });
+                }
             });
+            
+            ['hms_backup_3', 'hms_backup_2', 'hms_backup_1'].forEach(function(slotKey) {
+                if (!allSlots.some(function(s){ return s.key === slotKey; })) {
+                    var raw = localStorage.getItem(slotKey);
+                    if (raw) {
+                        var snapTs = 0;
+                        try {
+                            var parsed = JSON.parse(raw);
+                            if (parsed && parsed._meta && parsed._meta.exportedAt) {
+                                snapTs = new Date(parsed._meta.exportedAt).getTime();
+                            }
+                        } catch(e) {}
+                        allSlots.push({ key: slotKey, ts: snapTs });
+                    }
+                }
+            });
+
+            // Sort slots chronologically: OLDEST first, NEWEST last
+            allSlots.sort(function(a, b){ return a.ts - b.ts; });
+
+            if (allSlots.length === 0) return 0;
 
             var recoveredCount = 0;
             var deletedMap = this.getDeletedIds ? this.getDeletedIds() : {};
 
             function _getItemId(item) {
                 if (!item || typeof item !== 'object') return null;
-                if (item.id) return String(item.id);
+                if (item.id !== undefined && item.id !== null) return String(item.id);
                 if (item.date && (item.assignmentId || item.templateId || item.unitId || item.roomNo || item.title)) {
-                    return item.date + '_' + (item.assignmentId || item.templateId || item.unitId || item.roomNo || item.title);
+                    return String(item.date) + '_' + String(item.assignmentId || item.templateId || item.unitId || item.roomNo || item.title);
                 }
                 if (item.createdAt || item.submittedAt || item.timestamp) {
                     return String(item.createdAt || item.submittedAt || item.timestamp);
                 }
-                return JSON.stringify(item);
+                return null;
             }
 
-            slotNames.forEach(function(slotKey) {
-                var raw = localStorage.getItem(slotKey);
+            function _getItemTs(item) {
+                if (!item || typeof item !== 'object') return 0;
+                var t = item.updatedAt || item.createdAt || item.timestamp || item.ts || item.date || item.updated_at || item.created_at || 0;
+                if (typeof t === 'number') return t;
+                if (typeof t === 'string') {
+                    var d = Date.parse(t);
+                    if (!isNaN(d)) return d;
+                }
+                return 0;
+            }
+
+            allSlots.forEach(function(slotObj) {
+                var raw = localStorage.getItem(slotObj.key);
                 if (!raw) return;
                 try {
                     var snap = JSON.parse(raw);
@@ -432,27 +495,52 @@ const DB = {
 
                         if (Array.isArray(backupData)) {
                             if (!Array.isArray(currentData)) {
-                                localStorage.setItem('hms_' + key, JSON.stringify(backupData));
-                                recoveredCount++;
+                                var filteredBackup = backupData.filter(function(i){
+                                    return i && (!i.id || !deletedMap[i.id]);
+                                });
+                                if (filteredBackup.length > 0) {
+                                    localStorage.setItem('hms_' + key, JSON.stringify(filteredBackup));
+                                    try { sessionStorage.setItem('hms_' + key, JSON.stringify(filteredBackup)); } catch(e2){}
+                                    recoveredCount++;
+                                }
                             } else {
                                 var curMap = {};
-                                currentData.forEach(function(i){
-                                    var id = _getItemId(i);
-                                    if (id) curMap[id] = true;
+                                currentData.forEach(function(item, idx) {
+                                    var id = _getItemId(item);
+                                    if (id) curMap[id] = idx;
                                 });
-                                var added = false;
+
+                                var modified = false;
                                 backupData.forEach(function(bItem) {
-                                    if (bItem) {
-                                        var bId = _getItemId(bItem);
-                                        if (bId && !curMap[bId] && !(bItem.id && deletedMap[bItem.id])) {
+                                    if (!bItem) return;
+                                    var bId = _getItemId(bItem);
+                                    if (bItem.id && deletedMap[bItem.id]) return;
+
+                                    if (!bId) {
+                                        var bStr = JSON.stringify(bItem);
+                                        var exists = currentData.some(function(ci){ return JSON.stringify(ci) === bStr; });
+                                        if (!exists) {
                                             currentData.push(bItem);
-                                            curMap[bId] = true;
-                                            added = true;
+                                            modified = true;
+                                        }
+                                    } else if (curMap[bId] === undefined) {
+                                        curMap[bId] = currentData.length;
+                                        currentData.push(bItem);
+                                        modified = true;
+                                    } else {
+                                        var existingIdx = curMap[bId];
+                                        var curTs = _getItemTs(currentData[existingIdx]);
+                                        var bTs   = _getItemTs(bItem);
+                                        if (bTs > curTs) {
+                                            currentData[existingIdx] = bItem;
+                                            modified = true;
                                         }
                                     }
                                 });
-                                if (added) {
+
+                                if (modified) {
                                     localStorage.setItem('hms_' + key, JSON.stringify(currentData));
+                                    try { sessionStorage.setItem('hms_' + key, JSON.stringify(currentData)); } catch(e2){}
                                     recoveredCount++;
                                 }
                             }
@@ -461,6 +549,7 @@ const DB = {
                             var jsonMerged = JSON.stringify(mergedObj);
                             if (currentRaw !== jsonMerged) {
                                 localStorage.setItem('hms_' + key, jsonMerged);
+                                try { sessionStorage.setItem('hms_' + key, JSON.stringify(mergedObj)); } catch(e2){}
                                 recoveredCount++;
                             }
                         }

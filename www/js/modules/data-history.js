@@ -61,6 +61,7 @@ function _renderDataHistoryContent(container) {
 
     container.innerHTML = cloudHtml + `
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+            <button class="btn btn-success" onclick="dataHistoryRecoverAll()">⚡ Recover All Data (Today &amp; Yesterday)</button>
             <button class="btn btn-primary" onclick="dataHistorySnapNow()">${T('dhmod_btn_save_backup_now')}</button>
             <button class="btn btn-outline" onclick="DB.exportAll('manual-export')">${T('dhmod_btn_export_all')}</button>
             <label class="btn btn-outline" style="cursor:pointer;margin:0;">
@@ -295,4 +296,16 @@ function dataHistoryImportFile(input) {
     };
     reader.readAsText(file);
     input.value = '';
+}
+
+function dataHistoryRecoverAll() {
+    confirmAction('Scan and recover all historical data records from local backups (today & yesterday)? This will merge the latest records from all backup slots.', function() {
+        var count = DB.recoverAllFromBackups();
+        if (count > 0) {
+            APP.notify('Successfully recovered and merged data across ' + count + ' data stores ✓', 'success');
+            setTimeout(function() { window.location.reload(); }, 1200);
+        } else {
+            APP.notify('All data is already up-to-date or no extra records found in backups.', 'info');
+        }
+    });
 }
