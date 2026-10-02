@@ -122,6 +122,13 @@ function renderInventory(container) {
     const u = AUTH.currentUser();
     const canBio = u && AUTH.hasPermission(u, 'biomedical-inventory');
 
+    let initialTabHtml = renderInvItemsTab();
+    if (invView === 'linen') initialTabHtml = renderInvLinenTab();
+    else if (invView === 'uniform') initialTabHtml = renderInvUniformTab();
+    else if (invView === 'stockout') initialTabHtml = renderInvStockOutTab();
+    else if (invView === 'dept') initialTabHtml = renderInvDeptTab();
+    else if (invView === 'movements') initialTabHtml = renderInvMovementsTab();
+
     container.innerHTML = `
         <div class="tabs" style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
             <button class="tab-btn ${invView === 'items' ? 'active' : ''}" onclick="switchInvView('items',this)">${T('invmod_tab_items')}</button>
@@ -129,16 +136,26 @@ function renderInventory(container) {
             <button class="tab-btn ${invView === 'dept' ? 'active' : ''}" onclick="switchInvView('dept',this)">${T('invmod_tab_dept')}</button>
             <button class="tab-btn ${invView === 'movements' ? 'active' : ''}" onclick="switchInvView('movements',this)">${T('invmod_tab_movements')}</button>
             <button class="tab-btn ${invView === 'linen' ? 'active' : ''}" onclick="switchInvView('linen',this)">🛏️ Linen</button>
+            <button class="tab-btn ${invView === 'uniform' ? 'active' : ''}" onclick="switchInvView('uniform',this)">👔 Uniform & Scrubs</button>
         </div>
         <div id="invContent">
-            ${renderInvItemsTab()}
+            ${initialTabHtml}
         </div>
     `;
     setTimeout(() => {
         if (invView === 'linen') {
-            invDeptFilter = 'Linen';
+            renderInvLinenView();
+        } else if (invView === 'uniform') {
+            renderInvUniformView();
+        } else if (invView === 'stockout') {
+            renderInvStockOutView();
+        } else if (invView === 'dept') {
+            renderInvDeptView();
+        } else if (invView === 'movements') {
+            renderInvMovementsView();
+        } else {
+            renderInvList();
         }
-        renderInvList();
         initGlobalBarcodeScanner();
     }, 50);
 }
@@ -174,10 +191,15 @@ function switchInvView(view, btn) {
         content.innerHTML = renderInvMovementsTab();
         setTimeout(() => renderInvMovementsView(), 50);
     } else if (view === 'linen') {
-        invDeptFilter = 'Linen';
-        content.innerHTML = renderInvItemsTab();
+        content.innerHTML = renderInvLinenTab();
         setTimeout(() => {
-            renderInvList();
+            renderInvLinenView();
+            initGlobalBarcodeScanner();
+        }, 50);
+    } else if (view === 'uniform') {
+        content.innerHTML = renderInvUniformTab();
+        setTimeout(() => {
+            renderInvUniformView();
             initGlobalBarcodeScanner();
         }, 50);
     }
@@ -324,11 +346,15 @@ function renderInvList() {
         const qty = parseInt(i.quantity);
         const lifecyclePct = (i.purchaseDate && i.expiryDate) ? APP.lifecyclePercent(i.purchaseDate, i.expiryDate) : 0;
         const lifecycleColor = APP.lifecycleColor(lifecyclePct);
-        const status = qty === 0 ? 'out-of-stock' : (qty < 10 ? 'low-stock' : 'in-stock');
+        const isOutOfStock = qty === 0;
+        const isLowStock = !isOutOfStock && qty < (parseInt(i.minQty) || 10);
+        const status = isOutOfStock ? 'out-of-stock' : (isLowStock ? 'low-stock' : 'in-stock');
         const outCode = i.outBarcode || i.barcode || i.id.slice(-10);
         const inCode = i.inBarcode || '';
 
-        return `<tr>
+        const rowStyle = isOutOfStock ? 'background:#fff8f8;border-left:3px solid #ef4444;' : (isLowStock ? 'background:#fffdfa;border-left:3px solid #f59e0b;' : '');
+
+        return `<tr class="${isOutOfStock ? 'inv-row-out-of-stock' : (isLowStock ? 'inv-row-low-stock' : '')}" style="${rowStyle}">
             <td>
                 <div class="barcode-cell" style="cursor:pointer;" onclick="printBarcodeSticker('${i.id}')" title="${T('invmod_btn_print_sticker')}">
                     <svg class="barcode-svg" id="barcode_${i.id}" style="width:100px;height:26px;"></svg>
@@ -336,10 +362,10 @@ function renderInvList() {
                     ${inCode ? `<div style="font-size:8px;color:#64748b;text-align:center;font-family:monospace;">IN: ${inCode}</div>` : ''}
                 </div>
             </td>
-            <td><strong>${getInvItemName(i)}</strong></td>
+            <td><strong style="${isOutOfStock ? 'color:#b91c1c;' : (isLowStock ? 'color:#92400e;' : '')}">${getInvItemName(i)}</strong></td>
             <td>${i.category}</td>
             <td><span class="badge badge-info">${i.department || T('invmod_opt_all')}</span></td>
-            <td>${qty} ${i.unit || 'pcs'}</td>
+            <td style="${isOutOfStock ? 'color:#dc2626;font-weight:700;' : (isLowStock ? 'color:#d97706;font-weight:700;' : '')}">${qty} ${i.unit || 'pcs'}</td>
             <td style="font-size:12px;">${i.price ? '₹' + parseFloat(i.price).toFixed(2) : '-'}</td>
             <td style="font-size:12px;font-weight:600;">${i.price ? '₹' + (qty * parseFloat(i.price)).toFixed(2) : '-'}</td>
             <td style="font-size:12px;">${i.expiryDate ? APP.formatDate(i.expiryDate) : '-'}
@@ -352,13 +378,27 @@ function renderInvList() {
                 </div>
                 <div class="progress-label">${lifecyclePct}% used</div>
             </td>
-            <td><span class="badge ${status === 'in-stock' ? 'badge-success' : status === 'low-stock' ? 'badge-warning' : 'badge-danger'}">${invStatusLabel(status)}</span></td>
+            <td style="text-align:center;">
+                ${isOutOfStock ? `
+                    <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 12px;border-radius:14px;background:#fef2f2;color:#ef4444;font-size:10px;font-weight:700;line-height:1.2;text-align:center;border:1px solid #fee2e2;letter-spacing:0.3px;white-space:nowrap;box-shadow:0 1px 2px rgba(239,68,68,0.06);">
+                        <span>OUT OF</span>
+                        <span>STOCK</span>
+                    </div>
+                ` : (isLowStock ? `
+                    <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 12px;border-radius:14px;background:#fffbeb;color:#d97706;font-size:10px;font-weight:700;line-height:1.2;text-align:center;border:1px solid #fef3c7;letter-spacing:0.3px;white-space:nowrap;box-shadow:0 1px 2px rgba(217,119,6,0.06);">
+                        <span>LOW</span>
+                        <span>STOCK</span>
+                    </div>
+                ` : `<span class="badge badge-success" style="font-weight:600;font-size:11px;">${invStatusLabel(status)}</span>`)}
+            </td>
             <td>
-                <button class="btn btn-sm btn-success" onclick="receiveInvStock('${i.id}')">${T('invmod_btn_in')}</button>
-                <button class="btn btn-sm btn-warning" onclick="issueInvStock('${i.id}')" style="color:#fff;">${T('invmod_btn_out')}</button>
-                <button class="btn btn-sm btn-primary" onclick="editInv('${i.id}')">${T('invmod_btn_edit')}</button>
-                <button class="btn btn-sm btn-info" onclick="printBarcodeSticker('${i.id}')" title="${T('invmod_btn_print_sticker')}">🖨️ Sticker</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteInv('${i.id}')">${T('invmod_btn_del')}</button>
+                <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
+                    <button class="btn btn-sm btn-success" style="padding:3px 8px;font-size:11px;" onclick="receiveInvStock('${i.id}')">${T('invmod_btn_in')}</button>
+                    <button class="btn btn-sm btn-warning" style="padding:3px 8px;font-size:11px;color:#fff;" onclick="issueInvStock('${i.id}')">${T('invmod_btn_out')}</button>
+                    <button class="btn btn-sm btn-primary" style="padding:3px 8px;font-size:11px;" onclick="editInv('${i.id}')">${T('invmod_btn_edit')}</button>
+                    <button class="btn btn-sm btn-info" style="padding:3px 8px;font-size:11px;" onclick="printBarcodeSticker('${i.id}')" title="${T('invmod_btn_print_sticker')}">🖨️ Sticker</button>
+                    <button class="btn btn-sm btn-danger" style="padding:3px 8px;font-size:11px;" onclick="deleteInv('${i.id}')">${T('invmod_btn_del')}</button>
+                </div>
             </td>
         </tr>`;
     }).join('') || '<tr><td colspan="11" class="empty-state">' + T('invmod_no_items') + '</td></tr>';
@@ -433,14 +473,29 @@ function renderInvDeptView() {
                         const qty = parseInt(i.quantity);
                         const price = parseFloat(i.price) || 0;
                         const value = qty * price;
-                        const status = qty === 0 ? 'out-of-stock' : (qty < 10 ? 'low-stock' : 'in-stock');
-                        return `<tr>
-                            <td><strong>${getInvItemName(i)}</strong></td>
+                        const isOutOfStock = qty === 0;
+                        const isLowStock = !isOutOfStock && qty < (parseInt(i.minQty) || 10);
+                        const status = isOutOfStock ? 'out-of-stock' : (isLowStock ? 'low-stock' : 'in-stock');
+                        const rowStyle = isOutOfStock ? 'background:#fff8f8;border-left:3px solid #ef4444;' : (isLowStock ? 'background:#fffdfa;border-left:3px solid #f59e0b;' : '');
+                        return `<tr class="${isOutOfStock ? 'inv-row-out-of-stock' : (isLowStock ? 'inv-row-low-stock' : '')}" style="${rowStyle}">
+                            <td><strong style="${isOutOfStock ? 'color:#b91c1c;' : (isLowStock ? 'color:#92400e;' : '')}">${getInvItemName(i)}</strong></td>
                             <td>${i.category}</td>
-                            <td>${qty} ${i.unit || 'pcs'}</td>
+                            <td style="${isOutOfStock ? 'color:#dc2626;font-weight:700;' : (isLowStock ? 'color:#d97706;font-weight:700;' : '')}">${qty} ${i.unit || 'pcs'}</td>
                             <td>${price ? '₹' + price.toFixed(2) : '-'}</td>
                             <td style="font-weight:600;">${value ? '₹' + value.toFixed(2) : '-'}</td>
-                            <td><span class="badge ${status === 'in-stock' ? 'badge-success' : status === 'low-stock' ? 'badge-warning' : 'badge-danger'}">${invStatusLabel(status)}</span></td>
+                            <td style="text-align:center;">
+                                ${isOutOfStock ? `
+                                    <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 12px;border-radius:14px;background:#fef2f2;color:#ef4444;font-size:10px;font-weight:700;line-height:1.2;text-align:center;border:1px solid #fee2e2;letter-spacing:0.3px;white-space:nowrap;box-shadow:0 1px 2px rgba(239,68,68,0.06);">
+                                        <span>OUT OF</span>
+                                        <span>STOCK</span>
+                                    </div>
+                                ` : (isLowStock ? `
+                                    <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 12px;border-radius:14px;background:#fffbeb;color:#d97706;font-size:10px;font-weight:700;line-height:1.2;text-align:center;border:1px solid #fef3c7;letter-spacing:0.3px;white-space:nowrap;box-shadow:0 1px 2px rgba(217,119,6,0.06);">
+                                        <span>LOW</span>
+                                        <span>STOCK</span>
+                                    </div>
+                                ` : `<span class="badge badge-success">${invStatusLabel(status)}</span>`)}
+                            </td>
                             <td><button class="btn btn-sm btn-success" onclick="receiveInvStock('${i.id}')">${T('invmod_btn_in')}</button> <button class="btn btn-sm btn-warning" onclick="issueInvStock('${i.id}')" style="color:#fff;">${T('invmod_btn_out')}</button> <button class="btn btn-sm btn-primary" onclick="editInv('${i.id}')">${T('invmod_btn_edit')}</button></td>
                         </tr>`;
                     }).join('')}</tbody>
@@ -692,11 +747,16 @@ function initGlobalBarcodeScanner() {
     window._inventoryScannerInitialized = true;
 
     window.addEventListener('keydown', (e) => {
-        if (!document.getElementById('barcodeScanInput') && !document.getElementById('quickStockOutScanInput')) return;
+        if (!document.getElementById('barcodeScanInput') && 
+            !document.getElementById('quickStockOutScanInput') && 
+            !document.getElementById('uniformScanInput') && 
+            !document.getElementById('linenScanInput')) return;
         const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
         if (activeTag === 'input' && 
             document.activeElement.id !== 'barcodeScanInput' && 
             document.activeElement.id !== 'quickStockOutScanInput' && 
+            document.activeElement.id !== 'uniformScanInput' && 
+            document.activeElement.id !== 'linenScanInput' && 
             document.activeElement.name !== 'inBarcode' && 
             document.activeElement.name !== 'outBarcode') {
             return;
@@ -715,6 +775,10 @@ function initGlobalBarcodeScanner() {
                 e.preventDefault();
                 if (invView === 'stockout') {
                     executeQuickStockOut(code);
+                } else if (invView === 'uniform') {
+                    handleUniformBarcodeScan(code);
+                } else if (invView === 'linen') {
+                    handleLinenBarcodeScan(code);
                 } else {
                     handleBarcodeScan(code);
                 }

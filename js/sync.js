@@ -95,7 +95,13 @@ var SYNC = (function () {
                 if (json && json.connected && Array.isArray(json.data) && json.data.length > 0) {
                     json.data.forEach(function (row) {
                         if (row && row.key && row.data !== undefined) {
-                            _mergeIntoLocal(row.key, row.data);
+                            var hadLocalOnly = _mergeIntoLocal(row.key, row.data);
+                            if (hadLocalOnly) {
+                                try {
+                                    var merged = JSON.parse(localStorage.getItem('hms_' + row.key));
+                                    cloudSqlPush(row.key, merged);
+                                } catch (e) {}
+                            }
                         }
                     });
                     _recordSyncTs();
@@ -343,26 +349,21 @@ var SYNC = (function () {
         });
     }
 
-    // Apply a single changed key from Realtime into localStorage
+    // Apply a single changed key from Realtime into localStorage safely preserving local entries
     function _applyLiveChange(key, data) {
         if (SHARED_KEYS.indexOf(key) === -1) return false;
         if (_pushedKeys[key] && Date.now() - _pushedKeys[key] < 2000) return false;
         try {
-            var delMap = null;
-            try {
-                var delRaw = localStorage.getItem('hms__deleted_ids');
-                if (delRaw) delMap = JSON.parse(delRaw);
-            } catch (e2) {}
-            if (Array.isArray(data) && delMap) {
-                data = data.filter(function (i) { return !(i && i.id && delMap[i.id]); });
-            }
-            var json = JSON.stringify(data);
             var existing = localStorage.getItem('hms_' + key);
-            if (existing !== json) {
-                localStorage.setItem('hms_' + key, json);
-                sessionStorage.setItem('hms_' + key, json);
-                return true;
+            var hadLocalOnly = _mergeIntoLocal(key, data);
+            var updated = localStorage.getItem('hms_' + key);
+            if (hadLocalOnly) {
+                try {
+                    var merged = JSON.parse(updated);
+                    sbPush(key, merged);
+                } catch (e) {}
             }
+            return existing !== updated;
         } catch (e) {}
         return false;
     }

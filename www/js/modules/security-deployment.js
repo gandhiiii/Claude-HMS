@@ -22,7 +22,30 @@ var SecurityDeployment = (function () {
     }
 
     function _all() {
-        try { return DB.get(KEY) || []; } catch (e) { return []; }
+        try {
+            var items = DB.get(KEY) || [];
+            if (!Array.isArray(items)) items = [];
+            // Resilience: if local items became empty unexpectedly, check the backup key
+            if (items.length === 0) {
+                try {
+                    var bkRaw = localStorage.getItem('hms_' + KEY + '_bk');
+                    if (bkRaw) {
+                        var bk = JSON.parse(bkRaw);
+                        if (Array.isArray(bk) && bk.length > 0) {
+                            items = bk;
+                            DB.set(KEY, items);
+                        }
+                    }
+                } catch (e2) {}
+            } else {
+                try {
+                    localStorage.setItem('hms_' + KEY + '_bk', JSON.stringify(items));
+                } catch (e3) {}
+            }
+            return items;
+        } catch (e) {
+            return [];
+        }
     }
 
     function _floors() {
@@ -62,20 +85,22 @@ var SecurityDeployment = (function () {
         return !!(user && (user.isSuperAdmin || user.role === 'admin' || user.role === 'hod'));
     }
 
-    function _canEdit(user) {
-        return _isManager(user);
+    function _canEdit(user, e) {
+        if (_isManager(user)) return true;
+        return !!(user && e && (e.createdBy === user.username || !e.createdBy));
     }
 
     function _canRemove(user, e) {
         if (_isManager(user)) return true;
-        return !!(user && e.createdBy === user.username);
+        return !!(user && e && (e.createdBy === user.username || !e.createdBy));
     }
 
     function _filter(fromDate, toDate, type) {
         var out = _all().filter(function (e) {
             if (type && type !== 'all' && e.staffType !== type) return false;
-            if (fromDate && (e.date || '') < fromDate) return false;
-            if (toDate && (e.date || '') > toDate) return false;
+            var eDate = (e.date || '').slice(0, 10);
+            if (fromDate && eDate && eDate < fromDate) return false;
+            if (toDate && eDate && eDate > toDate) return false;
             return true;
         });
         return out.sort(function (a, b) {
@@ -345,18 +370,25 @@ var SecurityDeployment = (function () {
     }
 
     function _entriesTable(rows, title, color, user) {
-        var canEdit = _canEdit(user);
         var html = '<div class="card" style="margin-bottom:16px;border-top:3px solid ' + color + ';">'
             + '<div class="card-header"><h3>' + title + ' <span class="badge badge-primary" style="font-size:11px;">' + rows.length + '</span></h3></div>';
         if (rows.length === 0) {
-            html += '<div style="color:var(--gray);font-size:13px;padding:14px;">No entries.</div>';
+            var totalAll = _all().length;
+            if (totalAll > 0) {
+                html += '<div style="color:var(--gray);font-size:13px;padding:14px;background:#f8fafc;border-radius:6px;margin:8px;">'
+                    + 'ℹ️ No entries matching this filter. There are <strong>' + totalAll + '</strong> security deployment entries recorded overall. '
+                    + '<button class="btn btn-xs btn-outline" style="margin-left:8px;font-weight:600;" onclick="' + (_mode === 'module' ? 'SecurityDeployment.setRange(\'all\')' : 'SecurityDeployment.setTabRange(\'all\')') + '">View All Time (' + totalAll + ')</button>'
+                    + '</div>';
+            } else {
+                html += '<div style="color:var(--gray);font-size:13px;padding:14px;">No security deployment entries recorded yet. Click "➕ Add Entry" to record guard or supervisor duty posts.</div>';
+            }
         } else {
             html += '<div class="table-responsive"><table><thead><tr>'
                 + '<th>Date</th><th>Floor / Place</th><th>Time</th><th>Staff Name</th><th>Shift</th><th>Duty</th><th>Added By</th><th></th>'
                 + '</tr></thead><tbody>';
             rows.forEach(function (e) {
                 var actions = '';
-                if (canEdit) {
+                if (_canEdit(user, e)) {
                     actions += '<button class="btn btn-sm btn-primary" style="padding:2px 8px;font-size:11px;" onclick="SecurityDeployment.openEdit(\'' + e.id + '\')">✏️ Edit</button> ';
                 }
                 if (_canRemove(user, e)) {
@@ -436,6 +468,9 @@ var SecurityDeployment = (function () {
             + '</select></div>'
             + '<button class="btn btn-sm btn-primary" onclick="SecurityDeployment.applyFilter()">Apply</button>'
             + '<button class="btn btn-sm btn-outline" onclick="SecurityDeployment.setToday()">Today</button>'
+            + '<button class="btn btn-sm btn-outline" onclick="SecurityDeployment.setRange(\'week\')">This Week</button>'
+            + '<button class="btn btn-sm btn-outline" onclick="SecurityDeployment.setRange(\'month\')">This Month</button>'
+            + '<button class="btn btn-sm btn-outline" onclick="SecurityDeployment.setRange(\'all\')">All Time</button>'
             + '</div>'
 
             // Add form (hidden)
@@ -556,7 +591,7 @@ var SecurityDeployment = (function () {
         },
         submitAdd: function () {
             var type = (document.getElementById('sedType') || {}).value || 'guard';
-            var date = (document.getElementById('sedDate') || {}).value || _dateStr();
+            var date = ((document.getElementById('sedDate') || {}).value || _dateStr()).slice(0, 10);
             var floor = (document.getElementById('sedFloor') || {}).value || '';
             var staffName = (document.getElementById('sedStaffName') || {}).value || '';
             var shift = (document.getElementById('sedShift') || {}).value || 'Morning';
@@ -569,6 +604,22 @@ var SecurityDeployment = (function () {
                 time: time, place: place
             });
             if (!entry) return;
+
+            // Make sure the newly added entry's date is inside the currently viewed filter range
+            var ed = entry.date || _dateStr();
+            if (_mode === 'module') {
+                if (_state.from && ed < _state.from) _state.from = ed;
+                if (_state.to && ed > _state.to) _state.to = ed;
+            } else {
+                if (_tabState.from && ed < _tabState.from) _tabState.from = ed;
+                if (_tabState.to && ed > _tabState.to) _tabState.to = ed;
+            }
+
+            // Also keep immediate local backup copy
+            try {
+                localStorage.setItem('hms_' + KEY + '_bk', JSON.stringify(_all()));
+            } catch(e) {}
+
             if (document.getElementById('sedFloor')) {
                 var f = document.getElementById('sedFloor'); if (f) f.value = '';
                 var s = document.getElementById('sedStaffName'); if (s) s.value = '';
@@ -582,9 +633,9 @@ var SecurityDeployment = (function () {
         },
         openEdit: function (id) {
             var user = AUTH.currentUser();
-            if (!_canEdit(user)) { APP.notify('Only HOD/Admin can edit entries', 'error'); return; }
             var e = DB.getById(KEY, id);
             if (!e) { APP.notify('Entry not found', 'error'); return; }
+            if (!_canEdit(user, e)) { APP.notify('Only HOD/Admin or the person who created it can edit this entry', 'error'); return; }
             openFormModal('✏️ Edit Security Deployment Entry', _editFormHtml(e), 'SecurityDeployment.submitEdit()');
         },
         submitEdit: function () {
@@ -620,6 +671,24 @@ var SecurityDeployment = (function () {
             _state.from = t; _state.to = t;
             var f = document.getElementById('sedFrom'); if (f) f.value = t;
             var t2 = document.getElementById('sedTo'); if (t2) t2.value = t;
+            renderResults();
+        },
+        setRange: function (range) {
+            var now = new Date();
+            var today = _dateStr();
+            if (range === 'today') {
+                _state.from = today; _state.to = today;
+            } else if (range === 'week') {
+                var r = _periodRange('weekly');
+                _state.from = r.from; _state.to = r.to;
+            } else if (range === 'month') {
+                var r2 = _periodRange('monthly');
+                _state.from = r2.from; _state.to = r2.to;
+            } else if (range === 'all') {
+                _state.from = ''; _state.to = '';
+            }
+            var f = document.getElementById('sedFrom'); if (f) f.value = _state.from;
+            var t = document.getElementById('sedTo'); if (t) t.value = _state.to;
             renderResults();
         },
         exportCurrent: function () {
