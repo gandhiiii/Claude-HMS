@@ -24,7 +24,29 @@ var PatientShifting = (function () {
     }
 
     function _all() {
-        try { return DB.get(KEY) || []; } catch (e) { return []; }
+        try {
+            var items = DB.get(KEY) || [];
+            if (!Array.isArray(items)) items = [];
+            if (items.length === 0) {
+                try {
+                    var bkRaw = localStorage.getItem('hms_' + KEY + '_bk');
+                    if (bkRaw) {
+                        var bk = JSON.parse(bkRaw);
+                        if (Array.isArray(bk) && bk.length > 0) {
+                            items = bk;
+                            DB.set(KEY, items);
+                        }
+                    }
+                } catch (e2) {}
+            } else {
+                try {
+                    localStorage.setItem('hms_' + KEY + '_bk', JSON.stringify(items));
+                } catch (e3) {}
+            }
+            return items;
+        } catch (e) {
+            return [];
+        }
     }
 
     function _places() {
@@ -81,8 +103,9 @@ var PatientShifting = (function () {
 
     function _filter(fromDate, toDate) {
         var out = _all().filter(function (e) {
-            if (fromDate && (e.date || '') < fromDate) return false;
-            if (toDate && (e.date || '') > toDate) return false;
+            var eDate = (e.date || '').slice(0, 10);
+            if (fromDate && eDate && eDate < fromDate) return false;
+            if (toDate && eDate && eDate > toDate) return false;
             return true;
         });
         return out.sort(function (a, b) {
@@ -480,6 +503,18 @@ var PatientShifting = (function () {
                 category: category, fromPlace: fromPlace, toPlace: toPlace
             });
             if (!entry) return;
+
+            var ed = entry.date || _dateStr();
+            if (_mode === 'module') {
+                if (_state.from && ed < _state.from) _state.from = ed;
+                if (_state.to && ed > _state.to) _state.to = ed;
+            } else {
+                if (_tabState.from && ed < _tabState.from) _tabState.from = ed;
+                if (_tabState.to && ed > _tabState.to) _tabState.to = ed;
+            }
+            try {
+                localStorage.setItem('hms_' + KEY + '_bk', JSON.stringify(_all()));
+            } catch(e) {}
             var s = document.getElementById('psStaffName'); if (s) s.value = '';
             var f = document.getElementById('psFromPlace'); if (f) f.value = '';
             var t = document.getElementById('psToPlace'); if (t) t.value = '';

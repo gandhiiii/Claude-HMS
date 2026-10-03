@@ -6460,6 +6460,54 @@ function hodToggleCustomSizeInput(selectEl, boxId) {
     }
 }
 
+function hodToggleCustomCategoryInput(selectEl, boxId) {
+    var box = document.getElementById(boxId);
+    if (!box) return;
+    if (selectEl.value === '__custom__' || selectEl.value === 'Other') {
+        box.style.display = 'block';
+        var inp = box.querySelector('input');
+        if (inp) inp.focus();
+    } else {
+        box.style.display = 'none';
+    }
+}
+
+function _hodGetCustomCategories(type) {
+    var key = type === 'housekeeping' ? 'customHousekeepingCategories' : 'customLinenCategories';
+    return DB.get(key) || [];
+}
+
+function _hodSaveCustomCategory(type, newCat) {
+    if (!newCat || typeof newCat !== 'string') return;
+    newCat = newCat.trim();
+    if (!newCat || newCat === '__custom__' || newCat === 'Other') return;
+    var key = type === 'housekeeping' ? 'customHousekeepingCategories' : 'customLinenCategories';
+    var custom = DB.get(key) || [];
+    var cfg = _HOD_SPECIAL_INV[type];
+    var defaults = cfg ? cfg.placeholders : [];
+    if (defaults.indexOf(newCat) === -1 && custom.indexOf(newCat) === -1) {
+        custom.push(newCat);
+        DB.set(key, custom);
+    }
+}
+
+function _hodCategoryOptions(type, selected) {
+    var cfg = _HOD_SPECIAL_INV[type];
+    var defaults = cfg ? cfg.placeholders : [];
+    var custom = _hodGetCustomCategories(type);
+    var all = defaults.concat(custom);
+    var html = '';
+    all.forEach(function (c) {
+        html += '<option value="' + c + '"' + (c === selected ? ' selected' : '') + '>' + c + '</option>';
+    });
+    if (selected && all.indexOf(selected) === -1 && selected !== '__custom__' && selected !== 'Other') {
+        html += '<option value="' + selected + '" selected>' + selected + ' (Custom)</option>';
+    }
+    html += '<option value="__custom__" style="font-weight:bold;color:var(--primary,#0284c7);">+ Add Custom Category...</option>';
+    html += '<option value="Other"' + (selected === 'Other' ? ' selected' : '') + '>Other</option>';
+    return html;
+}
+
 function _hodGetCustomLinenSizes() {
     return DB.get('customLinenSizes') || [];
 }
@@ -6620,11 +6668,16 @@ function hodSpecialInvAdd(type) {
     _hodSpecialInvEditId = null;
     var cfg = _HOD_SPECIAL_INV[type];
     var dept = user.department || '';
-    var ph = cfg.placeholders.map(function (p) { return '<option value="' + p + '">' + p + '</option>'; }).join('');
+    var catBoxId = 'hodSpecialInvCustomCatBox';
+    var defaultCat = type === 'linen' ? 'Bed Sheet' : (cfg.placeholders[0] || '');
     var form = '<form id="hodSpecialInvForm">'
         + '<div class="grid-2" style="gap:10px;">'
         + '<div class="form-group"><label>Item Name *</label><input type="text" name="name" class="form-control" required placeholder="e.g. ' + cfg.placeholders[0] + '"></div>'
-        + '<div class="form-group"><label>Category</label><select name="category" class="form-control">' + ph + '<option value="Other">Other</option></select></div>'
+        + '<div class="form-group">'
+        + '<label style="display:flex;justify-content:space-between;align-items:center;"><span>Category</span><button type="button" class="btn btn-xs btn-outline" style="font-size:10px;padding:1px 6px;" onclick="var box=document.getElementById(\'' + catBoxId + '\');if(box)box.style.display=\'block\';var sel=document.querySelector(\'#hodSpecialInvForm select[name=category]\');if(sel)sel.value=\'__custom__\';var inp=box?box.querySelector(\'input\'):null;if(inp)inp.focus();">+ Custom Category</button></label>'
+        + '<select name="category" class="form-control" onchange="hodToggleCustomCategoryInput(this,\'' + catBoxId + '\')">' + _hodCategoryOptions(type, defaultCat) + '</select>'
+        + '<div id="' + catBoxId + '" style="display:none;margin-top:6px;"><input type="text" name="customCategory" class="form-control" placeholder="Type custom category (e.g. Draw Sheet, Baby Blanket, OT Drapes)..."></div>'
+        + '</div>'
         + '</div>'
         + '<div class="grid-2" style="gap:10px;">'
         + '<div class="form-group"><label>Quantity *</label><input type="number" name="quantity" class="form-control" min="0" value="1" required></div>'
@@ -6664,9 +6717,15 @@ function hodSpecialInvSave() {
             _hodSaveCustomLinenSize(finalSize);
         }
     }
+    var rawCat = (data.category || '').trim();
+    var customCatVal = (data.customCategory || '').trim();
+    var finalCat = (rawCat === '__custom__' || rawCat === 'Other' || customCatVal) ? (customCatVal || (rawCat !== '__custom__' ? rawCat : '')) : rawCat;
+    if (finalCat && finalCat !== '__custom__' && finalCat !== 'Other') {
+        _hodSaveCustomCategory(_hodSpecialInvType, finalCat);
+    }
     DB.add(cfg.store, {
         name: data.name.trim(),
-        category: data.category || '',
+        category: finalCat || '',
         size: isLinen ? finalSize : undefined,
         quantity: parseInt(data.quantity) || 0,
         unit: data.unit || 'pcs',
@@ -6691,11 +6750,16 @@ function hodSpecialInvEdit(type, id) {
     _hodSpecialInvType = type;
     _hodSpecialInvEditId = id;
     var esc = function (v) { return String(v || '').replace(/"/g, '&quot;'); };
-    var ph = cfg.placeholders.map(function (p) { return '<option value="' + p + '"' + (item.category === p ? ' selected' : '') + '>' + p + '</option>'; }).join('') + '<option value="Other"' + (['Bed Sheet','Pillow Cover','Blanket','Bedsheet Set','Towel','Gown','Quilt','Mattress Cover','Duster','Curtain','Broom','Mop','Bucket','Cleaning Liquid','Disinfectant','Dustbin','Gloves','Tissue Box','Waste Bag','Detergent'].indexOf(item.category) === -1 && item.category ? ' selected' : '') + '>Other</option>';
+    var catBoxId = 'hodSpecialInvCustomCatEditBox';
+    var isCustomCat = item.category && cfg.placeholders.indexOf(item.category) === -1 && _hodGetCustomCategories(type).indexOf(item.category) === -1 && item.category !== 'Other';
     var form = '<form id="hodSpecialInvForm">'
         + '<div class="grid-2" style="gap:10px;">'
         + '<div class="form-group"><label>Item Name *</label><input type="text" name="name" class="form-control" required value="' + esc(item.name) + '"></div>'
-        + '<div class="form-group"><label>Category</label><select name="category" class="form-control">' + ph + '</select></div>'
+        + '<div class="form-group">'
+        + '<label style="display:flex;justify-content:space-between;align-items:center;"><span>Category</span><button type="button" class="btn btn-xs btn-outline" style="font-size:10px;padding:1px 6px;" onclick="var box=document.getElementById(\'' + catBoxId + '\');if(box)box.style.display=\'block\';var sel=document.querySelector(\'#hodSpecialInvForm select[name=category]\');if(sel)sel.value=\'__custom__\';var inp=box?box.querySelector(\'input\'):null;if(inp)inp.focus();">+ Custom Category</button></label>'
+        + '<select name="category" class="form-control" onchange="hodToggleCustomCategoryInput(this,\'' + catBoxId + '\')">' + _hodCategoryOptions(type, item.category) + '</select>'
+        + '<div id="' + catBoxId + '" style="display:' + (isCustomCat || item.category === 'Other' ? 'block' : 'none') + ';margin-top:6px;"><input type="text" name="customCategory" class="form-control" value="' + esc(isCustomCat ? item.category : '') + '" placeholder="Type custom category..."></div>'
+        + '</div>'
         + '</div>'
         + '<div class="grid-2" style="gap:10px;">'
         + '<div class="form-group"><label>Quantity *</label><input type="number" name="quantity" class="form-control" min="0" value="' + (parseFloat(item.quantity) || 0) + '" required></div>'
@@ -6737,9 +6801,15 @@ function hodSpecialInvUpdate() {
             _hodSaveCustomLinenSize(finalSize);
         }
     }
+    var rawCat = (data.category || '').trim();
+    var customCatVal = (data.customCategory || '').trim();
+    var finalCat = (rawCat === '__custom__' || rawCat === 'Other' || customCatVal) ? (customCatVal || (rawCat !== '__custom__' ? rawCat : '')) : rawCat;
+    if (finalCat && finalCat !== '__custom__' && finalCat !== 'Other') {
+        _hodSaveCustomCategory(_hodSpecialInvType, finalCat);
+    }
     DB.update(cfg.store, id, {
         name: data.name.trim(),
-        category: data.category || '',
+        category: finalCat || '',
         size: isLinen ? finalSize : undefined,
         quantity: parseInt(data.quantity) || 0,
         unit: data.unit || 'pcs',

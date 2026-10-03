@@ -127,6 +127,34 @@ function saveCustomLinenSize(size) {
     }
 }
 
+const LINEN_CATEGORIES_PRESET = [
+    'Bed Sheet',
+    'Pillow Cover',
+    'Blanket',
+    'Bedsheet Set',
+    'Towel',
+    'Gown',
+    'Quilt',
+    'Mattress Cover',
+    'Duster',
+    'Curtain'
+];
+
+function getCustomLinenCategories() {
+    return DB.get('customLinenCategories') || [];
+}
+
+function saveCustomLinenCategory(cat) {
+    if (!cat || typeof cat !== 'string') return;
+    cat = cat.trim();
+    if (!cat || cat === '__custom__' || cat === 'Other') return;
+    const list = getCustomLinenCategories();
+    if (!LINEN_CATEGORIES_PRESET.includes(cat) && !list.includes(cat)) {
+        list.push(cat);
+        DB.set('customLinenCategories', list);
+    }
+}
+
 // Auto seed sample uniform and linen items if empty
 function ensureUniformAndLinenSeed() {
     const inv = DB.get('inventory') || [];
@@ -1470,10 +1498,13 @@ function showNewLinenForm(item) {
     const customSizes = getCustomLinenSizes();
     const isCustomSize = item?.size && !LINEN_STANDARD_SIZES.includes(item.size);
 
+    const customCats = getCustomLinenCategories();
+    const currentCat = item?.category && item.category !== 'Linen' && item.category !== 'Bedding' ? item.category : 'Bed Sheet';
+    const isCustomCat = currentCat && !LINEN_CATEGORIES_PRESET.includes(currentCat);
+
     const html = `
         <form id="newLinenForm" onsubmit="event.preventDefault();saveLinenItem();">
             <input type="hidden" name="id" value="${item?.id || ''}">
-            <input type="hidden" name="category" value="Linen">
             <input type="hidden" name="isLinen" value="true">
 
             <div class="card mb-3" style="background:#fdf4ff;padding:12px 16px;border:1px solid #f0abfc;border-radius:8px;">
@@ -1507,6 +1538,23 @@ function showNewLinenForm(item) {
 
             <div class="grid-2">
                 <div class="form-group">
+                    <label style="display:flex;justify-content:space-between;align-items:center;">
+                        <span>Category *</span>
+                        <button type="button" class="btn btn-xs btn-outline" style="font-size:10px;padding:1px 6px;" onclick="var box=document.getElementById('linenCustomCategoryBox');if(box)box.style.display='block';var sel=document.getElementById('linenCategorySelectInput');if(sel)sel.value='__custom__';var inp=box?box.querySelector('input'):null;if(inp)inp.focus();">+ Custom Category</button>
+                    </label>
+                    <select id="linenCategorySelectInput" name="categoryPreset" class="form-control" onchange="toggleCustomLinenCategory(this.value)" required>
+                        <option value="">Select category</option>
+                        ${LINEN_CATEGORIES_PRESET.map(c => `<option value="${c}" ${currentCat === c ? 'selected' : ''}>${c}</option>`).join('')}
+                        ${customCats.map(c => `<option value="${c}" ${currentCat === c ? 'selected' : ''}>${c} (Custom)</option>`).join('')}
+                        <option value="__custom__" style="color:#7e22ce;font-weight:700;">+ Add Custom Category...</option>
+                        <option value="Other" ${currentCat === 'Other' ? 'selected' : ''}>Other</option>
+                    </select>
+                    <div id="linenCustomCategoryBox" style="display:${isCustomCat || currentCat === 'Other' ? 'block' : 'none'};margin-top:6px;">
+                        <input type="text" id="linenCustomCategoryInput" name="categoryCustom" class="form-control" value="${isCustomCat ? currentCat : ''}" placeholder="Enter specific category name (e.g. Draw Sheet, Baby Blanket, OT Drapes)">
+                    </div>
+                </div>
+
+                <div class="form-group">
                     <label>Linen Item Name *</label>
                     <select id="linenNameSelect" name="namePreset" class="form-control" onchange="toggleCustomLinenName(this.value)" required>
                         <option value="">Select linen item</option>
@@ -1516,7 +1564,9 @@ function showNewLinenForm(item) {
                         <input type="text" id="linenCustomNameInput" name="nameCustom" class="form-control" value="${item && !LINEN_ITEMS_PRESET.includes(item.name) ? item.name : ''}" placeholder="Enter specific linen name">
                     </div>
                 </div>
+            </div>
 
+            <div class="grid-2">
                 <div class="form-group">
                     <label>Color / Shade *</label>
                     <select id="linenColorSelectInput" name="colorPreset" class="form-control" onchange="toggleCustomLinenColor(this.value)" required>
@@ -1640,6 +1690,18 @@ function toggleCustomLinenColor(val) {
     if (box) box.style.display = (val === 'Other / Custom') ? 'block' : 'none';
 }
 
+function toggleCustomLinenCategory(val) {
+    const box = document.getElementById('linenCustomCategoryBox');
+    if (!box) return;
+    if (val === '__custom__' || val === 'Other') {
+        box.style.display = 'block';
+        const inp = document.getElementById('linenCustomCategoryInput');
+        if (inp) inp.focus();
+    } else {
+        box.style.display = 'none';
+    }
+}
+
 function pickQuickLinenColor(colorName) {
     const select = document.getElementById('linenColorSelectInput');
     if (select) {
@@ -1708,12 +1770,19 @@ function saveLinenItem() {
         saveCustomLinenSize(size);
     }
 
+    let catVal = data.categoryPreset;
+    if (catVal === '__custom__' || catVal === 'Other' || data.categoryCustom) {
+        catVal = (data.categoryCustom || '').trim() || (catVal !== '__custom__' ? catVal : 'Bed Sheet');
+        saveCustomLinenCategory(catVal);
+    }
+    if (!catVal) catVal = 'Bed Sheet';
+
     const outBarcode = (data.outBarcode || '').trim() || ('HMS-LIN-' + Math.floor(1000 + Math.random() * 9000));
     const autoPrint = document.getElementById('linenAutoPrintSticker')?.checked;
 
     const itemPayload = {
         name: name,
-        category: 'Linen',
+        category: catVal,
         isLinen: true,
         color: color,
         size: size,
@@ -2003,6 +2072,7 @@ window.showLinenInOutModal = showLinenInOutModal;
 window.saveLinenInOut = saveLinenInOut;
 window.quickLinenQtyAdjust = quickLinenQtyAdjust;
 window.handleLinenBarcodeScan = handleLinenBarcodeScan;
+window.toggleCustomLinenCategory = toggleCustomLinenCategory;
 window.toggleCustomLinenName = toggleCustomLinenName;
 window.toggleCustomLinenColor = toggleCustomLinenColor;
 window.pickQuickLinenColor = pickQuickLinenColor;
