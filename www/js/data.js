@@ -99,6 +99,9 @@ const DB = {
         try { localStorage.setItem('hms_' + key, json); } catch (e) { console.warn('localStorage set error:', e); }
         try { sessionStorage.setItem('hms_' + key, json); } catch (e) { console.warn('sessionStorage set error:', e); }
         this._emit('change', { store: key, action: 'set' });
+        if (typeof SYNC !== 'undefined' && typeof SYNC.pushKey === 'function') {
+            try { SYNC.pushKey(key, data); } catch (e) {}
+        }
     },
     add(key, item) {
         this._autoSnapBeforeChange(key, 'add');

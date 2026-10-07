@@ -557,10 +557,23 @@ function saveUser() {
         APP.notify((T('usrmod_msg_user_created_prefix') || 'User created: ') + uName + ' / ' + pass, 'success');
     }
 
-    // Trigger cloud sync push if available
-    if (typeof SYNC !== 'undefined' && SYNC.pushNow) {
-        try { SYNC.pushNow(); } catch (e) {}
+    // Trigger cloud sync push immediately to Cloud SQL and Supabase
+    var currentUsers = DB.get('users') || [];
+    if (typeof SYNC !== 'undefined') {
+        if (typeof SYNC.pushKey === 'function') {
+            try { SYNC.pushKey('users', currentUsers); } catch(e){}
+        }
+        if (typeof SYNC.pushAll === 'function') {
+            try { SYNC.pushAll(); } catch(e){}
+        }
     }
+    try {
+        fetch('/api/db/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: 'users', data: currentUsers })
+        }).catch(function(e) { console.warn('Direct users sync notice:', e); });
+    } catch(e) {}
 
     var searchInput = document.getElementById('userSearch');
     if (searchInput) searchInput.value = '';

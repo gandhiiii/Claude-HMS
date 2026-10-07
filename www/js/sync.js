@@ -568,6 +568,24 @@ var SYNC = (function () {
             updateSyncBadge(state, label);
         },
 
+        /* Push single key data to Cloud SQL / Supabase immediately */
+        push: function (key, data) {
+            sbPush(key, data);
+        },
+        pushKey: function (key, data) {
+            sbPush(key, data);
+        },
+        pushNow: function (key, data) {
+            if (key) {
+                var payload = data !== undefined ? data : (typeof DB !== 'undefined' ? DB.get(key) : null);
+                if (payload !== null && payload !== undefined) {
+                    sbPush(key, payload);
+                }
+            } else {
+                this.pushAll();
+            }
+        },
+
         /* Return current sync state ('synced' | 'syncing' | 'offline') */
         getSyncState: function () {
             return _syncState;

@@ -162,6 +162,30 @@
                 });
                 if (!remote.users) return;
                 Object.keys(remote).forEach(function(key) {
+                    if (key === 'users' && Array.isArray(remote[key])) {
+                        var localUsers = [];
+                        try { localUsers = JSON.parse(localStorage.getItem('hms_users') || '[]'); } catch(e){}
+                        if (Array.isArray(localUsers) && localUsers.length > 0) {
+                            var map = {};
+                            remote[key].forEach(function(u) { if (u && u.id) map[u.id] = u; });
+                            localUsers.forEach(function(lu) {
+                                if (!lu || !lu.id) return;
+                                var ru = map[lu.id];
+                                if (!ru) {
+                                    map[lu.id] = lu;
+                                } else {
+                                    var lTs = lu.updatedAt ? Date.parse(lu.updatedAt) : 0;
+                                    var rTs = ru.updatedAt ? Date.parse(ru.updatedAt) : 0;
+                                    if (lTs > rTs) {
+                                        map[lu.id] = lu;
+                                    }
+                                }
+                            });
+                            var finalUsers = Object.keys(map).map(function(k){ return map[k]; });
+                            try { localStorage.setItem('hms_users', JSON.stringify(finalUsers)); } catch(e){}
+                            return;
+                        }
+                    }
                     try { localStorage.setItem('hms_' + key, JSON.stringify(remote[key])); } catch(e2){}
                 });
                 localStorage.setItem('hms_last_cloud_sync', new Date().toISOString());
