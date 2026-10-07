@@ -281,9 +281,9 @@ var SYNC = (function () {
                     return !(i && i.id && deletedMap[i.id]);
                 });
             } else if (remoteData && typeof remoteData === 'object' && localData && typeof localData === 'object') {
-                merged = Object.assign({}, remoteData, localData);
-                Object.keys(localData).forEach(function(k) {
-                    if (!remoteData.hasOwnProperty(k)) hasLocalOnly = true;
+                merged = Object.assign({}, localData, remoteData);
+                Object.keys(remoteData).forEach(function(k) {
+                    if (!localData.hasOwnProperty(k)) hasLocalOnly = true;
                 });
             }
 
@@ -482,25 +482,32 @@ var SYNC = (function () {
                 try { if (typeof APP_SYNC !== 'undefined') APP_SYNC._updateStatus(); } catch (e) {}
             }
 
-            // Periodic catch-up polling every 30 seconds to guarantee multi-device updates even if WS drops
+            // Periodic catch-up polling every 8 seconds to guarantee multi-device updates even if WS drops
             if (!this._pollInterval) {
                 this._pollInterval = setInterval(function () {
                     cloudSqlPull();
                     if (window.SB_DB && document.visibilityState === 'visible') {
                         sbPullAll(function () { _recordSyncTs(); });
                     }
-                }, 30000);
+                }, 8000);
             }
 
-            // Window Focus & Online re-sync listeners
+            // Window Focus, Mobile VisibilityChange & Online re-sync listeners
             if (!this._listenersAttached) {
                 this._listenersAttached = true;
                 window.addEventListener('focus', function () {
-                    cloudSqlPull();
-                    if (window.SB_DB) {
-                        sbPullAll(function () {
-                            _recordSyncTs();
-                            try { if (typeof APP !== 'undefined') APP.refreshCurrent(); } catch (e) {}
+                    cloudSqlPull(function (pulled) {
+                        if (pulled && typeof APP !== 'undefined' && typeof APP.refreshCurrent === 'function') {
+                            APP.refreshCurrent();
+                        }
+                    });
+                });
+                document.addEventListener('visibilitychange', function () {
+                    if (document.visibilityState === 'visible') {
+                        cloudSqlPull(function (pulled) {
+                            if (pulled && typeof APP !== 'undefined' && typeof APP.refreshCurrent === 'function') {
+                                APP.refreshCurrent();
+                            }
                         });
                     }
                 });
@@ -509,12 +516,6 @@ var SYNC = (function () {
                     cloudSqlPull(function () {
                         updateSyncBadge('synced', 'Synced');
                     });
-                    if (window.SB_DB) {
-                        sbPullAll(function () {
-                            _recordSyncTs();
-                            try { if (typeof APP !== 'undefined') APP.refreshCurrent(); } catch (e) {}
-                        });
-                    }
                 });
                 window.addEventListener('offline', function () {
                     updateSyncBadge('offline', 'Offline');
@@ -584,6 +585,24 @@ var SYNC = (function () {
             updateSyncBadge(state, label);
         },
 
+        /* Apply real-time incoming changes broadcast from other devices */
+        applyIncoming: function (key, remoteData) {
+            if (!key || remoteData === undefined) return;
+            if (SHARED_KEYS.indexOf(key) === -1) return;
+            _pushedKeys[key] = Date.now(); // prevent echo pushback
+            try {
+                var hadLocalOnly = _mergeIntoLocal(key, remoteData);
+                _recordSyncTs();
+                updateSyncBadge('synced', 'Synced');
+                if (typeof APP_SYNC !== 'undefined') APP_SYNC._flash();
+                if (typeof APP !== 'undefined' && typeof APP.refreshCurrent === 'function') {
+                    APP.refreshCurrent();
+                }
+            } catch (e) {
+                console.warn('[SYNC] applyIncoming error:', e);
+            }
+        },
+
         /* Push single key data to Cloud SQL / Supabase immediately */
         push: function (key, data) {
             sbPush(key, data);
@@ -610,9 +629,9 @@ var SYNC = (function () {
         /* Return connection + last-sync status */
         status: function () {
             return {
-                connected: !!window.SB_DB,
+                connected: _syncState === 'synced' || !!window.SB_DB,
                 state:     _syncState,
-                projectId: window.SB_URL || null,
+                projectId: 'Cloud SQL (PostgreSQL)',
                 lastSync:  this._lastSyncTs
             };
         }

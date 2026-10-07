@@ -473,15 +473,26 @@ const DB = {
                 }
             } catch(uErr) {}
         }
-        if (typeof SYNC !== 'undefined' && typeof SYNC.pushKey === 'function') {
-            try { SYNC.pushKey(key, data); } catch (e) {}
-        }
+        try {
+            if (typeof window !== 'undefined' && window.location && window.location.protocol !== 'file:') {
+                if (typeof SYNC !== 'undefined' && typeof SYNC.pushKey === 'function') {
+                    SYNC.pushKey(key, data);
+                } else if (key && key.indexOf('bk_') !== 0 && key !== 'last_cloud_sync' && key !== 'last_change_ts') {
+                    fetch('/api/db/sync', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key: key, data: data })
+                    }).catch(function(){});
+                }
+            }
+        } catch (syncErr) {}
     },
     add(key, item) {
         this._autoSnapBeforeChange(key, 'add');
         const items = this.get(key);
         item.id = Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-        item.createdAt = new Date().toISOString();
+        item.createdAt = item.createdAt || new Date().toISOString();
+        item.updatedAt = new Date().toISOString();
         items.push(item);
         this.set(key, items);
         this._emit('change', { store: key, action: 'add', id: item.id });
@@ -1611,10 +1622,13 @@ APP_SYNC = {
     _updateStatus() {
         const el = document.getElementById('liveIndicator');
         if (!el) return;
-        if (window.SB_DB) {
+        var isLive = (typeof SYNC !== 'undefined' && (SYNC.getSyncState() === 'synced' || SYNC.getSyncState() === 'syncing')) ||
+                     (typeof window !== 'undefined' && window.location && window.location.protocol !== 'file:') ||
+                     !!window.SB_DB;
+        if (isLive) {
             el.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#34a853;animation:pulse 2s ease-in-out infinite;display:inline-block;flex-shrink:0;"></span><span style="color:#34a853;font-size:11px;font-weight:700;letter-spacing:0.3px;">LIVE</span>';
             el.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:12px;background:rgba(52,168,83,0.10);border:1px solid rgba(52,168,83,0.3);cursor:default;';
-            el.title = 'Real-time sync active — changes on any device appear everywhere instantly';
+            el.title = 'Real-time database sync active — changes on any device appear everywhere instantly';
             el.onclick = null;
         } else {
             el.innerHTML = '<span style="width:8px;height:8px;border-radius:50%;background:#9aa0a6;display:inline-block;flex-shrink:0;"></span><span style="color:#9aa0a6;font-size:11px;font-weight:600;">offline</span>';

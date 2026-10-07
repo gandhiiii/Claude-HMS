@@ -66,6 +66,26 @@ function broadcastSyncUpdate(key, data) {
     });
 }
 
+let _storeDebounce = null;
+function persistStoreSnapshotDebounced() {
+    clearTimeout(_storeDebounce);
+    _storeDebounce = setTimeout(() => {
+        try {
+            const snapshot = {};
+            for (const [k, v] of localStore.entries()) {
+                snapshot[k] = v.data;
+            }
+            const dataDir = path.join(__dirname, 'data');
+            if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+            fs.writeFileSync(path.join(dataDir, 'hms_store.json'), JSON.stringify(snapshot, null, 2), 'utf8');
+
+            const wwwDataDir = path.join(__dirname, 'www', 'data');
+            if (!fs.existsSync(wwwDataDir)) fs.mkdirSync(wwwDataDir, { recursive: true });
+            fs.writeFileSync(path.join(wwwDataDir, 'hms_store.json'), JSON.stringify(snapshot, null, 2), 'utf8');
+        } catch (e) {}
+    }, 1000);
+}
+
 /* ── Helper: Persist updated users to disk so Git tracks them ── */
 function persistUsersToDisk(users) {
     if (!Array.isArray(users) || users.length === 0) return;
@@ -143,24 +163,26 @@ app.post('/api/db/sync', async (req, res) => {
     const p = getPool();
     const { key, data, items } = req.body;
 
-    // Always update local memory store & persist users if present
+    // Always update local memory store & broadcast to all connected devices (mobile + desktop)
     if (items && Array.isArray(items)) {
         for (const item of items) {
             if (item.key) {
                 localStore.set(item.key, { data: item.data, updated_at: new Date().toISOString() });
+                broadcastSyncUpdate(item.key, item.data);
                 if (item.key === 'users') {
                     persistUsersToDisk(item.data);
-                    broadcastSyncUpdate('users', item.data);
                 }
             }
         }
     } else if (key) {
         localStore.set(key, { data: data, updated_at: new Date().toISOString() });
+        broadcastSyncUpdate(key, data);
         if (key === 'users') {
             persistUsersToDisk(data);
-            broadcastSyncUpdate('users', data);
         }
     }
+
+    persistStoreSnapshotDebounced();
 
     if (!p) {
         return res.json({ success: true, count: items ? items.length : 1, mode: 'local' });
@@ -402,6 +424,26 @@ wss.on('connection', function (ws, req) {
                 break;
             }
 
+            case 'sync_push': {
+                if (msg.key && msg.data !== undefined) {
+                    localStore.set(msg.key, { data: msg.data, updated_at: new Date().toISOString() });
+                    broadcast({ type: 'sync_update', key: msg.key, data: msg.data, ts: Date.now() }, ws);
+                    if (msg.key === 'users') persistUsersToDisk(msg.data);
+                    persistStoreSnapshotDebounced();
+                    const p = getPool();
+                    if (p) {
+                        p.query(
+                            `INSERT INTO hms_store (key, data, updated_at)
+                             VALUES ($1, $2, NOW())
+                             ON CONFLICT (key) DO UPDATE
+                             SET data = EXCLUDED.data, updated_at = NOW()`,
+                            [msg.key, JSON.stringify(msg.data)]
+                        ).catch(err => console.error('[WS Sync] SQL error:', err.message));
+                    }
+                }
+                break;
+            }
+
             case 'reload': {
                 broadcast({ type: 'reload' }, ws);
                 break;
@@ -444,10 +486,29 @@ function pushToUser(userId, title, body, notifType) {
     deliver('user:' + userId, { type: 'notification', title, body, notifType: notifType || 'info' }, null);
 }
 
+/* ── Initialize Database Tables & Seed Snapshot ── */
+async function initDb() {
+    const p = getPool();
+    if (!p) return;
+    try {
+        await p.query(`
+            CREATE TABLE IF NOT EXISTS hms_store (
+                key VARCHAR(128) PRIMARY KEY,
+                data JSONB NOT NULL,
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        `);
+        console.log('[HMS Server] Database table hms_store ready ✓');
+    } catch (e) {
+        console.error('[HMS Server] Database init table error:', e.message);
+    }
+}
+
 /* ── Start server ── */
 httpServer.listen(PORT, HOST, function () {
     console.log(`[HMS] Server running on http://${HOST}:${PORT}`);
     console.log(`[HMS] WebSocket multiplexed on port ${PORT}`);
+    initDb();
 });
 
 process.on('SIGINT', function () {

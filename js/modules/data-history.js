@@ -8,16 +8,16 @@ function renderDataHistory(container) {
 }
 
 function _renderDataHistoryContent(container) {
-    var fb = !!window.SB_DB;
+    var isCloudSql = (typeof SYNC !== 'undefined' && (SYNC.getSyncState() === 'synced' || SYNC.getSyncState() === 'syncing')) || (typeof window !== 'undefined' && window.location && window.location.protocol !== 'file:') || !!window.SB_DB;
 
     /* ── Cloud Sync Section ── */
     var cloudHtml = '';
-    if (fb) {
+    if (isCloudSql) {
         cloudHtml = `
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:10px 14px;border-radius:10px;background:rgba(52,168,83,0.08);border:1px solid rgba(52,168,83,0.25);">
             <span style="width:10px;height:10px;border-radius:50%;background:#34a853;animation:pulse 2s ease-in-out infinite;flex-shrink:0;display:inline-block;"></span>
-            <span style="font-weight:700;color:#34a853;font-size:13px;">${T('dhmod_live_database')}</span>
-            <span style="font-size:12px;color:var(--gray);">${T('dhmod_live_database_desc')}</span>
+            <span style="font-weight:700;color:#34a853;font-size:13px;">Google Cloud SQL (PostgreSQL) — Live Database</span>
+            <span style="font-size:12px;color:var(--gray);">Multi-device real-time sync active across desktop and mobile devices.</span>
         </div>`;
     } else {
         cloudHtml = `

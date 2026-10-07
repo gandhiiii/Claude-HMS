@@ -859,13 +859,18 @@ var WS_NOTIFY = (function () {
                     var msg = JSON.parse(evt.data);
                     if (msg.type === 'notification') {
                         _push(msg.title || 'Notification', msg.body || '', msg.notifType || 'info', true, msg.key);
-                    } else if (msg.type === 'sync_update' && msg.key === 'users' && Array.isArray(msg.data)) {
-                        console.log('[WS_NOTIFY] Realtime users update received. Merging...');
+                    } else if (msg.type === 'sync_update' && msg.key && msg.data !== undefined) {
+                        console.log('[WS_NOTIFY] Realtime sync update received for key:', msg.key);
                         try {
-                            localStorage.setItem('hms_users', JSON.stringify(msg.data));
-                            sessionStorage.setItem('hms_users', JSON.stringify(msg.data));
-                            if (typeof APP !== 'undefined' && typeof APP.refreshCurrent === 'function') {
-                                APP.refreshCurrent();
+                            if (typeof SYNC !== 'undefined' && typeof SYNC.applyIncoming === 'function') {
+                                SYNC.applyIncoming(msg.key, msg.data);
+                            } else {
+                                var raw = JSON.stringify(msg.data);
+                                localStorage.setItem('hms_' + msg.key, raw);
+                                sessionStorage.setItem('hms_' + msg.key, raw);
+                                if (typeof APP !== 'undefined' && typeof APP.refreshCurrent === 'function') {
+                                    APP.refreshCurrent();
+                                }
                             }
                         } catch(e) {}
                     } else if (msg.type === 'reload') {
