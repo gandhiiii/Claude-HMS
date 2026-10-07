@@ -295,8 +295,8 @@ function showUserForm(user) {
             <input type="hidden" name="id" value="${user?.id || ''}">
             <div class="grid-2">
                 <div class="form-group">
-                    <label>Username / Login ID *</label>
-                    <input type="text" name="username" class="form-control" value="${user?.username || ''}" required placeholder="e.g. rahul_nurse, bme_tech">
+                    <label>${T('usrmod_label_username_req')}</label>
+                    <input type="text" id="userFormUsername" name="username" class="form-control" value="${user?.username || ''}" required placeholder="Enter username (Login ID)" style="font-weight:600;">
                 </div>
                 <div class="form-group">
                     <label>Employee ID / Staff Code</label>
@@ -485,6 +485,9 @@ function saveUser() {
             updateData.password = pass;
         }
 
+        var originalUser = existing.find(u => u && String(u.id) === String(data.id));
+        var oldUsername = originalUser ? (originalUser.username || '') : '';
+
         // Apply update to users database
         var updated = DB.update('users', data.id, updateData);
         if (!updated) {
@@ -495,11 +498,37 @@ function saveUser() {
             }
         }
 
+        // If username changed, cascade new username across assigned tasks, problems, checklists
+        if (oldUsername && oldUsername.toLowerCase() !== uName.toLowerCase()) {
+            try {
+                ['tasks', 'problems', 'complaints', 'material_requests', 'checklists', 'hodTasks', 'hodRequests'].forEach(function(storeKey) {
+                    var items = DB.get(storeKey) || [];
+                    var changed = false;
+                    items.forEach(function(item) {
+                        if (item) {
+                            if (item.assignedTo === oldUsername) { item.assignedTo = uName; changed = true; }
+                            if (item.createdBy === oldUsername) { item.createdBy = uName; changed = true; }
+                            if (item.username === oldUsername) { item.username = uName; changed = true; }
+                        }
+                    });
+                    if (changed) DB.set(storeKey, items);
+                });
+            } catch(cascadeErr) { console.warn('Cascade username update warning:', cascadeErr); }
+        }
+
         // Keep current session in sync if admin updated own profile
         var cu = AUTH.currentUser();
-        if (cu && (String(cu.id) === String(data.id) || cu.username === uName)) {
+        if (cu && (String(cu.id) === String(data.id) || cu.username === oldUsername || cu.username === uName)) {
             var merged = Object.assign({}, cu, updateData);
             try { localStorage.setItem('hms_currentUser', JSON.stringify(merged)); } catch(e){}
+        }
+
+        // Refresh HOD dashboard team list if loaded in memory
+        if (typeof _hodData !== 'undefined' && _hodData && typeof _getHodTeam === 'function') {
+            try {
+                _hodData.team = _getHodTeam(AUTH.currentUser());
+                _hodData.teamNames = _hodData.team.map(function(m) { return m.fullName; });
+            } catch(e){}
         }
 
         APP.notify(T('usrmod_msg_user_updated') || 'User profile updated successfully', 'success');

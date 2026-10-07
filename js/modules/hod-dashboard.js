@@ -894,9 +894,10 @@ function _hodTeam(el) {
                 + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">'
                 + '<div class="hq-bar" style="flex:1;"><div class="hq-fill" style="width:' + rate + '%;background:' + (rate >= 80 ? 'var(--success)' : rate >= 50 ? 'var(--warning)' : 'var(--danger)') + ';"></div></div>'
                 + '<span style="font-size:11px;color:var(--gray);min-width:32px;">' + rate + '%</span></div>'
-                + '<div style="display:flex;gap:6px;">'
+                + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
                 + '<button class="btn btn-sm btn-primary" onclick="hodCreateTaskFor(\'' + m.fullName.replace(/'/g, "\\'") + '\')">📝 Assign Task</button>'
-                + '<button class="btn btn-sm btn-outline" onclick="hodRemoveMember(\'' + m.username + '\',\'' + m.fullName.replace(/'/g, "\\'") + '\')">Remove</button>'
+                + '<button class="btn btn-sm btn-outline" onclick="editUser(\'' + (m.id || '') + '\')">✏️ Edit</button>'
+                + '<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger);" onclick="hodRemoveMember(\'' + m.username + '\',\'' + m.fullName.replace(/'/g, "\\'") + '\')">Remove</button>'
                 + '</div></div>';
         });
         html += '</div>';
