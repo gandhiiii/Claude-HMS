@@ -184,23 +184,13 @@
             if (!username || !password) { setMsg('Please enter username and password.', 'var(--danger)'); return; }
             setMsg('', '');
             try {
+                try { localStorage.removeItem('hms_lastModule'); } catch (e) {}
                 var result = AUTH.login(username, password);
-                if (!result || !result.success) {
-                    // Auto-seed default system accounts and retry login immediately
-                    var defs = [
-                        { id: 'usr_admin', fullName: 'System Administrator', username: 'admin', password: 'admin', role: 'admin', department: 'Admin', isSuperAdmin: true },
-                        { id: 'usr_superadmin', fullName: 'Super Admin', username: 'superadmin', password: 'admin', role: 'superadmin', department: 'Executive', isSuperAdmin: true },
-                        { id: 'usr_account', fullName: 'Accounts HOD', username: 'account', password: 'account', role: 'chief_accountant', department: 'Accounts', isSuperAdmin: false },
-                        { id: 'usr_reception', fullName: 'Reception Staff', username: 'reception', password: 'reception', role: 'receptionist', department: 'Reception', isSuperAdmin: false }
-                    ];
-                    try { DB.set('users', defs); } catch(e2){}
-                    result = AUTH.login(username, password);
-                }
 
                 if (result && result.success) {
                     window.location.replace('dashboard.html');
                 } else {
-                    setMsg((result && result.message) ? result.message : 'Invalid username or password.', 'var(--danger)');
+                    setMsg((result && result.message) ? result.message : 'Invalid username/user ID or password.', 'var(--danger)');
                 }
             } catch(e) { setMsg('Login error: ' + (e.message || e), 'var(--danger)'); }
         }

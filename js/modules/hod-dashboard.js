@@ -6626,34 +6626,66 @@ function _hodSpecialInv(el, type) {
     }
 
     var linenCols = type === 'linen';
-    html += '<div class="card"><div class="card-header"><h3>📋 Items</h3></div>'
-        + '<div class="table-responsive"><table><thead><tr><th>#</th><th>Item Name</th><th>Category</th>' + (linenCols ? '<th>Size</th>' : '') + '<th>Qty</th><th>Unit</th><th>Price/Unit</th><th>Value</th><th>Supplier</th><th>Location</th>' + (linenCols ? '<th>Purchase Date</th>' : '<th>Expiry</th>') + '<th>Stock</th><th>Actions</th></tr></thead><tbody>'
+    html += '<div class="card" style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);">'
+        + '<div class="card-header" style="background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">'
+        + '<h3 style="margin:0;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;"><span>📋</span> ' + cfg.title.split(' ')[1] + ' Stock Master</h3>'
+        + '<span style="font-size:12px;color:#64748b;font-weight:500;">' + items.length + ' record(s)</span>'
+        + '</div>'
+        + '<div class="table-responsive" style="overflow-x:auto;">'
+        + '<table style="width:100%;border-collapse:collapse;white-space:nowrap;">'
+        + '<thead>'
+        + '<tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:0.5px;">'
+        + '<th style="padding:12px 10px;text-align:center;width:40px;">#</th>'
+        + '<th style="padding:12px 14px;text-align:left;">Item Name</th>'
+        + '<th style="padding:12px 14px;text-align:left;">Category</th>'
+        + (linenCols ? '<th style="padding:12px 10px;text-align:center;">Size</th>' : '')
+        + '<th style="padding:12px 12px;text-align:center;">Quantity</th>'
+        + '<th style="padding:12px 10px;text-align:center;">Unit</th>'
+        + '<th style="padding:12px 14px;text-align:right;">Price/Unit</th>'
+        + '<th style="padding:12px 14px;text-align:right;">Total Value</th>'
+        + '<th style="padding:12px 14px;text-align:left;">Supplier</th>'
+        + '<th style="padding:12px 14px;text-align:left;">Location</th>'
+        + (linenCols ? '<th style="padding:12px 12px;text-align:center;">Purchase Date</th>' : '<th style="padding:12px 12px;text-align:center;">Expiry</th>')
+        + '<th style="padding:12px 12px;text-align:center;">Stock Status</th>'
+        + '<th style="padding:12px 14px;text-align:center;">Actions</th>'
+        + '</tr></thead><tbody>'
         + items.map(function (i, idx) {
             var ss = st(i);
             var es = exp(i);
-            var expBadge = es ? '<span class="inv-badge" style="background:' + es.b + ';color:' + es.c + ';">' + es.l + '</span>' : '<span style="font-size:11px;color:var(--gray);">—</span>';
+            var expBadge = es ? '<span class="inv-badge" style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:' + es.b + ';color:' + es.c + ';">' + es.l + '</span>' : '<span style="font-size:12px;color:#94a3b8;">—</span>';
             var sizeCell = linenCols
-                ? '<td>' + (i.size || '-') + '</td>'
+                ? '<td style="padding:10px 10px;vertical-align:middle;text-align:center;"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:#f1f5f9;color:#475569;">' + (i.size || '-') + '</span></td>'
                 : '';
             var dateExpCell = linenCols
-                ? '<td>' + (i.purchaseDate ? APP.formatDate(i.purchaseDate) : '-') + '</td>'
-                : '<td>' + expBadge + '</td>';
-            return '<tr>'
-                + '<td>' + (idx + 1) + '</td>'
-                + '<td><strong>' + (i.name || '-') + '</strong></td>'
-                + '<td>' + (i.category || '-') + '</td>'
+                ? '<td style="padding:10px 12px;vertical-align:middle;text-align:center;font-size:12px;color:#475569;">' + (i.purchaseDate ? APP.formatDate(i.purchaseDate) : '-') + '</td>'
+                : '<td style="padding:10px 12px;vertical-align:middle;text-align:center;">' + expBadge + '</td>';
+            var catDisplay = i.category || '-';
+            var isOtherCat = catDisplay === 'Other';
+            var catBadge = '<span style="display:inline-block;padding:3px 9px;border-radius:6px;font-size:12px;font-weight:600;background:' + (isOtherCat ? '#fef3c7' : '#f3e8ff') + ';color:' + (isOtherCat ? '#b45309' : '#7e22ce') + ';border:1px solid ' + (isOtherCat ? '#fde68a' : '#e9d5ff') + ';">' + catDisplay + '</span>';
+
+            return '<tr style="border-bottom:1px solid #f1f5f9;transition:background 0.15s ease;">'
+                + '<td style="padding:10px 10px;vertical-align:middle;text-align:center;color:#94a3b8;font-size:12px;font-weight:600;">' + (idx + 1) + '</td>'
+                + '<td style="padding:10px 14px;vertical-align:middle;font-weight:700;color:#0f172a;font-size:13px;">' + (i.name || '-') + '</td>'
+                + '<td style="padding:10px 14px;vertical-align:middle;">' + catBadge + '</td>'
                 + sizeCell
-                + '<td style="display:flex;align-items:center;gap:6px;"><button class="btn btn-xs" style="min-width:22px;padding:1px 6px;font-size:12px;line-height:1;" onclick="hodSpecialInvQty(\'' + type + '\',\'' + i.id + '\',-1)">−</button><strong>' + (parseFloat(i.quantity) || 0) + '</strong><button class="btn btn-xs" style="min-width:22px;padding:1px 6px;font-size:12px;line-height:1;" onclick="hodSpecialInvQty(\'' + type + '\',\'' + i.id + '\',1)">+</button></td>'
-                + '<td>' + (i.unit || 'pcs') + '</td>'
-                + '<td>₹' + (parseFloat(i.price) || 0).toFixed(2) + '</td>'
-                + '<td>₹' + ((parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0)).toFixed(2) + '</td>'
-                + '<td>' + (i.supplier || '-') + '</td>'
-                + '<td>' + (i.location || '-') + '</td>'
+                + '<td style="padding:10px 12px;vertical-align:middle;text-align:center;">'
+                + '<div style="display:inline-flex;align-items:center;gap:6px;background:#f8fafc;padding:3px 8px;border:1px solid #e2e8f0;border-radius:20px;">'
+                + '<button type="button" class="btn btn-xs" style="width:22px;height:22px;min-width:22px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:13px;font-weight:700;background:#fff;border:1px solid #cbd5e1;color:#475569;cursor:pointer;line-height:1;box-shadow:0 1px 2px rgba(0,0,0,0.05);" onclick="hodSpecialInvQty(\'' + type + '\',\'' + i.id + '\',-1)" title="Decrease">−</button>'
+                + '<strong style="min-width:28px;text-align:center;font-size:13px;color:#0f172a;">' + (parseFloat(i.quantity) || 0) + '</strong>'
+                + '<button type="button" class="btn btn-xs" style="width:22px;height:22px;min-width:22px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-size:13px;font-weight:700;background:#fff;border:1px solid #cbd5e1;color:#475569;cursor:pointer;line-height:1;box-shadow:0 1px 2px rgba(0,0,0,0.05);" onclick="hodSpecialInvQty(\'' + type + '\',\'' + i.id + '\',1)" title="Increase">+</button>'
+                + '</div></td>'
+                + '<td style="padding:10px 10px;vertical-align:middle;text-align:center;color:#64748b;font-size:12px;">' + (i.unit || 'pcs') + '</td>'
+                + '<td style="padding:10px 14px;vertical-align:middle;text-align:right;color:#334155;font-variant-numeric:tabular-nums;font-size:13px;">₹' + (parseFloat(i.price) || 0).toFixed(2) + '</td>'
+                + '<td style="padding:10px 14px;vertical-align:middle;text-align:right;font-weight:700;color:#0f172a;font-variant-numeric:tabular-nums;font-size:13px;">₹' + ((parseFloat(i.quantity) || 0) * (parseFloat(i.price) || 0)).toFixed(2) + '</td>'
+                + '<td style="padding:10px 14px;vertical-align:middle;color:#475569;font-size:13px;">' + (i.supplier || '-') + '</td>'
+                + '<td style="padding:10px 14px;vertical-align:middle;color:#475569;font-size:13px;">' + (i.location || '-') + '</td>'
                 + dateExpCell
-                + '<td><span class="inv-badge" style="background:' + ss.b + ';color:' + ss.c + ';border:1px solid ' + ss.c + ';">' + ss.l + '</span></td>'
-                + '<td style="white-space:nowrap;">'
-                + '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--primary);border-color:var(--primary);padding:2px 8px;" onclick="hodSpecialInvEdit(\'' + type + '\',\'' + i.id + '\')">✎ Edit</button> '
-                + '<button class="btn btn-sm btn-outline" style="font-size:11px;color:var(--danger);border-color:var(--danger);padding:2px 8px;" onclick="hodSpecialInvDelete(\'' + type + '\',\'' + i.id + '\')">🗑</button>'
+                + '<td style="padding:10px 12px;vertical-align:middle;text-align:center;"><span class="inv-badge" style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;letter-spacing:0.3px;background:' + ss.b + ';color:' + ss.c + ';border:1px solid ' + ss.c + ';">' + ss.l + '</span></td>'
+                + '<td style="padding:10px 14px;vertical-align:middle;text-align:center;">'
+                + '<div style="display:inline-flex;gap:6px;align-items:center;">'
+                + '<button class="btn btn-sm" style="font-size:12px;font-weight:600;color:#2563eb;background:#eff6ff;border:1px solid #bfdbfe;padding:4px 10px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" onclick="hodSpecialInvEdit(\'' + type + '\',\'' + i.id + '\')">✎ Edit</button> '
+                + '<button class="btn btn-sm" style="font-size:12px;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;padding:4px 8px;border-radius:6px;cursor:pointer;" onclick="hodSpecialInvDelete(\'' + type + '\',\'' + i.id + '\')" title="Delete">🗑</button>'
+                + '</div>'
                 + '</td></tr>';
         }).join('')
         + '</tbody></table></div></div>';

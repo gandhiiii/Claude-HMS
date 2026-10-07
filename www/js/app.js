@@ -12,17 +12,28 @@ const Router = {
         this.renderSidebar();
 
         // Restore last visited module or use role default
-        const isAdmin = user.isSuperAdmin || user.role === 'admin';
         const uRole = (user.role || '').toString().trim().toLowerCase();
+        if (uRole === 'employee' || uRole === 'staff' || uRole === 'nurse' || uRole === 'receptionist') {
+            user.isSuperAdmin = false;
+        }
+        const isAdmin = (user.isSuperAdmin === true || user.role === 'admin' || user.role === 'superadmin') && uRole !== 'employee';
 
         const defaultModule = isAdmin ? 'dashboard'
             : uRole === 'hod' ? 'hod-dashboard'
             : uRole === 'storekeeper' ? 'storekeeper-dashboard'
             : uRole === 'ambulance_employee' ? 'ambulance'
             : 'employee-dashboard';
+
+        const _adminOnly = ['dashboard', 'users', 'departments', 'feature-rights', 'admin-checklists', 'data-history', 'budget', 'quarterly-priorities', 'hospital-settings', 'reports'];
         const saved = localStorage.getItem('hms_lastModule');
-        let startModule = saved || defaultModule;
-        if (startModule === 'chief-accountant-portal' || startModule === 'cfo-portal' || (!isAdmin && startModule === 'dashboard')) {
+        let startModule = defaultModule;
+
+        // If non-admin, always default to role dashboard (employee-dashboard for employees)
+        if (isAdmin && saved) {
+            startModule = saved;
+        } else if (saved && !_adminOnly.includes(saved) && saved !== 'dashboard') {
+            startModule = saved;
+        } else {
             startModule = defaultModule;
             try { localStorage.setItem('hms_lastModule', defaultModule); } catch (e) {}
         }
@@ -61,26 +72,39 @@ const Router = {
         if (!header) return;
         const hs = getHospitalSettings();
         header.innerHTML = `
-            <div class="header-left">
-                <button id="menuToggle" class="menu-toggle" aria-label="Toggle menu" onclick="Router.toggleMobileMenu()">&#9776;</button>
-                <div style="display:flex;flex-direction:column;gap:1px;">
-                    <span id="headerHospitalName" style="font-size:11px;color:var(--primary);font-weight:700;letter-spacing:0.3px;line-height:1;">${hs.name || 'Stavya Intelligence'}</span>
-                    <h3 id="pageTitle" style="font-size:17px;font-weight:600;margin:0;">Dashboard</h3>
+            <div class="header-main-bar">
+                <div class="header-left">
+                    <button id="menuToggle" class="menu-toggle" aria-label="Toggle menu" onclick="Router.toggleMobileMenu()">&#9776;</button>
+                    <div class="header-titles">
+                        <span id="headerHospitalName" class="header-hospital-name">${hs.name || 'Stavya Intelligence'}</span>
+                        <h3 id="pageTitle" class="header-page-title">Dashboard</h3>
+                    </div>
                 </div>
-            </div>
-            <div class="header-right">
-                <span id="liveIndicator" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--success);padding:3px 8px;border-radius:12px;background:rgba(52,168,83,0.1);border:1px solid rgba(52,168,83,0.3);"><span style="width:7px;height:7px;border-radius:50%;background:var(--success);animation:pulse 1.5s infinite;"></span>${typeof T === 'function' ? T('ui_live') : 'LIVE'}</span>
-                ${(user.role === 'admin' || user.isSuperAdmin) ? `<button id="syncNowBtn" class="btn btn-sm" style="font-size:11px;padding:4px 10px;background:rgba(52,168,83,0.1);border:1px solid rgba(52,168,83,0.4);color:var(--secondary);" onclick="(typeof APP !== 'undefined' && APP._syncNow ? APP._syncNow() : Router._syncNow())" title="Upload all local data to cloud database">☁ Sync</button><button class="btn btn-sm btn-mobile-setup" style="font-size:11px;padding:4px 10px;" onclick="(typeof APP !== 'undefined' && APP._mobileSetup ? APP._mobileSetup() : Router._mobileSetup())" title="Get QR code to set up login on mobile">📱 Mobile</button>` : ''}
-                ${typeof LANG !== 'undefined' ? LANG.switcher() : ''}
-                ${typeof WS_NOTIFY !== 'undefined' ? WS_NOTIFY.bellHTML() : ''}
-                <span class="role-badge" style="font-size:13px;color:var(--gray);">${user.role.toUpperCase()}</span>
-                <div class="header-user" onclick="Router.showProfile()">
-                    <div class="avatar">${user.fullName.charAt(0).toUpperCase()}</div>
-                    <span class="user-name" style="font-size:14px;">${user.fullName}</span>
+                <div class="header-right">
+                    <div class="header-status-strip">
+                        <span id="liveIndicator" class="header-live-badge"><span class="live-dot"></span>${typeof T === 'function' ? T('ui_live') : 'LIVE'}</span>
+                        <span id="dbSyncBadge" class="db-sync-badge sync-synced" onclick="if (typeof SYNC !== 'undefined') SYNC.pullNow();" title="PostgreSQL database connected. Click to refresh."><span class="sync-dot sync-dot-synced"></span> Synced</span>
+                        ${(user.role === 'admin' || user.isSuperAdmin) ? `<button id="syncNowBtn" class="btn btn-sm btn-header-sync" onclick="(typeof APP !== 'undefined' && APP._syncNow ? APP._syncNow() : Router._syncNow())" title="Upload all local data to cloud database">☁ Sync</button>` : ''}
+                    </div>
+                    <div class="header-lang-strip">
+                        ${typeof LANG !== 'undefined' ? LANG.switcher() : ''}
+                    </div>
+                    <div class="header-user-strip">
+                        ${(user.role === 'admin' || user.isSuperAdmin) ? `<button class="btn btn-sm btn-mobile-setup" onclick="(typeof APP !== 'undefined' && APP._mobileSetup ? APP._mobileSetup() : Router._mobileSetup())" title="Get QR code to set up login on mobile">📱 Mobile</button>` : ''}
+                        ${typeof WS_NOTIFY !== 'undefined' ? WS_NOTIFY.bellHTML() : ''}
+                        <span class="role-badge">${user.role.toUpperCase()}</span>
+                        <div class="header-user" onclick="Router.showProfile()" title="${user.fullName}">
+                            <div class="avatar">${user.fullName.charAt(0).toUpperCase()}</div>
+                            <span class="user-name">${user.fullName}</span>
+                        </div>
+                        <button class="btn btn-sm btn-danger btn-header-logout" onclick="Router.logout()" title="Logout">${typeof T === 'function' ? T('ui_logout') : 'Logout'}</button>
+                    </div>
                 </div>
-                <button class="btn btn-sm btn-danger" onclick="Router.logout()">${typeof T === 'function' ? T('ui_logout') : 'Logout'}</button>
             </div>
         `;
+        if (typeof SYNC !== 'undefined' && SYNC.updateBadge) {
+            try { SYNC.updateBadge(); } catch(e) {}
+        }
     },
     renderSidebar() {
         const user = AUTH.currentUser();
@@ -140,7 +164,11 @@ const Router = {
     navigate(module) {
         var u = AUTH.currentUser();
         if (!u) { window.location.href = 'index.html'; return; }
-        var isAdmin = u.isSuperAdmin || u.role === 'admin';
+        var uRole = (u.role || '').toString().trim().toLowerCase();
+        if (uRole === 'employee' || uRole === 'staff' || uRole === 'nurse' || uRole === 'receptionist') {
+            u.isSuperAdmin = false;
+        }
+        var isAdmin = (u.isSuperAdmin === true || u.role === 'admin' || u.role === 'superadmin') && uRole !== 'employee';
 
         if (module === 'purchases') {
             window._hodTargetTab = 'purchases';

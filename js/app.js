@@ -12,17 +12,28 @@ const Router = {
         this.renderSidebar();
 
         // Restore last visited module or use role default
-        const isAdmin = user.isSuperAdmin || user.role === 'admin';
         const uRole = (user.role || '').toString().trim().toLowerCase();
+        if (uRole === 'employee' || uRole === 'staff' || uRole === 'nurse' || uRole === 'receptionist') {
+            user.isSuperAdmin = false;
+        }
+        const isAdmin = (user.isSuperAdmin === true || user.role === 'admin' || user.role === 'superadmin') && uRole !== 'employee';
 
         const defaultModule = isAdmin ? 'dashboard'
             : uRole === 'hod' ? 'hod-dashboard'
             : uRole === 'storekeeper' ? 'storekeeper-dashboard'
             : uRole === 'ambulance_employee' ? 'ambulance'
             : 'employee-dashboard';
+
+        const _adminOnly = ['dashboard', 'users', 'departments', 'feature-rights', 'admin-checklists', 'data-history', 'budget', 'quarterly-priorities', 'hospital-settings', 'reports'];
         const saved = localStorage.getItem('hms_lastModule');
-        let startModule = saved || defaultModule;
-        if (startModule === 'chief-accountant-portal' || startModule === 'cfo-portal' || (!isAdmin && startModule === 'dashboard')) {
+        let startModule = defaultModule;
+
+        // If non-admin, always default to role dashboard (employee-dashboard for employees)
+        if (isAdmin && saved) {
+            startModule = saved;
+        } else if (saved && !_adminOnly.includes(saved) && saved !== 'dashboard') {
+            startModule = saved;
+        } else {
             startModule = defaultModule;
             try { localStorage.setItem('hms_lastModule', defaultModule); } catch (e) {}
         }
@@ -153,7 +164,11 @@ const Router = {
     navigate(module) {
         var u = AUTH.currentUser();
         if (!u) { window.location.href = 'index.html'; return; }
-        var isAdmin = u.isSuperAdmin || u.role === 'admin';
+        var uRole = (u.role || '').toString().trim().toLowerCase();
+        if (uRole === 'employee' || uRole === 'staff' || uRole === 'nurse' || uRole === 'receptionist') {
+            u.isSuperAdmin = false;
+        }
+        var isAdmin = (u.isSuperAdmin === true || u.role === 'admin' || u.role === 'superadmin') && uRole !== 'employee';
 
         if (module === 'purchases') {
             window._hodTargetTab = 'purchases';

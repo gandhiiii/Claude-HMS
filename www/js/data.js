@@ -620,8 +620,14 @@ const AUTH = {
     },
     login(username, password) {
         try {
-            var cleanU = (username || '').trim().toLowerCase();
+            var rawU = (username || '').trim();
+            var cleanU = rawU.toLowerCase();
             var cleanP = (password || '').trim();
+            var uDigits = cleanU.replace(/\D/g, '');
+
+            if (!rawU) {
+                return { success: false, message: 'Please enter username, user ID, or employee ID.' };
+            }
 
             let users = DB.get('users');
             if (!Array.isArray(users) || users.length === 0) {
@@ -635,57 +641,74 @@ const AUTH = {
                 try { DB.set('users', users); } catch(e){}
             }
 
-            var user = users.find(u => 
-                (String(u.username||'').toLowerCase() === cleanU || String(u.email||'').toLowerCase() === cleanU) && 
-                (u.password === cleanP || u.password === password || !cleanP)
-            );
+            // Helper to check if a user record matches the identifier entered
+            function matchUserIdentifier(u) {
+                if (!u) return false;
+                var uId = String(u.id || '').trim().toLowerCase();
+                var uName = String(u.username || '').trim().toLowerCase();
+                var uEmpId = String(u.employeeId || u.empId || u.code || '').trim().toLowerCase();
+                var uMail = String(u.email || '').trim().toLowerCase();
+                var uPh = String(u.phone || '').replace(/\D/g, '');
 
-            // Special auto-heal for default system accounts (admin, superadmin, biomedical, hod, account, reception)
-            if (!user && (cleanU === 'admin' || cleanU === 'superadmin' || cleanU === 'admin_sys' || cleanU === 'biomedical' || cleanU === 'hod' || cleanU === 'account' || cleanU === 'reception')) {
-                var existing = users.find(u => String(u.username||'').toLowerCase() === cleanU || String(u.email||'').toLowerCase() === cleanU);
-                if (existing) {
-                    if (cleanP) existing.password = cleanP;
-                    user = existing;
-                } else {
-                    user = {
-                        id: 'usr_' + cleanU,
-                        fullName: cleanU === 'superadmin' ? 'Super Admin' : cleanU === 'biomedical' ? 'Biomedical HOD' : cleanU === 'hod' ? 'Department HOD' : 'System Administrator',
-                        username: cleanU,
-                        password: cleanP || (cleanU === 'superadmin' ? 'admin' : cleanU),
-                        role: cleanU === 'superadmin' ? 'superadmin' : (cleanU === 'biomedical' || cleanU === 'hod') ? 'hod' : cleanU === 'account' ? 'chief_accountant' : cleanU === 'reception' ? 'receptionist' : 'admin',
-                        department: cleanU === 'biomedical' ? 'Biomedical' : cleanU === 'account' ? 'Accounts' : 'Admin',
-                        isSuperAdmin: (cleanU === 'admin' || cleanU === 'superadmin')
-                    };
-                    users.push(user);
-                }
+                if (uId === cleanU) return true;
+                if (uName === cleanU) return true;
+                if (uEmpId === cleanU) return true;
+                if (uMail === cleanU) return true;
+                if (uDigits && uDigits.length >= 7 && uPh === uDigits) return true;
+                return false;
+            }
+
+            // Find all matching user records by identifier
+            var candidate = users.find(matchUserIdentifier);
+
+            // Special auto-heal ONLY for predefined root system accounts (admin, superadmin)
+            if (!candidate && (cleanU === 'admin' || cleanU === 'superadmin')) {
+                candidate = {
+                    id: 'usr_' + cleanU,
+                    fullName: cleanU === 'superadmin' ? 'Super Admin' : 'System Administrator',
+                    username: cleanU,
+                    password: cleanP || 'admin',
+                    role: cleanU === 'superadmin' ? 'superadmin' : 'admin',
+                    department: 'Admin',
+                    isSuperAdmin: true
+                };
+                users.push(candidate);
                 try { DB.set('users', users); } catch(e){}
             }
 
-            // Fallback: If any user matches username regardless of password, allow sign in and update password
-            if (!user && cleanU) {
-                var uMatch = users.find(u => String(u.username||'').toLowerCase() === cleanU || String(u.email||'').toLowerCase() === cleanU);
-                if (uMatch) {
-                    if (cleanP) uMatch.password = cleanP;
-                    user = uMatch;
-                    try { DB.set('users', users); } catch(e){}
-                }
+            if (!candidate) {
+                return { success: false, message: 'User ID / Username "' + rawU + '" not found. Please check your user ID.' };
             }
 
-            if (!user) {
-                user = users.find(u => u.username === 'admin' || u.isSuperAdmin) || users[0] || {
-                    id: 'usr_admin', fullName: 'System Administrator', username: 'admin', password: 'admin', role: 'admin', department: 'Admin', isSuperAdmin: true
-                };
+            // Verify password
+            var storedP = String(candidate.password || '').trim();
+            var passMatches = (storedP === cleanP) || (candidate.password === password) || (!storedP && cleanP);
+
+            if (!passMatches) {
+                return { success: false, message: 'Incorrect password for user ID "' + rawU + '".' };
             }
 
-            if (user) {
-                let sid = Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
-                try { localStorage.setItem('hms_currentUser', JSON.stringify(user)); } catch (e) {}
-                try { localStorage.setItem('hms_loginTime', new Date().toISOString()); } catch (e) {}
-                try { localStorage.setItem('hms_sid_' + sid, JSON.stringify(user)); } catch (e) {}
-                try { localStorage.setItem('hms_activeSid', sid); } catch (e) {}
-                try { sessionStorage.setItem('hms_t', sid); } catch (e) {}
-                return { success: true, user, sid };
+            // User authenticated successfully!
+            var user = Object.assign({}, candidate);
+
+            // CRITICAL SECURITY ENFORCEMENT:
+            // Non-admin roles (especially employee, staff, nurse, receptionist) MUST NEVER be treated as superadmin!
+            var roleLow = String(user.role || '').toLowerCase();
+            var nonAdminRoles = ['employee', 'staff', 'nurse', 'receptionist', 'reception', 'storekeeper', 'ambulance_employee', 'doctor', 'billing_clerk'];
+            if (nonAdminRoles.includes(roleLow) || (roleLow !== 'admin' && roleLow !== 'superadmin')) {
+                user.isSuperAdmin = false;
             }
+
+            // Clear any old module navigation state so a prior admin session doesn't hijack this user's view
+            try { localStorage.removeItem('hms_lastModule'); } catch (e) {}
+
+            let sid = Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+            try { localStorage.setItem('hms_currentUser', JSON.stringify(user)); } catch (e) {}
+            try { localStorage.setItem('hms_loginTime', new Date().toISOString()); } catch (e) {}
+            try { localStorage.setItem('hms_sid_' + sid, JSON.stringify(user)); } catch (e) {}
+            try { localStorage.setItem('hms_activeSid', sid); } catch (e) {}
+            try { sessionStorage.setItem('hms_t', sid); } catch (e) {}
+            return { success: true, user, sid };
         } catch (e) {
             return { success: false, message: 'Login error: ' + e.message };
         }
@@ -725,6 +748,12 @@ const AUTH = {
                 let d = localStorage.getItem('hms_currentUser');
                 if (d) u = JSON.parse(d);
             } catch (e) {}
+        }
+        if (u) {
+            var r = String(u.role || '').toLowerCase();
+            if (r === 'employee' || r === 'staff' || r === 'nurse' || r === 'receptionist' || r === 'reception') {
+                u.isSuperAdmin = false;
+            }
         }
         return u;
     },
