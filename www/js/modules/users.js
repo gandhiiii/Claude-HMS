@@ -163,9 +163,10 @@ function adminAddToTeam(dept) {
     var form = '<form id="userForm">'
         + '<input type="hidden" name="id" value="">'
         + '<div class="grid-2">'
-        + '<div class="form-group"><label>' + T('usrmod_label_username_req') + '</label><input type="text" name="username" class="form-control" required></div>'
-        + '<div class="form-group"><label>' + T('usrmod_label_password_req') + '</label><input type="text" name="password" class="form-control" required></div>'
-        + '<div class="form-group"><label>' + T('usrmod_label_fullname_req') + '</label><input type="text" name="fullName" class="form-control" required></div>'
+        + '<div class="form-group"><label>Username / Login ID *</label><input type="text" name="username" class="form-control" required placeholder="e.g. nurse_rita"></div>'
+        + '<div class="form-group"><label>Employee ID / Staff Code</label><input type="text" name="employeeId" class="form-control" placeholder="e.g. EMP-202"></div>'
+        + '<div class="form-group"><label>Login Password *</label><input type="text" name="password" class="form-control" required placeholder="Enter password"></div>'
+        + '<div class="form-group"><label>' + T('usrmod_label_fullname_req') + '</label><input type="text" name="fullName" class="form-control" required placeholder="Full Name"></div>'
         + '<div class="form-group"><label>' + T('usrmod_label_email') + ' <span style="font-size:11px;color:var(--gray);">' + T('usrmod_label_optional') + '</span></label><input type="email" name="email" class="form-control" placeholder="staff@hospital.com"></div>'
         + '<div class="form-group"><label>' + T('usrmod_label_phone') + ' <span style="font-size:11px;color:var(--gray);">' + T('usrmod_label_optional') + '</span></label><input type="text" name="phone" class="form-control" placeholder="' + T('usrmod_placeholder_mobile') + '"></div>'
         + '<div class="form-group"><label>' + T('usrmod_label_role_req') + '</label><select name="role" class="form-control" onchange="onRoleChange(this)">'
@@ -219,8 +220,12 @@ function renderUsersList() {
             var deptFeatures = typeof getDepartmentFeatures === 'function' ? getDepartmentFeatures(department) : [];
             var totalPerms = new Set(deptFeatures.concat(permissions)).size;
 
+            var empId = typeof u.employeeId === 'string' ? u.employeeId : (typeof u.empId === 'string' ? u.empId : '');
+
             rows += '<tr>'
-                + '<td><strong>' + username.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</strong></td>'
+                + '<td><strong style="color:var(--text);">' + username.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</strong>'
+                + (empId ? '<div style="font-size:11px;color:var(--primary);font-weight:600;">ID: ' + empId.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</div>' : '')
+                + '</td>'
                 + '<td>' + fullName.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</td>'
                 + '<td>' + email.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</td>'
                 + '<td>' + phone.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</td>'
@@ -229,8 +234,10 @@ function renderUsersList() {
                 + '<td style="font-size:12px;"><span class="badge badge-info">' + totalPerms + ' ' + T('usrmod_modules_label') + '</span>'
                 + (deptFeatures.length > 0 ? '<span style="color:var(--gray);display:block;">' + deptFeatures.length + ' ' + T('usrmod_from_dept_label') + '</span>' : '')
                 + '</td>'
-                + '<td><button class="btn btn-sm btn-primary" onclick="editUser(\'' + uid.replace(/'/g,'') + '\')">' + T('usrmod_btn_edit') + '</button> '
-                + '<button class="btn btn-sm btn-danger" onclick="deleteUser(\'' + uid.replace(/'/g,'') + '\')"' + (isSuperAdmin ? ' disabled' : '') + '>' + T('usrmod_btn_del') + '</button></td>'
+                + '<td><div style="display:flex;gap:4px;align-items:center;">'
+                + '<button class="btn btn-sm btn-primary" onclick="editUser(\'' + uid.replace(/'/g,'') + '\')">' + T('usrmod_btn_edit') + '</button> '
+                + '<button class="btn btn-sm btn-danger" onclick="deleteUser(\'' + uid.replace(/'/g,'') + '\')"' + (isSuperAdmin ? ' disabled' : '') + '>' + T('usrmod_btn_del') + '</button>'
+                + '</div></td>'
                 + '</tr>';
         }
 
@@ -288,16 +295,20 @@ function showUserForm(user) {
             <input type="hidden" name="id" value="${user?.id || ''}">
             <div class="grid-2">
                 <div class="form-group">
-                    <label>${T('usrmod_label_username_req')}</label>
-                    <input type="text" name="username" class="form-control" value="${user?.username || ''}" ${isEdit ? 'readonly' : ''} required>
+                    <label>Username / Login ID *</label>
+                    <input type="text" name="username" class="form-control" value="${user?.username || ''}" required placeholder="e.g. rahul_nurse, bme_tech">
                 </div>
                 <div class="form-group">
-                    <label>${isEdit ? T('usrmod_label_password_new') : T('usrmod_label_password_req')}</label>
-                    <input type="text" name="password" class="form-control" value="" ${isEdit ? '' : 'required'} placeholder="${isEdit ? T('usrmod_placeholder_leave_blank') : ''}">
+                    <label>Employee ID / Staff Code</label>
+                    <input type="text" name="employeeId" class="form-control" value="${user?.employeeId || user?.empId || user?.code || ''}" placeholder="e.g. EMP-101, BME-04">
+                </div>
+                <div class="form-group">
+                    <label>Login Password *</label>
+                    <input type="text" name="password" class="form-control" value="${user?.password || ''}" required placeholder="Enter login password">
                 </div>
                 <div class="form-group">
                     <label>${T('usrmod_label_fullname_req')}</label>
-                    <input type="text" name="fullName" class="form-control" value="${user?.fullName || ''}" required>
+                    <input type="text" name="fullName" class="form-control" value="${user?.fullName || ''}" required placeholder="Full Name">
                 </div>
                 <div class="form-group">
                     <label>${T('usrmod_label_email')} <span style="color:var(--gray);font-size:11px;">${T('usrmod_label_optional')}</span></label>
@@ -426,50 +437,106 @@ function onRoleChange(selectEl) {
     if (section) section.style.display = role === 'hod' ? '' : 'none';
 }
 
-var _userSaveGuard = 0;
-
 function saveUser() {
-    if (_userSaveGuard && Date.now() - _userSaveGuard < 1000) {
-        return false;
-    }
-    _userSaveGuard = Date.now();
-    const form = document.getElementById('userForm');
-    const data = { fullName: '', username: '', password: '', email: '', phone: '', role: 'employee', department: '' };
+    const form = document.querySelector('.modal #userForm') || document.getElementById('userForm');
+    if (!form) return false;
+
+    const data = { fullName: '', username: '', employeeId: '', password: '', email: '', phone: '', role: 'employee', department: '' };
     form.querySelectorAll('[name]').forEach(el => {
-        if (el.name !== 'permissions') data[el.name] = el.value;
+        if (el.name !== 'permissions' && el.name !== 'managedDept') data[el.name] = el.value;
     });
-    // Only save non-disabled checkboxes (disabled = inherited from dept, not user-specific)
+
     data.permissions = Array.from(form.querySelectorAll('[name="permissions"]:checked:not([disabled])')).map(cb => cb.value);
     var managedDepts = Array.from(form.querySelectorAll('[name="managedDept"]:checked')).map(function(cb) { return cb.value; });
 
-    if (!data.fullName || !data.username) {
-        APP.notify(T('usrmod_msg_username_fullname_required'), 'error'); return false;
+    var uName = (data.username || '').trim();
+    var fName = (data.fullName || '').trim();
+    var empId = (data.employeeId || '').trim();
+    var pass = (data.password || '').trim();
+
+    if (!fName || !uName) {
+        APP.notify(T('usrmod_msg_username_fullname_required') || 'Username and Full Name are required.', 'error');
+        return false;
     }
 
-    const existing = DB.get('users');
+    const existing = DB.get('users') || [];
+
     if (data.id) {
-        const updateData = { fullName: data.fullName, email: data.email, phone: data.phone, role: data.role, department: data.department, permissions: data.permissions };
-        if (data.password) updateData.password = data.password;
-        updateData.managedDepartments = managedDepts;
-        DB.update('users', data.id, updateData);
-        APP.notify(T('usrmod_msg_user_updated'), 'success');
+        // Check for duplicate username with any other user
+        const duplicate = existing.find(u => u && String(u.id) !== String(data.id) && String(u.username || '').toLowerCase() === uName.toLowerCase());
+        if (duplicate) {
+            APP.notify(T('usrmod_msg_username_exists') || 'Username already exists for another user', 'error');
+            return false;
+        }
+
+        const updateData = {
+            username: uName,
+            employeeId: empId,
+            fullName: fName,
+            email: (data.email || '').trim(),
+            phone: (data.phone || '').trim(),
+            role: data.role,
+            department: data.department,
+            permissions: data.permissions,
+            managedDepartments: managedDepts
+        };
+
+        if (pass) {
+            updateData.password = pass;
+        }
+
+        // Apply update to users database
+        var updated = DB.update('users', data.id, updateData);
+        if (!updated) {
+            var idx = existing.findIndex(u => u && (String(u.id) === String(data.id) || u.username === uName));
+            if (idx > -1) {
+                existing[idx] = Object.assign({}, existing[idx], updateData, { updatedAt: new Date().toISOString() });
+                DB.set('users', existing);
+            }
+        }
+
+        // Keep current session in sync if admin updated own profile
+        var cu = AUTH.currentUser();
+        if (cu && (String(cu.id) === String(data.id) || cu.username === uName)) {
+            var merged = Object.assign({}, cu, updateData);
+            try { localStorage.setItem('hms_currentUser', JSON.stringify(merged)); } catch(e){}
+        }
+
+        APP.notify(T('usrmod_msg_user_updated') || 'User profile updated successfully', 'success');
     } else {
-        if (!data.password) { APP.notify(T('usrmod_msg_password_required'), 'error'); return false; }
-        if (existing.find(u => u.username === data.username)) {
-            APP.notify(T('usrmod_msg_username_exists'), 'error'); return false;
+        if (!pass) {
+            APP.notify(T('usrmod_msg_password_required') || 'Password is required for new user', 'error');
+            return false;
+        }
+        if (existing.find(u => u && String(u.username || '').toLowerCase() === uName.toLowerCase())) {
+            APP.notify(T('usrmod_msg_username_exists') || 'Username already exists', 'error');
+            return false;
         }
         DB.add('users', {
-            username: data.username, password: data.password,
-            fullName: data.fullName, email: data.email, phone: data.phone,
-            role: data.role, department: data.department, permissions: data.permissions,
+            username: uName,
+            employeeId: empId,
+            password: pass,
+            fullName: fName,
+            email: (data.email || '').trim(),
+            phone: (data.phone || '').trim(),
+            role: data.role,
+            department: data.department,
+            permissions: data.permissions,
             managedDepartments: managedDepts,
             isSuperAdmin: false
         });
-        APP.notify(T('usrmod_msg_user_created_prefix') + data.username + ' / ' + data.password, 'success');
+        APP.notify((T('usrmod_msg_user_created_prefix') || 'User created: ') + uName + ' / ' + pass, 'success');
     }
+
+    // Trigger cloud sync push if available
+    if (typeof SYNC !== 'undefined' && SYNC.pushNow) {
+        try { SYNC.pushNow(); } catch (e) {}
+    }
+
     var searchInput = document.getElementById('userSearch');
     if (searchInput) searchInput.value = '';
     renderUsersList();
+    closeModal();
     return true;
 }
 
