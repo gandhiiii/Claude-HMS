@@ -478,7 +478,8 @@ function saveUser() {
             role: data.role,
             department: data.department,
             permissions: data.permissions,
-            managedDepartments: managedDepts
+            managedDepartments: managedDepts,
+            updatedAt: new Date().toISOString()
         };
 
         if (pass) {
@@ -568,6 +569,11 @@ function saveUser() {
         }
     }
     try {
+        fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ users: currentUsers })
+        }).catch(function(e) {});
         fetch('/api/db/sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

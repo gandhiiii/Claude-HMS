@@ -92,7 +92,7 @@ var SYNC = (function () {
         fetch('/api/db/sync')
             .then(function (res) { return res.json(); })
             .then(function (json) {
-                if (json && json.connected && Array.isArray(json.data) && json.data.length > 0) {
+                if (json && (json.connected || json.success) && Array.isArray(json.data) && json.data.length > 0) {
                     json.data.forEach(function (row) {
                         if (row && row.key && row.data !== undefined) {
                             var hadLocalOnly = _mergeIntoLocal(row.key, row.data);
@@ -109,12 +109,28 @@ var SYNC = (function () {
                     _syncTimer = setTimeout(function () { updateSyncBadge('synced', 'Synced'); }, 400);
                     if (cb) cb(true);
                 } else {
+                    // Fallback to static data/users.json (useful on GitHub Pages / static servers)
+                    fetch('data/users.json?_ts=' + Date.now())
+                        .then(function(r){ return r.json(); })
+                        .then(function(uList){
+                            if (Array.isArray(uList) && uList.length > 0) {
+                                _mergeIntoLocal('users', uList);
+                            }
+                        }).catch(function(){});
                     clearTimeout(_syncTimer);
                     _syncTimer = setTimeout(function () { updateSyncBadge('synced', 'Synced'); }, 400);
                     if (cb) cb(false);
                 }
             })
             .catch(function () {
+                // Static host fallback when /api/db/sync does not exist
+                fetch('data/users.json?_ts=' + Date.now())
+                    .then(function(r){ return r.json(); })
+                    .then(function(uList){
+                        if (Array.isArray(uList) && uList.length > 0) {
+                            _mergeIntoLocal('users', uList);
+                        }
+                    }).catch(function(){});
                 if (!navigator.onLine) {
                     updateSyncBadge('offline', 'Offline');
                 } else {

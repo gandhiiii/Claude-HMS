@@ -7,6 +7,7 @@
 const express   = require('express');
 const http      = require('http');
 const path      = require('path');
+const fs        = require('fs');
 const os        = require('os');
 const WebSocket = require('ws');
 const { Pool }  = require('pg');
@@ -51,11 +52,57 @@ app.get('/health', (req, res) => {
     });
 });
 
+/* ── Memory / Disk Fallback Store for Server-side Sync ── */
+const localStore = new Map();
+
+/* ── Helper: Broadcast real-time sync updates to all connected clients ── */
+function broadcastSyncUpdate(key, data) {
+    if (!wss) return;
+    const msg = JSON.stringify({ type: 'sync_update', key, data, ts: Date.now() });
+    wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+            try { client.send(msg); } catch(e){}
+        }
+    });
+}
+
+/* ── Helper: Persist updated users to disk so Git tracks them ── */
+function persistUsersToDisk(users) {
+    if (!Array.isArray(users) || users.length === 0) return;
+    try {
+        const dataDir = path.join(__dirname, 'data');
+        if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+        fs.writeFileSync(path.join(dataDir, 'users.json'), JSON.stringify(users, null, 2), 'utf8');
+
+        const wwwDataDir = path.join(__dirname, 'www', 'data');
+        if (!fs.existsSync(wwwDataDir)) fs.mkdirSync(wwwDataDir, { recursive: true });
+        fs.writeFileSync(path.join(wwwDataDir, 'users.json'), JSON.stringify(users, null, 2), 'utf8');
+
+        // Update getDefaultUsers in js/data.js and www/js/data.js
+        const fnStr = 'function getDefaultUsers() {\n    return ' + JSON.stringify(users, null, 4) + ';\n}\n';
+        ['js/data.js', 'www/js/data.js'].forEach(rel => {
+            const fp = path.join(__dirname, rel);
+            if (fs.existsSync(fp)) {
+                let content = fs.readFileSync(fp, 'utf8');
+                const startIdx = content.indexOf('function getDefaultUsers() {');
+                const endIdx = content.indexOf('window.getDefaultUsers = getDefaultUsers;');
+                if (startIdx !== -1 && endIdx !== -1) {
+                    content = content.substring(0, startIdx) + fnStr + content.substring(endIdx);
+                    fs.writeFileSync(fp, content, 'utf8');
+                }
+            }
+        });
+        console.log(`[HMS Server] Persisted ${users.length} users to disk & updated getDefaultUsers`);
+    } catch (e) {
+        console.error('[HMS Server] Error persisting users to disk:', e.message);
+    }
+}
+
 /* ── Cloud SQL Database Sync API ── */
 app.get('/api/db/status', async (req, res) => {
     const p = getPool();
     if (!p) {
-        return res.json({ configured: false, provider: 'None (Local / Standby)' });
+        return res.json({ configured: false, provider: 'Memory Store (Local / Standby)', storedKeys: localStore.size });
     }
     try {
         const result = await p.query('SELECT count(*) as count FROM hms_store');
@@ -72,21 +119,54 @@ app.get('/api/db/status', async (req, res) => {
 
 app.get('/api/db/sync', async (req, res) => {
     const p = getPool();
-    if (!p) return res.json({ connected: false, data: [] });
+    if (!p) {
+        const rows = [];
+        for (const [key, val] of localStore.entries()) {
+            rows.push({ key, data: val.data, updated_at: val.updated_at });
+        }
+        return res.json({ success: true, connected: false, data: rows });
+    }
     try {
         const result = await p.query('SELECT key, data, updated_at FROM hms_store');
-        res.json({ connected: true, data: result.rows });
+        res.json({ success: true, connected: true, data: result.rows });
     } catch (e) {
         console.error('Cloud SQL sync read error:', e.message);
-        res.status(500).json({ error: 'Failed to fetch from Cloud SQL' });
+        const rows = [];
+        for (const [key, val] of localStore.entries()) {
+            rows.push({ key, data: val.data, updated_at: val.updated_at });
+        }
+        res.json({ success: true, connected: false, data: rows });
     }
 });
 
 app.post('/api/db/sync', async (req, res) => {
     const p = getPool();
-    if (!p) return res.status(503).json({ error: 'Cloud SQL not configured' });
+    const { key, data, items } = req.body;
+
+    // Always update local memory store & persist users if present
+    if (items && Array.isArray(items)) {
+        for (const item of items) {
+            if (item.key) {
+                localStore.set(item.key, { data: item.data, updated_at: new Date().toISOString() });
+                if (item.key === 'users') {
+                    persistUsersToDisk(item.data);
+                    broadcastSyncUpdate('users', item.data);
+                }
+            }
+        }
+    } else if (key) {
+        localStore.set(key, { data: data, updated_at: new Date().toISOString() });
+        if (key === 'users') {
+            persistUsersToDisk(data);
+            broadcastSyncUpdate('users', data);
+        }
+    }
+
+    if (!p) {
+        return res.json({ success: true, count: items ? items.length : 1, mode: 'local' });
+    }
+
     try {
-        const { key, data, items } = req.body;
         if (items && Array.isArray(items)) {
             for (const item of items) {
                 if (item.key) {
@@ -112,8 +192,115 @@ app.post('/api/db/sync', async (req, res) => {
         res.json({ success: true, key });
     } catch (e) {
         console.error('Cloud SQL sync write error:', e.message);
-        res.status(500).json({ error: 'Failed to write to Cloud SQL' });
+        // Fallback succeeded in localStore
+        res.json({ success: true, key: key || 'items', warning: e.message });
     }
+});
+
+/* ── Direct Users Sync API ── */
+app.get('/api/users', async (req, res) => {
+    const p = getPool();
+    if (p) {
+        try {
+            const result = await p.query("SELECT data FROM hms_store WHERE key = 'users'");
+            if (result.rows.length > 0 && Array.isArray(result.rows[0].data)) {
+                return res.json({ success: true, users: result.rows[0].data });
+            }
+        } catch (e) {
+            console.error('Error querying users from Cloud SQL:', e.message);
+        }
+    }
+    const dataUsersFile = path.join(__dirname, 'data', 'users.json');
+    if (fs.existsSync(dataUsersFile)) {
+        try {
+            const users = JSON.parse(fs.readFileSync(dataUsersFile, 'utf8'));
+            return res.json({ success: true, users });
+        } catch (e) {}
+    }
+    res.json({ success: true, users: [] });
+});
+
+app.post('/api/users', async (req, res) => {
+    const users = req.body && req.body.users ? req.body.users : req.body;
+    if (!Array.isArray(users)) {
+        return res.status(400).json({ success: false, error: 'Expected array of users' });
+    }
+    localStore.set('users', { data: users, updated_at: new Date().toISOString() });
+    persistUsersToDisk(users);
+    broadcastSyncUpdate('users', users);
+
+    const p = getPool();
+    if (p) {
+        try {
+            await p.query(
+                `INSERT INTO hms_store (key, data, updated_at)
+                 VALUES ('users', $1, NOW())
+                 ON CONFLICT (key) DO UPDATE
+                 SET data = EXCLUDED.data, updated_at = NOW()`,
+                [JSON.stringify(users)]
+            );
+        } catch (e) {
+            console.error('Error writing users to Cloud SQL:', e.message);
+        }
+    }
+    res.json({ success: true, count: users.length });
+});
+
+/* ── Live Cross-Device Authentication Verification API ── */
+app.post('/api/auth/verify', async (req, res) => {
+    const { username, password } = req.body || {};
+    if (!username || !password) {
+        return res.status(400).json({ success: false, message: 'Missing credentials' });
+    }
+    const rawU = String(username).trim();
+    const cleanU = rawU.toLowerCase();
+    const cleanP = String(password).trim();
+    const uDigits = cleanU.replace(/\D/g, '');
+
+    let users = [];
+    const p = getPool();
+    if (p) {
+        try {
+            const result = await p.query("SELECT data FROM hms_store WHERE key = 'users'");
+            if (result.rows.length > 0 && Array.isArray(result.rows[0].data)) {
+                users = result.rows[0].data;
+            }
+        } catch (e) {}
+    }
+    if (users.length === 0) {
+        const dataUsersFile = path.join(__dirname, 'data', 'users.json');
+        if (fs.existsSync(dataUsersFile)) {
+            try { users = JSON.parse(fs.readFileSync(dataUsersFile, 'utf8')); } catch (e) {}
+        }
+    }
+
+    const matched = users.find(u => {
+        if (!u) return false;
+        const uName = (u.username || '').toString().trim().toLowerCase();
+        const uEmpId = (u.employeeId || '').toString().trim().toLowerCase();
+        const uId = (u.id || '').toString().trim().toLowerCase();
+        const uEmail = (u.email || '').toString().trim().toLowerCase();
+        const uPhone = (u.phone || '').toString().replace(/\D/g, '');
+
+        const idMatch = (uName === cleanU) ||
+            (uEmpId && uEmpId === cleanU) ||
+            (uId === cleanU) ||
+            (uEmail && uEmail === cleanU) ||
+            (uDigits && uDigits.length >= 4 && (
+                uId === 'usr_' + uDigits ||
+                (uEmpId && uEmpId.replace(/\D/g, '') === uDigits) ||
+                (uPhone && uPhone.endsWith(uDigits))
+            ));
+        if (!idMatch) return false;
+
+        const storedPass = (u.password || '').toString().trim();
+        return storedPass === cleanP;
+    });
+
+    if (matched) {
+        return res.json({ success: true, user: matched, allUsers: users });
+    }
+    res.json({ success: false, message: 'Invalid username or password' });
 });
 
 /* ── Serve static files ── */

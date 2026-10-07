@@ -859,6 +859,15 @@ var WS_NOTIFY = (function () {
                     var msg = JSON.parse(evt.data);
                     if (msg.type === 'notification') {
                         _push(msg.title || 'Notification', msg.body || '', msg.notifType || 'info', true, msg.key);
+                    } else if (msg.type === 'sync_update' && msg.key === 'users' && Array.isArray(msg.data)) {
+                        console.log('[WS_NOTIFY] Realtime users update received. Merging...');
+                        try {
+                            localStorage.setItem('hms_users', JSON.stringify(msg.data));
+                            sessionStorage.setItem('hms_users', JSON.stringify(msg.data));
+                            if (typeof APP !== 'undefined' && typeof APP.refreshCurrent === 'function') {
+                                APP.refreshCurrent();
+                            }
+                        } catch(e) {}
                     } else if (msg.type === 'reload') {
                         console.log('[WS_NOTIFY] Reload signal received. Refreshing page...');
                         window.location.reload();

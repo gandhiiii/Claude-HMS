@@ -1,17 +1,349 @@
 function getDefaultUsers() {
     return [
-        { id: 'usr_admin', fullName: 'System Administrator', username: 'admin', password: 'admin', role: 'admin', department: 'Admin', email: 'admin@hospital.org', phone: '+91 98765 00001', isSuperAdmin: true },
-        { id: 'usr_superadmin', fullName: 'Super Admin', username: 'superadmin', password: 'admin', role: 'superadmin', department: 'Executive', email: 'superadmin@hospital.org', phone: '+91 98765 00002', isSuperAdmin: true },
-        { id: 'usr_biomedical', fullName: 'Er. Hardik Shah', username: 'biomedical', password: 'biomedical', role: 'hod', department: 'Biomedical', email: 'hardik.bme@hospital.org', phone: '+91 98765 00003', isSuperAdmin: false },
-        { id: 'usr_bme_tech', fullName: 'Sr. BME Tech Officer', username: 'bme_tech', password: 'bme', role: 'employee', department: 'Biomedical', email: 'bme.tech@hospital.org', phone: '+91 98765 00004', isSuperAdmin: false },
-        { id: 'usr_account', fullName: 'Accounts HOD', username: 'account', password: 'account', role: 'chief_accountant', department: 'Accounts', email: 'accounts@hospital.org', phone: '+91 98765 00005', isSuperAdmin: false },
-        { id: 'usr_reception', fullName: 'Reception Staff', username: 'reception', password: 'reception', role: 'receptionist', department: 'Reception', email: 'reception@hospital.org', phone: '+91 98765 00006', isSuperAdmin: false },
-        { id: 'usr_storekeeper', fullName: 'Storekeeper Manager', username: 'storekeeper', password: 'storekeeper', role: 'storekeeper', department: 'Store', email: 'store@hospital.org', phone: '+91 98765 00007', isSuperAdmin: false },
-        { id: 'usr_doc_sarah', fullName: 'Dr. Sarah Jenkins', username: 'doc_sarah', password: 'password', role: 'doctor', department: 'Radiology', email: 'sarah.j@hospital.org', phone: '+91 98765 00008', isSuperAdmin: false },
-        { id: 'usr_doc_rajesh', fullName: 'Dr. Rajesh Kumar', username: 'doc_rajesh', password: 'password', role: 'doctor', department: 'OPD', email: 'rajesh.k@hospital.org', phone: '+91 98765 00009', isSuperAdmin: false },
-        { id: 'usr_facility', fullName: 'Facility Manager', username: 'facility', password: 'facility', role: 'hod', department: 'Facility', email: 'facility@hospital.org', phone: '+91 98765 00010', isSuperAdmin: false },
-        { id: 'usr_it_hod', fullName: 'IT Manager', username: 'ithod', password: 'ithod', role: 'hod', department: 'IT', email: 'it.hod@hospital.org', phone: '+91 98765 00011', isSuperAdmin: false }
-    ];
+    {
+        "id": "usr_admin",
+        "role": "admin",
+        "email": "admin@hospital.org",
+        "phone": "+91 98765 00001",
+        "fullName": "System Administrator",
+        "password": "admin",
+        "username": "admin",
+        "updatedAt": "2026-10-07T05:32:42.810Z",
+        "department": "Admin",
+        "isSuperAdmin": true
+    },
+    {
+        "id": "usr_superadmin",
+        "role": "superadmin",
+        "email": "superadmin@hospital.org",
+        "phone": "+91 98765 00002",
+        "fullName": "Super Admin",
+        "password": "admin",
+        "username": "superadmin",
+        "updatedAt": "2026-10-07T05:32:42.810Z",
+        "department": "Executive",
+        "isSuperAdmin": true
+    },
+    {
+        "id": "usr_biomedical",
+        "role": "hod",
+        "email": "hardik.bme@hospital.org",
+        "phone": "+91 98765 00003",
+        "fullName": "Er. Hardik Shah",
+        "password": "biomedical",
+        "username": "biomedical",
+        "updatedAt": "2026-10-07T05:32:42.810Z",
+        "department": "Biomedical",
+        "isSuperAdmin": false
+    },
+    {
+        "id": "usr_bme_tech",
+        "role": "employee",
+        "email": "bme.tech@hospital.org",
+        "phone": "+91 98765 00004",
+        "fullName": "Sr. BME Tech Officer",
+        "password": "bme",
+        "username": "bme_tech",
+        "updatedAt": "2026-10-07T05:32:42.810Z",
+        "department": "Biomedical",
+        "isSuperAdmin": false
+    },
+    {
+        "id": "usr_reception",
+        "role": "receptionist",
+        "email": "reception@hospital.org",
+        "phone": "+91 98765 00006",
+        "fullName": "Reception Staff",
+        "password": "reception",
+        "username": "reception",
+        "updatedAt": "2026-10-07T05:32:42.810Z",
+        "department": "Reception",
+        "isSuperAdmin": false
+    },
+    {
+        "id": "usr_storekeeper",
+        "role": "storekeeper",
+        "email": "store@hospital.org",
+        "phone": "+91 98765 00007",
+        "fullName": "Storekeeper Manager",
+        "password": "storekeeper",
+        "username": "storekeeper",
+        "updatedAt": "2026-10-07T05:32:42.810Z",
+        "department": "Store",
+        "isSuperAdmin": false
+    },
+    {
+        "id": "usr_doc_sarah",
+        "role": "doctor",
+        "email": "sarah.j@hospital.org",
+        "phone": "+91 98765 00008",
+        "fullName": "Dr. Sarah Jenkins",
+        "password": "password",
+        "username": "doc_sarah",
+        "updatedAt": "2026-10-07T05:32:42.810Z",
+        "department": "Radiology",
+        "isSuperAdmin": false
+    },
+    {
+        "id": "usr_doc_rajesh",
+        "role": "doctor",
+        "email": "rajesh.k@hospital.org",
+        "phone": "+91 98765 00009",
+        "fullName": "Dr. Rajesh Kumar",
+        "password": "password",
+        "username": "doc_rajesh",
+        "updatedAt": "2026-10-07T05:32:42.810Z",
+        "department": "OPD",
+        "isSuperAdmin": false
+    },
+    {
+        "id": "usr_facility",
+        "role": "hod",
+        "email": "facility@hospital.org",
+        "phone": "+91 98765 00010",
+        "fullName": "Facility Manager",
+        "password": "facility",
+        "username": "facility",
+        "updatedAt": "2026-10-07T05:32:42.810Z",
+        "department": "Facility",
+        "isSuperAdmin": false
+    },
+    {
+        "id": "usr_it_hod",
+        "role": "hod",
+        "email": "it.hod@hospital.org",
+        "phone": "+91 98765 00011",
+        "fullName": "IT Manager",
+        "password": "ithod",
+        "username": "ithod",
+        "updatedAt": "2026-10-07T05:32:42.810Z",
+        "department": "IT",
+        "isSuperAdmin": false
+    },
+    {
+        "id": "admin_super",
+        "role": "admin",
+        "email": "admin@hospital.com",
+        "phone": "9876543210",
+        "fullName": "Super Admin",
+        "password": "admin123",
+        "username": "admin",
+        "createdAt": "2026-07-16T02:17:15.230Z",
+        "updatedAt": "2026-07-20T05:42:12.612Z",
+        "department": "",
+        "isSuperAdmin": true
+    },
+    {
+        "id": "1784180144173_qsbi7",
+        "role": "hod",
+        "email": "admin@gmail.com",
+        "phone": "9106882723",
+        "fullName": "Vatsal Patel",
+        "password": "vatsal123",
+        "username": "V001",
+        "createdAt": "2026-07-16T05:35:44.173Z",
+        "updatedAt": "2026-07-29T17:10:33.278Z",
+        "department": "IT",
+        "permissions": [
+            "complaints"
+        ],
+        "isSuperAdmin": false,
+        "managedDepartments": [
+            "Radiology",
+            "Mintanance",
+            "Facility",
+            "IT",
+            "Nursing",
+            "Medical",
+            "OT",
+            "Biomedical",
+            "Housekeeping"
+        ]
+    },
+    {
+        "id": "1784216211044_q5q42",
+        "role": "employee",
+        "email": "abhishek@gmail.com",
+        "phone": "9106882723",
+        "fullName": "abhishek",
+        "password": "abhishek@2026",
+        "username": "A001",
+        "createdAt": "2026-07-16T15:36:51.044Z",
+        "updatedAt": "2026-09-21T16:49:38.094Z",
+        "department": "Facility",
+        "permissions": [
+            "matrequests",
+            "problems",
+            "tasks",
+            "suggestions",
+            "lost-found",
+            "checklists",
+            "handover",
+            "equipbackdown",
+            "reports",
+            "staff-deployment",
+            "security-deployment"
+        ],
+        "isSuperAdmin": false,
+        "managedDepartments": []
+    },
+    {
+        "id": "1784367177760_iij2o",
+        "role": "hod",
+        "email": "zankhana@gmail.com",
+        "phone": "9106882723",
+        "fullName": "zankhana",
+        "password": "zankhana@123",
+        "username": "Z001",
+        "createdAt": "2026-07-18T09:32:57.760Z",
+        "updatedAt": "2026-09-21T11:59:17.901Z",
+        "department": "Facility",
+        "permissions": [
+            "inventory",
+            "purchases",
+            "matrequests",
+            "scrap",
+            "ambulance",
+            "problems",
+            "tasks",
+            "work",
+            "complaints",
+            "room-checklist",
+            "rooms",
+            "admissions",
+            "lost-found",
+            "checklists",
+            "handover",
+            "cleaning",
+            "equipbackdown",
+            "reports",
+            "staff-deployment",
+            "security-deployment",
+            "patient-shifting"
+        ],
+        "isSuperAdmin": false,
+        "managedDepartments": []
+    },
+    {
+        "id": "1784617032276_gai55",
+        "role": "storekeeper",
+        "email": "",
+        "phone": "",
+        "fullName": "Narayan",
+        "password": "naran@123",
+        "username": "N001",
+        "createdAt": "2026-07-21T06:57:12.276Z",
+        "updatedAt": "2026-09-21T10:30:27.370Z",
+        "department": "Facility",
+        "permissions": [
+            "inventory"
+        ],
+        "isSuperAdmin": false,
+        "managedDepartments": []
+    },
+    {
+        "id": "1784634198330_243ia",
+        "role": "employee",
+        "email": "",
+        "phone": "",
+        "fullName": "Arvind",
+        "password": "arvind@420",
+        "username": "A002",
+        "createdAt": "2026-07-21T11:43:18.330Z",
+        "updatedAt": "2026-08-22T15:18:40.781Z",
+        "department": "Facility",
+        "permissions": [
+            "matrequests",
+            "problems",
+            "complaints",
+            "room-checklist",
+            "admissions",
+            "lost-found",
+            "checklists",
+            "cleaning",
+            "equipbackdown",
+            "reports",
+            "staff-deployment",
+            "patient-shifting"
+        ],
+        "isSuperAdmin": false,
+        "managedDepartments": []
+    },
+    {
+        "id": "1785908458121_erdfm",
+        "role": "employee",
+        "email": "",
+        "phone": "",
+        "fullName": "Mohit patel",
+        "password": "mohit123",
+        "username": "M001",
+        "createdAt": "2026-08-05T05:40:58.121Z",
+        "department": "IT",
+        "isSuperAdmin": false
+    },
+    {
+        "id": "1787581420160_enmcd",
+        "role": "CFO",
+        "email": "",
+        "phone": "",
+        "fullName": "Nipa",
+        "password": "nipa123",
+        "username": "N002",
+        "createdAt": "2026-08-24T14:23:40.160Z",
+        "updatedAt": "2026-08-27T08:05:07.939Z",
+        "department": "Account",
+        "permissions": [
+            "discounts"
+        ],
+        "isSuperAdmin": false,
+        "managedDepartments": []
+    },
+    {
+        "id": "1787652551292_ukogs",
+        "role": "CHIEF_ACCOUNTANT",
+        "email": "",
+        "phone": "",
+        "fullName": "manthan",
+        "password": "manthan123",
+        "username": "M002",
+        "createdAt": "2026-08-25T10:09:11.292Z",
+        "updatedAt": "2026-08-27T08:05:03.574Z",
+        "department": "Account",
+        "permissions": [
+            "discounts"
+        ],
+        "isSuperAdmin": false,
+        "managedDepartments": []
+    },
+    {
+        "id": "1788952280945_lv5wj",
+        "role": "hod",
+        "email": "",
+        "phone": "",
+        "fullName": "meet pathak",
+        "password": "meet@123",
+        "username": "M003",
+        "createdAt": "2026-09-09T11:11:20.945Z",
+        "updatedAt": "2026-09-09T11:34:29.209Z",
+        "department": "Biomedical",
+        "permissions": [],
+        "isSuperAdmin": false,
+        "managedDepartments": []
+    },
+    {
+        "id": "1784550074647_2z119",
+        "role": "employee",
+        "email": "",
+        "phone": "",
+        "fullName": "Vishal",
+        "password": "Vatsal1234",
+        "username": "V002",
+        "createdAt": "2026-07-20T12:21:14.647Z",
+        "department": "Mintanance",
+        "permissions": [],
+        "isSuperAdmin": false
+    }
+];
 }
 window.getDefaultUsers = getDefaultUsers;
 
@@ -61,10 +393,41 @@ const DB = {
                     }
                 }
                 if (val !== null && val !== undefined) {
-                    if (key === 'users' && Array.isArray(val) && val.length === 0) {
-                        var defaults = getDefaultUsers();
-                        try { this.set('users', defaults); } catch(e2){}
-                        return defaults;
+                    if (key === 'users' && Array.isArray(val)) {
+                        if (val.length === 0) {
+                            var defaults = getDefaultUsers();
+                            try { this.set('users', defaults); } catch(e2){}
+                            return defaults;
+                        }
+                        // Merge in any newer updates or missing users from getDefaultUsers()
+                        try {
+                            var defaults = getDefaultUsers();
+                            var changed = false;
+                            var valMap = {};
+                            val.forEach(function(u){ if (u && u.id) valMap[u.id] = u; });
+                            defaults.forEach(function(du) {
+                                if (!du || !du.id) return;
+                                var existingU = valMap[du.id];
+                                if (!existingU) {
+                                    val.push(du);
+                                    changed = true;
+                                } else {
+                                    var duTs = du.updatedAt ? Date.parse(du.updatedAt) : 0;
+                                    var exTs = existingU.updatedAt ? Date.parse(existingU.updatedAt) : 0;
+                                    if (duTs > exTs || (du.password && existingU.password !== du.password && duTs >= exTs)) {
+                                        Object.assign(existingU, du);
+                                        changed = true;
+                                    }
+                                }
+                            });
+                            if (changed) {
+                                try {
+                                    localStorage.setItem('hms_users', JSON.stringify(val));
+                                    sessionStorage.setItem('hms_users', JSON.stringify(val));
+                                } catch(e3){}
+                            }
+                        } catch(mergeErr) {}
+                        return val;
                     }
                     return val;
                 }
@@ -99,6 +462,17 @@ const DB = {
         try { localStorage.setItem('hms_' + key, json); } catch (e) { console.warn('localStorage set error:', e); }
         try { sessionStorage.setItem('hms_' + key, json); } catch (e) { console.warn('sessionStorage set error:', e); }
         this._emit('change', { store: key, action: 'set' });
+        if (key === 'users') {
+            try {
+                if (typeof window !== 'undefined' && window.location && window.location.protocol !== 'file:') {
+                    fetch('/api/users', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ users: data })
+                    }).catch(function(){});
+                }
+            } catch(uErr) {}
+        }
         if (typeof SYNC !== 'undefined' && typeof SYNC.pushKey === 'function') {
             try { SYNC.pushKey(key, data); } catch (e) {}
         }

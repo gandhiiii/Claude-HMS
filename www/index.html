@@ -127,73 +127,67 @@
             } catch(e) {}
         })();
 
-        // ── On load: redirect if already logged in, else pull from Firebase ──
+        // ── Helper to merge incoming remote users into local storage ──
+        function mergeRemoteUsers(remoteUsers) {
+            if (!Array.isArray(remoteUsers) || remoteUsers.length === 0) return false;
+            try {
+                var localUsers = [];
+                try { localUsers = JSON.parse(localStorage.getItem('hms_users') || '[]'); } catch(e){}
+                if (!Array.isArray(localUsers)) localUsers = [];
+
+                var map = {};
+                remoteUsers.forEach(function(u) { if (u && u.id) map[u.id] = u; });
+
+                localUsers.forEach(function(lu) {
+                    if (!lu || !lu.id) return;
+                    var ru = map[lu.id];
+                    if (!ru) {
+                        map[lu.id] = lu;
+                    } else {
+                        var lTs = lu.updatedAt ? Date.parse(lu.updatedAt) : 0;
+                        var rTs = ru.updatedAt ? Date.parse(ru.updatedAt) : 0;
+                        if (lTs > rTs) {
+                            map[lu.id] = lu;
+                        } else {
+                            map[lu.id] = ru;
+                        }
+                    }
+                });
+                var merged = Object.keys(map).map(function(k){ return map[k]; });
+                localStorage.setItem('hms_users', JSON.stringify(merged));
+                sessionStorage.setItem('hms_users', JSON.stringify(merged));
+                return true;
+            } catch(e) {
+                return false;
+            }
+        }
+
+        // ── On load: redirect if already logged in, and sync latest users across devices ──
         (function () {
             try {
-                // A password-reset link must take priority over the "already logged in" redirect —
-                // otherwise a logged-in user clicking a reset link is bounced to the dashboard and
-                // can never reach the reset form.
                 var hasResetToken = new URLSearchParams(window.location.search).has('reset');
                 if (!hasResetToken && AUTH.currentUser()) { window.location.replace('dashboard.html'); return; }
             } catch(e){}
 
-            var localUsers = [];
-            try { localUsers = DB.get('users') || []; } catch(e){}
-
-            if (localUsers.length > 0) return; // have local data — nothing else needed
-
-            if (!window.SB_DB) return;
-
-            var _timer = setTimeout(function() {}, 10000);
-
-            window.SB_DB.from('hms_store').select('key, data').then(function(res) {
-                clearTimeout(_timer);
-                if (res.error) throw res.error;
-                var remote = {};
-                (res.data || []).forEach(function(row) {
-                    var val = row.data;
-                    if (val && typeof val === 'object' && !Array.isArray(val)) {
-                        var ks = Object.keys(val);
-                        if (ks.length > 0 && ks.every(function(k){ return /^\d+$/.test(k); })) {
-                            val = ks.map(function(k){ return val[k]; });
+            // 1. Fetch from server API if online
+            if (typeof window !== 'undefined' && window.location && window.location.protocol !== 'file:') {
+                fetch('/api/users')
+                    .then(function(res){ return res.json(); })
+                    .then(function(json){
+                        if (json && json.success && Array.isArray(json.users) && json.users.length > 0) {
+                            mergeRemoteUsers(json.users);
                         }
-                    }
-                    remote[row.key] = val;
-                });
-                if (!remote.users) return;
-                Object.keys(remote).forEach(function(key) {
-                    if (key === 'users' && Array.isArray(remote[key])) {
-                        var localUsers = [];
-                        try { localUsers = JSON.parse(localStorage.getItem('hms_users') || '[]'); } catch(e){}
-                        if (Array.isArray(localUsers) && localUsers.length > 0) {
-                            var map = {};
-                            remote[key].forEach(function(u) { if (u && u.id) map[u.id] = u; });
-                            localUsers.forEach(function(lu) {
-                                if (!lu || !lu.id) return;
-                                var ru = map[lu.id];
-                                if (!ru) {
-                                    map[lu.id] = lu;
-                                } else {
-                                    var lTs = lu.updatedAt ? Date.parse(lu.updatedAt) : 0;
-                                    var rTs = ru.updatedAt ? Date.parse(ru.updatedAt) : 0;
-                                    if (lTs > rTs) {
-                                        map[lu.id] = lu;
-                                    }
-                                }
-                            });
-                            var finalUsers = Object.keys(map).map(function(k){ return map[k]; });
-                            try { localStorage.setItem('hms_users', JSON.stringify(finalUsers)); } catch(e){}
-                            return;
+                    }).catch(function(){});
+
+                // Fallback / complement: static data/users.json (for GitHub Pages & static hosting)
+                fetch('data/users.json?_ts=' + Date.now())
+                    .then(function(res){ return res.json(); })
+                    .then(function(json){
+                        if (Array.isArray(json) && json.length > 0) {
+                            mergeRemoteUsers(json);
                         }
-                    }
-                    try { localStorage.setItem('hms_' + key, JSON.stringify(remote[key])); } catch(e2){}
-                });
-                localStorage.setItem('hms_last_cloud_sync', new Date().toISOString());
-            }).catch(function(err) {
-                clearTimeout(_timer);
-                console.warn('[HMS] Supabase cloud fetch notice:', err ? err.message : err);
-                setMsg('', '');
-            });
+                    }).catch(function(){});
+            }
         })();
 
         function setMsg(text, color) {
@@ -201,22 +195,69 @@
             if (el) { el.textContent = text; el.style.color = color || 'var(--gray)'; }
         }
 
-        /* ── Login ── */
+        /* ── Login with live multi-device fallback verification ── */
         function handleLogin() {
             var username = document.getElementById('loginUser').value.trim();
             var password = document.getElementById('loginPass').value.trim();
             if (!username || !password) { setMsg('Please enter username and password.', 'var(--danger)'); return; }
             setMsg('', '');
-            try {
-                try { localStorage.removeItem('hms_lastModule'); } catch (e) {}
-                var result = AUTH.login(username, password);
+            try { localStorage.removeItem('hms_lastModule'); } catch (e) {}
 
-                if (result && result.success) {
-                    window.location.replace('dashboard.html');
-                } else {
-                    setMsg((result && result.message) ? result.message : 'Invalid username/user ID or password.', 'var(--danger)');
+            var result = AUTH.login(username, password);
+            if (result && result.success) {
+                window.location.replace('dashboard.html');
+                return;
+            }
+
+            // If local login failed, check backend live or fresh data/users.json (in case credentials were changed on another device)
+            setMsg('Verifying credentials across devices...', 'var(--gray)');
+            var verifyUrl = '/api/auth/verify';
+            fetch(verifyUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: username, password: password })
+            }).then(function(r){ return r.json(); }).then(function(vData){
+                if (vData && vData.success && vData.user) {
+                    if (vData.allUsers && Array.isArray(vData.allUsers)) {
+                        localStorage.setItem('hms_users', JSON.stringify(vData.allUsers));
+                        sessionStorage.setItem('hms_users', JSON.stringify(vData.allUsers));
+                    }
+                    var retryResult = AUTH.login(username, password);
+                    if (retryResult && retryResult.success) {
+                        window.location.replace('dashboard.html');
+                        return;
+                    }
                 }
-            } catch(e) { setMsg('Login error: ' + (e.message || e), 'var(--danger)'); }
+                // Try checking data/users.json directly (works for static GitHub Pages)
+                fetch('data/users.json?_ts=' + Date.now()).then(function(r2){ return r2.json(); }).then(function(uList){
+                    if (Array.isArray(uList) && uList.length > 0) {
+                        mergeRemoteUsers(uList);
+                        var retry2 = AUTH.login(username, password);
+                        if (retry2 && retry2.success) {
+                            window.location.replace('dashboard.html');
+                            return;
+                        }
+                    }
+                    setMsg((result && result.message) ? result.message : 'Invalid username/user ID or password.', 'var(--danger)');
+                }).catch(function(){
+                    setMsg((result && result.message) ? result.message : 'Invalid username/user ID or password.', 'var(--danger)');
+                });
+            }).catch(function(){
+                // Network error to /api/auth/verify: check data/users.json directly
+                fetch('data/users.json?_ts=' + Date.now()).then(function(r2){ return r2.json(); }).then(function(uList){
+                    if (Array.isArray(uList) && uList.length > 0) {
+                        mergeRemoteUsers(uList);
+                        var retry2 = AUTH.login(username, password);
+                        if (retry2 && retry2.success) {
+                            window.location.replace('dashboard.html');
+                            return;
+                        }
+                    }
+                    setMsg((result && result.message) ? result.message : 'Invalid username/user ID or password.', 'var(--danger)');
+                }).catch(function(){
+                    setMsg((result && result.message) ? result.message : 'Invalid username/user ID or password.', 'var(--danger)');
+                });
+            });
         }
 
         document.getElementById('loginPass').addEventListener('keydown', function(e){ if(e.key==='Enter') handleLogin(); });

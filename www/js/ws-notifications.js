@@ -45,17 +45,13 @@ var WS_NOTIFY = (function () {
             if (window.WS_SERVER_URL && window.WS_SERVER_URL.startsWith('ws')) {
                 return window.WS_SERVER_URL;
             }
-            // On HTTPS origins (such as GitHub Pages), unencrypted ws:// connections are blocked
-            // by browser Mixed Content Security. Return null to rely on Supabase Realtime WSS.
-            if (window.location && window.location.protocol === 'https:') {
-                return null;
+            if (window.location && window.location.host && window.location.protocol !== 'file:') {
+                var proto = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+                return proto + window.location.host;
             }
-            var host = (window.location && window.location.hostname && window.location.hostname !== '' && window.location.hostname !== 'file:')
-                ? window.location.hostname
-                : 'localhost';
-            return 'ws://' + host + ':8765';
+            return 'ws://localhost:3000';
         } catch (e) {
-            return 'ws://localhost:8765';
+            return null;
         }
     }
 
@@ -863,6 +859,15 @@ var WS_NOTIFY = (function () {
                     var msg = JSON.parse(evt.data);
                     if (msg.type === 'notification') {
                         _push(msg.title || 'Notification', msg.body || '', msg.notifType || 'info', true, msg.key);
+                    } else if (msg.type === 'sync_update' && msg.key === 'users' && Array.isArray(msg.data)) {
+                        console.log('[WS_NOTIFY] Realtime users update received. Merging...');
+                        try {
+                            localStorage.setItem('hms_users', JSON.stringify(msg.data));
+                            sessionStorage.setItem('hms_users', JSON.stringify(msg.data));
+                            if (typeof APP !== 'undefined' && typeof APP.refreshCurrent === 'function') {
+                                APP.refreshCurrent();
+                            }
+                        } catch(e) {}
                     } else if (msg.type === 'reload') {
                         console.log('[WS_NOTIFY] Reload signal received. Refreshing page...');
                         window.location.reload();
